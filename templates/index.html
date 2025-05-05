@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+    <div class="background">
+        <h1>Dashboard</h1>
+        <div class="inventory-grid foreground">
+            <h2>Top 5 Best Sellers</h2>
+            <div class="front">
+                {% for item in top_items %}
+                    <div class="inventory-card">
+                        <h3>{{ item.item }}</h3>
+                        <p>Sold: {{ item.total }}</p>
+                    </div>
+                {% endfor %}
+            </div>
+        </div><br>
+        <div class="inventory-grid foreground">
+            <h2>Low Inventory</h2>
+            <div class="front">
+                {% for item in low_items %}
+                    <div class="inventory-card-low-count">
+                        <h3>{{ item.name }}</h3>
+                        <p>Stock: {{ item.stock }}</p>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+{% endblock %}

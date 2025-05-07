@@ -4,29 +4,14 @@
     <meta charset="UTF-8" name="viewport" content="width=device-width, initial-scale=1">
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <title>{% block title %}Sales App{% endblock %}</title>
+    <title>{% block title %}newsletterr{% endblock %}</title>
 </head>
 <body class="{% if dark_mode %}dark{% endif %}">
     <nav class="navbar">
         <div class="nav-container">
             <button class="nav-toggle" onclick="toggleMenu()">☰</button>
             <ul class="nav-links" id="navLinks">
-                {% if session.get("username") %}
-                    <a href="{{ url_for('index') }}">{{ session['company'] }}</a>
-                    <a href="{{ url_for('inventory') }}">Inventory</a>
-                    <a href="{{ url_for('sales') }}">Sales</a>
-                    {% if session.get("role") == "admin" or session.get("role") == "manager" %}
-                        <a href="{{ url_for('management_dashboard') }}">Management</a>
-                    {% endif %}
-                    {% if session.get("role") == "admin" %}
-                        <a href="{{ url_for('admin_dashboard') }}">Admin</a>
-                    {% endif %}
-                    <a href="{{ url_for('preferences') }}">Preferences</a>
-                    <a href="{{ url_for('logout') }}">Logout: {{ session['username'] }}</a>
-                {% else %}
-                    <a href="{{ url_for('login') }}">Login</a>
-                    <a href="{{ url_for('signup') }}">Sign Up</a>
-                {% endif %}
+                <a href="{{ url_for('index') }}">newsletterr</a>
             </ul>
         </div>
     </nav><br>

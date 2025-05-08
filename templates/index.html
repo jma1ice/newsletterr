@@ -1,12 +1,24 @@
 {% extends "base.html" %}
-{% block title %}Dashboard{% endblock %}
+{% block title %}newsletterr{% endblock %}
 {% block content %}
     <div class="background">
-        <h1>Dashboard</h1>
-        <div class="inventory-grid foreground">
-            <h2>A</h2>
+        <h1>Dashboard</h1><br>
+        <div class="foreground">
+            <h2>A</h2><br>
+            <div>
+                <form method="POST" action="/send_email">
+                    <input type="email" name="from_email" placeholder="Your Email" required><br><br>
+                    <input type="password" name="password" placeholder="Email Password or App Password" required><br><br>
+                    <input type="text" name="smtp_server" placeholder="SMTP Server (e.g. smtp.gmail.com)" required><br><br>
+                    <input type="number" name="smtp_port" placeholder="SMTP Port (465 for SSL)" required><br><br>
+                    <input type="email" name="to_email" placeholder="Recipient Email" required><br><br>
+                    <input type="text" name="subject" placeholder="Subject" required><br><br>
+                    <textarea name="html_content" placeholder="HTML email body" required></textarea><br><br>
+                    <input type="submit" value="Send Email">
+                </form>
+            </div>
         </div><br>
-        <div class="inventory-grid foreground">
+        <div class="foreground">
             <h2>B</h2>
         </div>
     </div>

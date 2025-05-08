@@ -9,7 +9,7 @@ def apply_layout(body, layout):
     if layout == "basic":
         return f"""
         <html><body style="font-family: Arial; padding: 20px;">
-        <h2>Newsletter</h2>
+        <h2>newsletterr</h2>
         <div style="border: 1px solid #ddd; padding: 10px; background: #f9f9f9;">
             {body}
         </div></body></html>"""
@@ -31,7 +31,7 @@ def apply_layout(body, layout):
         <table style="width: 100%;">
           <tr>
             <td style="width: 50%; padding: 10px;">
-              <img src="https://via.placeholder.com/250" style="max-width: 100%;">
+              <img src="https://d15k2d11r6t6rl.cloudfront.net/public/users/Integrators/669d5713-9b6a-46bb-bd7e-c542cff6dd6a/3bef3c50f13f4320a9e31b8be79c6ad2/Plex%20Logo%20Update%202022/plex-logo-heavy-stroke.png" style="max-width: 100%;">
             </td>
             <td style="width: 50%; padding: 10px;">{body}</td>
           </tr>
@@ -40,7 +40,7 @@ def apply_layout(body, layout):
         return f"""
         <html><body style="font-family: Arial;">
         <div style="background: #0077cc; color: white; padding: 20px; text-align: center;">
-          <h1>Newsletter Header</h1>
+          <h1>newsletterr Header</h1>
         </div>
         <div style="padding: 20px;">{body}</div></body></html>"""
     else:

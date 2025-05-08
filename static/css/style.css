@@ -2,38 +2,14 @@ body {
     margin: 0;
     background: #282c34;
     display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 100vh;
-    overflow: hidden;
-    touch-action: none;
 }
 
-canvas {
-    width: 100vw;
-    height: auto;
-    image-rendering: pixelated;
-    display: block;
-    margin: 0 auto;
-    border: 2px solid #fff;
+.right_float {
+    float: right;
 }
 
-@media (max-width: 600px) {
-    .container {
-        padding: 0.75rem;
-    }
-    .nav-links {
-        display: none;
-        flex-direction: column;
-        margin-top: 1rem;
-    }
-    .nav-links a {
-        padding: 0.25rem;
-    }
-    .nav-links.show {
-        display: flex;
-    }
-    .nav-toggle {
-        display: block;
-    }
+.right_frame {
+    float: right;
+    height: 240px;
+    border: 1px solid #ccc;
 }

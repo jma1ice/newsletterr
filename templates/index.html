@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}newsletterr{% endblock %}
+{% block title %}rr{% endblock %}
 {% block content %}
     <div class="background">
         <h1>Dashboard</h1><br>
@@ -10,16 +10,47 @@
             <h2>A</h2><br>
             <div>
                 <form method="POST" action="/send_email">
-                    <input type="email" name="from_email" placeholder="Your Email" required><br><br>
-                    <input type="password" name="password" placeholder="Email Password or App Password" required><br><br>
-                    <input type="text" name="smtp_server" placeholder="SMTP Server (e.g. smtp.gmail.com)" required><br><br>
-                    <input type="number" name="smtp_port" placeholder="SMTP Port (465 for SSL)" required><br><br>
-                    <input type="email" name="to_email" placeholder="Recipient Email" required><br><br>
-                    <input type="text" name="subject" placeholder="Subject" required><br><br>
-                    <textarea name="html_content" placeholder="HTML email body" required></textarea><br><br>
+                    From: <input type="email" name="from_email" placeholder="Your Email" required><br><br>
+                    Password: <input type="password" name="password" placeholder="Email Password or App Password" required><br><br>
+                    SMTP Server: <input type="text" name="smtp_server" placeholder="SMTP Server (e.g. smtp.gmail.com)" required><br><br>
+                    SMTP Port: <input type="number" name="smtp_port" placeholder="SMTP Port (465 for SSL)" required><br><br>
+                    To: <input type="email" name="to_email" placeholder="Recipient Email" required><br><br>
+                    Subject: <input type="text" name="subject" placeholder="Subject" required><br><br>
+                    <label><input type="checkbox" name="layout" value="basic"> Use Basic Layout</label><br><br>
+                    <textarea name="email_text" id="email_text" placeholder="Write your message..." rows="10" cols="50" oninput="updatePreview()" required></textarea>
+                    
+                    Preview: <iframe class="right_frame" id="preview"></iframe><br>
+
                     <input type="submit" value="Send Email">
                 </form>
             </div>
+            <script>
+                function updatePreview() {
+                    const raw = document.getElementById('email_text').value;
+                    const useLayout = document.querySelector('input[name="layout"]').checked;
+                    let html = raw.replace(/\n/g, "<br>");
+                
+                    if (useLayout) {
+                    html = `
+                        <html>
+                        <body style="font-family: Arial, sans-serif; padding: 20px;">
+                            <h2>Newsletterr</h2>
+                            <div style="border: 1px solid #ddd; padding: 10px; background: #f9f9f9;">
+                            ${html}
+                            </div>
+                        </body>
+                        </html>
+                    `;
+                    }
+                
+                    document.getElementById('preview').srcdoc = html;
+                }
+                
+                document.addEventListener('DOMContentLoaded', function () {
+                    document.getElementById('email_text').addEventListener('input', updatePreview);
+                    document.querySelector('input[name="layout"]').addEventListener('change', updatePreview);
+                });
+            </script>
         </div><br>
         <div class="foreground">
             <h2>B</h2>

@@ -1,6 +1,6 @@
 import smtplib
 from email.mime.text import MIMEText
-from flask import Flask, render_template, request
+from flask import Flask, render_template, render_template_string, request
 
 app = Flask(__name__)
 
@@ -16,7 +16,22 @@ def send_email():
     smtp_port = int(request.form['smtp_port'])
     to_email = request.form['to_email']
     subject = request.form['subject']
-    html_content = request.form['html_content']
+    email_text = request.form['email_text']
+    use_layout = 'layout' in request.form
+
+    if use_layout:
+        html_content = f"""
+        <html>
+            <body style="font-family: Arial, sans-serif; padding: 20px;">
+            <h2>Newsletterr</h2>
+            <div style="border: 1px solid #ddd; padding: 10px; background: #f9f9f9;">
+                {email_text.replace('\n', '<br>')}
+            </div>
+            </body>
+        </html>
+        """
+    else:
+        html_content = email_text.replace('\n', '<br>')
 
     msg = MIMEText(html_content, 'html')
     msg['Subject'] = subject

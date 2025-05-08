@@ -27,9 +27,10 @@ def send_email():
         with smtplib.SMTP_SSL(smtp_server, smtp_port) as server:
             server.login(from_email, password)
             server.sendmail(from_email, to_email, msg.as_string())
-        return "Email sent!"
+            alert = "Email sent!"
     except Exception as e:
-        return f"Error: {str(e)}"
+        alert = f"Error: {str(e)}"
+    return render_template('index.html', alert=alert)
 
 if __name__ == '__main__':
     app.run(host="127.0.0.1", port=9898, debug=True)

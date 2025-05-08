@@ -3,6 +3,9 @@
 {% block content %}
     <div class="background">
         <h1>Dashboard</h1><br>
+        {% if alert %}
+            <h3>{{ alert }}</h3>
+        {% endif %}
         <div class="foreground">
             <h2>A</h2><br>
             <div>

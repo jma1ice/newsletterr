@@ -4,6 +4,48 @@ from flask import Flask, render_template, render_template_string, request
 
 app = Flask(__name__)
 
+def apply_layout(body, layout):
+    body = body.replace('\n', '<br>')
+    if layout == "basic":
+        return f"""
+        <html><body style="font-family: Arial; padding: 20px;">
+        <h2>Newsletter</h2>
+        <div style="border: 1px solid #ddd; padding: 10px; background: #f9f9f9;">
+            {body}
+        </div></body></html>"""
+    elif layout == "card":
+        return f"""
+        <html><body style="background: #f0f0f0; display: flex; justify-content: center; font-family: Arial;">
+        <div style="background: white; max-width: 600px; padding: 20px; margin: 40px auto; box-shadow: 0 0 10px rgba(0,0,0,0.1);">
+            {body}
+        </div></body></html>"""
+    elif layout == "dark":
+        return f"""
+        <html><body style="background: #111; color: #eee; font-family: Arial; padding: 20px;">
+        <div style="background: #222; padding: 20px; border-radius: 8px;">
+            {body}
+        </div></body></html>"""
+    elif layout == "twocol":
+        return f"""
+        <html><body style="font-family: Arial; padding: 20px;">
+        <table style="width: 100%;">
+          <tr>
+            <td style="width: 50%; padding: 10px;">
+              <img src="https://via.placeholder.com/250" style="max-width: 100%;">
+            </td>
+            <td style="width: 50%; padding: 10px;">{body}</td>
+          </tr>
+        </table></body></html>"""
+    elif layout == "banner":
+        return f"""
+        <html><body style="font-family: Arial;">
+        <div style="background: #0077cc; color: white; padding: 20px; text-align: center;">
+          <h1>Newsletter Header</h1>
+        </div>
+        <div style="padding: 20px;">{body}</div></body></html>"""
+    else:
+        return body
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -17,21 +59,8 @@ def send_email():
     to_email = request.form['to_email']
     subject = request.form['subject']
     email_text = request.form['email_text']
-    use_layout = 'layout' in request.form
-
-    if use_layout:
-        html_content = f"""
-        <html>
-            <body style="font-family: Arial, sans-serif; padding: 20px;">
-            <h2>Newsletterr</h2>
-            <div style="border: 1px solid #ddd; padding: 10px; background: #f9f9f9;">
-                {email_text.replace('\n', '<br>')}
-            </div>
-            </body>
-        </html>
-        """
-    else:
-        html_content = email_text.replace('\n', '<br>')
+    layout = request.form.get('layout', 'none')
+    html_content = apply_layout(email_text, layout)
 
     msg = MIMEText(html_content, 'html')
     msg['Subject'] = subject

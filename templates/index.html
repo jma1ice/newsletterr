@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}rr{% endblock %}
+{% block title %}newsletterr{% endblock %}
 {% block content %}
     <div class="background">
         <h1>Dashboard</h1><br>
@@ -16,7 +16,15 @@
                     SMTP Port: <input type="number" name="smtp_port" placeholder="SMTP Port (465 for SSL)" required><br><br>
                     To: <input type="email" name="to_email" placeholder="Recipient Email" required><br><br>
                     Subject: <input type="text" name="subject" placeholder="Subject" required><br><br>
-                    <label><input type="checkbox" name="layout" value="basic"> Use Basic Layout</label><br><br>
+                    <label for="layout">Choose a layout:</label>
+                    <select id="layout" name="layout" onchange="updatePreview()">
+                        <option value="none">Plain Text</option>
+                        <option value="basic">Basic</option>
+                        <option value="card">Centered Card</option>
+                        <option value="dark">Dark Mode Box</option>
+                        <option value="twocol">Two-column</option>
+                        <option value="banner">Banner/Header</option>
+                    </select><br><br>
                     <textarea name="email_text" id="email_text" placeholder="Write your message..." rows="10" cols="50" oninput="updatePreview()" required></textarea>
                     
                     Preview: <iframe class="right_frame" id="preview"></iframe><br>
@@ -27,28 +35,62 @@
             <script>
                 function updatePreview() {
                     const raw = document.getElementById('email_text').value;
-                    const useLayout = document.querySelector('input[name="layout"]').checked;
-                    let html = raw.replace(/\n/g, "<br>");
+                    const layout = document.getElementById('layout').value;
+                    let body = raw.replace(/\n/g, "<br>");
+                    let html = "";
                 
-                    if (useLayout) {
-                    html = `
-                        <html>
-                        <body style="font-family: Arial, sans-serif; padding: 20px;">
-                            <h2>Newsletterr</h2>
-                            <div style="border: 1px solid #ddd; padding: 10px; background: #f9f9f9;">
-                            ${html}
-                            </div>
-                        </body>
-                        </html>
-                    `;
+                    switch (layout) {
+                        case "basic":
+                            html = `
+                                <html><body style="font-family: Arial; padding: 20px;">
+                                <h2>newsletterr</h2>
+                                <div style="border: 1px solid #ddd; padding: 10px; background: #f9f9f9;">
+                                    ${body}
+                                </div></body></html>`;
+                            break;
+                        case "card":
+                            html = `
+                                <html><body style="background: #f0f0f0; display: flex; justify-content: center; font-family: Arial;">
+                                <div style="background: white; max-width: 600px; padding: 20px; margin: 40px auto; box-shadow: 0 0 10px rgba(0,0,0,0.1);">
+                                    ${body}
+                                </div></body></html>`;
+                            break;
+                        case "dark":
+                            html = `
+                                <html><body style="background: #111; color: #eee; font-family: Arial; padding: 20px;">
+                                <div style="background: #222; padding: 20px; border-radius: 8px;">
+                                    ${body}
+                                </div></body></html>`;
+                            break;
+                        case "twocol":
+                            html = `
+                                <html><body style="font-family: Arial; padding: 20px;">
+                                <table style="width: 100%;">
+                                <tr>
+                                    <td style="width: 50%; padding: 10px;">
+                                    <img src="https://d15k2d11r6t6rl.cloudfront.net/public/users/Integrators/669d5713-9b6a-46bb-bd7e-c542cff6dd6a/3bef3c50f13f4320a9e31b8be79c6ad2/Plex%20Logo%20Update%202022/plex-logo-heavy-stroke.png" style="max-width: 100%;">
+                                    </td>
+                                    <td style="width: 50%; padding: 10px;">${body}</td>
+                                </tr>
+                                </table></body></html>`;
+                            break;
+                        case "banner":
+                            html = `
+                                <html><body style="font-family: Arial;">
+                                <div style="background: #0077cc; color: white; padding: 20px; text-align: center;">
+                                <h1>newsletterr</h1>
+                                </div>
+                                <div style="padding: 20px;">${body}</div></body></html>`;
+                            break;
+                        default:
+                            html = `<html><body>${body}</body></html>`;
                     }
                 
                     document.getElementById('preview').srcdoc = html;
                 }
                 
-                document.addEventListener('DOMContentLoaded', function () {
+                document.addEventListener('DOMContentLoaded', () => {
                     document.getElementById('email_text').addEventListener('input', updatePreview);
-                    document.querySelector('input[name="layout"]').addEventListener('change', updatePreview);
                 });
             </script>
         </div><br>

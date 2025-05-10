@@ -80,9 +80,38 @@ def apply_layout(body, layout, subject, server_name):
     else:
         return body
 
+def run_tautulli_command(base_url, api_key, command, data_type, error, alert):
+    api_url = f"{base_url}/api/v2?apikey={api_key}&cmd={command}"
+
+    try:
+        response = requests.get(api_url)
+        response.raise_for_status()
+        data = response.json()
+
+        if data.get('response', {}).get('result') == 'success':
+            out_data = data['response']['data']
+            if alert == None:
+                alert = f'{data_type} pulled'
+            else:
+                alert += f'\n{data_type} pulled'
+        else:
+            if error == None:
+                error = data.get('response', {}).get('message', 'Unknown error')
+            else:
+                error += f"\n{data.get('response', {}).get('message', 'Unknown error')}"
+    except requests.exceptions.RequestException as e:
+        if error == None:
+            error = str(f"{data_type} Error: {e}")
+        else:
+            error += str(f"\n{data_type} Error: {e}")
+
+    return [out_data, error, alert]
+
 @app.route('/', methods=['GET', 'POST'])
 def index():
     stats = None
+    users = None
+    user_emails = []
     error = None
     alert = None
 
@@ -90,22 +119,14 @@ def index():
         base_url = request.form.get('base_url').rstrip('/')
         api_key = request.form.get('api_key')
 
-        api_url = f"{base_url}/api/v2?apikey={api_key}&cmd=get_home_stats"
-
-        try:
-            response = requests.get(api_url)
-            response.raise_for_status()
-            data = response.json()
-
-            if data.get('response', {}).get('result') == 'success':
-                stats = data['response']['data']
-                print(stats)
-                alert = 'Stats pulled'
-            else:
-                error = data.get('response', {}).get('message', 'Unknown error')
-        except requests.exceptions.RequestException as e:
-            error = str(e)
-    return render_template('index.html', stats=stats, error=error, alert=alert)
+        stats, error, alert = run_tautulli_command(base_url, api_key, 'get_home_stats', 'Stats', error, alert)
+        users, error, alert = run_tautulli_command(base_url, api_key, 'get_users', 'Users', error, alert)
+        
+        for user in users:
+            if user['email'] != None:
+                user_emails.append(user['email'])
+        
+    return render_template('index.html', stats=stats, user_emails=user_emails, error=error, alert=alert)
 
 @app.route('/send_email', methods=['POST'])
 def send_email():
@@ -117,7 +138,7 @@ def send_email():
     smtp_server = request.form['smtp_server']
     smtp_port = int(request.form['smtp_port'])
     server_name = request.form['server_name']
-    to_email = request.form['to_email']
+    to_emails = [request.form['to_email']]
     subject = request.form['subject']
     email_text = request.form['email_text']
     layout = request.form.get('layout', 'none')
@@ -126,12 +147,12 @@ def send_email():
     msg = MIMEText(html_content, 'html')
     msg['Subject'] = subject
     msg['From'] = from_email
-    msg['To'] = to_email
+    msg['To'] = from_email
 
     try:
         with smtplib.SMTP_SSL(smtp_server, smtp_port) as server:
             server.login(from_email, password)
-            server.sendmail(from_email, to_email, msg.as_string())
+            server.sendmail(from_email, from_email + ", ".join(to_emails), msg.as_string())
             alert = "Email sent!"
     except Exception as e:
         error = f"Error: {str(e)}"

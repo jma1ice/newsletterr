@@ -20,7 +20,7 @@
                                 SMTP Server: <input type="text" name="smtp_server" placeholder="SMTP Server (e.g. smtp.gmail.com)" required><br><br>
                                 SMTP Port: <input type="number" name="smtp_port" placeholder="SMTP Port (465 for SSL)" required><br><br>
                                 Plex Server Name: <input type="text" name="server_name" id="server_name" placeholder="Paramount Plex" required><br><br>
-                                To: <input type="email" name="to_email" placeholder="Recipient Email" required><br><br>
+                                To: <input type="text" name="to_email" placeholder="Recipient Email" value="{{ user_emails | join(', ') }}" required><br><br>
                                 Subject: <input type="text" name="subject" id="subject" placeholder="Subject" required><br><br>
                                 <label for="layout">Choose a layout:</label>
                                 <select id="layout" name="layout" onchange="updatePreview()">
@@ -48,7 +48,7 @@
                                 <label for="api_key">API Key:</label><br>
                                 <input type="text" id="api_key" name="api_key" required><br><br>
                         
-                                <input type="submit" value="Get Stats">
+                                <input type="submit" value="Get Stats\Users">
                             </form>
                         </td>
                         <td style="width: 25%; padding: 10px;">

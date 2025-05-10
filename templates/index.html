@@ -13,7 +13,7 @@
             <div>
                 <table style="width: 100%;">
                     <tr>
-                        <td style="width: 25%; padding: 10px;">
+                        <td style="width: 20%; padding: 10px;">
                             <form method="POST" action="/send_email">
                                 From: <input type="email" name="from_email" placeholder="Your Email" required><br><br>
                                 Password: <input type="password" name="password" placeholder="Email Password or App Password" required><br><br>
@@ -40,7 +40,7 @@
                         <td style="width: 25%; padding: 10px;">
                             Preview: <iframe class="right_frame" id="preview"></iframe>
                         </td>
-                        <td style="width: 25%; padding: 10px;">
+                        <td style="width: 15%; padding: 10px;">
                             <form method="post">
                                 <label for="base_url">Tautulli Base URL:</label><br>
                                 <input type="text" id="base_url" name="base_url" placeholder="http://localhost:8181" required><br><br>
@@ -51,23 +51,54 @@
                                 <input type="submit" value="Get Stats\Users">
                             </form>
                         </td>
-                        <td style="width: 25%; padding: 10px;">
+                        <td style="width: 40%; padding: 10px;">
                             {% if stats %}
-                                <h2>Statistics:</h2>
-                                <table style="border: 1px solid #ccc">
-                                    <tr>
-                                        <th>Stat</th>
-                                        <th>Value</th>
-                                    </tr>
+                                <h2>Select a Stat Category</h2>
+                                <select id="statSelector" class="form-select w-50 mb-4">
+                                    <option selected>Choose an option...</option>
                                     {% for stat in stats %}
-                                        <tr>
-                                            <td>{{ stat['stat_title'] }}</td>
-                                            {% for row in stat['rows'] %}
-                                                <td>{{ row['title'] }}</td>
-                                            {% endfor %}
-                                        </tr>
+                                        <option value="stat-{{ loop.index0 }}">{{ stat.stat_title }}</option>
                                     {% endfor %}
-                                </table>
+                                </select>
+                                {% for stat in stats %}
+                                    <div id="stat-{{ loop.index0 }}" class="stat-table d-none">
+                                        <div class="card my-4">
+                                            <div class="card-header bg-primary text-white">
+                                                {{ stat.stat_title }}
+                                            </div>
+                                            <div class="card-body p-0">
+                                                {% if stat.rows %}
+                                                    <table class="table table-striped m-0">
+                                                        <thead class="table-dark">
+                                                            <tr>
+                                                                <th>Title</th>
+                                                                <th>Year</th>
+                                                                <th>Plays</th>
+                                                                <th>Total Duration (min)</th>
+                                                                <th>Type</th>
+                                                                <th>Rating</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {% for row in stat.rows %}
+                                                                <tr>
+                                                                    <td>{{ row.title }}</td>
+                                                                    <td>{{ row.year }}</td>
+                                                                    <td>{{ row.total_plays }}</td>
+                                                                    <td>{{ row.total_duration }}</td>
+                                                                    <td>{{ row.media_type }}</td>
+                                                                    <td>{{ row.content_rating }}</td>
+                                                                </tr>
+                                                            {% endfor %}
+                                                        </tbody>
+                                                    </table>
+                                                {% else %}
+                                                    <p class="m-3">No data available.</p>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    </div>
+                                {% endfor %}
                             {% endif %}
                         </td>
                     </tr>
@@ -170,6 +201,15 @@
                     document.getElementById('email_text').addEventListener('input', updatePreview);
                 });
             </script>
+            <script>
+                document.getElementById('statSelector').addEventListener('change', function () {
+                    const selectedId = this.value;
+                    document.querySelectorAll('.stat-table').forEach(el => {
+                        el.classList.add('d-none');  // hide all
+                    });
+                    document.getElementById(selectedId).classList.remove('d-none');  // show selected
+                });
+            </script>                
         </div>
     </div>
 {% endblock %}

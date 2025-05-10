@@ -93,17 +93,17 @@ def run_tautulli_command(base_url, api_key, command, data_type, error, alert):
             if alert == None:
                 alert = f'{data_type} pulled'
             else:
-                alert += f'\n{data_type} pulled'
+                alert += f'<br>{data_type} pulled'
         else:
             if error == None:
                 error = data.get('response', {}).get('message', 'Unknown error')
             else:
-                error += f"\n{data.get('response', {}).get('message', 'Unknown error')}"
+                error += f"<br>{data.get('response', {}).get('message', 'Unknown error')}"
     except requests.exceptions.RequestException as e:
         if error == None:
             error = str(f"{data_type} Error: {e}")
         else:
-            error += str(f"\n{data_type} Error: {e}")
+            error += str(f"<br>{data_type} Error: {e}")
 
     return [out_data, error, alert]
 
@@ -160,6 +160,3 @@ def send_email():
 
 if __name__ == '__main__':
     app.run(host="127.0.0.1", port=9898, debug=True)
-
-##testjmw commit###
-#jmam test for branching

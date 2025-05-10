@@ -1,6 +1,7 @@
 import smtplib
+import requests
 from email.mime.text import MIMEText
-from flask import Flask, render_template, render_template_string, request
+from flask import Flask, render_template, request
 
 app = Flask(__name__)
 
@@ -79,12 +80,38 @@ def apply_layout(body, layout, subject, server_name):
     else:
         return body
 
-@app.route('/')
+@app.route('/', methods=['GET', 'POST'])
 def index():
-    return render_template('index.html')
+    stats = None
+    error = None
+    alert = None
+
+    if request.method == 'POST':
+        base_url = request.form.get('base_url').rstrip('/')
+        api_key = request.form.get('api_key')
+
+        api_url = f"{base_url}/api/v2?apikey={api_key}&cmd=get_home_stats"
+
+        try:
+            response = requests.get(api_url)
+            response.raise_for_status()
+            data = response.json()
+
+            if data.get('response', {}).get('result') == 'success':
+                stats = data['response']['data']
+                print(stats)
+                alert = 'Stats pulled'
+            else:
+                error = data.get('response', {}).get('message', 'Unknown error')
+        except requests.exceptions.RequestException as e:
+            error = str(e)
+    return render_template('index.html', stats=stats, error=error, alert=alert)
 
 @app.route('/send_email', methods=['POST'])
 def send_email():
+    alert = None
+    error = None
+
     from_email = request.form['from_email']
     password = request.form['password']
     smtp_server = request.form['smtp_server']
@@ -107,8 +134,8 @@ def send_email():
             server.sendmail(from_email, to_email, msg.as_string())
             alert = "Email sent!"
     except Exception as e:
-        alert = f"Error: {str(e)}"
-    return render_template('index.html', alert=alert)
+        error = f"Error: {str(e)}"
+    return render_template('index.html', alert=alert, error=error)
 
 if __name__ == '__main__':
     app.run(host="127.0.0.1", port=9898, debug=True)

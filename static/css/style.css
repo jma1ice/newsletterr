@@ -11,6 +11,6 @@ body {
 .right_frame {
     float: right;
     height: 25rem;
-    width: 60rem;
+    width: 25rem;
     border: 1px solid #ccc;
 }

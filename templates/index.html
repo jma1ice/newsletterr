@@ -4,35 +4,74 @@
     <div class="background">
         <h1>Dashboard</h1><br>
         {% if alert %}
-            <h3>{{ alert }}</h3>
+            <p style="color: green;">{{ alert }}</p>
+        {% endif %}
+        {% if error %}
+            <p style="color: red;">Error: {{ error }}</p>
         {% endif %}
         <div class="foreground">
-            <h2>A</h2><br>
             <div>
-                <form method="POST" action="/send_email">
-                    From: <input type="email" name="from_email" placeholder="Your Email" required><br><br>
-                    Password: <input type="password" name="password" placeholder="Email Password or App Password" required><br><br>
-                    SMTP Server: <input type="text" name="smtp_server" placeholder="SMTP Server (e.g. smtp.gmail.com)" required><br><br>
-                    SMTP Port: <input type="number" name="smtp_port" placeholder="SMTP Port (465 for SSL)" required><br><br>
-                    Plex Server Name: <input type="text" name="server_name" id="server_name" placeholder="Paramount Plex" required><br><br>
-                    To: <input type="email" name="to_email" placeholder="Recipient Email" required><br><br>
-                    Subject: <input type="text" name="subject" id="subject" placeholder="Subject" required><br><br>
-                    <label for="layout">Choose a layout:</label>
-                    <select id="layout" name="layout" onchange="updatePreview()">
-                        <option value="none">Plain Text</option>
-                        <option value="basic">Basic</option>
-                        <option value="card">Centered Card</option>
-                        <option value="dark">Dark Mode Box</option>
-                        <option value="twocol">Two-column</option>
-                        <option value="banner">Banner/Header</option>
-                        <option value="tautulli">Tautulli</option>
-                    </select><br><br>
-                    <textarea name="email_text" id="email_text" placeholder="Write your message..." rows="10" cols="50" oninput="updatePreview()" required></textarea>
-                    
-                    Preview: <iframe class="right_frame" id="preview"></iframe><br>
+                <table style="width: 100%;">
+                    <tr>
+                        <td style="width: 25%; padding: 10px;">
+                            <form method="POST" action="/send_email">
+                                From: <input type="email" name="from_email" placeholder="Your Email" required><br><br>
+                                Password: <input type="password" name="password" placeholder="Email Password or App Password" required><br><br>
+                                SMTP Server: <input type="text" name="smtp_server" placeholder="SMTP Server (e.g. smtp.gmail.com)" required><br><br>
+                                SMTP Port: <input type="number" name="smtp_port" placeholder="SMTP Port (465 for SSL)" required><br><br>
+                                Plex Server Name: <input type="text" name="server_name" id="server_name" placeholder="Paramount Plex" required><br><br>
+                                To: <input type="email" name="to_email" placeholder="Recipient Email" required><br><br>
+                                Subject: <input type="text" name="subject" id="subject" placeholder="Subject" required><br><br>
+                                <label for="layout">Choose a layout:</label>
+                                <select id="layout" name="layout" onchange="updatePreview()">
+                                    <option value="none">Plain Text</option>
+                                    <option value="basic">Basic</option>
+                                    <option value="card">Centered Card</option>
+                                    <option value="dark">Dark Mode Box</option>
+                                    <option value="twocol">Two-column</option>
+                                    <option value="banner">Banner/Header</option>
+                                    <option value="tautulli">Tautulli</option>
+                                </select><br><br>
+                                <textarea name="email_text" id="email_text" placeholder="Write your message..." rows="10" cols="30" oninput="updatePreview()" required></textarea>
 
-                    <input type="submit" value="Send Email">
-                </form>
+                                <input type="submit" value="Send Email">
+                            </form>
+                        </td>
+                        <td style="width: 25%; padding: 10px;">
+                            Preview: <iframe class="right_frame" id="preview"></iframe>
+                        </td>
+                        <td style="width: 25%; padding: 10px;">
+                            <form method="post">
+                                <label for="base_url">Tautulli Base URL:</label><br>
+                                <input type="text" id="base_url" name="base_url" placeholder="http://localhost:8181" required><br><br>
+                        
+                                <label for="api_key">API Key:</label><br>
+                                <input type="text" id="api_key" name="api_key" required><br><br>
+                        
+                                <input type="submit" value="Get Stats">
+                            </form>
+                        </td>
+                        <td style="width: 25%; padding: 10px;">
+                            {% if stats %}
+                                <h2>Statistics:</h2>
+                                <table style="border: 1px solid #ccc">
+                                    <tr>
+                                        <th>Stat</th>
+                                        <th>Value</th>
+                                    </tr>
+                                    {% for stat in stats %}
+                                        <tr>
+                                            <td>{{ stat['stat_title'] }}</td>
+                                            {% for row in stat['rows'] %}
+                                                <td>{{ row['title'] }}</td>
+                                            {% endfor %}
+                                        </tr>
+                                    {% endfor %}
+                                </table>
+                            {% endif %}
+                        </td>
+                    </tr>
+                </table>
             </div>
             <script>
                 function updatePreview() {
@@ -131,9 +170,6 @@
                     document.getElementById('email_text').addEventListener('input', updatePreview);
                 });
             </script>
-        </div><br>
-        <div class="foreground">
-            <h2>B</h2>
         </div>
     </div>
 {% endblock %}

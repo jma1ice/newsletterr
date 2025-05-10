@@ -1,29 +1,175 @@
 {% extends "base.html" %}
-{% block title %}Dashboard{% endblock %}
+{% block title %}newsletterr{% endblock %}
 {% block content %}
     <div class="background">
-        <h1>Dashboard</h1>
-        <div class="inventory-grid foreground">
-            <h2>Top 5 Best Sellers</h2>
-            <div class="front">
-                {% for item in top_items %}
-                    <div class="inventory-card">
-                        <h3>{{ item.item }}</h3>
-                        <p>Sold: {{ item.total }}</p>
-                    </div>
-                {% endfor %}
+        <h1>Dashboard</h1><br>
+        {% if alert %}
+            <p style="color: green;">{{ alert }}</p>
+        {% endif %}
+        {% if error %}
+            <p style="color: red;">Error: {{ error }}</p>
+        {% endif %}
+        <div class="foreground">
+            <div>
+                <table style="width: 100%;">
+                    <tr>
+                        <td style="width: 25%; padding: 10px;">
+                            <form method="POST" action="/send_email">
+                                From: <input type="email" name="from_email" placeholder="Your Email" required><br><br>
+                                Password: <input type="password" name="password" placeholder="Email Password or App Password" required><br><br>
+                                SMTP Server: <input type="text" name="smtp_server" placeholder="SMTP Server (e.g. smtp.gmail.com)" required><br><br>
+                                SMTP Port: <input type="number" name="smtp_port" placeholder="SMTP Port (465 for SSL)" required><br><br>
+                                Plex Server Name: <input type="text" name="server_name" id="server_name" placeholder="Paramount Plex" required><br><br>
+                                BCC: <textarea type="text" name="to_emails" placeholder="Recipient Email" rows="10" cols="40" value="" required>{{ user_emails | join(', ') }}</textarea><br><br>
+                                Subject: <input type="text" name="subject" id="subject" placeholder="Subject" required><br><br>
+                                <label for="layout">Choose a layout:</label>
+                                <select id="layout" name="layout" onchange="updatePreview()">
+                                    <option value="none">Plain Text</option>
+                                    <option value="basic">Basic</option>
+                                    <option value="card">Centered Card</option>
+                                    <option value="dark">Dark Mode Box</option>
+                                    <option value="twocol">Two-column</option>
+                                    <option value="banner">Banner/Header</option>
+                                    <option value="tautulli">Tautulli</option>
+                                </select><br><br>
+                                <textarea name="email_text" id="email_text" placeholder="Write your message..." rows="10" cols="40" oninput="updatePreview()" required></textarea>
+
+                                <input type="submit" value="Send Email">
+                            </form>
+                        </td>
+                        <td style="width: 25%; padding: 10px;">
+                            Preview: <iframe class="right_frame" id="preview"></iframe>
+                        </td>
+                        <td style="width: 25%; padding: 10px;">
+                            <form method="post">
+                                <label for="base_url">Tautulli Base URL:</label><br>
+                                <input type="text" id="base_url" name="base_url" placeholder="http://localhost:8181" required><br><br>
+                        
+                                <label for="api_key">API Key:</label><br>
+                                <input type="text" id="api_key" name="api_key" required><br><br>
+                        
+                                <input type="submit" value="Get Stats\Users">
+                            </form>
+                        </td>
+                        <td style="width: 25%; padding: 10px;">
+                            {% if stats %}
+                                <h2>Statistics:</h2>
+                                <table style="border: 1px solid #ccc">
+                                    <tr>
+                                        <th>Stat</th>
+                                        <th>Value</th>
+                                    </tr>
+                                    {% for stat in stats %}
+                                        <tr>
+                                            <td>{{ stat['stat_title'] }}</td>
+                                            {% for row in stat['rows'] %}
+                                                <td>{{ row['title'] }}</td>
+                                            {% endfor %}
+                                        </tr>
+                                    {% endfor %}
+                                </table>
+                            {% endif %}
+                        </td>
+                    </tr>
+                </table>
             </div>
-        </div><br>
-        <div class="inventory-grid foreground">
-            <h2>Low Inventory</h2>
-            <div class="front">
-                {% for item in low_items %}
-                    <div class="inventory-card-low-count">
-                        <h3>{{ item.name }}</h3>
-                        <p>Stock: {{ item.stock }}</p>
-                    </div>
-                {% endfor %}
-            </div>
+            <script>
+                function updatePreview() {
+                    const raw = document.getElementById('email_text').value;
+                    const layout = document.getElementById('layout').value;
+                    const serverName = document.getElementById('server_name').value;
+                    const subject = document.getElementById('subject').value;
+                    let body = raw.replace(/\n/g, "<br>");
+                    let html = "";
+                
+                    switch (layout) {
+                        case "basic":
+                            html = `
+                                <html><body style="font-family: Arial; padding: 20px;">
+                                <h2>newsletterr</h2>
+                                <div style="border: 1px solid #ddd; padding: 10px; background: #f9f9f9;">
+                                    ${body}
+                                </div></body></html>`;
+                            break;
+                        case "card":
+                            html = `
+                                <html><body style="background: #f0f0f0; display: flex; justify-content: center; font-family: Arial;">
+                                <div style="background: white; max-width: 600px; padding: 20px; margin: 40px auto; box-shadow: 0 0 10px rgba(0,0,0,0.1);">
+                                    ${body}
+                                </div></body></html>`;
+                            break;
+                        case "dark":
+                            html = `
+                                <html><body style="background: #111; color: #eee; font-family: Arial; padding: 20px;">
+                                <div style="background: #222; padding: 20px; border-radius: 8px;">
+                                    ${body}
+                                </div></body></html>`;
+                            break;
+                        case "twocol":
+                            html = `
+                                <html><body style="font-family: Arial; padding: 20px;">
+                                <table style="width: 100%;">
+                                <tr>
+                                    <td style="width: 50%; padding: 10px;">
+                                    <img src="https://d15k2d11r6t6rl.cloudfront.net/public/users/Integrators/669d5713-9b6a-46bb-bd7e-c542cff6dd6a/3bef3c50f13f4320a9e31b8be79c6ad2/Plex%20Logo%20Update%202022/plex-logo-heavy-stroke.png" style="max-width: 100%;">
+                                    </td>
+                                    <td style="width: 50%; padding: 10px;">${body}</td>
+                                </tr>
+                                </table></body></html>`;
+                            break;
+                        case "banner":
+                            html = `
+                                <html><body style="font-family: Arial;">
+                                <div style="background: #0077cc; color: white; padding: 20px; text-align: center;">
+                                <h1>newsletterr</h1>
+                                </div>
+                                <div style="padding: 20px;">${body}</div></body></html>`;
+                            break;
+                        case "tautulli":
+                            html = `
+                                <html><body style="font-family: Arial;">
+                                    <table class="body" style="border-collapse: separate; mso-table-lspace: 0pt; mso-table-rspace: 0pt; width: 100%;" border="0" cellspacing="0" cellpadding="0">
+                                        <tbody>
+                                            <tr>
+                                                <td class="container" style="font-family: 'Open Sans', Helvetica, Arial, sans-serif; font-size: 14px; vertical-align: top; display: block; max-width: 1042px; padding: 10px; width: 1042px; margin: 0 auto !important;">
+                                                    <div class="content" style="box-sizing: border-box; display: block; margin: 0 auto; max-width: 1037px; padding: 10px;"><span class="preheader" style="color: transparent; display: none; height: 0; max-height: 0; max-width: 0; opacity: 0; overflow: hidden; mso-hide: all; visibility: hidden; width: 0;">${serverName} Newsletter</span>
+                                                        <table class="main" style="border-collapse: separate; mso-table-lspace: 0pt; mso-table-rspace: 0pt; width: 100%; background: #282A2D; border-radius: 3px; color: #ffffff;" border="0" cellspacing="0" cellpadding="3">
+                                                            <tbody>
+                                                                <tr>
+                                                                    <td class="wrapper" style="font-family: 'Open Sans', Helvetica, Arial, sans-serif; font-size: 14px; vertical-align: top; box-sizing: border-box; padding: 5px; overflow: auto;">
+                                                                        <div class="header" style="width: 50%; height: 10px; text-align: center;"><img class="header-img" style="border: none; -ms-interpolation-mode: bicubic; max-width: 9%; width: 492px; height: 20px; margin-left: -35px;" src="https://d15k2d11r6t6rl.cloudfront.net/public/users/Integrators/669d5713-9b6a-46bb-bd7e-c542cff6dd6a/3bef3c50f13f4320a9e31b8be79c6ad2/Plex%20Logo%20Update%202022/plex-logo-heavy-stroke.png" width="492" height="90" /></div>
+                                                                        <div class="server-name" style="font-size: 25px; text-align: center; margin-bottom: 0;">${serverName} Newsletter</div>
+                                                                    </td>
+                                                                </tr>
+                                                                <tr>
+                                                                    <td class="footer" style="font-family: 'Open Sans', Helvetica, Arial, sans-serif; font-size: 12px; vertical-align: top; clear: both; margin-top: 0; text-align: center; width: 100%;">
+                                                                        <h1 class="footer-bar" style="margin-left: auto; margin-right: auto; width: 250px; border-top: 1px solid #E5A00D; margin-top: 5px;">${subject}</h1>
+                                                                        <p>
+                                                                            ${body}
+                                                                        </p>
+                                                                        <div class="footer-bar" style="margin-left: auto; margin-right: auto; width: 250px; border-top: 1px solid #E5A00D; margin-top: 25px;">&nbsp;</div>
+                                                                        <div class="content-block powered-by" style="padding-bottom: 10px; padding-top: 0;">Generated for Plex Media Server by newsletterr</div>
+                                                                    </td>
+                                                                </tr>
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table></body></html>`;
+                            break;
+                        default:
+                            html = `<html><body>${body}</body></html>`;
+                    }
+                
+                    document.getElementById('preview').srcdoc = html;
+                }
+                
+                document.addEventListener('DOMContentLoaded', () => {
+                    document.getElementById('email_text').addEventListener('input', updatePreview);
+                });
+            </script>
         </div>
     </div>
 {% endblock %}

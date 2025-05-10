@@ -123,7 +123,7 @@ def index():
         users, error, alert = run_tautulli_command(base_url, api_key, 'get_users', 'Users', error, alert)
         
         for user in users:
-            if user['email'] != None:
+            if user['email'] != None and user['is_active']:
                 user_emails.append(user['email'])
         
     return render_template('index.html', stats=stats, user_emails=user_emails, error=error, alert=alert)
@@ -138,7 +138,7 @@ def send_email():
     smtp_server = request.form['smtp_server']
     smtp_port = int(request.form['smtp_port'])
     server_name = request.form['server_name']
-    to_emails = [request.form['to_email']]
+    to_emails = request.form['to_emails'].split(", ")
     subject = request.form['subject']
     email_text = request.form['email_text']
     layout = request.form.get('layout', 'none')
@@ -152,7 +152,7 @@ def send_email():
     try:
         with smtplib.SMTP_SSL(smtp_server, smtp_port) as server:
             server.login(from_email, password)
-            server.sendmail(from_email, from_email + ", ".join(to_emails), msg.as_string())
+            server.sendmail(from_email, [from_email] + to_emails, msg.as_string())
             alert = "Email sent!"
     except Exception as e:
         error = f"Error: {str(e)}"

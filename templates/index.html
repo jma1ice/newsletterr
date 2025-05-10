@@ -20,7 +20,7 @@
                                 SMTP Server: <input type="text" name="smtp_server" placeholder="SMTP Server (e.g. smtp.gmail.com)" required><br><br>
                                 SMTP Port: <input type="number" name="smtp_port" placeholder="SMTP Port (465 for SSL)" required><br><br>
                                 Plex Server Name: <input type="text" name="server_name" id="server_name" placeholder="Paramount Plex" required><br><br>
-                                To: <input type="text" name="to_email" placeholder="Recipient Email" value="{{ user_emails | join(', ') }}" required><br><br>
+                                BCC: <textarea type="text" name="to_emails" placeholder="Recipient Email" rows="10" cols="40" value="" required>{{ user_emails | join(', ') }}</textarea><br><br>
                                 Subject: <input type="text" name="subject" id="subject" placeholder="Subject" required><br><br>
                                 <label for="layout">Choose a layout:</label>
                                 <select id="layout" name="layout" onchange="updatePreview()">

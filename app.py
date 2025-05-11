@@ -93,17 +93,17 @@ def run_tautulli_command(base_url, api_key, command, data_type, error, alert):
             if alert == None:
                 alert = f'{data_type} pulled'
             else:
-                alert += f'\n{data_type} pulled'
+                alert += f', {data_type} pulled'
         else:
             if error == None:
                 error = data.get('response', {}).get('message', 'Unknown error')
             else:
-                error += f"\n{data.get('response', {}).get('message', 'Unknown error')}"
+                error += f", {data.get('response', {}).get('message', 'Unknown error')}"
     except requests.exceptions.RequestException as e:
         if error == None:
             error = str(f"{data_type} Error: {e}")
         else:
-            error += str(f"\n{data_type} Error: {e}")
+            error += str(f", {data_type} Error: {e}")
 
     return [out_data, error, alert]
 
@@ -111,8 +111,58 @@ def run_tautulli_command(base_url, api_key, command, data_type, error, alert):
 def index():
     stats = None
     users = None
-    plays = None
     user_emails = []
+    graph_commands = [
+        {
+            'command' : 'get_concurrent_streams_by_stream_type',
+            'name' : 'Stream Type'
+        },
+        {
+            'command' : 'get_plays_by_date',
+            'name' : 'Plays by Date'
+        },
+        {
+            'command' : 'get_plays_by_dayofweek',
+            'name' : 'Plays by Day'
+        },
+        {
+            'command' : 'get_plays_by_hourofday',
+            'name' : 'Plays by Hour'
+        },
+        {
+            'command' : 'get_plays_by_source_resolution',
+            'name' : 'Plays by Source Res'
+        },
+        {
+            'command' : 'get_plays_by_stream_resolution',
+            'name' : 'Plays by Stream Res'
+        },
+        {
+            'command' : 'get_plays_by_stream_type',
+            'name' : 'Plays by Stream Type'
+        },
+        {
+            'command' : 'get_plays_by_top_10_platforms',
+            'name' : 'Plays by Top Platforms'
+        },
+        {
+            'command' : 'get_plays_by_top_10_users',
+            'name' : 'Plays by Top Users'
+        },
+        {
+            'command' : 'get_plays_per_month',
+            'name' : 'Plays per Month'
+        },
+        {
+            'command' : 'get_stream_type_by_top_10_platforms',
+            'name' : 'Stream Type by Top Platforms'
+        },
+        {
+            'command' : 'get_stream_type_by_top_10_users',
+            'name' : 'Stream Type by Top Users'
+        }
+    ]
+    graph_data = []
     error = None
     alert = None
 
@@ -122,13 +172,15 @@ def index():
 
         stats, error, alert = run_tautulli_command(base_url, api_key, 'get_home_stats', 'Stats', error, alert)
         users, error, alert = run_tautulli_command(base_url, api_key, 'get_users', 'Users', error, alert)
-        plays, error, alert = run_tautulli_command(base_url, api_key, 'get_plays_by_date', 'Plays', error, alert)
+        for command in graph_commands:
+            gd, error, alert = run_tautulli_command(base_url, api_key, command["command"], command["name"], error, alert)
+            graph_data.append(gd)
         
         for user in users:
             if user['email'] != None and user['is_active']:
                 user_emails.append(user['email'])
         
-    return render_template('index.html', stats=stats, user_emails=user_emails, plays=plays, error=error, alert=alert)
+    return render_template('index.html', stats=stats, user_emails=user_emails, graph_data=graph_data, error=error, alert=alert)
 
 @app.route('/send_email', methods=['POST'])
 def send_email():

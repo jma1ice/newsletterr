@@ -7,7 +7,7 @@
             <p style="color: green;">{{ alert }}</p>
         {% endif %}
         {% if error %}
-            <p style="color: red;">Error: {{ error }}</p>
+            <p style="color: red;">{{ error }}</p>
         {% endif %}
         <div class="foreground">
             <div>
@@ -74,7 +74,7 @@
                                                                 <th>Title</th>
                                                                 <th>Year</th>
                                                                 <th>Plays</th>
-                                                                <th>Total Duration (min)</th>
+                                                                <th>Hours Played</th>
                                                                 <th>Type</th>
                                                                 <th>Rating</th>
                                                             </tr>
@@ -85,7 +85,11 @@
                                                                     <td>{{ row.title }}</td>
                                                                     <td>{{ row.year }}</td>
                                                                     <td>{{ row.total_plays }}</td>
-                                                                    <td>{{ row.total_duration }}</td>
+                                                                    {% if row.total_duration %}
+                                                                        <td>{{ (row.total_duration/60/60)|round(2) }}</td>
+                                                                    {% else %}
+                                                                        <td>no time data</td>
+                                                                    {% endif %}
                                                                     <td>{{ row.media_type }}</td>
                                                                     <td>{{ row.content_rating }}</td>
                                                                 </tr>
@@ -218,7 +222,7 @@
                 });
             </script>
             <script>
-                const playsData = {{ plays | tojson }};
+                const graphData = {{ graph_data[1] | tojson }};
                 Highcharts.chart('plays-by-date', {
                     chart: {
                         type: 'line'
@@ -227,14 +231,14 @@
                         text: 'Plays By Date'
                     },
                     xAxis: {
-                        categories: playsData.categories
+                        categories: graphData.categories
                     },
                     yAxis: {
                         title: {
                             text: 'Plays'
                         }
                     },
-                    series: playsData.series
+                    series: graphData.series
                 });
             </script>
         </div>

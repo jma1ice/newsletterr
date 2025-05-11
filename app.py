@@ -179,6 +179,9 @@ def index():
         for user in users:
             if user['email'] != None and user['is_active']:
                 user_emails.append(user['email'])
+
+    if graph_data == []:
+        graph_data = [{},{}]
         
     return render_template('index.html', stats=stats, user_emails=user_emails, graph_data=graph_data, error=error, alert=alert)
 

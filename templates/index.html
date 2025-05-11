@@ -11,8 +11,8 @@
         {% endif %}
         <div class="foreground">
             <div>
-                <table style="width: 100%;">
-                    <tr>
+                <table style="height: 75%; width: 100%;">
+                    <tr style="height: 100%; padding: 10px;">
                         <td style="width: 20%; padding: 10px;">
                             <form method="POST" action="/send_email">
                                 From: <input type="email" name="from_email" placeholder="Your Email" required><br><br>
@@ -100,6 +100,13 @@
                                     </div>
                                 {% endfor %}
                             {% endif %}
+                        </td>
+                    </tr>
+                </table>
+                <table style="height: 25%; width: 100%;">
+                    <tr style="height: 100%; padding: 10px;">
+                        <td style="width: 50%; padding: 10px;">
+                            <div id="plays-by-date"></div>
                         </td>
                     </tr>
                 </table>
@@ -209,7 +216,27 @@
                     });
                     document.getElementById(selectedId).classList.remove('d-none');  // show selected
                 });
-            </script>                
+            </script>
+            <script>
+                const playsData = {{ plays | tojson }};
+                Highcharts.chart('plays-by-date', {
+                    chart: {
+                        type: 'line'
+                    },
+                    title: {
+                        text: 'Plays By Date'
+                    },
+                    xAxis: {
+                        categories: playsData.categories
+                    },
+                    yAxis: {
+                        title: {
+                            text: 'Plays'
+                        }
+                    },
+                    series: playsData.series
+                });
+            </script>
         </div>
     </div>
 {% endblock %}

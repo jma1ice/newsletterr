@@ -93,17 +93,17 @@ def run_tautulli_command(base_url, api_key, command, data_type, error, alert):
             if alert == None:
                 alert = f'{data_type} pulled'
             else:
-                alert += f'<br>{data_type} pulled'
+                alert += f'\n{data_type} pulled'
         else:
             if error == None:
                 error = data.get('response', {}).get('message', 'Unknown error')
             else:
-                error += f"<br>{data.get('response', {}).get('message', 'Unknown error')}"
+                error += f"\n{data.get('response', {}).get('message', 'Unknown error')}"
     except requests.exceptions.RequestException as e:
         if error == None:
             error = str(f"{data_type} Error: {e}")
         else:
-            error += str(f"<br>{data_type} Error: {e}")
+            error += str(f"\n{data_type} Error: {e}")
 
     return [out_data, error, alert]
 
@@ -111,6 +111,7 @@ def run_tautulli_command(base_url, api_key, command, data_type, error, alert):
 def index():
     stats = None
     users = None
+    plays = None
     user_emails = []
     error = None
     alert = None
@@ -121,12 +122,13 @@ def index():
 
         stats, error, alert = run_tautulli_command(base_url, api_key, 'get_home_stats', 'Stats', error, alert)
         users, error, alert = run_tautulli_command(base_url, api_key, 'get_users', 'Users', error, alert)
+        plays, error, alert = run_tautulli_command(base_url, api_key, 'get_plays_by_date', 'Plays', error, alert)
         
         for user in users:
             if user['email'] != None and user['is_active']:
                 user_emails.append(user['email'])
         
-    return render_template('index.html', stats=stats, user_emails=user_emails, error=error, alert=alert)
+    return render_template('index.html', stats=stats, user_emails=user_emails, plays=plays, error=error, alert=alert)
 
 @app.route('/send_email', methods=['POST'])
 def send_email():

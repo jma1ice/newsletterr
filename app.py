@@ -107,6 +107,10 @@ def run_tautulli_command(base_url, api_key, command, data_type, error, alert):
 
     return [out_data, error, alert]
 
+@app.context_processor
+def inject_enumerate():
+    return dict(enumerate=enumerate)
+
 @app.route('/', methods=['GET', 'POST'])
 def index():
     stats = None
@@ -183,7 +187,11 @@ def index():
     if graph_data == []:
         graph_data = [{},{}]
         
-    return render_template('index.html', stats=stats, user_emails=user_emails, graph_data=graph_data, error=error, alert=alert)
+    return render_template('index.html',
+                           stats=stats, user_emails=user_emails,
+                           graph_data=graph_data, graph_commands=graph_commands,
+                           error=error, alert=alert
+                        )
 
 @app.route('/send_email', methods=['POST'])
 def send_email():

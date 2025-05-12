@@ -109,8 +109,21 @@
                 </table>
                 <table style="height: 25%; width: 100%;">
                     <tr style="height: 100%; padding: 10px;">
-                        <td style="width: 50%; padding: 10px;">
-                            <div id="plays-by-date"></div>
+                        <td style="width: 15%; padding: 10px;">
+                            {% if graph_data != [{},{}] %}
+                                <h2>Select a Graph</h2>
+                                <select id="graphSelector" class="form-select w-50 mb-4">
+                                    <option selected>Choose an option...</option>
+                                    {% for graph in graph_data %}
+                                        <option value="graph-{{ loop.index0 }}">{{ graph_commands[loop.index0].name }}</option>
+                                    {% endfor %}
+                                </select>
+                            {% endif %}
+                        </td>
+                        <td style="width: 85%; padding: 10px;">
+                            {% for graph in graph_data %}
+                                <div class="graph-table d-none" id="graph-{{ loop.index0 }}"></div>
+                            {% endfor %}
                         </td>
                     </tr>
                 </table>
@@ -222,25 +235,41 @@
                 });
             </script>
             <script>
-                const graphData = {{ graph_data[1] | tojson }};
-                Highcharts.chart('plays-by-date', {
-                    chart: {
-                        type: 'line'
-                    },
-                    title: {
-                        text: 'Plays By Date'
-                    },
-                    xAxis: {
-                        categories: graphData.categories
-                    },
-                    yAxis: {
-                        title: {
-                            text: 'Plays'
-                        }
-                    },
-                    series: graphData.series
+                const graphDataList = {{ graph_data | tojson }};
+                const graphCommands = {{ graph_commands | tojson }};
+            
+                const renderedCharts = new Set();
+            
+                document.getElementById('graphSelector').addEventListener('change', function () {
+                    const selectedId = this.value;
+            
+                    // Hide all
+                    document.querySelectorAll('.graph-table').forEach(el => el.classList.add('d-none'));
+            
+                    // Show selected
+                    const container = document.getElementById(selectedId);
+                    container.classList.remove('d-none');
+            
+                    // Render if not already rendered
+                    if (!renderedCharts.has(selectedId)) {
+                        const index = parseInt(selectedId.split('-')[1]);
+                        const graphData = graphDataList[index];
+            
+                        Highcharts.chart(selectedId, {
+                            chart: { type: 'line' },
+                            title: { text: graphCommands[index].name },
+                            exporting: {
+                                enabled: true
+                            },
+                            xAxis: { categories: graphData.categories },
+                            yAxis: { title: { text: 'Plays' } },
+                            series: graphData.series
+                        });
+            
+                        renderedCharts.add(selectedId);
+                    }
                 });
-            </script>
+            </script>            
         </div>
     </div>
 {% endblock %}

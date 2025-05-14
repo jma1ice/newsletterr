@@ -121,10 +121,12 @@
                         </td>
                         <td style="width: 85%; padding: 10px;">
                             {% for graph in graph_data %}
-                                <label>
-                                    <input type="checkbox" class="graph-checkbox" value="graph-{{ loop.index0 }}">
-                                    Include {{ graph_commands[loop.index0].name }} in email
-                                </label>
+                                <div class="checkbox-container d-none" id="checkbox-graph-{{ loop.index0 }}">
+                                    <label>
+                                        <input type="checkbox" class="graph-checkbox" value="graph-{{ loop.index0 }}">
+                                        Include {{ graph_commands[loop.index0].name }} in email
+                                    </label>
+                                </div>
                                 <div class="graph-table d-none" id="graph-{{ loop.index0 }}"></div>
                             {% endfor %}
                         </td>
@@ -271,6 +273,15 @@
                 });
             </script>
             <script>
+                function showGraph(index) {
+                    document.querySelectorAll('.graph-table').forEach(el => el.classList.add('d-none'));
+                    document.querySelectorAll('.checkbox-container').forEach(el => el.classList.add('d-none'));
+                
+                    document.getElementById(`graph-${index}`).classList.remove('d-none');
+                    document.getElementById(`checkbox-graph-${index}`).classList.remove('d-none');
+                }
+            </script>
+            <script>
                 const graphDataList = {{ graph_data | tojson }};
                 const graphCommands = {{ graph_commands | tojson }};
             
@@ -300,6 +311,8 @@
                         });
             
                         renderedCharts.add(selectedId);
+
+                        showGraph(index)
                     }
                 });
             </script>

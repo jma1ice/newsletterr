@@ -1,16 +1,11 @@
 body {
     margin: 0;
-    background: #282c34;
+    background: #818faa;
     display: flex;
 }
 
-.right_float {
-    float: right;
-}
-
-.right_frame {
-    float: right;
-    height: 25rem;
-    width: 25rem;
+.frame {
+    height: 50rem;
+    width: 50rem;
     border: 1px solid #ccc;
 }

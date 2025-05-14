@@ -20,7 +20,7 @@
                                 SMTP Server: <input type="text" name="smtp_server" placeholder="SMTP Server (e.g. smtp.gmail.com)" required><br><br>
                                 SMTP Port: <input type="number" name="smtp_port" placeholder="SMTP Port (465 for SSL)" required><br><br>
                                 Plex Server Name: <input type="text" name="server_name" id="server_name" placeholder="Paramount Plex" required><br><br>
-                                BCC: <textarea type="text" name="to_emails" placeholder="Recipient Email" rows="10" cols="40" value="" required>{{ user_emails | join(', ') }}</textarea><br><br>
+                                BCC: <textarea type="text" name="to_emails" id="to_emails" placeholder="Recipient Email" rows="10" cols="40" value="" required>{{ user_emails | join(', ') }}</textarea><br><br>
                                 Subject: <input type="text" name="subject" id="subject" placeholder="Subject" required><br><br>
                                 <label for="layout">Choose a layout:</label>
                                 <select id="layout" name="layout" onchange="updatePreview()">
@@ -33,14 +33,13 @@
                                     <option value="tautulli">Tautulli</option>
                                 </select><br><br>
                                 <textarea name="email_text" id="email_text" placeholder="Write your message..." rows="10" cols="40" oninput="updatePreview()" required></textarea>
-
-                                <input type="submit" value="Send Email">
                             </form>
+                            <button id="sendEmailBtn" class="btn btn-primary">Send Email with Selected Graphs</button>
                         </td>
-                        <td style="width: 25%; padding: 10px;">
-                            Preview: <iframe class="right_frame" id="preview"></iframe>
+                        <td style="width: 30%; padding: 10px;">
+                            Preview: <iframe class="frame" id="preview"></iframe>
                         </td>
-                        <td style="width: 15%; padding: 10px;">
+                        <td style="width: 10%; padding: 10px;">
                             <form method="post">
                                 <label for="base_url">Tautulli Base URL:</label><br>
                                 <input type="text" id="base_url" name="base_url" placeholder="http://localhost:8181" required><br><br>
@@ -48,7 +47,7 @@
                                 <label for="api_key">API Key:</label><br>
                                 <input type="text" id="api_key" name="api_key" required><br><br>
                         
-                                <input type="submit" value="Get Stats\Users">
+                                <button class="btn btn-info">Get Stats\Users</button>
                             </form>
                         </td>
                         <td style="width: 40%; padding: 10px;">
@@ -122,6 +121,10 @@
                         </td>
                         <td style="width: 85%; padding: 10px;">
                             {% for graph in graph_data %}
+                                <label>
+                                    <input type="checkbox" class="graph-checkbox" value="graph-{{ loop.index0 }}">
+                                    Include {{ graph_commands[loop.index0].name }} in email
+                                </label>
                                 <div class="graph-table d-none" id="graph-{{ loop.index0 }}"></div>
                             {% endfor %}
                         </td>
@@ -129,13 +132,42 @@
                 </table>
             </div>
             <script>
-                function updatePreview() {
+                async function updatePreview() {
                     const raw = document.getElementById('email_text').value;
                     const layout = document.getElementById('layout').value;
                     const serverName = document.getElementById('server_name').value;
                     const subject = document.getElementById('subject').value;
                     let body = raw.replace(/\n/g, "<br>");
                     let html = "";
+
+                    const selectedGraphs = Array.from(document.querySelectorAll('.graph-checkbox:checked'))
+                        .map(cb => cb.value);
+
+                    let graphImagesHTML = "";
+                    for (let id of selectedGraphs) {
+                        const chart = Highcharts.charts.find(c => c && c.renderTo.id === id);
+                        if (chart) {
+                            const svg = chart.getSVG();
+                            const canvas = document.createElement("canvas");
+                            const ctx = canvas.getContext("2d");
+                            const img = new Image();
+
+                            await new Promise((resolve, reject) => {
+                                img.onload = () => {
+                                    canvas.width = img.width;
+                                    canvas.height = img.height;
+                                    ctx.drawImage(img, 0, 0);
+                                    const dataUrl = canvas.toDataURL("image/png");
+                                    graphImagesHTML += `<img src="${dataUrl}" style="max-width: 100%; margin-bottom: 10px;">`;
+                                    resolve();
+                                };
+                                img.onerror = reject;
+                                img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)));
+                            });
+                        }
+                    }
+
+                    const content = `${body}${graphImagesHTML}`;
                 
                     switch (layout) {
                         case "basic":
@@ -143,21 +175,21 @@
                                 <html><body style="font-family: Arial; padding: 20px;">
                                 <h2>newsletterr</h2>
                                 <div style="border: 1px solid #ddd; padding: 10px; background: #f9f9f9;">
-                                    ${body}
+                                    ${content}
                                 </div></body></html>`;
                             break;
                         case "card":
                             html = `
                                 <html><body style="background: #f0f0f0; display: flex; justify-content: center; font-family: Arial;">
                                 <div style="background: white; max-width: 600px; padding: 20px; margin: 40px auto; box-shadow: 0 0 10px rgba(0,0,0,0.1);">
-                                    ${body}
+                                    ${content}
                                 </div></body></html>`;
                             break;
                         case "dark":
                             html = `
                                 <html><body style="background: #111; color: #eee; font-family: Arial; padding: 20px;">
                                 <div style="background: #222; padding: 20px; border-radius: 8px;">
-                                    ${body}
+                                    ${content}
                                 </div></body></html>`;
                             break;
                         case "twocol":
@@ -168,7 +200,7 @@
                                     <td style="width: 50%; padding: 10px;">
                                     <img src="https://d15k2d11r6t6rl.cloudfront.net/public/users/Integrators/669d5713-9b6a-46bb-bd7e-c542cff6dd6a/3bef3c50f13f4320a9e31b8be79c6ad2/Plex%20Logo%20Update%202022/plex-logo-heavy-stroke.png" style="max-width: 100%;">
                                     </td>
-                                    <td style="width: 50%; padding: 10px;">${body}</td>
+                                    <td style="width: 50%; padding: 10px;">${content}</td>
                                 </tr>
                                 </table></body></html>`;
                             break;
@@ -178,7 +210,7 @@
                                 <div style="background: #0077cc; color: white; padding: 20px; text-align: center;">
                                 <h1>newsletterr</h1>
                                 </div>
-                                <div style="padding: 20px;">${body}</div></body></html>`;
+                                <div style="padding: 20px;">${content}</div></body></html>`;
                             break;
                         case "tautulli":
                             html = `
@@ -200,7 +232,7 @@
                                                                     <td class="footer" style="font-family: 'Open Sans', Helvetica, Arial, sans-serif; font-size: 12px; vertical-align: top; clear: both; margin-top: 0; text-align: center; width: 100%;">
                                                                         <h1 class="footer-bar" style="margin-left: auto; margin-right: auto; width: 250px; border-top: 1px solid #E5A00D; margin-top: 5px;">${subject}</h1>
                                                                         <p>
-                                                                            ${body}
+                                                                            ${content}
                                                                         </p>
                                                                         <div class="footer-bar" style="margin-left: auto; margin-right: auto; width: 250px; border-top: 1px solid #E5A00D; margin-top: 25px;">&nbsp;</div>
                                                                         <div class="content-block powered-by" style="padding-bottom: 10px; padding-top: 0;">Generated for Plex Media Server by newsletterr</div>
@@ -215,7 +247,7 @@
                                     </table></body></html>`;
                             break;
                         default:
-                            html = `<html><body>${body}</body></html>`;
+                            html = `<html><body>${content}</body></html>`;
                     }
                 
                     document.getElementById('preview').srcdoc = html;
@@ -223,15 +255,19 @@
                 
                 document.addEventListener('DOMContentLoaded', () => {
                     document.getElementById('email_text').addEventListener('input', updatePreview);
+                    document.getElementById('layout').addEventListener('change', updatePreview);
+                    document.querySelectorAll('.graph-checkbox').forEach(cb => {
+                        cb.addEventListener('change', updatePreview);
+                    });
                 });
             </script>
             <script>
                 document.getElementById('statSelector').addEventListener('change', function () {
                     const selectedId = this.value;
                     document.querySelectorAll('.stat-table').forEach(el => {
-                        el.classList.add('d-none');  // hide all
+                        el.classList.add('d-none');
                     });
-                    document.getElementById(selectedId).classList.remove('d-none');  // show selected
+                    document.getElementById(selectedId).classList.remove('d-none');
                 });
             </script>
             <script>
@@ -243,14 +279,11 @@
                 document.getElementById('graphSelector').addEventListener('change', function () {
                     const selectedId = this.value;
             
-                    // Hide all
                     document.querySelectorAll('.graph-table').forEach(el => el.classList.add('d-none'));
             
-                    // Show selected
                     const container = document.getElementById(selectedId);
                     container.classList.remove('d-none');
             
-                    // Render if not already rendered
                     if (!renderedCharts.has(selectedId)) {
                         const index = parseInt(selectedId.split('-')[1]);
                         const graphData = graphDataList[index];
@@ -269,7 +302,70 @@
                         renderedCharts.add(selectedId);
                     }
                 });
-            </script>            
+            </script>
+            <script>
+                document.getElementById('sendEmailBtn').addEventListener('click', async () => {
+                    const selectedGraphs = Array.from(document.querySelectorAll('.graph-checkbox:checked'))
+                        .map(cb => cb.value);
+                
+                    const from_email = document.querySelector('input[name="from_email"]').value;
+                    const password = document.querySelector('input[name="password"]').value;
+                    const smtp_server = document.querySelector('input[name="smtp_server"]').value;
+                    const smtp_port = document.querySelector('input[name="smtp_port"]').value;
+                    const server_name = document.getElementById('server_name').value;
+                    const to_emails = document.getElementById('to_emails').value;
+                    const subject = document.getElementById('subject').value;
+                    const email_text = document.getElementById('email_text').value;
+                    const layout = document.getElementById('layout').value;
+                    const graphImages = [];
+                
+                    for (let id of selectedGraphs) {
+                        const chart = Highcharts.charts.find(c => c && c.renderTo.id === id);
+                        if (chart) {
+                            const svg = chart.getSVG();
+                            const canvas = document.createElement("canvas");
+                            const ctx = canvas.getContext("2d");
+                            const img = new Image();
+
+                            await new Promise((resolve, reject) => {
+                                img.onload = () => {
+                                    canvas.width = img.width;
+                                    canvas.height = img.height;
+                                    ctx.drawImage(img, 0, 0);
+                                    const dataUrl = canvas.toDataURL("image/png");
+                                    graphImages.push({ id, img: dataUrl });
+                                    resolve();
+                                };
+                                img.onerror = reject;
+                                img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)));
+                            });
+                        }
+                    }
+
+                    fetch('/send_email', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({
+                            from_email,
+                            password,
+                            smtp_server,
+                            smtp_port,
+                            server_name,
+                            to_emails,
+                            subject,
+                            email_text,
+                            layout,
+                            graphs: graphImages
+                        })
+                    }).then(resp => {
+                        if (resp.ok) {
+                            alert("Email sent!");
+                        } else {
+                            alert("Error sending email.");
+                        }
+                    });
+                });
+            </script>
         </div>
     </div>
 {% endblock %}

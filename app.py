@@ -1,12 +1,17 @@
+import uuid
+import base64
 import smtplib
 import requests
 from email.mime.text import MIMEText
-from flask import Flask, render_template, request
+from email.mime.image import MIMEImage
+from email.mime.multipart import MIMEMultipart
+from flask import Flask, render_template, request, jsonify
 
 app = Flask(__name__)
 
-def apply_layout(body, layout, subject, server_name):
+def apply_layout(body, graphs_html_block, layout, subject, server_name):
     body = body.replace('\n', '<br>')
+    body = body.replace('[[GRAPH_SECTION]]', graphs_html_block)
     if layout == "basic":
         return f"""
         <html><body style="font-family: Arial; padding: 20px;">
@@ -107,10 +112,6 @@ def run_tautulli_command(base_url, api_key, command, data_type, error, alert):
 
     return [out_data, error, alert]
 
-@app.context_processor
-def inject_enumerate():
-    return dict(enumerate=enumerate)
-
 @app.route('/', methods=['GET', 'POST'])
 def index():
     stats = None
@@ -198,30 +199,56 @@ def send_email():
     alert = None
     error = None
 
-    from_email = request.form['from_email']
-    password = request.form['password']
-    smtp_server = request.form['smtp_server']
-    smtp_port = int(request.form['smtp_port'])
-    server_name = request.form['server_name']
-    to_emails = request.form['to_emails'].split(", ")
-    subject = request.form['subject']
-    email_text = request.form['email_text']
-    layout = request.form.get('layout', 'none')
-    html_content = apply_layout(email_text, layout, subject, server_name)
+    data = request.get_json()
 
-    msg = MIMEText(html_content, 'html')
-    msg['Subject'] = subject
-    msg['From'] = from_email
-    msg['To'] = from_email
+    graphs = data['graphs']
+    from_email = data['from_email']
+    password = data['password']
+    smtp_server = data['smtp_server']
+    smtp_port = int(data['smtp_port'])
+    server_name = data['server_name']
+    to_emails = data['to_emails'].split(", ")
+    subject = data['subject']
+    email_text = data['email_text'] + '[[GRAPH_SECTION]]'
+    layout = data.get('layout', 'none')
+
+    msg_root = MIMEMultipart('related')
+    msg_root['Subject'] = subject
+    msg_root['From'] = from_email
+    msg_root['To'] = from_email
+
+    msg_alternative = MIMEMultipart('alternative')
+    msg_root.attach(msg_alternative)
+
+    html_graphs = []
+    for graph in graphs:
+        cid = str(uuid.uuid4())
+
+        html_graphs.append(f'<p><img src="cid:{cid}" style="max-width: 100%;"></p>')
+
+        base64_data = graph['img'].split(',')[1]
+        image_data = base64.b64decode(base64_data)
+
+        image_part = MIMEImage(image_data, _subtype='png')
+        image_part.add_header('Content-ID', f'<{cid}>')
+        image_part.add_header('Content-Disposition', 'inline', filename=f'{cid}.png')
+        msg_root.attach(image_part)
+
+    graphs_html_block = ''.join(html_graphs)
+    html_content = apply_layout(email_text, graphs_html_block, layout, subject, server_name)
+
+    msg_alternative.attach(MIMEText(html_content, 'html'))
 
     try:
         with smtplib.SMTP_SSL(smtp_server, smtp_port) as server:
             server.login(from_email, password)
-            server.sendmail(from_email, [from_email] + to_emails, msg.as_string())
-            alert = "Email sent!"
+            server.sendmail(from_email, [from_email] + to_emails, msg_root.as_string())
+            #alert = "Email sent!"
+        return jsonify({"success": True})
     except Exception as e:
-        error = f"Error: {str(e)}"
-    return render_template('index.html', alert=alert, error=error)
+        #error = f"Error: {str(e)}"
+        return jsonify({"error": str(e)}), 500
+    #return render_template('index.html', alert=alert, error=error)
 
 if __name__ == '__main__':
     app.run(host="127.0.0.1", port=9898, debug=True)

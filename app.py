@@ -215,8 +215,12 @@ def send_email():
 
     msg_root = MIMEMultipart('related')
     msg_root['Subject'] = subject
-    msg_root['From'] = alias_email
-    msg_root['To'] = alias_email
+    if alias_email == '':
+        msg_root['From'] = from_email
+        msg_root['To'] = from_email
+    else:
+        msg_root['From'] = alias_email
+        msg_root['To'] = alias_email
 
     msg_alternative = MIMEMultipart('alternative')
     msg_root.attach(msg_alternative)
@@ -243,7 +247,10 @@ def send_email():
     try:
         with smtplib.SMTP_SSL(smtp_server, smtp_port) as server:
             server.login(from_email, password)
-            server.sendmail(alias_email, [alias_email] + to_emails, msg_root.as_string())
+            if alias_email == '':
+                server.sendmail(from_email, [from_email] + to_emails, msg_root.as_string())
+            else:
+                server.sendmail(alias_email, [alias_email] + to_emails, msg_root.as_string())
             #alert = "Email sent!"
         return jsonify({"success": True})
     except Exception as e:

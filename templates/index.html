@@ -4,7 +4,7 @@
     <div class="background">
         <h1>Dashboard</h1><br>
         {% if alert %}
-            <p style="color: green;">{{ alert }}</p>
+            <p style="color: #01b301;">{{ alert }}</p>
         {% endif %}
         {% if error %}
             <p style="color: red;">{{ error }}</p>
@@ -16,6 +16,7 @@
                         <td style="width: 20%; padding: 10px;">
                             <form method="POST" action="/send_email">
                                 From: <input type="email" name="from_email" placeholder="Your Email" required><br><br>
+                                Send-As Alias: <input type="email" name="alias_email" placeholder="Blank if no alias"><br><br>
                                 Password: <input type="password" name="password" placeholder="Email Password or App Password" required><br><br>
                                 SMTP Server: <input type="text" name="smtp_server" placeholder="SMTP Server (e.g. smtp.gmail.com)" required><br><br>
                                 SMTP Port: <input type="number" name="smtp_port" placeholder="SMTP Port (465 for SSL)" required><br><br>
@@ -322,6 +323,7 @@
                         .map(cb => cb.value);
                 
                     const from_email = document.querySelector('input[name="from_email"]').value;
+                    const alias_email = document.querySelector('input[name="alias_email"]').value;
                     const password = document.querySelector('input[name="password"]').value;
                     const smtp_server = document.querySelector('input[name="smtp_server"]').value;
                     const smtp_port = document.querySelector('input[name="smtp_port"]').value;
@@ -360,6 +362,7 @@
                         headers: {'Content-Type': 'application/json'},
                         body: JSON.stringify({
                             from_email,
+                            alias_email,
                             password,
                             smtp_server,
                             smtp_port,

@@ -4,10 +4,10 @@
 <div class="container">
     <h1>Dashboard</h1><br>
     {% if alert %}
-    <p style="color: #01b301;">{{ alert }}</p>
+        <p style="color: #01b301;">{{ alert }}</p>
     {% endif %}
     {% if error %}
-    <p style="color: red;">{{ error }}</p>
+        <p style="color: #770010;">{{ error }}</p>
     {% endif %}
     <div class="foreground">
         <div>
@@ -53,68 +53,61 @@
                     </td>
                     <td style="width: 10%; padding: 10px;">
                         <form method="post">
-                            <label for="base_url">Tautulli Base URL:</label><br>
-                            <input type="text" id="base_url" name="base_url" placeholder="http://localhost:8181"
-                                required><br><br>
-
-                            <label for="api_key">API Key:</label><br>
-                            <input type="text" id="api_key" name="api_key" required><br><br>
-
                             <button class="btn btn-info">Get Stats\Users</button>
                         </form>
                     </td>
                     <td style="width: 40%; padding: 10px;">
                         {% if stats %}
-                        <h2>Select a Stat Category</h2>
-                        <select id="statSelector" class="form-select w-50 mb-4">
-                            <option selected>Choose an option...</option>
+                            <h2>Select a Stat Category</h2>
+                            <select id="statSelector" class="form-select w-50 mb-4">
+                                <option selected>Choose an option...</option>
+                                {% for stat in stats %}
+                                    <option value="stat-{{ loop.index0 }}">{{ stat.stat_title }}</option>
+                                {% endfor %}
+                            </select>
                             {% for stat in stats %}
-                            <option value="stat-{{ loop.index0 }}">{{ stat.stat_title }}</option>
+                                <div id="stat-{{ loop.index0 }}" class="stat-table d-none">
+                                    <div class="card my-4">
+                                        <div class="card-header bg-primary text-white">
+                                            {{ stat.stat_title }}
+                                        </div>
+                                        <div class="card-body p-0">
+                                            {% if stat.rows %}
+                                                <table class="table table-striped m-0">
+                                                    <thead class="table-dark">
+                                                        <tr>
+                                                            <th>Title</th>
+                                                            <th>Year</th>
+                                                            <th>Plays</th>
+                                                            <th>Hours Played</th>
+                                                            <th>Type</th>
+                                                            <th>Rating</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {% for row in stat.rows %}
+                                                            <tr>
+                                                                <td>{{ row.title }}</td>
+                                                                <td>{{ row.year }}</td>
+                                                                <td>{{ row.total_plays }}</td>
+                                                                {% if row.total_duration %}
+                                                                    <td>{{ (row.total_duration/60/60)|round(2) }}</td>
+                                                                {% else %}
+                                                                    <td>no time data</td>
+                                                                {% endif %}
+                                                                <td>{{ row.media_type }}</td>
+                                                                <td>{{ row.content_rating }}</td>
+                                                            </tr>
+                                                        {% endfor %}
+                                                    </tbody>
+                                                </table>
+                                            {% else %}
+                                                <p class="m-3">No data available.</p>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
                             {% endfor %}
-                        </select>
-                        {% for stat in stats %}
-                        <div id="stat-{{ loop.index0 }}" class="stat-table d-none">
-                            <div class="card my-4">
-                                <div class="card-header bg-primary text-white">
-                                    {{ stat.stat_title }}
-                                </div>
-                                <div class="card-body p-0">
-                                    {% if stat.rows %}
-                                    <table class="table table-striped m-0">
-                                        <thead class="table-dark">
-                                            <tr>
-                                                <th>Title</th>
-                                                <th>Year</th>
-                                                <th>Plays</th>
-                                                <th>Hours Played</th>
-                                                <th>Type</th>
-                                                <th>Rating</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {% for row in stat.rows %}
-                                            <tr>
-                                                <td>{{ row.title }}</td>
-                                                <td>{{ row.year }}</td>
-                                                <td>{{ row.total_plays }}</td>
-                                                {% if row.total_duration %}
-                                                <td>{{ (row.total_duration/60/60)|round(2) }}</td>
-                                                {% else %}
-                                                <td>no time data</td>
-                                                {% endif %}
-                                                <td>{{ row.media_type }}</td>
-                                                <td>{{ row.content_rating }}</td>
-                                            </tr>
-                                            {% endfor %}
-                                        </tbody>
-                                    </table>
-                                    {% else %}
-                                    <p class="m-3">No data available.</p>
-                                    {% endif %}
-                                </div>
-                            </div>
-                        </div>
-                        {% endfor %}
                         {% endif %}
                     </td>
                 </tr>
@@ -123,24 +116,24 @@
                 <tr style="height: 100%; padding: 10px;">
                     <td style="width: 15%; padding: 10px;">
                         {% if graph_data != [{},{}] %}
-                        <h2>Select a Graph</h2>
-                        <select id="graphSelector" class="form-select w-100 mb-4">
-                            <option selected>Choose an option...</option>
-                            {% for graph in graph_data %}
-                            <option value="graph-{{ loop.index0 }}">{{ graph_commands[loop.index0].name }}</option>
-                            {% endfor %}
-                        </select>
+                            <h2>Select a Graph</h2>
+                            <select id="graphSelector" class="form-select w-100 mb-4">
+                                <option selected>Choose an option...</option>
+                                {% for graph in graph_data %}
+                                    <option value="graph-{{ loop.index0 }}">{{ graph_commands[loop.index0].name }}</option>
+                                {% endfor %}
+                            </select>
                         {% endif %}
                     </td>
                     <td style="width: 85%; padding: 10px;">
                         {% for graph in graph_data %}
-                        <div class="checkbox-container d-none" id="checkbox-graph-{{ loop.index0 }}">
-                            <label>
-                                <input type="checkbox" class="graph-checkbox" value="graph-{{ loop.index0 }}">
-                                Include {{ graph_commands[loop.index0].name }} in email
-                            </label>
-                        </div>
-                        <div class="graph-table d-none" id="graph-{{ loop.index0 }}"></div>
+                            <div class="checkbox-container d-none" id="checkbox-graph-{{ loop.index0 }}">
+                                <label>
+                                    <input type="checkbox" class="graph-checkbox" value="graph-{{ loop.index0 }}">
+                                    Include {{ graph_commands[loop.index0].name }} in email
+                                </label>
+                            </div>
+                            <div class="graph-table d-none" id="graph-{{ loop.index0 }}"></div>
                         {% endfor %}
                     </td>
                 </tr>

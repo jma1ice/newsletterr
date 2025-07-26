@@ -194,19 +194,50 @@ def index():
     error = None
     alert = None
 
-    if request.method == 'POST':
-        base_url = request.form.get('base_url').rstrip('/')
-        api_key = request.form.get('api_key')
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT
+        from_email, alias_email, password, smtp_server, smtp_port, server_name, tautulli_url, tautulli_api
+        FROM settings WHERE id = 1
+    """)
+    row = cursor.fetchone()
+    conn.close()
 
-        stats, error, alert = run_tautulli_command(base_url, api_key, 'get_home_stats', 'Stats', error, alert)
-        users, error, alert = run_tautulli_command(base_url, api_key, 'get_users', 'Users', error, alert)
-        for command in graph_commands:
-            gd, error, alert = run_tautulli_command(base_url, api_key, command["command"], command["name"], error, alert)
-            graph_data.append(gd)
-        
-        for user in users:
-            if user['email'] != None and user['is_active']:
-                user_emails.append(user['email'])
+    if row:
+        settings = {
+            "from_email": row[0],
+            "alias_email": row[1],
+            "password": row[2],
+            "smtp_server": row[3],
+            "smtp_port": int(row[4]),
+            "server_name": row[5],
+            "tautulli_url": row[6],
+            "tautulli_api": row[7]
+        }
+    else:
+        settings = {
+            "from_email": ""
+        }
+
+    if request.method == 'POST':
+        if settings['from_email'] == "":
+            return render_template('index.html', error='Please enter tautulli info on settings page',
+                                    stats=stats, user_emails=user_emails, graph_data=graph_data,
+                                    graph_commands=graph_commands, alert=alert)
+        else:
+            base_url = settings['tautulli_url'].rstrip('/')
+            api_key = settings['tautulli_api']
+
+            stats, error, alert = run_tautulli_command(base_url, api_key, 'get_home_stats', 'Stats', error, alert)
+            users, error, alert = run_tautulli_command(base_url, api_key, 'get_users', 'Users', error, alert)
+            for command in graph_commands:
+                gd, error, alert = run_tautulli_command(base_url, api_key, command["command"], command["name"], error, alert)
+                graph_data.append(gd)
+            
+            for user in users:
+                if user['email'] != None and user['is_active']:
+                    user_emails.append(user['email'])
 
     if graph_data == []:
         graph_data = [{},{}]

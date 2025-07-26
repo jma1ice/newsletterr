@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}settings{% endblock %}
+{% block content %}
+<div class="container">
+    <h1>Settings</h1><br>
+    {% if alert %}
+        <p style="color: #01b301;">{{ alert }}</p>
+    {% endif %}
+    {% if error %}
+        <p style="color: red;">{{ error }}</p>
+    {% endif %}
+    <div class="foreground">
+        <div style="margin: 0px 0px 0px 15px;">
+            <form method="POST">
+                <label for="from_email">From:</label><br>
+                <input type="email" id="from_email" name="from_email"
+                    {% if settings.from_email !="" %}value="{{ settings.from_email }}"{% endif %}
+                    placeholder="Your Email" required><br><br>
+
+                <label for="alias_email">Send-As Alias:</label><br>
+                <input type="email" id="alias_email" name="alias_email"
+                    {% if settings.from_email !="" %}value="{{ settings.alias_email }}"{% endif %}
+                    placeholder="Blank if no alias"><br><br>
+
+                <label for="password">Password:</label><br>
+                <input type="password" id="password" name="password"
+                    {% if settings.from_email !="" %}value="{{ settings.password }}"{% endif %}
+                    placeholder="Email Password or App Password" required><br><br>
+
+                <label for="smtp_server">SMTP Server:</label><br>
+                <input type="text" id="smtp_server" name="smtp_server"
+                    {% if settings.from_email !="" %}value="{{ settings.smtp_server }}"{% endif %}
+                    placeholder="SMTP Server (e.g. smtp.gmail.com)" required><br><br>
+
+                <label for="smtp_port">SMTP Port:</label><br>
+                <input type="number" id="smtp_port" name="smtp_port"
+                    {% if settings.from_email !="" %}value="{{ settings.smtp_port }}"{% endif %}
+                    placeholder="SMTP Port (465 for SSL)" required><br><br>
+
+                <label for="server_name">Plex Server Name:</label><br>
+                <input type="text" id="server_name" name="server_name"
+                    {% if settings.from_email !="" %}value="{{ settings.server_name }}"{% endif %}
+                    placeholder="Paramount Plex" required><br><br>
+
+                <label for="tautulli_url">Tautulli Base URL:</label><br>
+                <input type="text" id="tautulli_url" name="tautulli_url"
+                    {% if settings.from_email !="" %}value="{{ settings.tautulli_url }}"{% endif %}
+                    placeholder="http://localhost:8181" required><br><br>
+
+                <label for="tautulli_api">API Key:</label><br>
+                <input type="text" id="tautulli_api" name="tautulli_api"
+                    {% if settings.from_email !="" %}value="{{ settings.tautulli_api }}"{% endif %}
+                    placeholder="API Key" required><br><br>
+                
+                <button id="applySettings" class="btn btn-info">Apply Settings</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

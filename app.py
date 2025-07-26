@@ -1,13 +1,36 @@
+import os
 import uuid
 import base64
 import smtplib
+import sqlite3
 import requests
 from email.mime.text import MIMEText
 from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, redirect, render_template, request, jsonify, url_for
 
 app = Flask(__name__)
+
+DB_PATH = os.path.join("database", "data.db")
+
+def init_db(db_path):
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS settings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            from_email TEXT,
+            alias_email TEXT,
+            password TEXT,
+            smtp_server TEXT,
+            smtp_port INTEGER,
+            server_name TEXT,
+            tautulli_url TEXT,
+            tautulli_api TEXT
+        )
+    """)
+    conn.commit()
+    conn.close()
 
 def apply_layout(body, graphs_html_block, layout, subject, server_name):
     body = body.replace('\n', '<br>')
@@ -258,9 +281,69 @@ def send_email():
         return jsonify({"error": str(e)}), 500
     #return render_template('index.html', alert=alert, error=error)
 
-@app.route('/setup', methods=['GET', 'POST'])
-def setup():
-    return render_template('setup.html')
+@app.route('/settings', methods=['GET', 'POST'])
+def settings():
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    if request.method == "POST":
+        from_email = request.form.get("from_email")
+        alias_email = request.form.get("alias_email")
+        password = request.form.get("password")
+        smtp_server = request.form.get("smtp_server")
+        smtp_port = int(request.form.get("smtp_port"))
+        server_name = request.form.get("server_name")
+        tautulli_url = request.form.get("tautulli_url")
+        tautulli_api = request.form.get("tautulli_api")
+
+        cursor.execute("""
+            REPLACE INTO settings
+            (id, from_email, alias_email, password, smtp_server, smtp_port, server_name, tautulli_url, tautulli_api)
+            VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (from_email, alias_email, password, smtp_server, smtp_port, server_name, tautulli_url, tautulli_api))
+        conn.commit()
+        conn.close()
+
+        settings = {
+            "from_email": from_email,
+            "alias_email": alias_email,
+            "password": password,
+            "smtp_server": smtp_server,
+            "smtp_port": smtp_port,
+            "server_name": server_name,
+            "tautulli_url": tautulli_url,
+            "tautulli_api": tautulli_api
+        }
+
+        return render_template('settings.html', alert="Settings saved successfully!", settings=settings)
+
+    cursor.execute("""
+        SELECT
+        from_email, alias_email, password, smtp_server, smtp_port, server_name, tautulli_url, tautulli_api
+        FROM settings WHERE id = 1
+    """)
+    row = cursor.fetchone()
+    conn.close()
+
+    if row:
+        settings = {
+            "from_email": row[0],
+            "alias_email": row[1],
+            "password": row[2],
+            "smtp_server": row[3],
+            "smtp_port": int(row[4]),
+            "server_name": row[5],
+            "tautulli_url": row[6],
+            "tautulli_api": row[7]
+        }
+    else:
+        settings = {
+            "from_email": ""
+        }
+
+    return render_template('settings.html', settings=settings)
 
 if __name__ == '__main__':
+    os.makedirs("database", exist_ok=True)
+    init_db(DB_PATH)
     app.run(host="127.0.0.1", port=9898, debug=True)

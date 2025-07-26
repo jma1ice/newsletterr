@@ -14,18 +14,10 @@
             <table style="height: 75%; width: 100%;">
                 <tr style="height: 100%; padding: 10px;">
                     <td style="width: 20%; padding: 10px;">
+                        <form method="post">
+                            <button class="btn btn-info">Get Stats\Users</button>
+                        </form><br>
                         <form method="POST" action="/send_email">
-                            From: <input type="email" name="from_email" placeholder="Your Email" required><br><br>
-                            Send-As Alias: <input type="email" name="alias_email"
-                                placeholder="Blank if no alias"><br><br>
-                            Password: <input type="password" name="password"
-                                placeholder="Email Password or App Password" required><br><br>
-                            SMTP Server: <input type="text" name="smtp_server"
-                                placeholder="SMTP Server (e.g. smtp.gmail.com)" required><br><br>
-                            SMTP Port: <input type="number" name="smtp_port" placeholder="SMTP Port (465 for SSL)"
-                                required><br><br>
-                            Plex Server Name: <input type="text" name="server_name" id="server_name"
-                                placeholder="Paramount Plex" required><br><br>
                             BCC: <textarea type="text" name="to_emails" id="to_emails" placeholder="Recipient Email"
                                 rows="10" cols="40" value="" required>{{ user_emails | join(', ') }}</textarea><br><br>
                             Subject: <input type="text" name="subject" id="subject" placeholder="Subject"
@@ -48,13 +40,8 @@
                         </form>
                         <button id="sendEmailBtn" class="btn btn-info">Send Email with Selected Graphs</button>
                     </td>
-                    <td style="width: 30%; padding: 10px;">
+                    <td style="width: 40%; padding: 10px;">
                         Preview: <iframe class="frame" id="preview"></iframe>
-                    </td>
-                    <td style="width: 10%; padding: 10px;">
-                        <form method="post">
-                            <button class="btn btn-info">Get Stats\Users</button>
-                        </form>
                     </td>
                     <td style="width: 40%; padding: 10px;">
                         {% if stats %}
@@ -143,7 +130,7 @@
             async function updatePreview() {
                 const raw = document.getElementById('email_text').value;
                 const layout = document.getElementById('layout').value;
-                const serverName = document.getElementById('server_name').value;
+                const serverName = "{{ settings.server_name }}";
                 const subject = document.getElementById('subject').value;
                 let body = raw.replace(/\n/g, "<br>");
                 let html = "";
@@ -334,12 +321,6 @@
                 const selectedGraphs = Array.from(document.querySelectorAll('.graph-checkbox:checked'))
                     .map(cb => cb.value);
 
-                const from_email = document.querySelector('input[name="from_email"]').value;
-                const alias_email = document.querySelector('input[name="alias_email"]').value;
-                const password = document.querySelector('input[name="password"]').value;
-                const smtp_server = document.querySelector('input[name="smtp_server"]').value;
-                const smtp_port = document.querySelector('input[name="smtp_port"]').value;
-                const server_name = document.getElementById('server_name').value;
                 const to_emails = document.getElementById('to_emails').value;
                 const subject = document.getElementById('subject').value;
                 const email_text = document.getElementById('email_text').value;
@@ -373,12 +354,6 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        from_email,
-                        alias_email,
-                        password,
-                        smtp_server,
-                        smtp_port,
-                        server_name,
                         to_emails,
                         subject,
                         email_text,
@@ -389,8 +364,12 @@
                     if (resp.ok) {
                         alert("Email sent!");
                     } else {
-                        alert("Error sending email.");
+                        resp.json().then(data => {
+                            alert("Error sending email: " + data.error);
+                        });
                     }
+                }).catch(err => {
+                    console.error("Error sending email:", err);
                 });
             });
         </script>

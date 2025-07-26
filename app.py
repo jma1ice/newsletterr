@@ -224,7 +224,7 @@ def index():
         if settings['from_email'] == "":
             return render_template('index.html', error='Please enter tautulli info on settings page',
                                     stats=stats, user_emails=user_emails, graph_data=graph_data,
-                                    graph_commands=graph_commands, alert=alert)
+                                    graph_commands=graph_commands, alert=alert, settings=settings)
         else:
             base_url = settings['tautulli_url'].rstrip('/')
             api_key = settings['tautulli_api']
@@ -245,7 +245,7 @@ def index():
     return render_template('index.html',
                            stats=stats, user_emails=user_emails,
                            graph_data=graph_data, graph_commands=graph_commands,
-                           error=error, alert=alert
+                           error=error, alert=alert, settings=settings
                         )
 
 @app.route('/send_email', methods=['POST'])
@@ -253,15 +253,39 @@ def send_email():
     alert = None
     error = None
 
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT
+        from_email, alias_email, password, smtp_server, smtp_port, server_name, tautulli_url, tautulli_api
+        FROM settings WHERE id = 1
+    """)
+    row = cursor.fetchone()
+    conn.close()
+
+    if row:
+        settings = {
+            "from_email": row[0],
+            "alias_email": row[1],
+            "password": row[2],
+            "smtp_server": row[3],
+            "smtp_port": int(row[4]),
+            "server_name": row[5],
+            "tautulli_url": row[6],
+            "tautulli_api": row[7]
+        }
+    else:
+        return jsonify({"error": "Please enter email info on settings page"}), 500
+
     data = request.get_json()
 
     graphs = data['graphs']
-    from_email = data['from_email']
-    alias_email = data['alias_email']
-    password = data['password']
-    smtp_server = data['smtp_server']
-    smtp_port = int(data['smtp_port'])
-    server_name = data['server_name']
+    from_email = settings['from_email']
+    alias_email = settings['alias_email']
+    password = settings['password']
+    smtp_server = settings['smtp_server']
+    smtp_port = int(settings['smtp_port'])
+    server_name = settings['server_name']
     to_emails = data['to_emails'].split(", ")
     subject = data['subject']
     email_text = data['email_text']

@@ -11,7 +11,7 @@ app = Flask(__name__)
 
 def apply_layout(body, graphs_html_block, layout, subject, server_name):
     body = body.replace('\n', '<br>')
-    body = body.replace('[[GRAPH_SECTION]]', graphs_html_block)
+    body = body.replace('[GRAPHS]', graphs_html_block)
     if layout == "basic":
         return f"""
         <html><body style="font-family: Arial; padding: 20px;">
@@ -210,7 +210,7 @@ def send_email():
     server_name = data['server_name']
     to_emails = data['to_emails'].split(", ")
     subject = data['subject']
-    email_text = data['email_text'] + '[[GRAPH_SECTION]]'
+    email_text = data['email_text']
     layout = data.get('layout', 'none')
 
     msg_root = MIMEMultipart('related')
@@ -257,6 +257,10 @@ def send_email():
         #error = f"Error: {str(e)}"
         return jsonify({"error": str(e)}), 500
     #return render_template('index.html', alert=alert, error=error)
+
+@app.route('/setup', methods=['GET', 'POST'])
+def setup():
+    return render_template('setup.html')
 
 if __name__ == '__main__':
     app.run(host="127.0.0.1", port=9898, debug=True)

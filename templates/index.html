@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}newsletterr{% endblock %}
 {% block content %}
-    <div class="background">
+    <div class="container">
         <h1>Dashboard</h1><br>
         {% if alert %}
             <p style="color: #01b301;">{{ alert }}</p>
@@ -35,7 +35,7 @@
                                 </select><br><br>
                                 <textarea name="email_text" id="email_text" placeholder="Write your message..." rows="10" cols="40" oninput="updatePreview()" required></textarea>
                             </form>
-                            <button id="sendEmailBtn" class="btn btn-primary">Send Email with Selected Graphs</button>
+                            <button id="sendEmailBtn" class="btn btn-info">Send Email with Selected Graphs</button>
                         </td>
                         <td style="width: 30%; padding: 10px;">
                             Preview: <iframe class="frame" id="preview"></iframe>

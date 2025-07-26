@@ -1,202 +1,221 @@
 {% extends "base.html" %}
 {% block title %}newsletterr{% endblock %}
 {% block content %}
-    <div class="container">
-        <h1>Dashboard</h1><br>
-        {% if alert %}
-            <p style="color: #01b301;">{{ alert }}</p>
-        {% endif %}
-        {% if error %}
-            <p style="color: red;">{{ error }}</p>
-        {% endif %}
-        <div class="foreground">
-            <div>
-                <table style="height: 75%; width: 100%;">
-                    <tr style="height: 100%; padding: 10px;">
-                        <td style="width: 20%; padding: 10px;">
-                            <form method="POST" action="/send_email">
-                                From: <input type="email" name="from_email" placeholder="Your Email" required><br><br>
-                                Send-As Alias: <input type="email" name="alias_email" placeholder="Blank if no alias"><br><br>
-                                Password: <input type="password" name="password" placeholder="Email Password or App Password" required><br><br>
-                                SMTP Server: <input type="text" name="smtp_server" placeholder="SMTP Server (e.g. smtp.gmail.com)" required><br><br>
-                                SMTP Port: <input type="number" name="smtp_port" placeholder="SMTP Port (465 for SSL)" required><br><br>
-                                Plex Server Name: <input type="text" name="server_name" id="server_name" placeholder="Paramount Plex" required><br><br>
-                                BCC: <textarea type="text" name="to_emails" id="to_emails" placeholder="Recipient Email" rows="10" cols="40" value="" required>{{ user_emails | join(', ') }}</textarea><br><br>
-                                Subject: <input type="text" name="subject" id="subject" placeholder="Subject" required><br><br>
-                                <label for="layout">Choose a layout:</label>
-                                <select id="layout" name="layout" onchange="updatePreview()">
-                                    <option value="none">Plain Text</option>
-                                    <option value="basic">Basic</option>
-                                    <option value="card">Centered Card</option>
-                                    <option value="dark">Dark Mode Box</option>
-                                    <option value="twocol">Two-column</option>
-                                    <option value="banner">Banner/Header</option>
-                                    <option value="tautulli">Tautulli</option>
-                                </select><br><br>
-                                <textarea name="email_text" id="email_text" placeholder="Write your message..." rows="10" cols="40" oninput="updatePreview()" required></textarea>
-                            </form>
-                            <button id="sendEmailBtn" class="btn btn-info">Send Email with Selected Graphs</button>
-                        </td>
-                        <td style="width: 30%; padding: 10px;">
-                            Preview: <iframe class="frame" id="preview"></iframe>
-                        </td>
-                        <td style="width: 10%; padding: 10px;">
-                            <form method="post">
-                                <label for="base_url">Tautulli Base URL:</label><br>
-                                <input type="text" id="base_url" name="base_url" placeholder="http://localhost:8181" required><br><br>
-                        
-                                <label for="api_key">API Key:</label><br>
-                                <input type="text" id="api_key" name="api_key" required><br><br>
-                        
-                                <button class="btn btn-info">Get Stats\Users</button>
-                            </form>
-                        </td>
-                        <td style="width: 40%; padding: 10px;">
-                            {% if stats %}
-                                <h2>Select a Stat Category</h2>
-                                <select id="statSelector" class="form-select w-50 mb-4">
-                                    <option selected>Choose an option...</option>
-                                    {% for stat in stats %}
-                                        <option value="stat-{{ loop.index0 }}">{{ stat.stat_title }}</option>
-                                    {% endfor %}
-                                </select>
-                                {% for stat in stats %}
-                                    <div id="stat-{{ loop.index0 }}" class="stat-table d-none">
-                                        <div class="card my-4">
-                                            <div class="card-header bg-primary text-white">
-                                                {{ stat.stat_title }}
-                                            </div>
-                                            <div class="card-body p-0">
-                                                {% if stat.rows %}
-                                                    <table class="table table-striped m-0">
-                                                        <thead class="table-dark">
-                                                            <tr>
-                                                                <th>Title</th>
-                                                                <th>Year</th>
-                                                                <th>Plays</th>
-                                                                <th>Hours Played</th>
-                                                                <th>Type</th>
-                                                                <th>Rating</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody>
-                                                            {% for row in stat.rows %}
-                                                                <tr>
-                                                                    <td>{{ row.title }}</td>
-                                                                    <td>{{ row.year }}</td>
-                                                                    <td>{{ row.total_plays }}</td>
-                                                                    {% if row.total_duration %}
-                                                                        <td>{{ (row.total_duration/60/60)|round(2) }}</td>
-                                                                    {% else %}
-                                                                        <td>no time data</td>
-                                                                    {% endif %}
-                                                                    <td>{{ row.media_type }}</td>
-                                                                    <td>{{ row.content_rating }}</td>
-                                                                </tr>
-                                                            {% endfor %}
-                                                        </tbody>
-                                                    </table>
-                                                {% else %}
-                                                    <p class="m-3">No data available.</p>
-                                                {% endif %}
-                                            </div>
-                                        </div>
-                                    </div>
-                                {% endfor %}
-                            {% endif %}
-                        </td>
-                    </tr>
-                </table>
-                <table style="height: 25%; width: 100%;">
-                    <tr style="height: 100%; padding: 10px;">
-                        <td style="width: 15%; padding: 10px;">
-                            {% if graph_data != [{},{}] %}
-                                <h2>Select a Graph</h2>
-                                <select id="graphSelector" class="form-select w-50 mb-4">
-                                    <option selected>Choose an option...</option>
-                                    {% for graph in graph_data %}
-                                        <option value="graph-{{ loop.index0 }}">{{ graph_commands[loop.index0].name }}</option>
-                                    {% endfor %}
-                                </select>
-                            {% endif %}
-                        </td>
-                        <td style="width: 85%; padding: 10px;">
-                            {% for graph in graph_data %}
-                                <div class="checkbox-container d-none" id="checkbox-graph-{{ loop.index0 }}">
-                                    <label>
-                                        <input type="checkbox" class="graph-checkbox" value="graph-{{ loop.index0 }}">
-                                        Include {{ graph_commands[loop.index0].name }} in email
-                                    </label>
-                                </div>
-                                <div class="graph-table d-none" id="graph-{{ loop.index0 }}"></div>
+<div class="container">
+    <h1>Dashboard</h1><br>
+    {% if alert %}
+    <p style="color: #01b301;">{{ alert }}</p>
+    {% endif %}
+    {% if error %}
+    <p style="color: red;">{{ error }}</p>
+    {% endif %}
+    <div class="foreground">
+        <div>
+            <table style="height: 75%; width: 100%;">
+                <tr style="height: 100%; padding: 10px;">
+                    <td style="width: 20%; padding: 10px;">
+                        <form method="POST" action="/send_email">
+                            From: <input type="email" name="from_email" placeholder="Your Email" required><br><br>
+                            Send-As Alias: <input type="email" name="alias_email"
+                                placeholder="Blank if no alias"><br><br>
+                            Password: <input type="password" name="password"
+                                placeholder="Email Password or App Password" required><br><br>
+                            SMTP Server: <input type="text" name="smtp_server"
+                                placeholder="SMTP Server (e.g. smtp.gmail.com)" required><br><br>
+                            SMTP Port: <input type="number" name="smtp_port" placeholder="SMTP Port (465 for SSL)"
+                                required><br><br>
+                            Plex Server Name: <input type="text" name="server_name" id="server_name"
+                                placeholder="Paramount Plex" required><br><br>
+                            BCC: <textarea type="text" name="to_emails" id="to_emails" placeholder="Recipient Email"
+                                rows="10" cols="40" value="" required>{{ user_emails | join(', ') }}</textarea><br><br>
+                            Subject: <input type="text" name="subject" id="subject" placeholder="Subject"
+                                required><br><br>
+                            <label for="layout">Choose a layout:</label>
+                            <select id="layout" name="layout" onchange="updatePreview()">
+                                <option value="none">Plain Text</option>
+                                <option value="basic">Basic</option>
+                                <option value="card">Centered Card</option>
+                                <option value="dark">Dark Mode Box</option>
+                                <option value="twocol">Two-column</option>
+                                <option value="banner">Banner/Header</option>
+                                <option value="tautulli">Tautulli</option>
+                            </select><br><br>
+                            <textarea name="email_text" id="email_text" placeholder="Write your message..." rows="10"
+                                cols="40" oninput="updatePreview()" required></textarea><br><br>
+                            <label for="graph_placeholder">Graph Placeholder:</label>
+                            <input type="text" id="graph_placeholder" name="graph_placeholder" value="[GRAPHS]"
+                                oninput="updatePreview()"><br><br>
+                        </form>
+                        <button id="sendEmailBtn" class="btn btn-info">Send Email with Selected Graphs</button>
+                    </td>
+                    <td style="width: 30%; padding: 10px;">
+                        Preview: <iframe class="frame" id="preview"></iframe>
+                    </td>
+                    <td style="width: 10%; padding: 10px;">
+                        <form method="post">
+                            <label for="base_url">Tautulli Base URL:</label><br>
+                            <input type="text" id="base_url" name="base_url" placeholder="http://localhost:8181"
+                                required><br><br>
+
+                            <label for="api_key">API Key:</label><br>
+                            <input type="text" id="api_key" name="api_key" required><br><br>
+
+                            <button class="btn btn-info">Get Stats\Users</button>
+                        </form>
+                    </td>
+                    <td style="width: 40%; padding: 10px;">
+                        {% if stats %}
+                        <h2>Select a Stat Category</h2>
+                        <select id="statSelector" class="form-select w-50 mb-4">
+                            <option selected>Choose an option...</option>
+                            {% for stat in stats %}
+                            <option value="stat-{{ loop.index0 }}">{{ stat.stat_title }}</option>
                             {% endfor %}
-                        </td>
-                    </tr>
-                </table>
-            </div>
-            <script>
-                async function updatePreview() {
-                    const raw = document.getElementById('email_text').value;
-                    const layout = document.getElementById('layout').value;
-                    const serverName = document.getElementById('server_name').value;
-                    const subject = document.getElementById('subject').value;
-                    let body = raw.replace(/\n/g, "<br>");
-                    let html = "";
+                        </select>
+                        {% for stat in stats %}
+                        <div id="stat-{{ loop.index0 }}" class="stat-table d-none">
+                            <div class="card my-4">
+                                <div class="card-header bg-primary text-white">
+                                    {{ stat.stat_title }}
+                                </div>
+                                <div class="card-body p-0">
+                                    {% if stat.rows %}
+                                    <table class="table table-striped m-0">
+                                        <thead class="table-dark">
+                                            <tr>
+                                                <th>Title</th>
+                                                <th>Year</th>
+                                                <th>Plays</th>
+                                                <th>Hours Played</th>
+                                                <th>Type</th>
+                                                <th>Rating</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for row in stat.rows %}
+                                            <tr>
+                                                <td>{{ row.title }}</td>
+                                                <td>{{ row.year }}</td>
+                                                <td>{{ row.total_plays }}</td>
+                                                {% if row.total_duration %}
+                                                <td>{{ (row.total_duration/60/60)|round(2) }}</td>
+                                                {% else %}
+                                                <td>no time data</td>
+                                                {% endif %}
+                                                <td>{{ row.media_type }}</td>
+                                                <td>{{ row.content_rating }}</td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                    {% else %}
+                                    <p class="m-3">No data available.</p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                        {% endif %}
+                    </td>
+                </tr>
+            </table>
+            <table style="height: 25%; width: 100%;">
+                <tr style="height: 100%; padding: 10px;">
+                    <td style="width: 15%; padding: 10px;">
+                        {% if graph_data != [{},{}] %}
+                        <h2>Select a Graph</h2>
+                        <select id="graphSelector" class="form-select w-100 mb-4">
+                            <option selected>Choose an option...</option>
+                            {% for graph in graph_data %}
+                            <option value="graph-{{ loop.index0 }}">{{ graph_commands[loop.index0].name }}</option>
+                            {% endfor %}
+                        </select>
+                        {% endif %}
+                    </td>
+                    <td style="width: 85%; padding: 10px;">
+                        {% for graph in graph_data %}
+                        <div class="checkbox-container d-none" id="checkbox-graph-{{ loop.index0 }}">
+                            <label>
+                                <input type="checkbox" class="graph-checkbox" value="graph-{{ loop.index0 }}">
+                                Include {{ graph_commands[loop.index0].name }} in email
+                            </label>
+                        </div>
+                        <div class="graph-table d-none" id="graph-{{ loop.index0 }}"></div>
+                        {% endfor %}
+                    </td>
+                </tr>
+            </table>
+        </div>
+        <script>
+            async function updatePreview() {
+                const raw = document.getElementById('email_text').value;
+                const layout = document.getElementById('layout').value;
+                const serverName = document.getElementById('server_name').value;
+                const subject = document.getElementById('subject').value;
+                let body = raw.replace(/\n/g, "<br>");
+                let html = "";
 
-                    const selectedGraphs = Array.from(document.querySelectorAll('.graph-checkbox:checked'))
-                        .map(cb => cb.value);
+                const selectedGraphs = Array.from(document.querySelectorAll('.graph-checkbox:checked'))
+                    .map(cb => cb.value);
 
-                    let graphImagesHTML = "";
-                    for (let id of selectedGraphs) {
-                        const chart = Highcharts.charts.find(c => c && c.renderTo.id === id);
-                        if (chart) {
-                            const svg = chart.getSVG();
-                            const canvas = document.createElement("canvas");
-                            const ctx = canvas.getContext("2d");
-                            const img = new Image();
+                let graphImagesHTML = "";
+                for (let id of selectedGraphs) {
+                    const chart = Highcharts.charts.find(c => c && c.renderTo.id === id);
+                    if (chart) {
+                        const svg = chart.getSVG();
+                        const canvas = document.createElement("canvas");
+                        const ctx = canvas.getContext("2d");
+                        const img = new Image();
 
-                            await new Promise((resolve, reject) => {
-                                img.onload = () => {
-                                    canvas.width = img.width;
-                                    canvas.height = img.height;
-                                    ctx.drawImage(img, 0, 0);
-                                    const dataUrl = canvas.toDataURL("image/png");
-                                    graphImagesHTML += `<img src="${dataUrl}" style="max-width: 100%; margin-bottom: 10px;">`;
-                                    resolve();
-                                };
-                                img.onerror = reject;
-                                img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)));
-                            });
-                        }
+                        await new Promise((resolve, reject) => {
+                            img.onload = () => {
+                                canvas.width = img.width;
+                                canvas.height = img.height;
+                                ctx.drawImage(img, 0, 0);
+                                const dataUrl = canvas.toDataURL("image/png");
+                                graphImagesHTML += `<img src="${dataUrl}" style="max-width: 100%; margin-bottom: 10px;">`;
+                                resolve();
+                            };
+                            img.onerror = reject;
+                            img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)));
+                        });
                     }
+                }
 
-                    const content = `${body}${graphImagesHTML}`;
-                
-                    switch (layout) {
-                        case "basic":
-                            html = `
+                const graphPlaceholder = document.getElementById('graph_placeholder').value;
+                let content = body;
+
+                if (raw.includes(graphPlaceholder)) {
+                    content = body.replace(graphPlaceholder, graphImagesHTML);
+                } else {
+                    content = `${body}${graphImagesHTML}`;
+                }
+
+                switch (layout) {
+                    case "basic":
+                        html = `
                                 <html><body style="font-family: Arial; padding: 20px;">
                                 <h2>newsletterr</h2>
                                 <div style="border: 1px solid #ddd; padding: 10px; background: #f9f9f9;">
                                     ${content}
                                 </div></body></html>`;
-                            break;
-                        case "card":
-                            html = `
+                        break;
+                    case "card":
+                        html = `
                                 <html><body style="background: #f0f0f0; display: flex; justify-content: center; font-family: Arial;">
                                 <div style="background: white; max-width: 600px; padding: 20px; margin: 40px auto; box-shadow: 0 0 10px rgba(0,0,0,0.1);">
                                     ${content}
                                 </div></body></html>`;
-                            break;
-                        case "dark":
-                            html = `
+                        break;
+                    case "dark":
+                        html = `
                                 <html><body style="background: #111; color: #eee; font-family: Arial; padding: 20px;">
                                 <div style="background: #222; padding: 20px; border-radius: 8px;">
                                     ${content}
                                 </div></body></html>`;
-                            break;
-                        case "twocol":
-                            html = `
+                        break;
+                    case "twocol":
+                        html = `
                                 <html><body style="font-family: Arial; padding: 20px;">
                                 <table style="width: 100%;">
                                 <tr>
@@ -206,17 +225,17 @@
                                     <td style="width: 50%; padding: 10px;">${content}</td>
                                 </tr>
                                 </table></body></html>`;
-                            break;
-                        case "banner":
-                            html = `
+                        break;
+                    case "banner":
+                        html = `
                                 <html><body style="font-family: Arial;">
                                 <div style="background: #0077cc; color: white; padding: 20px; text-align: center;">
                                 <h1>newsletterr</h1>
                                 </div>
                                 <div style="padding: 20px;">${content}</div></body></html>`;
-                            break;
-                        case "tautulli":
-                            html = `
+                        break;
+                    case "tautulli":
+                        html = `
                                 <html><body style="font-family: Arial;">
                                     <table class="body" style="border-collapse: separate; mso-table-lspace: 0pt; mso-table-rspace: 0pt; width: 100%;" border="0" cellspacing="0" cellpadding="0">
                                         <tbody>
@@ -248,140 +267,140 @@
                                             </tr>
                                         </tbody>
                                     </table></body></html>`;
-                            break;
-                        default:
-                            html = `<html><body>${content}</body></html>`;
-                    }
-                
-                    document.getElementById('preview').srcdoc = html;
+                        break;
+                    default:
+                        html = `<html><body>${content}</body></html>`;
                 }
-                
-                document.addEventListener('DOMContentLoaded', () => {
-                    document.getElementById('email_text').addEventListener('input', updatePreview);
-                    document.getElementById('layout').addEventListener('change', updatePreview);
-                    document.querySelectorAll('.graph-checkbox').forEach(cb => {
-                        cb.addEventListener('change', updatePreview);
-                    });
+
+                document.getElementById('preview').srcdoc = html;
+            }
+
+            document.addEventListener('DOMContentLoaded', () => {
+                document.getElementById('email_text').addEventListener('input', updatePreview);
+                document.getElementById('layout').addEventListener('change', updatePreview);
+                document.querySelectorAll('.graph-checkbox').forEach(cb => {
+                    cb.addEventListener('change', updatePreview);
                 });
-            </script>
-            <script>
-                document.getElementById('statSelector').addEventListener('change', function () {
-                    const selectedId = this.value;
-                    document.querySelectorAll('.stat-table').forEach(el => {
-                        el.classList.add('d-none');
-                    });
-                    document.getElementById(selectedId).classList.remove('d-none');
+            });
+        </script>
+        <script>
+            document.getElementById('statSelector').addEventListener('change', function () {
+                const selectedId = this.value;
+                document.querySelectorAll('.stat-table').forEach(el => {
+                    el.classList.add('d-none');
                 });
-            </script>
-            <script>
-                function showGraph(index) {
-                    document.querySelectorAll('.graph-table').forEach(el => el.classList.add('d-none'));
-                    document.querySelectorAll('.checkbox-container').forEach(el => el.classList.add('d-none'));
-                
-                    document.getElementById(`graph-${index}`).classList.remove('d-none');
-                    document.getElementById(`checkbox-graph-${index}`).classList.remove('d-none');
+                document.getElementById(selectedId).classList.remove('d-none');
+            });
+        </script>
+        <script>
+            function showGraph(index) {
+                document.querySelectorAll('.graph-table').forEach(el => el.classList.add('d-none'));
+                document.querySelectorAll('.checkbox-container').forEach(el => el.classList.add('d-none'));
+
+                document.getElementById(`graph-${index}`).classList.remove('d-none');
+                document.getElementById(`checkbox-graph-${index}`).classList.remove('d-none');
+            }
+        </script>
+        <script>
+            const graphDataList = {{ graph_data | tojson }};
+            const graphCommands = {{ graph_commands | tojson }};
+
+            const renderedCharts = new Set();
+
+            document.getElementById('graphSelector').addEventListener('change', function () {
+                const selectedId = this.value;
+
+                document.querySelectorAll('.graph-table').forEach(el => el.classList.add('d-none'));
+
+                const container = document.getElementById(selectedId);
+                container.classList.remove('d-none');
+
+                if (!renderedCharts.has(selectedId)) {
+                    const index = parseInt(selectedId.split('-')[1]);
+                    const graphData = graphDataList[index];
+
+                    Highcharts.chart(selectedId, {
+                        chart: { type: 'line' },
+                        title: { text: graphCommands[index].name },
+                        exporting: {
+                            enabled: true
+                        },
+                        xAxis: { categories: graphData.categories },
+                        yAxis: { title: { text: 'Plays' } },
+                        series: graphData.series
+                    });
+
+                    renderedCharts.add(selectedId);
+
+                    showGraph(index)
                 }
-            </script>
-            <script>
-                const graphDataList = {{ graph_data | tojson }};
-                const graphCommands = {{ graph_commands | tojson }};
-            
-                const renderedCharts = new Set();
-            
-                document.getElementById('graphSelector').addEventListener('change', function () {
-                    const selectedId = this.value;
-            
-                    document.querySelectorAll('.graph-table').forEach(el => el.classList.add('d-none'));
-            
-                    const container = document.getElementById(selectedId);
-                    container.classList.remove('d-none');
-            
-                    if (!renderedCharts.has(selectedId)) {
-                        const index = parseInt(selectedId.split('-')[1]);
-                        const graphData = graphDataList[index];
-            
-                        Highcharts.chart(selectedId, {
-                            chart: { type: 'line' },
-                            title: { text: graphCommands[index].name },
-                            exporting: {
-                                enabled: true
-                            },
-                            xAxis: { categories: graphData.categories },
-                            yAxis: { title: { text: 'Plays' } },
-                            series: graphData.series
+            });
+        </script>
+        <script>
+            document.getElementById('sendEmailBtn').addEventListener('click', async () => {
+                const selectedGraphs = Array.from(document.querySelectorAll('.graph-checkbox:checked'))
+                    .map(cb => cb.value);
+
+                const from_email = document.querySelector('input[name="from_email"]').value;
+                const alias_email = document.querySelector('input[name="alias_email"]').value;
+                const password = document.querySelector('input[name="password"]').value;
+                const smtp_server = document.querySelector('input[name="smtp_server"]').value;
+                const smtp_port = document.querySelector('input[name="smtp_port"]').value;
+                const server_name = document.getElementById('server_name').value;
+                const to_emails = document.getElementById('to_emails').value;
+                const subject = document.getElementById('subject').value;
+                const email_text = document.getElementById('email_text').value;
+                const layout = document.getElementById('layout').value;
+                const graphImages = [];
+
+                for (let id of selectedGraphs) {
+                    const chart = Highcharts.charts.find(c => c && c.renderTo.id === id);
+                    if (chart) {
+                        const svg = chart.getSVG();
+                        const canvas = document.createElement("canvas");
+                        const ctx = canvas.getContext("2d");
+                        const img = new Image();
+
+                        await new Promise((resolve, reject) => {
+                            img.onload = () => {
+                                canvas.width = img.width;
+                                canvas.height = img.height;
+                                ctx.drawImage(img, 0, 0);
+                                const dataUrl = canvas.toDataURL("image/png");
+                                graphImages.push({ id, img: dataUrl });
+                                resolve();
+                            };
+                            img.onerror = reject;
+                            img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)));
                         });
-            
-                        renderedCharts.add(selectedId);
+                    }
+                }
 
-                        showGraph(index)
+                fetch('/send_email', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        from_email,
+                        alias_email,
+                        password,
+                        smtp_server,
+                        smtp_port,
+                        server_name,
+                        to_emails,
+                        subject,
+                        email_text,
+                        layout,
+                        graphs: graphImages
+                    })
+                }).then(resp => {
+                    if (resp.ok) {
+                        alert("Email sent!");
+                    } else {
+                        alert("Error sending email.");
                     }
                 });
-            </script>
-            <script>
-                document.getElementById('sendEmailBtn').addEventListener('click', async () => {
-                    const selectedGraphs = Array.from(document.querySelectorAll('.graph-checkbox:checked'))
-                        .map(cb => cb.value);
-                
-                    const from_email = document.querySelector('input[name="from_email"]').value;
-                    const alias_email = document.querySelector('input[name="alias_email"]').value;
-                    const password = document.querySelector('input[name="password"]').value;
-                    const smtp_server = document.querySelector('input[name="smtp_server"]').value;
-                    const smtp_port = document.querySelector('input[name="smtp_port"]').value;
-                    const server_name = document.getElementById('server_name').value;
-                    const to_emails = document.getElementById('to_emails').value;
-                    const subject = document.getElementById('subject').value;
-                    const email_text = document.getElementById('email_text').value;
-                    const layout = document.getElementById('layout').value;
-                    const graphImages = [];
-                
-                    for (let id of selectedGraphs) {
-                        const chart = Highcharts.charts.find(c => c && c.renderTo.id === id);
-                        if (chart) {
-                            const svg = chart.getSVG();
-                            const canvas = document.createElement("canvas");
-                            const ctx = canvas.getContext("2d");
-                            const img = new Image();
-
-                            await new Promise((resolve, reject) => {
-                                img.onload = () => {
-                                    canvas.width = img.width;
-                                    canvas.height = img.height;
-                                    ctx.drawImage(img, 0, 0);
-                                    const dataUrl = canvas.toDataURL("image/png");
-                                    graphImages.push({ id, img: dataUrl });
-                                    resolve();
-                                };
-                                img.onerror = reject;
-                                img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)));
-                            });
-                        }
-                    }
-
-                    fetch('/send_email', {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({
-                            from_email,
-                            alias_email,
-                            password,
-                            smtp_server,
-                            smtp_port,
-                            server_name,
-                            to_emails,
-                            subject,
-                            email_text,
-                            layout,
-                            graphs: graphImages
-                        })
-                    }).then(resp => {
-                        if (resp.ok) {
-                            alert("Email sent!");
-                        } else {
-                            alert("Error sending email.");
-                        }
-                    });
-                });
-            </script>
-        </div>
+            });
+        </script>
     </div>
+</div>
 {% endblock %}

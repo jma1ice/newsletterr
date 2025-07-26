@@ -12,11 +12,10 @@
 </head>
 <body class="{% if dark_mode %}dark{% endif %}">
     <nav class="navbar">
-        <div class="nav-container">
-            <ul class="nav-links" id="navLinks">
-                <a href="{{ url_for('index') }}">newsletterr</a>
-            </ul>
-        </div>
+        <ul id="navLinks">
+            <li><a href="{{ url_for('index') }}">newsletterr</a></li>
+            <li><a href="{{ url_for('setup') }}">setup</a></li>
+        </ul>
     </nav><br>
     {% block content %}{% endblock %}
     <script>

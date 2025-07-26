@@ -1,35 +1,29 @@
-body {
-    margin: 0;
-    display: flex;
-}
-
 .frame {
     height: 50rem;
     width: 50rem;
     border: 1px solid #ccc;
 }
 
-/* General Body Styles */
 body {
     font-family: 'Arial', sans-serif;
     margin: 0;
     padding: 0;
+    display: flex;
     background-color: #f4f4f4;
     background: #818faa;
     color: #333;
 }
 
-/* Navigation Bar Styles */
 .navbar {
     background-color: #333;
     color: white;
     padding: 1em 0;
     text-align: center;
-    position: fixed; /* Makes the navbar stick to the top */
+    position: fixed;
     width: 100%;
     top: 0;
     left: 0;
-    z-index: 1000; /* Ensures the navbar is above other content */
+    z-index: 1000;
     box-shadow: 0 2px 5px rgba(0,0,0,0.2);
 }
 
@@ -37,12 +31,12 @@ body {
     list-style-type: none;
     padding: 0px;
     margin: 5px 10px;
-    display: flex; /* Use flexbox for horizontal alignment */
-    justify-content: center; /* Center the navigation items */
+    display: flex;
+    justify-content: center;
 }
 
 .navbar ul li {
-    margin: 5px 15px;
+    margin: 0px 15px;
 }
 
 .navbar ul li a {
@@ -56,13 +50,10 @@ body {
     color: #ddd;
 }
 
-/* Content Area Adjustment */
-/* Add padding to the body or a main content div to prevent content from being hidden behind the fixed navbar */
 body {
-    padding-top: 70px; /* Adjust this value based on your navbar's height */
+    padding-top: 70px;
 }
 
-/* Basic Container for Content */
 .container {
     max-width: 1900px;
     margin: 1px auto;

@@ -108,7 +108,7 @@ def apply_layout(body, graphs_html_block, layout, subject, server_name):
     else:
         return body
 
-def run_tautulli_command(base_url, api_key, command, data_type, error, alert):
+def run_tautulli_command(base_url, api_key, command, data_type, error):
     api_url = f"{base_url}/api/v2?apikey={api_key}&cmd={command}"
 
     try:
@@ -118,10 +118,6 @@ def run_tautulli_command(base_url, api_key, command, data_type, error, alert):
 
         if data.get('response', {}).get('result') == 'success':
             out_data = data['response']['data']
-            if alert == None:
-                alert = f'{data_type} pulled'
-            else:
-                alert += f', {data_type} pulled'
         else:
             if error == None:
                 error = data.get('response', {}).get('message', 'Unknown error')
@@ -133,7 +129,7 @@ def run_tautulli_command(base_url, api_key, command, data_type, error, alert):
         else:
             error += str(f", {data_type} Error: {e}")
 
-    return [out_data, error, alert]
+    return [out_data, error]
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
@@ -229,15 +225,17 @@ def index():
             base_url = settings['tautulli_url'].rstrip('/')
             api_key = settings['tautulli_api']
 
-            stats, error, alert = run_tautulli_command(base_url, api_key, 'get_home_stats', 'Stats', error, alert)
-            users, error, alert = run_tautulli_command(base_url, api_key, 'get_users', 'Users', error, alert)
+            stats, error = run_tautulli_command(base_url, api_key, 'get_home_stats', 'Stats', error)
+            users, error = run_tautulli_command(base_url, api_key, 'get_users', 'Users', error)
             for command in graph_commands:
-                gd, error, alert = run_tautulli_command(base_url, api_key, command["command"], command["name"], error, alert)
+                gd, error = run_tautulli_command(base_url, api_key, command["command"], command["name"], error)
                 graph_data.append(gd)
             
             for user in users:
                 if user['email'] != None and user['is_active']:
                     user_emails.append(user['email'])
+            
+            alert = "Users and stats pulled successfully!"
 
     if graph_data == []:
         graph_data = [{},{}]

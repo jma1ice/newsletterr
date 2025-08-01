@@ -1,4 +1,5 @@
 import os
+import math
 import uuid
 import base64
 import smtplib
@@ -71,11 +72,15 @@ def apply_layout(body, graphs_html_block, layout, subject, server_name):
     else:
         return body
 
-def run_tautulli_command(base_url, api_key, command, data_type, error, time_range=30):
+def run_tautulli_command(base_url, api_key, command, data_type, error, time_range='30'):
     if command == 'get_users':
         api_url = f"{base_url}/api/v2?apikey={api_key}&cmd={command}"
     else:
-        api_url = f"{base_url}/api/v2?apikey={api_key}&cmd={command}&time_range={time_range}"
+        if command == 'get_plays_per_month':
+            month_range = str(math.ceil(int(time_range) / 30))
+            api_url = f"{base_url}/api/v2?apikey={api_key}&cmd={command}&time_range={month_range}"
+        else:
+            api_url = f"{base_url}/api/v2?apikey={api_key}&cmd={command}&time_range={time_range}"
 
     try:
         response = requests.get(api_url)

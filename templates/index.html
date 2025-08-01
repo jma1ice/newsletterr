@@ -14,7 +14,9 @@
             <table style="height: 75%; width: 100%;">
                 <tr style="height: 100%; padding: 10px;">
                     <td style="width: 20%; padding: 10px;">
-                        <form method="post">
+                        <form method="POST">
+                            <label for="days_to_pull">Time Range:</label>
+                            <input type="number" id="days_to_pull" name="days_to_pull" value="30" /><br><br>
                             <button class="btn btn-info">Get Stats\Users</button>
                         </form><br>
                         <form method="POST" action="/send_email">
@@ -25,12 +27,7 @@
                             <label for="layout">Choose a layout:</label>
                             <select id="layout" name="layout" onchange="updatePreview()">
                                 <option value="none">Plain Text</option>
-                                <option value="basic">Basic</option>
-                                <option value="card">Centered Card</option>
-                                <option value="dark">Dark Mode Box</option>
-                                <option value="twocol">Two-column</option>
-                                <option value="banner">Banner/Header</option>
-                                <option value="tautulli">Tautulli</option>
+                                <option value="standard">Standard</option>
                             </select><br><br>
                             <textarea name="email_text" id="email_text" placeholder="Write your message..." rows="10"
                                 cols="40" oninput="updatePreview()" required></textarea><br><br>
@@ -172,49 +169,7 @@
                 }
 
                 switch (layout) {
-                    case "basic":
-                        html = `
-                                <html><body style="font-family: Arial; padding: 20px;">
-                                <h2>newsletterr</h2>
-                                <div style="border: 1px solid #ddd; padding: 10px; background: #f9f9f9;">
-                                    ${content}
-                                </div></body></html>`;
-                        break;
-                    case "card":
-                        html = `
-                                <html><body style="background: #f0f0f0; display: flex; justify-content: center; font-family: Arial;">
-                                <div style="background: white; max-width: 600px; padding: 20px; margin: 40px auto; box-shadow: 0 0 10px rgba(0,0,0,0.1);">
-                                    ${content}
-                                </div></body></html>`;
-                        break;
-                    case "dark":
-                        html = `
-                                <html><body style="background: #111; color: #eee; font-family: Arial; padding: 20px;">
-                                <div style="background: #222; padding: 20px; border-radius: 8px;">
-                                    ${content}
-                                </div></body></html>`;
-                        break;
-                    case "twocol":
-                        html = `
-                                <html><body style="font-family: Arial; padding: 20px;">
-                                <table style="width: 100%;">
-                                <tr>
-                                    <td style="width: 50%; padding: 10px;">
-                                    <img src="https://d15k2d11r6t6rl.cloudfront.net/public/users/Integrators/669d5713-9b6a-46bb-bd7e-c542cff6dd6a/3bef3c50f13f4320a9e31b8be79c6ad2/Plex%20Logo%20Update%202022/plex-logo-heavy-stroke.png" style="max-width: 100%;">
-                                    </td>
-                                    <td style="width: 50%; padding: 10px;">${content}</td>
-                                </tr>
-                                </table></body></html>`;
-                        break;
-                    case "banner":
-                        html = `
-                                <html><body style="font-family: Arial;">
-                                <div style="background: #0077cc; color: white; padding: 20px; text-align: center;">
-                                <h1>newsletterr</h1>
-                                </div>
-                                <div style="padding: 20px;">${content}</div></body></html>`;
-                        break;
-                    case "tautulli":
+                    case "standard":
                         html = `
                                 <html><body style="font-family: Arial;">
                                     <table class="body" style="border-collapse: separate; mso-table-lspace: 0pt; mso-table-rspace: 0pt; width: 100%;" border="0" cellspacing="0" cellpadding="0">

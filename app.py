@@ -35,44 +35,7 @@ def init_db(db_path):
 def apply_layout(body, graphs_html_block, layout, subject, server_name):
     body = body.replace('\n', '<br>')
     body = body.replace('[GRAPHS]', graphs_html_block)
-    if layout == "basic":
-        return f"""
-        <html><body style="font-family: Arial; padding: 20px;">
-        <h2>newsletterr</h2>
-        <div style="border: 1px solid #ddd; padding: 10px; background: #f9f9f9;">
-            {body}
-        </div></body></html>"""
-    elif layout == "card":
-        return f"""
-        <html><body style="background: #f0f0f0; display: flex; justify-content: center; font-family: Arial;">
-        <div style="background: white; max-width: 600px; padding: 20px; margin: 40px auto; box-shadow: 0 0 10px rgba(0,0,0,0.1);">
-            {body}
-        </div></body></html>"""
-    elif layout == "dark":
-        return f"""
-        <html><body style="background: #111; color: #eee; font-family: Arial; padding: 20px;">
-        <div style="background: #222; padding: 20px; border-radius: 8px;">
-            {body}
-        </div></body></html>"""
-    elif layout == "twocol":
-        return f"""
-        <html><body style="font-family: Arial; padding: 20px;">
-        <table style="width: 100%;">
-            <tr>
-                <td style="width: 50%; padding: 10px;">
-                    <img src="https://d15k2d11r6t6rl.cloudfront.net/public/users/Integrators/669d5713-9b6a-46bb-bd7e-c542cff6dd6a/3bef3c50f13f4320a9e31b8be79c6ad2/Plex%20Logo%20Update%202022/plex-logo-heavy-stroke.png" style="max-width: 100%;">
-                </td>
-                <td style="width: 50%; padding: 10px;">{body}</td>
-            </tr>
-        </table></body></html>"""
-    elif layout == "banner":
-        return f"""
-        <html><body style="font-family: Arial;">
-        <div style="background: #0077cc; color: white; padding: 20px; text-align: center;">
-            <h1>newsletterr Header</h1>
-        </div>
-        <div style="padding: 20px;">{body}</div></body></html>"""
-    elif layout == "tautulli":
+    if layout == "tautulli":
         return f"""
         <html><body style="font-family: Arial;">
             <table class="body" style="border-collapse: separate; mso-table-lspace: 0pt; mso-table-rspace: 0pt; width: 100%;" border="0" cellspacing="0" cellpadding="0">
@@ -108,8 +71,11 @@ def apply_layout(body, graphs_html_block, layout, subject, server_name):
     else:
         return body
 
-def run_tautulli_command(base_url, api_key, command, data_type, error):
-    api_url = f"{base_url}/api/v2?apikey={api_key}&cmd={command}"
+def run_tautulli_command(base_url, api_key, command, data_type, error, time_range=30):
+    if command == 'get_users':
+        api_url = f"{base_url}/api/v2?apikey={api_key}&cmd={command}"
+    else:
+        api_url = f"{base_url}/api/v2?apikey={api_key}&cmd={command}&time_range={time_range}"
 
     try:
         response = requests.get(api_url)
@@ -222,13 +188,14 @@ def index():
                                     stats=stats, user_emails=user_emails, graph_data=graph_data,
                                     graph_commands=graph_commands, alert=alert, settings=settings)
         else:
+            time_range = request.form.get("days_to_pull")
             base_url = settings['tautulli_url'].rstrip('/')
             api_key = settings['tautulli_api']
 
-            stats, error = run_tautulli_command(base_url, api_key, 'get_home_stats', 'Stats', error)
+            stats, error = run_tautulli_command(base_url, api_key, 'get_home_stats', 'Stats', error, time_range)
             users, error = run_tautulli_command(base_url, api_key, 'get_users', 'Users', error)
             for command in graph_commands:
-                gd, error = run_tautulli_command(base_url, api_key, command["command"], command["name"], error)
+                gd, error = run_tautulli_command(base_url, api_key, command["command"], command["name"], error, time_range)
                 graph_data.append(gd)
             
             for user in users:

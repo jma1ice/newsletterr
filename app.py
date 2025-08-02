@@ -33,10 +33,11 @@ def init_db(db_path):
     conn.commit()
     conn.close()
 
-def apply_layout(body, graphs_html_block, layout, subject, server_name):
+def apply_layout(body, graphs_html_block, stats_html_block, layout, subject, server_name):
     body = body.replace('\n', '<br>')
     body = body.replace('[GRAPHS]', graphs_html_block)
-    if layout == "tautulli":
+    body = body.replace('[STATS]', stats_html_block)
+    if layout == "standard":
         return f"""
         <html><body style="font-family: Arial;">
             <table class="body" style="border-collapse: separate; mso-table-lspace: 0pt; mso-table-rspace: 0pt; width: 100%;" border="0" cellspacing="0" cellpadding="0">
@@ -250,6 +251,7 @@ def send_email():
     data = request.get_json()
 
     graphs = data['graphs']
+    stats = data['stats']
     from_email = settings['from_email']
     alias_email = settings['alias_email']
     password = settings['password']
@@ -286,9 +288,24 @@ def send_email():
         image_part.add_header('Content-ID', f'<{cid}>')
         image_part.add_header('Content-Disposition', 'inline', filename=f'{cid}.png')
         msg_root.attach(image_part)
-
     graphs_html_block = ''.join(html_graphs)
-    html_content = apply_layout(email_text, graphs_html_block, layout, subject, server_name)
+
+    html_stats = []
+    for stat in stats:
+        cid = str(uuid.uuid4())
+
+        html_stats.append(f'<p><img src="cid:{cid}" style="max-width: 100%;"></p>')
+
+        base64_data = stat['img'].split(',')[1]
+        image_data = base64.b64decode(base64_data)
+
+        image_part = MIMEImage(image_data, _subtype='png')
+        image_part.add_header('Content-ID', f'<{cid}>')
+        image_part.add_header('Content-Disposition', 'inline', filename=f'{cid}.png')
+        msg_root.attach(image_part)
+    stats_html_block = ''.join(html_stats)
+
+    html_content = apply_layout(email_text, graphs_html_block, stats_html_block, layout, subject, server_name)
 
     msg_alternative.attach(MIMEText(html_content, 'html'))
 

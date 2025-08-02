@@ -34,6 +34,9 @@
                             <label for="graph_placeholder">Graph Placeholder:</label>
                             <input type="text" id="graph_placeholder" name="graph_placeholder" value="[GRAPHS]"
                                 oninput="updatePreview()"><br><br>
+                            <label for="stat_placeholder">Stat Placeholder:</label>
+                            <input type="text" id="stat_placeholder" name="stat_placeholder" value="[STATS]"
+                                oninput="updatePreview()"><br><br>
                         </form>
                         <button id="sendEmailBtn" class="btn btn-info">Send Email with Selected Graphs</button>
                     </td>
@@ -50,6 +53,12 @@
                                 {% endfor %}
                             </select>
                             {% for stat in stats %}
+                                <div class="stat-checkbox-container d-none" id="checkbox-stat-{{ loop.index0 }}">
+                                    <label>
+                                        <input type="checkbox" class="stat-checkbox" value="stat-{{ loop.index0 }}">
+                                        Include {{ stat.stat_title }} in email
+                                    </label>
+                                </div>
                                 <div id="stat-{{ loop.index0 }}" class="stat-table d-none">
                                     <div class="card my-4">
                                         <div class="card-header bg-primary text-white">
@@ -111,7 +120,7 @@
                     </td>
                     <td style="width: 85%; padding: 10px;">
                         {% for graph in graph_data %}
-                            <div class="checkbox-container d-none" id="checkbox-graph-{{ loop.index0 }}">
+                            <div class="graph-checkbox-container d-none" id="checkbox-graph-{{ loop.index0 }}">
                                 <label>
                                     <input type="checkbox" class="graph-checkbox" value="graph-{{ loop.index0 }}">
                                     Include {{ graph_commands[loop.index0].name }} in email
@@ -133,6 +142,8 @@
                 let html = "";
 
                 const selectedGraphs = Array.from(document.querySelectorAll('.graph-checkbox:checked'))
+                    .map(cb => cb.value);
+                const selectedStats = Array.from(document.querySelectorAll('.stat-checkbox:checked'))
                     .map(cb => cb.value);
 
                 let graphImagesHTML = "";
@@ -159,24 +170,55 @@
                     }
                 }
 
+                let statImagesHTML = "";
+                for (let id of selectedStats) {
+                    const tableElement = document.getElementById(id);
+                    if (tableElement) {
+                        const wasHidden = tableElement.classList.contains('d-none');
+                        if (wasHidden) {
+                            tableElement.classList.remove('d-none');
+                        }
+                        await new Promise(resolve => setTimeout(resolve, 50));
+
+                        const canvas = await html2canvas(tableElement, {
+                            backgroundColor: null,
+                            scale: 1
+                        });
+
+                        const dataUrl = canvas.toDataURL("image/png");
+                        statImagesHTML += `<img src="${dataUrl}" style="max-width: 100%; margin-bottom: 10px;">`;
+
+                        if (wasHidden) {
+                            tableElement.classList.add('d-none');
+                        }
+                    }
+                }
+
                 const graphPlaceholder = document.getElementById('graph_placeholder').value;
-                let content = body;
+                const statPlaceholder = document.getElementById('stat_placeholder').value;
+                let gContent = body;
 
                 if (raw.includes(graphPlaceholder)) {
-                    content = body.replace(graphPlaceholder, graphImagesHTML);
+                    gContent = body.replace(graphPlaceholder, graphImagesHTML);
                 } else {
-                    content = `${body}${graphImagesHTML}`;
+                    gContent = `${body}`;
+                }
+
+                if (raw.includes(statPlaceholder)) {
+                    content = gContent.replace(statPlaceholder, statImagesHTML);
+                } else {
+                    content = `${gContent}`;
                 }
 
                 switch (layout) {
                     case "standard":
                         html = `
                                 <html><body style="font-family: Arial;">
-                                    <table class="body" style="border-collapse: separate; mso-table-lspace: 0pt; mso-table-rspace: 0pt; width: 100%;" border="0" cellspacing="0" cellpadding="0">
+                                    <table class="body" style="border-collapse: separate; mso-table-lspace: 0pt; mso-table-rspace: 0pt; width: 90%;" border="0" cellspacing="0" cellpadding="0">
                                         <tbody>
                                             <tr>
-                                                <td class="container" style="font-family: 'Open Sans', Helvetica, Arial, sans-serif; font-size: 14px; vertical-align: top; display: block; max-width: 1042px; padding: 10px; width: 1042px; margin: 0 auto !important;">
-                                                    <div class="content" style="box-sizing: border-box; display: block; margin: 0 auto; max-width: 1037px; padding: 10px;"><span class="preheader" style="color: transparent; display: none; height: 0; max-height: 0; max-width: 0; opacity: 0; overflow: hidden; mso-hide: all; visibility: hidden; width: 0;">${serverName} Newsletter</span>
+                                                <td class="preview-container" style="font-family: 'Open Sans', Helvetica, Arial, sans-serif; font-size: 14px; vertical-align: top; display: block; max-width: 925px; padding: 5px; width: 925px; margin: 0 auto !important;">
+                                                    <div class="content" style="box-sizing: border-box; display: block; margin: 0 auto; max-width: 1037px; padding: 5px;"><span class="preheader" style="color: transparent; display: none; height: 0; max-height: 0; max-width: 0; opacity: 0; overflow: hidden; mso-hide: all; visibility: hidden; width: 0;">${serverName} Newsletter</span>
                                                         <table class="main" style="border-collapse: separate; mso-table-lspace: 0pt; mso-table-rspace: 0pt; width: 100%; background: #282A2D; border-radius: 3px; color: #ffffff;" border="0" cellspacing="0" cellpadding="3">
                                                             <tbody>
                                                                 <tr>
@@ -216,6 +258,9 @@
                 document.querySelectorAll('.graph-checkbox').forEach(cb => {
                     cb.addEventListener('change', updatePreview);
                 });
+                document.querySelectorAll('.stat-checkbox').forEach(cb => {
+                    cb.addEventListener('change', updatePreview);
+                });
             });
         </script>
         <script>
@@ -224,13 +269,16 @@
                 document.querySelectorAll('.stat-table').forEach(el => {
                     el.classList.add('d-none');
                 });
+                document.querySelectorAll('.stat-checkbox-container').forEach(el => el.classList.add('d-none'));
+
                 document.getElementById(selectedId).classList.remove('d-none');
+                document.getElementById(`checkbox-${selectedId}`).classList.remove('d-none');
             });
         </script>
         <script>
             function showGraph(index) {
                 document.querySelectorAll('.graph-table').forEach(el => el.classList.add('d-none'));
-                document.querySelectorAll('.checkbox-container').forEach(el => el.classList.add('d-none'));
+                document.querySelectorAll('.graph-checkbox-container').forEach(el => el.classList.add('d-none'));
 
                 document.getElementById(`graph-${index}`).classList.remove('d-none');
                 document.getElementById(`checkbox-graph-${index}`).classList.remove('d-none');
@@ -275,12 +323,15 @@
             document.getElementById('sendEmailBtn').addEventListener('click', async () => {
                 const selectedGraphs = Array.from(document.querySelectorAll('.graph-checkbox:checked'))
                     .map(cb => cb.value);
+                const selectedStats = Array.from(document.querySelectorAll('.stat-checkbox:checked'))
+                    .map(cb => cb.value);
 
                 const to_emails = document.getElementById('to_emails').value;
                 const subject = document.getElementById('subject').value;
                 const email_text = document.getElementById('email_text').value;
                 const layout = document.getElementById('layout').value;
                 const graphImages = [];
+                const statImages = [];
 
                 for (let id of selectedGraphs) {
                     const chart = Highcharts.charts.find(c => c && c.renderTo.id === id);
@@ -305,6 +356,29 @@
                     }
                 }
 
+                for (let id of selectedStats) {
+                    const tableElement = document.getElementById(id);
+                    if (tableElement) {
+                        const wasHidden = tableElement.classList.contains('d-none');
+                        if (wasHidden) {
+                            tableElement.classList.remove('d-none');
+                        }
+                        await new Promise(resolve => setTimeout(resolve, 50));
+
+                        const canvas = await html2canvas(tableElement, {
+                            backgroundColor: null,
+                            scale: 1
+                        });
+
+                        const dataUrl = canvas.toDataURL("image/png");
+                        statImages.push({ id, img: dataUrl });
+
+                        if (wasHidden) {
+                            tableElement.classList.add('d-none');
+                        }
+                    }
+                }
+
                 fetch('/send_email', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -313,7 +387,8 @@
                         subject,
                         email_text,
                         layout,
-                        graphs: graphImages
+                        graphs: graphImages,
+                        stats: statImages
                     })
                 }).then(resp => {
                     if (resp.ok) {

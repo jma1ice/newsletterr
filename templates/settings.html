@@ -11,7 +11,7 @@
     {% endif %}
     <div class="foreground">
         <div style="margin: 0px 0px 0px 15px;">
-            <form method="POST">
+            <form method="POST" id="settings_form">
                 <label for="from_email">From:</label><br>
                 <input type="email" id="from_email" name="from_email"
                     {% if settings.from_email !="" %}value="{{ settings.from_email }}"{% endif %}
@@ -55,6 +55,11 @@
                 <button id="applySettings" class="btn btn-info">Apply Settings</button>
             </form>
         </div>
+        <script>
+            document.getElementById('settings_form').addEventListener('submit', (e) => {
+                showSpinner('Applying settings...');
+            });
+        </script>
     </div>
 </div>
 {% endblock %}

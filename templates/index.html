@@ -14,7 +14,7 @@
             <table style="height: 75%; width: 100%;">
                 <tr style="height: 100%; padding: 10px;">
                     <td style="width: 20%; padding: 10px;">
-                        <form method="POST">
+                        <form method="POST" id="stats_form">
                             <label for="days_to_pull">Time Range:</label>
                             <input type="number" id="days_to_pull" name="days_to_pull" value="30" /><br><br>
                             <button class="btn btn-info">Get Stats\Users</button>
@@ -266,9 +266,7 @@
         <script>
             document.getElementById('statSelector').addEventListener('change', function () {
                 const selectedId = this.value;
-                document.querySelectorAll('.stat-table').forEach(el => {
-                    el.classList.add('d-none');
-                });
+                document.querySelectorAll('.stat-table').forEach(el => {el.classList.add('d-none');});
                 document.querySelectorAll('.stat-checkbox-container').forEach(el => el.classList.add('d-none'));
 
                 document.getElementById(selectedId).classList.remove('d-none');
@@ -276,13 +274,14 @@
             });
         </script>
         <script>
-            function showGraph(index) {
+            document.getElementById('graphSelector').addEventListener('change', function () {
+                const selectedId = this.value;
                 document.querySelectorAll('.graph-table').forEach(el => el.classList.add('d-none'));
                 document.querySelectorAll('.graph-checkbox-container').forEach(el => el.classList.add('d-none'));
 
-                document.getElementById(`graph-${index}`).classList.remove('d-none');
-                document.getElementById(`checkbox-graph-${index}`).classList.remove('d-none');
-            }
+                document.getElementById(selectedId).classList.remove('d-none');
+                document.getElementById(`checkbox-${selectedId}`).classList.remove('d-none');
+            });
         </script>
         <script>
             const graphDataList = {{ graph_data | tojson }};
@@ -314,13 +313,13 @@
                     });
 
                     renderedCharts.add(selectedId);
-
-                    showGraph(index)
                 }
             });
         </script>
         <script>
             document.getElementById('sendEmailBtn').addEventListener('click', async () => {
+                showSpinner('Sending email...');
+
                 const selectedGraphs = Array.from(document.querySelectorAll('.graph-checkbox:checked'))
                     .map(cb => cb.value);
                 const selectedStats = Array.from(document.querySelectorAll('.stat-checkbox:checked'))
@@ -379,28 +378,37 @@
                     }
                 }
 
-                fetch('/send_email', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        to_emails,
-                        subject,
-                        email_text,
-                        layout,
-                        graphs: graphImages,
-                        stats: statImages
-                    })
-                }).then(resp => {
+                try {
+                    const resp = await fetch('/send_email', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            to_emails,
+                            subject,
+                            email_text,
+                            layout,
+                            graphs: graphImages,
+                            stats: statImages
+                        })
+                    });
+                    
                     if (resp.ok) {
                         alert("Email sent!");
                     } else {
-                        resp.json().then(data => {
-                            alert("Error sending email: " + data.error);
-                        });
+                        const data = await resp.json();
+                        alert("Error sending email: " + data.error);
                     }
-                }).catch(err => {
+                } catch (err) {
                     console.error("Error sending email:", err);
-                });
+                    alert("Something went wrong while sending the email.");
+                }
+
+                hideSpinner();
+            });
+        </script>
+        <script>
+            document.getElementById('stats_form').addEventListener('submit', (e) => {
+                showSpinner('Getting stats and users...');
             });
         </script>
     </div>

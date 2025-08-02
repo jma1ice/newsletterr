@@ -1,6 +1,6 @@
 # Newsletterr
 
-_Turn your Plex server analytics into a beautiful weekly (or whenever‑you‑like) newsletter._
+_Turn your Plex server analytics into a beautiful weekly* (or whenever‑you‑like) newsletter._
 
 Newsletterr is a lightweight Flask application that talks to **[Tautulli](https://tautulli.com/)**, crunches your Plex statistics, renders charts with **Highcharts**, and emails the results to your user base, all without leaving the browser.
 
@@ -104,6 +104,7 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 
 ## To-Do
 
+* Add in scheduled newsletter functionality
 * Dockerize
 * Compile EXE and ELF files
 * HTML cards and other CSS to add some life to the UI

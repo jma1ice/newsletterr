@@ -12,17 +12,28 @@
     <title>{% block title %}newsletterr{% endblock %}</title>
 </head>
 <body class="{% if dark_mode %}dark{% endif %}">
+    <div id="spinner" class="spinner" style="display: none;">
+        <img src="/static/img/bouncing_newspaper.gif" alt="Loading..." />
+        <p id="loading-text"></p>
+    </div>
     <nav class="navbar">
         <ul id="navLinks">
             <li><a href="{{ url_for('index') }}">newsletterr</a></li>
             <li><a href="{{ url_for('settings') }}">settings</a></li>
         </ul>
-    </nav><br>
+        <div>
+            <img src="/static/img/newspaper.png" alt="Logo" class="logo" />
+        </div>
+    </nav>
     {% block content %}{% endblock %}
     <script>
-        function toggleMenu() {
-            const nav = document.getElementById("navLinks");
-            nav.classList.toggle("show");
+        function showSpinner(passedText) {
+            document.getElementById('spinner').style.display = 'flex';
+            document.getElementById('loading-text').innerText = passedText;
+        }
+
+        function hideSpinner() {
+            document.getElementById('spinner').style.display = 'none';
         }
     </script>
 </body>

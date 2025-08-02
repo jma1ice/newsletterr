@@ -1,0 +1,121 @@
+# Newsletterr
+
+_Turn your Plex server analytics into a beautiful weekly (or whenever‑you‑like) newsletter._
+
+Newsletterr is a lightweight Flask application that talks to **[Tautulli](https://tautulli.com/)**, crunches your Plex statistics, renders charts with **Highcharts**, and emails the results to your user base, all without leaving the browser.
+
+---
+
+## Features
+
+* **One‑click stats pull** – choose a time‑range and let Newsletterr query Tautulli for the most‑watched items, top users, and more.  
+* **Interactive charts & tables** – Highcharts + HTML tables are rendered in the browser, then flattened into inline images with *html2canvas* so every e‑mail client sees exactly what you see.  
+* **WYSIWYG e‑mail preview** – compose the subject & body, drop in `[GRAPHS]` or `[STATS]` tokens, and pick a layout.  
+* **SMTP delivery with BCC support** – works with Gmail (app‑password), Outlook, Mailgun, or your own server.  
+* **Secure local persistence** – all settings are kept in a tiny SQLite database inside `database/data.db`.  
+* **Zero‑install frontend** – Tailwind + Bootstrap served from a CDN; no Node toolchain required.  
+* **Friendly loading spinner** – keep users informed while running scripts complete.
+
+---
+
+## Quick Start
+
+### 1. Prerequisites
+
+* Python **3.9** or higher  
+* A running **Tautulli** instance with an API key  
+* SMTP credentials (username & password _or_ an app‑password if using Gmail)
+
+### 2. Installation
+
+```bash
+git clone https://github.com/jma1ice/newsletterr.git
+cd newsletterr                 # root of the project
+python -m venv .venv
+source .venv/bin/activate      # Windows: .venv\\Scripts\\activate
+pip install -r requirements.txt
+```
+
+> **Note**: If `requirements.txt` is missing, create one containing:  
+> `Flask==3.0`, `requests>=2.0`.
+
+### 3. Run
+
+```bash
+python app.py
+```
+
+By default the app listens on **http://127.0.0.1:9898**.
+
+---
+
+## Configuration
+
+1. Navigate to **Settings** in the navbar.  
+2. Fill in:
+   * **From** – e‑mail address that will appear as the sender  
+   * **Alias (optional)** – _Send As_ alias  
+   * **Password** – account or app‑password if using Gmail  
+   * **SMTP Server** – e.g. `smtp.gmail.com`  
+   * **SMTP Port** – `465` for SSL or `587` for TLS  
+   * **Plex Server Name** – appears in the newsletter header  
+   * **Tautulli URL** – e.g. `http://tautulli.local:8181`  
+   * **Tautulli API Key** – copy from your Tautulli settings  
+3. Click **Apply Settings**.  Settings are saved to `database/data.db`.
+
+---
+
+## Sending a Newsletter
+
+1. On the **Dashboard** choose a **Time Range** in days and click **Get Stats\\Users**.  
+2. Wait for the spinner to disappear, then the BCC, charts, and tables will populate.  
+3. Alter the BCC field to specify the recipient e‑mails (comma‑separated) if needed.  
+4. Draft the body, insert `[GRAPHS]` or `[STATS]` where appropriate.  
+5. Hit **Send Email**.  Success and error messages will show after running.
+
+---
+
+## Project Structure
+
+```
+newsletterr/
+├── app.py            # Flask routes & helper functions
+├── templates/
+│   ├── base.html
+│   ├── index.html
+│   └── settings.html
+├── static/
+│   ├── css/style.css
+│   └── img/
+|      ├── newspaper.png
+│      └── bouncing-newspaper.gif
+├── database/         # created at first launch
+│   └── data.db
+└── README.md         # this file
+```
+
+---
+
+## License
+
+Released under the **MIT License** – see [LICENSE](LICENSE) for details.
+
+---
+
+## To-Do
+
+* Dockerize
+* Compile EXE and ELF files
+* HTML cards and other CSS to add some life to the UI
+* Additional email templates
+* Fix up the stats tables that do not adhere to the typical ones pulled from Tautulli
+
+---
+
+## Acknowledgements
+
+* [Tautulli](https://tautulli.com/) for the Plex goodness  
+* [Highcharts](https://www.highcharts.com/) for charting  
+* [Tailwind CSS](https://tailwindcss.com/) & [Bootstrap](https://getbootstrap.com/) for styling
+
+Happy streaming!

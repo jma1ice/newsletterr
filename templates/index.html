@@ -66,7 +66,11 @@
                                         </div>
                                         <div class="card-body blur-container p-0">
                                             {% if stat.rows %}
-                                                <img src="/proxy-art{{ stat.rows[0].art }}" class="bg-blur" alt="" />
+                                                {% if stat.rows[0].art != '' %}
+                                                    <img src="/proxy-art{{ stat.rows[0].art }}" class="bg-blur" alt="" />
+                                                {% elif stat.rows[0].grandparent_thumb != '' %}
+                                                    <img src="/proxy-art{{ stat.rows[0].grandparent_thumb }}" class="bg-blur" alt="" />
+                                                {% endif %}
                                                 <table class="table table-striped content-table m-0">
                                                     {% if stat.stat_title == "Most Watched Movies" or stat.stat_title == "Most Watched TV Shows" %}
                                                         <thead class="table-dark">

@@ -8,7 +8,7 @@ import requests
 from email.mime.text import MIMEText
 from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
-from flask import Flask, redirect, render_template, request, jsonify, url_for, Response
+from flask import Flask, render_template, request, jsonify, Response
 
 app = Flask(__name__)
 

@@ -68,29 +68,122 @@
                                             {% if stat.rows %}
                                                 <img src="/proxy-art{{ stat.rows[0].art }}" class="bg-blur" alt="" />
                                                 <table class="table table-striped content-table m-0">
-                                                    <thead class="table-dark">
-                                                        <tr>
-                                                            <th>Title</th>
-                                                            <th>Year</th>
-                                                            <th>Plays</th>
-                                                            <th>Hours Played</th>
-                                                            <th>Type</th>
-                                                            <th>Rating</th>
-                                                        </tr>
-                                                    </thead>
+                                                    {% if stat.stat_title == "Most Watched Movies" or stat.stat_title == "Most Watched TV Shows" %}
+                                                        <thead class="table-dark">
+                                                            <tr>
+                                                                <th>Title</th>
+                                                                <th>Year</th>
+                                                                <th>Plays</th>
+                                                                <th>Hours Played</th>
+                                                                <th>Rating</th>
+                                                            </tr>
+                                                        </thead>
+                                                    {% elif stat.stat_title == "Most Popular Movies" or stat.stat_title == "Most Popular TV Shows" %}
+                                                        <thead class="table-dark">
+                                                            <tr>
+                                                                <th>Title</th>
+                                                                <th>Year</th>
+                                                                <th>Plays</th>
+                                                                <th>Users</th>
+                                                                <th>Rating</th>
+                                                            </tr>
+                                                        </thead>
+                                                    {% elif stat.stat_title == "Most Played Artists" %}
+                                                        <thead class="table-dark">
+                                                            <tr>
+                                                                <th>Author</th>
+                                                                <th>Year</th>
+                                                                <th>Plays</th>
+                                                                <th>Hours Played</th>
+                                                            </tr>
+                                                        </thead>
+                                                    {% elif stat.stat_title == "Most Popular Artists" %}
+                                                        <thead class="table-dark">
+                                                            <tr>
+                                                                <th>Author</th>
+                                                                <th>Year</th>
+                                                                <th>Plays</th>
+                                                                <th>Users</th>
+                                                            </tr>
+                                                        </thead>
+                                                    {% elif stat.stat_title == "Recently Watched" %}
+                                                        <thead class="table-dark">
+                                                            <tr>
+                                                                <th>Title</th>
+                                                                <th>Year</th>
+                                                                <th>Rating</th>
+                                                            </tr>
+                                                        </thead>
+                                                    {% elif stat.stat_title == "Most Active Libraries" %}
+                                                        <thead class="table-dark">
+                                                            <tr>
+                                                                <th>Library</th>
+                                                                <th>Plays</th>
+                                                                <th>Hours Played</th>
+                                                            </tr>
+                                                        </thead>
+                                                    {% elif stat.stat_title == "Most Active Users" %}
+                                                        <thead class="table-dark">
+                                                            <tr>
+                                                                <th>Username</th>
+                                                                <th>Plays</th>
+                                                                <th>Hours Played</th>
+                                                            </tr>
+                                                        </thead>
+                                                    {% elif stat.stat_title == "Most Active Platforms" %}
+                                                        <thead class="table-dark">
+                                                            <tr>
+                                                                <th>Platform</th>
+                                                                <th>Plays</th>
+                                                                <th>Hours Played</th>
+                                                            </tr>
+                                                        </thead>
+                                                    {% elif stat.stat_title == "Most Concurrent Streams" %}
+                                                        <thead class="table-dark">
+                                                            <tr>
+                                                                <th>Category</th>
+                                                                <th>Count</th>
+                                                            </tr>
+                                                        </thead>
+                                                    {% endif %}
                                                     <tbody>
                                                         {% for row in stat.rows %}
                                                             <tr>
-                                                                <td>{{ row.title }}</td>
-                                                                <td>{{ row.year }}</td>
-                                                                <td>{{ row.total_plays }}</td>
-                                                                {% if row.total_duration %}
-                                                                    <td>{{ (row.total_duration/60/60)|round(2) }}</td>
+                                                                {% if stat.stat_title == "Most Active Libraries" %}
+                                                                    <td>{{ row.section_name }}</td>
+                                                                {% elif stat.stat_title == "Most Active Users" %}
+                                                                    <td>{{ row.user }}</td>
+                                                                {% elif stat.stat_title == "Most Active Platforms" %}
+                                                                    <td>{{ row.platform }}</td>
                                                                 {% else %}
-                                                                    <td>no time data</td>
+                                                                    <td>{{ row.title }}</td>
                                                                 {% endif %}
-                                                                <td>{{ row.media_type }}</td>
-                                                                <td>{{ row.content_rating }}</td>
+
+                                                                {% if stat.stat_title == "Most Active Libraries" or stat.stat_title == "Most Active Users" or stat.stat_title == "Most Active Platforms" or stat.stat_title == "Most Concurrent Streams" %}
+                                                                {% else %}
+                                                                    <td>{{ row.year }}</td>
+                                                                {% endif %}
+
+                                                                {% if "Recently" in stat.stat_title %}
+                                                                {% elif "Concurrent" in stat.stat_title %}
+                                                                {% else %}
+                                                                    <td>{{ row.total_plays }}</td>
+                                                                {% endif %}
+
+                                                                {% if stat.stat_title == "Most Watched Movies" or stat.stat_title == "Most Watched TV Shows" or stat.stat_title == "Most Played Artists" or stat.stat_title == "Most Active Libraries" or stat.stat_title == "Most Active Users" or stat.stat_title == "Most Active Platforms" %}
+                                                                    <td>{{ (row.total_duration/60/60)|round(2) }}</td>
+                                                                {% elif stat.stat_title == "Most Popular Movies" or stat.stat_title == "Most Popular TV Shows" or stat.stat_title == "Most Popular Artists" %}
+                                                                    <td>{{ row.users_watched }}</td>
+                                                                {% endif %}
+
+                                                                {% if stat.stat_title == "Most Active Libraries" or stat.stat_title == "Most Played Artists" or stat.stat_title == "Most Popular Artists" or stat.stat_title == "Most Active Users" or stat.stat_title == "Most Active Platforms" or stat.stat_title == "Most Concurrent Streams" %}
+                                                                {% else %}
+                                                                    <td>{{ row.content_rating }}</td>
+                                                                {% endif %}
+
+                                                                {% if stat.stat_title == "Most Concurrent Streams" %}
+                                                                    <td>{{ row.count }}</td>
+                                                                {% endif %}
                                                             </tr>
                                                         {% endfor %}
                                                     </tbody>

@@ -64,9 +64,10 @@
                                         <div class="card-header bg-primary text-white">
                                             {{ stat.stat_title }}
                                         </div>
-                                        <div class="card-body p-0">
+                                        <div class="card-body blur-container p-0">
                                             {% if stat.rows %}
-                                                <table class="table table-striped m-0">
+                                                <img src="/proxy-art{{ stat.rows[0].art }}" class="bg-blur" alt="" />
+                                                <table class="table table-striped content-table m-0">
                                                     <thead class="table-dark">
                                                         <tr>
                                                             <th>Title</th>
@@ -178,15 +179,47 @@
                         if (wasHidden) {
                             tableElement.classList.remove('d-none');
                         }
-                        await new Promise(resolve => setTimeout(resolve, 50));
+                        await new Promise(resolve => setTimeout(resolve, 150));
 
-                        const canvas = await html2canvas(tableElement, {
+                        const original = document.getElementById(id);
+                        if (!original) continue;
+
+                        const clone = original.cloneNode(true);
+                        const tempWrapper = document.createElement('div');
+
+                        clone.style.display = 'inline-block';
+                        clone.style.width = 'auto';
+
+                        const table = clone.querySelector('.content-table');
+                        if (table) {
+                            table.style.width = 'auto';
+                        }
+
+                        tempWrapper.style.position = 'fixed';
+                        tempWrapper.style.top = '-10000px';
+                        tempWrapper.style.left = '0';
+                        tempWrapper.style.zIndex = '-1';
+                        tempWrapper.style.overflow = 'hidden';
+                        tempWrapper.appendChild(clone);
+                        document.body.appendChild(tempWrapper);
+
+                        const blurImage = clone.querySelector('.bg-blur');
+                        if (blurImage) {
+                            await blurImageElement(blurImage);
+                        }
+
+                        await new Promise(resolve => setTimeout(resolve, 50));
+                        
+                        const canvas = await html2canvas(clone, {
                             backgroundColor: null,
-                            scale: 1
+                            scale: 1,
+                            useCORS: true
                         });
 
                         const dataUrl = canvas.toDataURL("image/png");
                         statImagesHTML += `<img src="${dataUrl}" style="max-width: 100%; margin-bottom: 10px;">`;
+
+                        document.body.removeChild(tempWrapper);
 
                         if (wasHidden) {
                             tableElement.classList.add('d-none');
@@ -362,15 +395,47 @@
                         if (wasHidden) {
                             tableElement.classList.remove('d-none');
                         }
-                        await new Promise(resolve => setTimeout(resolve, 50));
+                        await new Promise(resolve => setTimeout(resolve, 150));
 
-                        const canvas = await html2canvas(tableElement, {
+                        const original = document.getElementById(id);
+                        if (!original) continue;
+
+                        const clone = original.cloneNode(true);
+                        const tempWrapper = document.createElement('div');
+
+                        clone.style.display = 'inline-block';
+                        clone.style.width = 'auto';
+
+                        const table = clone.querySelector('.content-table');
+                        if (table) {
+                            table.style.width = 'auto';
+                        }
+
+                        tempWrapper.style.position = 'fixed';
+                        tempWrapper.style.top = '-10000px';
+                        tempWrapper.style.left = '0';
+                        tempWrapper.style.zIndex = '-1';
+                        tempWrapper.style.overflow = 'hidden';
+                        tempWrapper.appendChild(clone);
+                        document.body.appendChild(tempWrapper);
+
+                        const blurImage = clone.querySelector('.bg-blur');
+                        if (blurImage) {
+                            await blurImageElement(blurImage);
+                        }
+
+                        await new Promise(resolve => setTimeout(resolve, 50));
+                        
+                        const canvas = await html2canvas(clone, {
                             backgroundColor: null,
-                            scale: 1
+                            scale: 1,
+                            useCORS: true
                         });
 
                         const dataUrl = canvas.toDataURL("image/png");
                         statImages.push({ id, img: dataUrl });
+
+                        document.body.removeChild(tempWrapper);
 
                         if (wasHidden) {
                             tableElement.classList.add('d-none');
@@ -410,6 +475,36 @@
             document.getElementById('stats_form').addEventListener('submit', (e) => {
                 showSpinner('Getting stats and users...');
             });
+        </script>
+        <script>
+            async function blurImageElement(imgElement) {
+                const tempImg = new Image();
+                tempImg.crossOrigin = 'anonymous';
+                tempImg.src = imgElement.src;
+
+                await new Promise((resolve, reject) => {
+                    tempImg.onload = resolve;
+                    tempImg.onerror = reject;
+                });
+
+                const rect = imgElement.getBoundingClientRect();
+                const canvas = document.createElement('canvas');
+                canvas.width = rect.width || 800;
+                canvas.height = rect.height || 450;
+
+                const ctx = canvas.getContext('2d');
+                ctx.filter = 'blur(4px) brightness(0.75)';
+                ctx.drawImage(tempImg, 0, 0, canvas.width, canvas.height);
+
+                const blurredDataURL = canvas.toDataURL('image/png');
+                imgElement.src = blurredDataURL;
+                imgElement.style.position = 'absolute';
+                imgElement.style.width = '100%';
+                imgElement.style.height = '100%';
+                imgElement.style.objectFit = 'cover';
+                imgElement.style.zIndex = '0';
+                imgElement.style.filter = 'none';
+            }
         </script>
     </div>
 </div>

@@ -59,6 +59,8 @@ By default the app listens on **http://127.0.0.1:9898**.
    * **SMTP Server** – e.g. `smtp.gmail.com`  
    * **SMTP Port** – `465` for SSL or `587` for TLS  
    * **Plex Server Name** – appears in the newsletter header  
+   * **Plex Base URL** – e.g. `http://localhost:32400`  
+   * **Plex Token** – [X-Plex-Token](https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/) view XML in 'Get Info' of a library item  
    * **Tautulli URL** – e.g. `http://tautulli.local:8181`  
    * **Tautulli API Key** – copy from your Tautulli settings  
 3. Click **Apply Settings**.  Settings are saved to `database/data.db`.
@@ -110,6 +112,7 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 * HTML cards and other CSS to add some life to the UI
 * Additional email templates
 * Fix up the stats tables that do not adhere to the typical ones pulled from Tautulli
+* Get recently added items
 
 ---
 

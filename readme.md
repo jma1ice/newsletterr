@@ -112,7 +112,6 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 * HTML cards and other CSS to add some life to the UI
 * Additional email templates
 * Get recently added items
-* Add fallback for stat table if art is missing
 
 ---
 

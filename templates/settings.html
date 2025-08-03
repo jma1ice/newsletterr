@@ -42,6 +42,16 @@
                     {% if settings.from_email !="" %}value="{{ settings.server_name }}"{% endif %}
                     placeholder="Paramount Plex" required><br><br>
 
+                <label for="plex_url">Plex Base URL:</label><br>
+                <input type="text" id="plex_url" name="plex_url"
+                    {% if settings.from_email !="" %}value="{{ settings.plex_url }}"{% endif %}
+                    placeholder="http://localhost:32400" required><br><br>
+
+                <label for="plex_token">Plex Token:</label><br>
+                <input type="text" id="plex_token" name="plex_token"
+                    {% if settings.from_email !="" %}value="{{ settings.plex_token }}"{% endif %}
+                    placeholder="Plex Token" required><br><br>
+
                 <label for="tautulli_url">Tautulli Base URL:</label><br>
                 <input type="text" id="tautulli_url" name="tautulli_url"
                     {% if settings.from_email !="" %}value="{{ settings.tautulli_url }}"{% endif %}

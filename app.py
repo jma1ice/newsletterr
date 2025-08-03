@@ -8,7 +8,7 @@ import requests
 from email.mime.text import MIMEText
 from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
-from flask import Flask, redirect, render_template, request, jsonify, url_for
+from flask import Flask, redirect, render_template, request, jsonify, url_for, Response
 
 app = Flask(__name__)
 
@@ -26,6 +26,8 @@ def init_db(db_path):
             smtp_server TEXT,
             smtp_port INTEGER,
             server_name TEXT,
+            plex_url TEXT,
+            plex_token TEXT,
             tautulli_url TEXT,
             tautulli_api TEXT
         )
@@ -166,7 +168,7 @@ def index():
     cursor = conn.cursor()
     cursor.execute("""
         SELECT
-        from_email, alias_email, password, smtp_server, smtp_port, server_name, tautulli_url, tautulli_api
+        from_email, alias_email, password, smtp_server, smtp_port, server_name, plex_url, plex_token, tautulli_url, tautulli_api
         FROM settings WHERE id = 1
     """)
     row = cursor.fetchone()
@@ -180,8 +182,10 @@ def index():
             "smtp_server": row[3],
             "smtp_port": int(row[4]),
             "server_name": row[5],
-            "tautulli_url": row[6],
-            "tautulli_api": row[7]
+            "plex_url": row[6],
+            "plex_token": row[7],
+            "tautulli_url": row[8],
+            "tautulli_api": row[9]
         }
     else:
         settings = {
@@ -218,6 +222,43 @@ def index():
                            graph_data=graph_data, graph_commands=graph_commands,
                            error=error, alert=alert, settings=settings
                         )
+
+@app.route('/proxy-art/<path:art_path>')
+def proxy_art(art_path):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT
+        from_email, alias_email, password, smtp_server, smtp_port, server_name, plex_url, plex_token, tautulli_url, tautulli_api
+        FROM settings WHERE id = 1
+    """)
+    row = cursor.fetchone()
+    conn.close()
+
+    if row:
+        settings = {
+            "from_email": row[0],
+            "alias_email": row[1],
+            "password": row[2],
+            "smtp_server": row[3],
+            "smtp_port": int(row[4]),
+            "server_name": row[5],
+            "plex_url": row[6],
+            "plex_token": row[7],
+            "tautulli_url": row[8],
+            "tautulli_api": row[9]
+        }
+    else:
+        settings = {
+            "from_email": ""
+        }
+
+    plex_token = settings['plex_token']
+    plex_url = settings['plex_url'].rstrip('/')
+
+    full_url = f"{plex_url}/{art_path}?X-Plex-Token={plex_token}"
+    r = requests.get(full_url, stream=True)
+    return Response(r.content, content_type=r.headers['Content-Type'])
 
 @app.route('/send_email', methods=['POST'])
 def send_email():
@@ -335,14 +376,16 @@ def settings():
         smtp_server = request.form.get("smtp_server")
         smtp_port = int(request.form.get("smtp_port"))
         server_name = request.form.get("server_name")
+        plex_url = request.form.get("plex_url")
+        plex_token = request.form.get("plex_token")
         tautulli_url = request.form.get("tautulli_url")
         tautulli_api = request.form.get("tautulli_api")
 
         cursor.execute("""
             REPLACE INTO settings
-            (id, from_email, alias_email, password, smtp_server, smtp_port, server_name, tautulli_url, tautulli_api)
-            VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (from_email, alias_email, password, smtp_server, smtp_port, server_name, tautulli_url, tautulli_api))
+            (id, from_email, alias_email, password, smtp_server, smtp_port, server_name, plex_url, plex_token, tautulli_url, tautulli_api)
+            VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (from_email, alias_email, password, smtp_server, smtp_port, server_name, plex_url, plex_token, tautulli_url, tautulli_api))
         conn.commit()
         conn.close()
 
@@ -353,6 +396,8 @@ def settings():
             "smtp_server": smtp_server,
             "smtp_port": smtp_port,
             "server_name": server_name,
+            "plex_url": plex_url,
+            "plex_token": plex_token,
             "tautulli_url": tautulli_url,
             "tautulli_api": tautulli_api
         }
@@ -361,7 +406,7 @@ def settings():
 
     cursor.execute("""
         SELECT
-        from_email, alias_email, password, smtp_server, smtp_port, server_name, tautulli_url, tautulli_api
+        from_email, alias_email, password, smtp_server, smtp_port, server_name, plex_url, plex_token, tautulli_url, tautulli_api
         FROM settings WHERE id = 1
     """)
     row = cursor.fetchone()
@@ -375,8 +420,10 @@ def settings():
             "smtp_server": row[3],
             "smtp_port": int(row[4]),
             "server_name": row[5],
-            "tautulli_url": row[6],
-            "tautulli_api": row[7]
+            "plex_url": row[6],
+            "plex_token": row[7],
+            "tautulli_url": row[8],
+            "tautulli_api": row[9]
         }
     else:
         settings = {

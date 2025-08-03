@@ -111,8 +111,8 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 * Compile EXE and ELF files
 * HTML cards and other CSS to add some life to the UI
 * Additional email templates
-* Fix up the stats tables that do not adhere to the typical ones pulled from Tautulli
 * Get recently added items
+* Add fallback for stat table if art is missing
 
 ---
 

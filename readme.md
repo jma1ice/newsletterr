@@ -112,6 +112,27 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 * HTML cards and other CSS to add some life to the UI
 * Additional email templates
 * Get recently added items
+* Update footer to include a link to this Github, as well as a (C) 2025
+* Prefill subject
+* Auto fetch plex token, and make it easier for the user to get tautulli API
+* Plex integration/automation to get the server details? See above?
+* Include functionality for users without tautulli? Such that they could just provide emails and a text body for the email
+* Mailing lists (Weekly, monthly, Movies, Shows) that you can add users to, to automate some emails. E.g. - Monthly email contains the following users, and uses the following template. 
+* Template management to go with lists
+* Automation management (Which lists, how often?)
+* Opt out support?
+* Version in the top right of each HTML page (or, an 'about' button/section with version info, publish date)
+* Update functionality (new version available)
+* Longer fields on the Settings page
+* Checking "include XYZ in email" buttons should trigger them to be added to the previewed email in realtime, as snap-ins that can be removed on the fly as well. Maybe a button instead of a check box? 
+* Graph/stat ordering? Should it have a default ordering, or user editable?
+* "API Key" text on Settings should be updated to "Tautulli API Key"
+* BCC text appears on the bottom left of the main text field, should be on top or centered. Some form of field validation should be in here to make sure it's "email, email" - regex maybe? Prevent empty emails or duplicates in case the user messes with it. Come to think of it, could the users not be added in a "tag" format style, that is to say, each user entered is an 'item' with a small 'x' next to them to remove if needed. 
+* More rounded boxes
+* Color options? light and dark? The blue is throwing me lol
+* What does "time range" mean? Days? Weeks?
+* I don't believe I understand the placeholder boxes...
+
 
 ---
 

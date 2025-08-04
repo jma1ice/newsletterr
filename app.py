@@ -8,11 +8,15 @@ import requests
 from email.mime.text import MIMEText
 from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
-from flask import Flask, render_template, request, jsonify, Response
+from flask import Flask, render_template, request, jsonify, Response, send_file
 
 app = Flask(__name__)
 
 DB_PATH = os.path.join("database", "data.db")
+
+@app.route('/favicon.ico')
+def favicon():
+    return send_file('favicon.ico', mimetype='image/x-icon')
 
 def init_db(db_path):
     conn = sqlite3.connect(db_path)

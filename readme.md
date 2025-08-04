@@ -118,7 +118,7 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 * Plex integration/automation to get the server details? See above?
 * Include functionality for users without tautulli? Such that they could just provide emails and a text body for the email
 * Mailing lists (Weekly, monthly, Movies, Shows) that you can add users to, to automate some emails. E.g. - Monthly email contains the following users, and uses the following template. 
-* Template management to go with lists
+* Template management to go with lists - Include a few default templates that snap in the most common stats
 * Automation management (Which lists, how often?)
 * Opt out support?
 * Version in the top right of each HTML page (or, an 'about' button/section with version info, publish date)

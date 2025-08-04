@@ -132,6 +132,7 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 * Color options? light and dark? The blue is throwing me lol
 * What does "time range" mean? Days? Weeks?
 * I don't believe I understand the placeholder boxes...
+* Limit maximum days to pull data, and have buttons underneath to pull last 7, 30, 60, 90, 120? Max at like 6 months? 
 
 
 ---

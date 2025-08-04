@@ -135,6 +135,7 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 * Limit maximum days to pull data, and have buttons underneath to pull last 7, 30, 60, 90, 120? Max at like 6 months? 
 * Need to put text under "Time Range" to indicate what was just pulled, since the field defaults back to 30 days
 * All "hours" values should be rounded down to whole numbers
+* "ARE YOU SURE?" after pressing send button
 
 
 ---

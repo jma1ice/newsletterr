@@ -23,7 +23,7 @@
                             BCC: <textarea type="text" name="to_emails" id="to_emails" placeholder="Recipient Email"
                                 rows="10" cols="40" value="" required>{{ user_emails | join(', ') }}</textarea><br><br>
                             Subject: <input type="text" name="subject" id="subject" placeholder="Subject"
-                                required><br><br>
+                                value="{{ settings.server_name }} News" required><br><br>
                             <label for="layout">Choose a layout:</label>
                             <select id="layout" name="layout" onchange="updatePreview()">
                                 <option value="none">Plain Text</option>

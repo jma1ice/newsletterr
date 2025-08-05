@@ -435,4 +435,4 @@ def settings():
 if __name__ == '__main__':
     os.makedirs("database", exist_ok=True)
     init_db(DB_PATH)
-    app.run(host="127.0.0.1", port=9898, debug=True)
+    app.run(host="127.0.0.1", port=6397, debug=True)

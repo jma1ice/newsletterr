@@ -43,6 +43,12 @@ def apply_layout(body, graphs_html_block, stats_html_block, layout, subject, ser
     body = body.replace('\n', '<br>')
     body = body.replace('[GRAPHS]', graphs_html_block)
     body = body.replace('[STATS]', stats_html_block)
+
+    if subject.startswith(server_name):
+        display_subject = subject[len(server_name):].lstrip()
+    else:
+        display_subject = subject
+
     if layout == "standard":
         return f"""
         <html><body style="font-family: Arial;">
@@ -61,7 +67,7 @@ def apply_layout(body, graphs_html_block, stats_html_block, layout, subject, ser
                                         </tr>
                                         <tr>
                                             <td class="footer" style="font-family: 'Open Sans', Helvetica, Arial, sans-serif; font-size: 12px; vertical-align: top; clear: both; margin-top: 0; text-align: center; width: 100%;">
-                                                <h1 class="footer-bar" style="margin-left: auto; margin-right: auto; width: 250px; border-top: 1px solid #E5A00D; margin-top: 5px;">{subject}</h1>
+                                                <h1 class="footer-bar" style="margin-left: auto; margin-right: auto; width: 250px; border-top: 1px solid #E5A00D; margin-top: 5px;">{display_subject}</h1>
                                                 <p>
                                                     {body}
                                                 </p>

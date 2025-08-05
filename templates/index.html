@@ -238,6 +238,9 @@
                 const subject = document.getElementById('subject').value;
                 let body = raw.replace(/\n/g, "<br>");
                 let html = "";
+                let displaySubject = subject.startsWith(serverName) 
+                    ? subject.slice(serverName.length).trimStart()
+                    : subject;
 
                 const selectedGraphs = Array.from(document.querySelectorAll('.graph-checkbox:checked'))
                     .map(cb => cb.value);
@@ -359,7 +362,7 @@
                                                                 </tr>
                                                                 <tr>
                                                                     <td class="footer" style="font-family: 'Open Sans', Helvetica, Arial, sans-serif; font-size: 12px; vertical-align: top; clear: both; margin-top: 0; text-align: center; width: 100%;">
-                                                                        <h1 class="footer-bar" style="margin-left: auto; margin-right: auto; width: 250px; border-top: 1px solid #E5A00D; margin-top: 5px;">${subject}</h1>
+                                                                        <h1 class="footer-bar" style="margin-left: auto; margin-right: auto; width: 250px; border-top: 1px solid #E5A00D; margin-top: 5px;">${displaySubject}</h1>
                                                                         <p>
                                                                             ${content}
                                                                         </p>

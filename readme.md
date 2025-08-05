@@ -112,8 +112,6 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 * HTML cards and other CSS to add some life to the UI
 * Additional email templates
 * Get recently added items
-* Update footer to include a link to this Github, as well as a (C) 2025
-* Prefill subject
 * Auto fetch plex token, and make it easier for the user to get tautulli API
 * Plex integration/automation to get the server details? See above?
 * Include functionality for users without tautulli? Such that they could just provide emails and a text body for the email

@@ -14,6 +14,8 @@ app = Flask(__name__)
 
 DB_PATH = os.path.join("database", "data.db")
 
+VERSION = "v0.6.0"
+
 @app.route('/favicon.ico')
 def favicon():
     return send_file('favicon.ico', mimetype='image/x-icon')
@@ -222,7 +224,7 @@ def index():
                 if user['email'] != None and user['is_active']:
                     user_emails.append(user['email'])
             
-            alert = "Users and stats pulled successfully!"
+            alert = f"Users and graphs/stats for {time_range} days pulled successfully!"
 
     if graph_data == []:
         graph_data = [{},{}]
@@ -441,6 +443,10 @@ def settings():
         }
 
     return render_template('settings.html', settings=settings)
+
+@app.route('/about', methods=['GET'])
+def about():
+    return render_template('about.html')
 
 if __name__ == '__main__':
     os.makedirs("database", exist_ok=True)

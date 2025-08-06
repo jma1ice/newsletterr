@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}newsletterr{% endblock %}
+{% block title %}dashboard{% endblock %}
 {% block content %}
 <div class="container">
     <h1>Dashboard</h1><br>
@@ -15,7 +15,7 @@
                 <tr style="height: 100%; padding: 10px;">
                     <td style="width: 20%; padding: 10px;">
                         <form method="POST" id="stats_form">
-                            <label for="days_to_pull">Time Range:</label>
+                            <label for="days_to_pull">Time Range (days):</label>
                             <input type="number" id="days_to_pull" name="days_to_pull" value="30" /><br><br>
                             <button class="btn btn-info">Get Stats\Users</button>
                         </form><br>

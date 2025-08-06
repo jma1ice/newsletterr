@@ -119,22 +119,15 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 * Template management to go with lists - Include a few default templates that snap in the most common stats
 * Automation management (Which lists, how often?)
 * Opt out support?
-* Version in the top right of each HTML page (or, an 'about' button/section with version info, publish date)
 * Update functionality (new version available)
-* Longer fields on the Settings page
 * Checking "include XYZ in email" buttons should trigger them to be added to the previewed email in realtime, as snap-ins that can be removed on the fly as well. Maybe a button instead of a check box? 
 * Graph/stat ordering? Should it have a default ordering, or user editable?
-* "API Key" text on Settings should be updated to "Tautulli API Key"
 * BCC text appears on the bottom left of the main text field, should be on top or centered. Some form of field validation should be in here to make sure it's "email, email" - regex maybe? Prevent empty emails or duplicates in case the user messes with it. Come to think of it, could the users not be added in a "tag" format style, that is to say, each user entered is an 'item' with a small 'x' next to them to remove if needed. 
-* More rounded boxes
 * Color options? light and dark? The blue is throwing me lol
-* What does "time range" mean? Days? Weeks?
 * I don't believe I understand the placeholder boxes...
 * Limit maximum days to pull data, and have buttons underneath to pull last 7, 30, 60, 90, 120? Max at like 6 months? 
-* Need to put text under "Time Range" to indicate what was just pulled, since the field defaults back to 30 days
 * All "hours" values should be rounded down to whole numbers
 * "ARE YOU SURE?" after pressing send button
-
 
 ---
 

@@ -19,8 +19,9 @@
     </div>
     <nav class="navbar">
         <ul id="navLinks">
-            <li><a href="{{ url_for('index') }}">newsletterr</a></li>
-            <li><a href="{{ url_for('settings') }}">settings</a></li>
+            <li><a href="{{ url_for('index') }}" class="hover:underline">newsletterr</a></li>
+            <li><a href="{{ url_for('settings') }}" class="hover:underline">settings</a></li>
+            <li><a href="{{ url_for('about') }}" class="hover:underline">about</a></li>
         </ul>
         <div>
             <img src="/static/img/newspaper.png" alt="Logo" class="logo" />
@@ -39,9 +40,12 @@
     </script>
 </body>
 <footer>
-    <p>
+    <p class="left-foot">
         Newsletterr © 2025. 
         <a target="_blank" href="https://github.com/jma1ice/newsletterr">GitHub</a>
+    </p>
+    <p class="right-foot">
+        v0.6.2
     </p>
 </footer>
 </html>

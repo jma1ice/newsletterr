@@ -131,6 +131,19 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 
 ---
 
+## Recent Changes
+
+* "API Key" text on Settings should be updated to "Tautulli API Key"
+* More rounded boxes
+* Version in the footer of each HTML page
+* Longer fields on the Settings page
+* hover:underline on navbar links
+* an 'about' page with version info, publish date
+* What does "time range" mean? Days? Weeks?
+* Need to put text under "Time Range" to indicate what was just pulled, since the field defaults back to 30 days
+
+---
+
 ## Acknowledgements
 
 * [Tautulli](https://tautulli.com/) for the Plex goodness  

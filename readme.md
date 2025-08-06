@@ -133,6 +133,9 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 
 ## Recent Changes
 
+* Footer
+* Prefilled Subject
+* Port change
 * "API Key" text on Settings should be updated to "Tautulli API Key"
 * More rounded boxes
 * Version in the footer of each HTML page

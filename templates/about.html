@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}about{% endblock %}
+{% block content %}
+<div class="container">
+    <h1>About</h1>
+  
+    <dl class="grid grid-cols-1 sm:grid-cols-2 gap-5 text-lg leading-tight">
+        <div>
+            <dt class="font-semibold text-gray-600 dark:text-gray-300">Version</dt>
+            <dd class="mt-1">v0.6.2</dd>
+        </div><br>
+        <div>
+            <dt class="font-semibold text-gray-600 dark:text-gray-300">Published</dt>
+            <dd class="mt-1">August 6, 2025</dd>
+        </div>
+        <div class="sm:col-span-2">
+            <dt class="font-semibold text-gray-600 dark:text-gray-300">License</dt>
+            <dd class="mt-1">MIT</dd>
+        </div>
+    </dl>
+
+    <hr class="my-8 border-dashed border-gray-300 dark:border-gray-600">
+
+    <h2 class="text-2xl font-bold mb-4">Credits & Libraries</h2>
+    <ul class="list-disc list-inside space-y-1">
+        <li>Python Flask 3.x</li>
+        <li>Tautulli API</li>
+        <li>Highcharts for interactive graphs</li>
+        <li>Tailwind CSS + Bootstrap utilities</li>
+        <li>html2canvas for PNG rendering of charts</li>
+    </ul>
+
+    <hr class="my-8 border-dashed border-gray-300 dark:border-gray-600">
+
+    <h2 class="text-2xl font-bold mb-4">Recent Changes</h2>
+    <ul class="list-disc list-inside space-y-2 text-sm">
+        <li>"API Key" text on Settings page updated to "Tautulli API Key"</li>
+        <li>More rounded boxes</li>
+        <li>Version in footer</li>
+        <li>An 'about' page with version info, publish date, etc.</li>
+        <li>Longer fields on the Settings page</li>
+        <li>Added hover:underline on navbar links</li>
+        <li>(days) added to time range text</li>
+        <li>Days pulled added to successful pull text</li>
+    </ul>
+</div>
+{% endblock %}

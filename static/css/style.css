@@ -2,6 +2,7 @@
     height: 50rem;
     width: 60rem;
     border: 1px solid #ccc;
+    border-radius: 8px;
 }
 
 body {
@@ -12,6 +13,7 @@ body {
     background-color: #f4f4f4;
     background: #818faa;
     color: #333;
+    padding-top: 70px;
 }
 
 .navbar {
@@ -50,13 +52,9 @@ body {
     color: #ddd;
 }
 
-body {
-    padding-top: 70px;
-}
-
 .container {
     max-width: 1900px;
-    margin: 1px auto 30px auto;
+    margin: 1px auto 40px auto;
     padding: 10px;
     background-color: #6a7894;
     border-radius: 8px;
@@ -122,6 +120,14 @@ body {
     background-color: rgba(255, 255, 255, 0.5);
 }
 
+input, textarea, select {
+    border-radius: 5px;
+}
+
+#settings_form input {
+    width: 20rem;
+}
+
 footer {
     position: fixed;
     bottom: 0;
@@ -130,11 +136,18 @@ footer {
     background-color: #333;
     color: white;
     padding: 0;
-    text-align: left;
     box-shadow: 0 -2px 5px rgba(0,0,0,0.2);
 }
 
 footer p {
     margin: 0;
     padding: 10px;
+}
+
+.left-foot {
+    float: left;
+}
+
+.right-foot {
+    float: right;
 }

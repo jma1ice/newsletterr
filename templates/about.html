@@ -2,20 +2,20 @@
 {% block title %}about{% endblock %}
 {% block content %}
 <div class="container">
-    <h1>About</h1>
+    <h1>About</h1><br>
   
-    <dl class="grid grid-cols-1 sm:grid-cols-2 gap-5 text-lg leading-tight">
-        <div>
-            <dt class="font-semibold text-gray-600 dark:text-gray-300">Version</dt>
-            <dd class="mt-1">{{ version }}</dd>
-        </div><br>
-        <div>
-            <dt class="font-semibold text-gray-600 dark:text-gray-300">Published</dt>
-            <dd class="mt-1">{{ publish_date }}</dd>
+    <dl class="grid grid-cols-1 sm:grid-cols-1 gap-3 text-lg leading-tight">
+        <div class="sm:col-span-2">
+            <dt class="font-semibold dark:border-gray-300">Version</dt>
+            <dd class="mt-1 text-sm">{{ version }}</dd>
         </div>
         <div class="sm:col-span-2">
-            <dt class="font-semibold text-gray-600 dark:text-gray-300">License</dt>
-            <dd class="mt-1">MIT</dd>
+            <dt class="font-semibold dark:border-gray-300">Published</dt>
+            <dd class="mt-1 text-sm">{{ publish_date }}</dd>
+        </div>
+        <div class="sm:col-span-2">
+            <dt class="font-semibold dark:border-gray-300">License</dt>
+            <dd class="mt-1 text-sm">MIT</dd>
         </div>
     </dl>
 

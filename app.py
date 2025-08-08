@@ -11,7 +11,7 @@ from email.mime.multipart import MIMEMultipart
 from flask import Flask, render_template, request, jsonify, Response, send_file
 
 app = Flask(__name__)
-app.jinja_env.globals["version"] = "v0.6.3"
+app.jinja_env.globals["version"] = "v0.6.4"
 app.jinja_env.globals["publish_date"] = "August 7, 2025"
 
 DB_PATH = os.path.join("database", "data.db")

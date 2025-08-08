@@ -1,3 +1,9 @@
+@import url(https://fonts.googleapis.com/css?family=IBM+Plex+Sans:400,700&display=swap);
+
+div, nav, footer {
+    font-family: 'IBM Plex Sans';
+}
+
 .frame {
     height: 50rem;
     width: 60rem;
@@ -8,16 +14,16 @@
 body {
     font-family: 'Arial', sans-serif;
     margin: 0;
-    padding: 0;
+    padding: 5px;
     display: flex;
     background-color: #f4f4f4;
-    background: #818faa;
+    background: #8acbd4;
     color: #333;
     padding-top: 70px;
 }
 
 .navbar {
-    background-color: #333;
+    background-color: #222222;
     color: white;
     padding: 8px 0;
     text-align: center;
@@ -42,21 +48,21 @@ body {
 }
 
 .navbar ul li a {
-    color: white;
+    color: #8acbd4;
     text-decoration: none;
     padding: 0;
     transition: color 0.3s ease-in-out;
 }
 
 .navbar ul li a:hover {
-    color: #ddd;
+    color: #62a1a4;
 }
 
 .container {
     max-width: 1900px;
     margin: 1px auto 40px auto;
     padding: 10px;
-    background-color: #6a7894;
+    background-color: #62a1a4;
     border-radius: 8px;
     box-shadow: 0 0 10px rgba(0,0,0,0.1);
 }
@@ -87,6 +93,23 @@ body {
     margin-right: 10px;
 }
 
+.button {
+    display: inline-block;
+    padding: 10px 20px;
+    background-color: #333333;
+    color: #62a1a4;
+    text-decoration: none;
+    border-radius: 5px;
+    margin-top: 10px;
+    transition: background-color 0.3s ease-in-out, color 0.3s ease-in-out, transform 0.3s ease-in-out;
+}
+
+.button:hover {
+    background-color: #222222;
+    color: #8acbd4;
+    transform: scale(1.01);
+}
+
 .blur-container {
     position: relative;
     height: 100%;
@@ -102,7 +125,6 @@ body {
     object-fit: cover;
     filter: blur(4px) brightness(0.75);
     z-index: 0;
-    will-change: filter;
 }
 
 .content-table {
@@ -120,6 +142,10 @@ body {
     background-color: rgba(255, 255, 255, 0.5);
 }
 
+input, textarea {
+    padding: 0 8px;
+}
+
 input, textarea, select {
     border-radius: 5px;
 }
@@ -130,10 +156,11 @@ input, textarea, select {
 
 footer {
     position: fixed;
+    z-index: 2;
     bottom: 0;
     left: 0;
     width: 100%;
-    background-color: #333;
+    background-color: #222222;
     color: white;
     padding: 0;
     box-shadow: 0 -2px 5px rgba(0,0,0,0.2);

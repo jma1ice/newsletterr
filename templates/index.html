@@ -4,10 +4,10 @@
 <div class="container">
     <h1>Dashboard</h1><br>
     {% if alert %}
-        <p style="color: #01b301;">{{ alert }}</p>
+        <p style="color: #01b301; text-shadow: 1px 0 #000, 0 1px #000, -1px 0 #000, 0 -1px #000;">{{ alert }}</p>
     {% endif %}
     {% if error %}
-        <p style="color: #770010;">{{ error }}</p>
+        <p style="color: #770010; text-shadow: 1px 0 #000, 0 1px #000, -1px 0 #000, 0 -1px #000;">{{ error }}</p>
     {% endif %}
     <div class="foreground">
         <div>
@@ -17,7 +17,7 @@
                         <form method="POST" id="stats_form">
                             <label for="days_to_pull">Time Range (days):</label>
                             <input type="number" id="days_to_pull" name="days_to_pull" value="30" /><br><br>
-                            <button class="btn btn-info">Get Stats\Users</button>
+                            <button class="button">Get Stats\Users</button>
                         </form><br>
                         <form method="POST" action="/send_email">
                             BCC: <textarea type="text" name="to_emails" id="to_emails" placeholder="Recipient Email"
@@ -38,7 +38,7 @@
                             <input type="text" id="stat_placeholder" name="stat_placeholder" value="[STATS]"
                                 oninput="updatePreview()"><br><br>
                         </form>
-                        <button id="sendEmailBtn" class="btn btn-info">Send Email with Selected Graphs</button>
+                        <button id="sendEmailBtn" class="button">Send Email with Selected Graphs</button>
                     </td>
                     <td style="width: 40%; padding: 10px;">
                         Preview: <iframe class="frame" id="preview"></iframe>
@@ -346,22 +346,23 @@
                 switch (layout) {
                     case "standard":
                         html = `
-                                <html><body style="font-family: Arial;">
+                                <link href="https://fonts.googleapis.com/css?family=IBM+Plex+Sans:400,500,600,700&display=swap" rel="stylesheet">
+                                <html><body style="font-family: IBM Plex Sans;">
                                     <table class="body" style="border-collapse: separate; mso-table-lspace: 0pt; mso-table-rspace: 0pt; width: 90%;" border="0" cellspacing="0" cellpadding="0">
                                         <tbody>
                                             <tr>
-                                                <td class="preview-container" style="font-family: 'Open Sans', Helvetica, Arial, sans-serif; font-size: 14px; vertical-align: top; display: block; max-width: 925px; padding: 5px; width: 925px; margin: 0 auto !important;">
+                                                <td class="preview-container" style="font-family: 'IBM Plex Sans', Helvetica, Arial, sans-serif; font-size: 14px; vertical-align: top; display: block; max-width: 925px; padding: 5px; width: 925px; margin: 0 auto !important;">
                                                     <div class="content" style="box-sizing: border-box; display: block; margin: 0 auto; max-width: 1037px; padding: 5px;"><span class="preheader" style="color: transparent; display: none; height: 0; max-height: 0; max-width: 0; opacity: 0; overflow: hidden; mso-hide: all; visibility: hidden; width: 0;">${serverName} Newsletter</span>
                                                         <table class="main" style="border-collapse: separate; mso-table-lspace: 0pt; mso-table-rspace: 0pt; width: 100%; background: #282A2D; border-radius: 3px; color: #ffffff;" border="0" cellspacing="0" cellpadding="3">
                                                             <tbody>
                                                                 <tr>
-                                                                    <td class="wrapper" style="font-family: 'Open Sans', Helvetica, Arial, sans-serif; font-size: 14px; vertical-align: top; box-sizing: border-box; padding: 5px; overflow: auto;">
+                                                                    <td class="wrapper" style="font-family: 'IBM Plex Sans', Helvetica, Arial, sans-serif; font-size: 14px; vertical-align: top; box-sizing: border-box; padding: 5px; overflow: auto;">
                                                                         <div class="header" style="width: 50%; height: 10px; text-align: center;"><img class="header-img" style="border: none; -ms-interpolation-mode: bicubic; max-width: 9%; width: 492px; height: 20px; margin-left: -35px;" src="https://d15k2d11r6t6rl.cloudfront.net/public/users/Integrators/669d5713-9b6a-46bb-bd7e-c542cff6dd6a/3bef3c50f13f4320a9e31b8be79c6ad2/Plex%20Logo%20Update%202022/plex-logo-heavy-stroke.png" width="492" height="90" /></div>
                                                                         <div class="server-name" style="font-size: 25px; text-align: center; margin-bottom: 0;">${serverName} Newsletter</div>
                                                                     </td>
                                                                 </tr>
                                                                 <tr>
-                                                                    <td class="footer" style="font-family: 'Open Sans', Helvetica, Arial, sans-serif; font-size: 12px; vertical-align: top; clear: both; margin-top: 0; text-align: center; width: 100%;">
+                                                                    <td class="footer" style="font-family: 'IBM Plex Sans', Helvetica, Arial, sans-serif; font-size: 12px; vertical-align: top; clear: both; margin-top: 0; text-align: center; width: 100%;">
                                                                         <h1 class="footer-bar" style="margin-left: auto; margin-right: auto; width: 250px; border-top: 1px solid #E5A00D; margin-top: 5px;">${displaySubject}</h1>
                                                                         <p>
                                                                             ${content}
@@ -433,6 +434,14 @@
                 if (!renderedCharts.has(selectedId)) {
                     const index = parseInt(selectedId.split('-')[1]);
                     const graphData = graphDataList[index];
+
+                    Highcharts.setOptions({
+                        chart: {
+                            style: {
+                                fontFamily: 'IBM Plex Sans'
+                            }
+                        }
+                    });
 
                     Highcharts.chart(selectedId, {
                         chart: { type: 'line' },

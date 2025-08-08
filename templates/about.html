@@ -7,11 +7,11 @@
     <dl class="grid grid-cols-1 sm:grid-cols-2 gap-5 text-lg leading-tight">
         <div>
             <dt class="font-semibold text-gray-600 dark:text-gray-300">Version</dt>
-            <dd class="mt-1">v0.6.2</dd>
+            <dd class="mt-1">{{ version }}</dd>
         </div><br>
         <div>
             <dt class="font-semibold text-gray-600 dark:text-gray-300">Published</dt>
-            <dd class="mt-1">August 6, 2025</dd>
+            <dd class="mt-1">{{ publish_date }}</dd>
         </div>
         <div class="sm:col-span-2">
             <dt class="font-semibold text-gray-600 dark:text-gray-300">License</dt>
@@ -45,6 +45,8 @@
         <li>Added hover:underline on navbar links</li>
         <li>(days) added to time range text</li>
         <li>Days pulled added to successful pull text</li>
+        <li>Font, colors, and images updated</li>
+        <li>Version and publish date moved to variable in python</li>
     </ul>
 </div>
 {% endblock %}

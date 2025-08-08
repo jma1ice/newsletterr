@@ -14,7 +14,7 @@
 </head>
 <body class="{% if dark_mode %}dark{% endif %}">
     <div id="spinner" class="spinner" style="display: none;">
-        <img src="/static/img/bouncing_newspaper.gif" alt="Loading..." />
+        <img src="/static/img/load.gif" alt="Loading..." />
         <p id="loading-text"></p>
     </div>
     <nav class="navbar">
@@ -24,7 +24,7 @@
             <li><a href="{{ url_for('about') }}" class="hover:underline">about</a></li>
         </ul>
         <div>
-            <img src="/static/img/newspaper.png" alt="Logo" class="logo" />
+            <img src="/static/img/Asset_94x.png" alt="Logo" class="logo" />
         </div>
     </nav>
     {% block content %}{% endblock %}
@@ -45,7 +45,7 @@
         <a target="_blank" href="https://github.com/jma1ice/newsletterr">GitHub</a>
     </p>
     <p class="right-foot">
-        v0.6.2
+        {{ version }}
     </p>
 </footer>
 </html>

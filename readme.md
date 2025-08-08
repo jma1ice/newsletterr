@@ -135,19 +135,30 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 
 ## Recent Changes
 
-* Footer
-* Prefilled Subject
-* Port change
-* "API Key" text on Settings should be updated to "Tautulli API Key"
+### v0.6.4
+* About page cleaned up
+* Readme recent changes cleaned up
+
+### v0.6.3
+* Font, colors, and images updated
+* Version and publish date moved to variable in python
+
+### v0.6.2
+* An 'about' page with version info, publish date
+* Time Range definied with (days)
+* Added text to successful users/stats/graphs pull to indicate what was just pulled, since the field defaults back to 30 days
+
+### v0.6.1
+* "API Key" text on Settings page updated to "Tautulli API Key"
 * More rounded boxes
 * Version in the footer of each HTML page
 * Longer fields on the Settings page
-* hover:underline on navbar links
-* an 'about' page with version info, publish date
-* What does "time range" mean? Days? Weeks?
-* Need to put text under "Time Range" to indicate what was just pulled, since the field defaults back to 30 days
-* Font, colors, and images updated
-* Version and publish date moved to variable in python
+* Added hover:underline on navbar links
+
+### v0.6.0
+* Footer added
+* Prefilled subject based on server name
+* Port changed to 6397
 
 ---
 

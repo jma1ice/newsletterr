@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}dashboard{% endblock %}
 {% block content %}
-<div class="container">
+<div class="container-fluid">
     <h1>Dashboard</h1><br>
     {% if alert %}
         <p style="color: #01b301; text-shadow: 1px 0 #000, 0 1px #000, -1px 0 #000, 0 -1px #000;">{{ alert }}</p>
@@ -418,6 +418,31 @@
             });
         </script>
         <script>
+            function applyChartTheme(isDark) {
+                Highcharts.setOptions(isDark ? {
+                    chart: { backgroundColor: 'transparent' },
+                    title: { style: { color: '#333' } },
+                    xAxis: { labels: { style: { color: '#333' } }, gridLineColor: '#374151' },
+                    yAxis: { labels: { style: { color: '#333' } }, gridLineColor: '#374151' },
+                    legend: { itemStyle: { color: '#333' } }
+                } : {
+                    chart: { backgroundColor: 'transparent' },
+                    title: { style: { color: '#8acbd4' } },
+                    xAxis: { labels: { style: { color: '#8acbd4' } }, gridLineColor: '#e5e7eb' },
+                    yAxis: { labels: { style: { color: '#8acbd4' } }, gridLineColor: '#e5e7eb' },
+                    legend: { itemStyle: { color: '#8acbd4' } }
+                });
+            }
+
+            const isDark = document.documentElement.classList.contains('dark');
+            applyChartTheme(isDark);
+
+            document.getElementById('theme-toggle')?.addEventListener('click', () => {
+                const nowDark = document.documentElement.classList.contains('dark');
+                applyChartTheme(nowDark);
+                Highcharts.charts.filter(Boolean).forEach(c => c.reflow());
+            });
+
             const graphDataList = {{ graph_data | tojson }};
             const graphCommands = {{ graph_commands | tojson }};
 

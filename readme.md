@@ -54,15 +54,15 @@ By default the app listens on **http://127.0.0.1:9898**.
 1. Navigate to **Settings** in the navbar.  
 2. Fill in:
    * **From** – e‑mail address that will appear as the sender  
-   * **Alias (optional)** – _Send As_ alias  
-   * **Password** – account or app‑password if using Gmail  
+   * **Alias (optional)** – _Send As_ alias. If blank, **From** will be used, [setup instructions](https://support.google.com/a/answer/33327?hl=en)  
+   * **Password** – account or [app‑password](https://support.google.com/mail/answer/185833?hl=en) if using Gmail  
    * **SMTP Server** – e.g. `smtp.gmail.com`  
    * **SMTP Port** – `465` for SSL or `587` for TLS  
    * **Plex Server Name** – appears in the newsletter header  
    * **Plex Base URL** – e.g. `http://localhost:32400`  
    * **Plex Token** – [X-Plex-Token](https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/) view XML in 'Get Info' of a library item  
    * **Tautulli URL** – e.g. `http://tautulli.local:8181`  
-   * **Tautulli API Key** – copy from your Tautulli settings  
+   * **Tautulli API Key** – make sure 'Enable API' is checked, and copy the API key from your Tautulli settings. e.g. http://localhost:8181/settings#tabs_tabs-web_interface  
 3. Click **Apply Settings**.  Settings are saved to `database/data.db`.
 
 ---
@@ -112,9 +112,6 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 * HTML cards and other CSS to add some life to the UI
 * Additional email templates
 * Get recently added items
-* Auto fetch plex token, and make it easier for the user to get tautulli API
-* Plex integration/automation to get the server details? See above?
-* Include functionality for users without tautulli? Such that they could just provide emails and a text body for the email
 * Mailing lists (Weekly, monthly, Movies, Shows) that you can add users to, to automate some emails. E.g. - Monthly email contains the following users, and uses the following template. 
 * Template management to go with lists - Include a few default templates that snap in the most common stats
 * Automation management (Which lists, how often?)
@@ -123,7 +120,6 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 * Checking "include XYZ in email" buttons should trigger them to be added to the previewed email in realtime, as snap-ins that can be removed on the fly as well. Maybe a button instead of a check box? 
 * Graph/stat ordering? Should it have a default ordering, or user editable?
 * BCC text appears on the bottom left of the main text field, should be on top or centered. Some form of field validation should be in here to make sure it's "email, email" - regex maybe? Prevent empty emails or duplicates in case the user messes with it. Come to think of it, could the users not be added in a "tag" format style, that is to say, each user entered is an 'item' with a small 'x' next to them to remove if needed. 
-* light and dark mode toggle in settings
 * I don't believe I understand the placeholder boxes...
 * Limit maximum days to pull data, and have buttons underneath to pull last 7, 30, 60, 90, 120? Max at like 6 months? 
 * All "hours" values should be rounded down to whole numbers
@@ -134,6 +130,14 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 ---
 
 ## Recent Changes
+
+### v0.6.5
+* Clarified where to pull Tautulli API key from in readme.md
+* Auto fetch plex token, automation to get the server details
+* Remove Tautulli settings requirement for users without tautulli
+* Added instruction links for alias and app password setup in readme.md
+* Added 'Join the discussion' footer link to discord
+* Added light and dark mode toggle
 
 ### v0.6.4
 * About page cleaned up

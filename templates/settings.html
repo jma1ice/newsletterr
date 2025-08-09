@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}settings{% endblock %}
 {% block content %}
-<div class="container">
+<div class="container-fluid">
     <h1>Settings</h1><br>
     {% if alert %}
         <p style="color: #01b301; text-shadow: 1px 0 #000, 0 1px #000, -1px 0 #000, 0 -1px #000;">{{ alert }}</p>
@@ -11,6 +11,12 @@
     {% endif %}
     <div class="foreground">
         <div style="margin: 0px 0px 0px 15px;">
+            <div>
+                <h3>Plex Account</h3>
+                <button id="connect_plex" class="button">Connect Plex</button>
+                <div id="plex_status">{% if settings.plex_token %}<p style="padding-left: 8px; color: #01b301; text-shadow: 1px 0 #000, 0 1px #000, -1px 0 #000, 0 -1px #000;">Connected</p>{% endif %}</div>
+            </div><br>
+
             <form method="POST" id="settings_form">
                 <label for="from_email">From:</label><br>
                 <input type="email" id="from_email" name="from_email"
@@ -42,32 +48,118 @@
                     {% if settings.from_email !="" %}value="{{ settings.server_name }}"{% endif %}
                     placeholder="Paramount Plex" required><br><br>
 
-                <label for="plex_url">Plex Base URL:</label><br>
-                <input type="text" id="plex_url" name="plex_url"
-                    {% if settings.from_email !="" %}value="{{ settings.plex_url }}"{% endif %}
-                    placeholder="http://localhost:32400" required><br><br>
-
-                <label for="plex_token">Plex Token:</label><br>
-                <input type="text" id="plex_token" name="plex_token"
-                    {% if settings.from_email !="" %}value="{{ settings.plex_token }}"{% endif %}
-                    placeholder="Plex Token" required><br><br>
-
                 <label for="tautulli_url">Tautulli Base URL:</label><br>
                 <input type="text" id="tautulli_url" name="tautulli_url"
                     {% if settings.from_email !="" %}value="{{ settings.tautulli_url }}"{% endif %}
-                    placeholder="http://localhost:8181" required><br><br>
+                    placeholder="http://localhost:8181"><br><br>
 
                 <label for="tautulli_api">Tautulli API Key:</label><br>
                 <input type="text" id="tautulli_api" name="tautulli_api"
                     {% if settings.from_email !="" %}value="{{ settings.tautulli_api }}"{% endif %}
-                    placeholder="Tautulli API Key" required><br><br>
+                    placeholder="Tautulli API Key"><br><br>
                 
-                <button id="applySettings" class="button">Apply Settings</button>
+                <button id="apply_settings" class="button">Apply Settings</button>
             </form>
         </div>
         <script>
             document.getElementById('settings_form').addEventListener('submit', (e) => {
                 showSpinner('Applying settings...');
+            });
+        </script>
+        <script>
+            function openCenteredPopup(url, w = 520, h = 680, name = 'plex-auth', offsetX = 0, offsetY = 0) {
+                const dualLeft = window.screenLeft ?? window.screenX;
+                const dualTop  = window.screenTop  ?? window.screenY;
+
+                const vw = window.innerWidth  || document.documentElement.clientWidth  || screen.width;
+                const vh = window.innerHeight || document.documentElement.clientHeight || screen.height;
+
+                let left = dualLeft + (vw - w) / 2 + offsetX;
+                let top  = dualTop  + (vh - h) / 2 + offsetY;
+
+                left = Math.max(dualLeft, Math.min(left, dualLeft + vw - w));
+                top  = Math.max(dualTop,  Math.min(top,  dualTop  + vh - h));
+
+                const features = `width=${w},height=${h},left=${Math.round(left)},top=${Math.round(top)},` +
+                                `resizable=yes,scrollbars=yes,toolbar=no,menubar=no,location=yes,noopener,noreferrer`;
+
+                const win = window.open(url, name, features);
+                if (!win) return window.open(url, '_blank', 'noopener,noreferrer');
+                win.focus();
+                return win;
+            }
+            
+            const button = document.getElementById('connect_plex');
+            const statusEl = document.getElementById('plex_status');
+            let pollTimer = null;
+            let connected_to_plex = false;
+
+            button?.addEventListener('click', async () => {
+                button.disabled = true;
+                statusEl.textContent = '';
+                showSpinner('Waiting for Plex approval...');
+
+                try {
+                    const r = await fetch('/api/plex/pin', {method: 'POST'});
+                    if (!r.ok) throw new Error('Failed to create PIN');
+                    const data = await r.json();
+
+                    hideSpinner();
+                    showSpinner(`Enter this code into Plex: ${data.code}`);
+                    const authWin = openCenteredPopup(data.auth_url, 520, 480, 'plex-auth', 520);
+
+                    const start = Date.now();
+                    const timeoutMs = (data.expires_in ?? 600) * 1000;
+
+                    async function waitForPIN() {
+                        return new Promise((resolve, reject) => {
+                            const poll = async () => {
+                                const pollr = await fetch(`/api/plex/pin/${data.pin_id}`);
+                                const polld = await pollr.json();
+                                if (polld.connected) {
+                                    hideSpinner();
+                                    statusEl.textContent = 'Connected! Your Plex token is saved.';
+                                    clearInterval(pollTimer);
+                                    button.disabled = false;
+                                    resolve(polld);
+                                    return;
+                                }
+                                if (Date.now() - start > timeoutMs) {
+                                    hideSpinner();
+                                    statusEl.textContent = 'PIN expired. Please try again.';
+                                    clearInterval(pollTimer);
+                                    button.disabled = false;
+                                    reject(new Error('PIN expired.'));
+                                }
+                            };
+                            pollTimer = setInterval(poll, 1500);
+                            poll();
+                        });
+                    }
+
+                    async function getPlexInfo(authWin) {
+                        const polld = await waitForPIN();
+
+                        showSpinner('Retreiving Plex information...');
+                        const infor = await fetch('/api/plex/info', {method: 'GET'});
+                        if (!infor.ok) throw new Error('Failed to get info');
+                        const infod = await infor.json();
+
+                        if (infod.connected) {
+                            try { if (authWin && !authWin.closed) authWin.close(); } catch {}
+                            hideSpinner();
+                            statusEl.textContent = 'Plex information retrieved.';
+                            setTimeout(() => location.replace(location.href), 2000);
+                            return;
+                        }
+                    }
+
+                    getPlexInfo(authWin);
+                } catch (e) {
+                    hideSpinner();
+                    statusEl.textContent = 'Error starting Plex connection.';
+                    button.disabled = false;
+                }
             });
         </script>
     </div>

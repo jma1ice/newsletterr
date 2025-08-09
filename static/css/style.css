@@ -7,24 +7,32 @@ div, nav, footer {
 .frame {
     height: 50rem;
     width: 60rem;
-    border: 1px solid #ccc;
+    border: 1px solid #444;
     border-radius: 8px;
+    background: #8acbd4;
+}
+
+.dark .frame {
+    border: 1px solid #ccc;
+    background: #333;
 }
 
 body {
-    font-family: 'Arial', sans-serif;
     margin: 0;
     padding: 5px;
     display: flex;
-    background-color: #f4f4f4;
     background: #8acbd4;
     color: #333;
     padding-top: 70px;
 }
 
+.dark body {
+    background: #333;
+    color: #8acbd4;
+}
+
 .navbar {
-    background-color: #222222;
-    color: white;
+    background-color: #222;
     padding: 8px 0;
     text-align: center;
     position: fixed;
@@ -32,7 +40,12 @@ body {
     top: 0;
     left: 0;
     z-index: 1000;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    box-shadow: 0 5px 10px rgba(0,0,0,0.8);
+}
+
+.dark .navbar {
+    background-color: #62a1a4;
+    box-shadow: 0 5px 10px rgba(74,127,130,0.8);
 }
 
 .navbar ul {
@@ -54,17 +67,28 @@ body {
     transition: color 0.3s ease-in-out;
 }
 
+.dark .navbar ul li a {
+    color: #333;
+}
+
 .navbar ul li a:hover {
     color: #62a1a4;
 }
 
-.container {
+.dark .navbar ul li a:hover {
+    color: #222;
+}
+
+.container-fluid {
     max-width: 1900px;
     margin: 1px auto 40px auto;
     padding: 10px;
     background-color: #62a1a4;
     border-radius: 8px;
-    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+}
+
+.dark .container-fluid {
+    background-color: #222;
 }
 
 .spinner {
@@ -96,7 +120,7 @@ body {
 .button {
     display: inline-block;
     padding: 10px 20px;
-    background-color: #333333;
+    background-color: #333;
     color: #62a1a4;
     text-decoration: none;
     border-radius: 5px;
@@ -104,10 +128,20 @@ body {
     transition: background-color 0.3s ease-in-out, color 0.3s ease-in-out, transform 0.3s ease-in-out;
 }
 
+.dark .button {
+    background-color: #62a1a4;
+    color: #333;
+}
+
 .button:hover {
-    background-color: #222222;
+    background-color: #222;
     color: #8acbd4;
     transform: scale(1.01);
+}
+
+.dark .button:hover {
+    background-color: #8acbd4;
+    color: #222;
 }
 
 .blur-container {
@@ -146,12 +180,19 @@ input, textarea {
     padding: 0 8px;
 }
 
-input, textarea, select {
+input, textarea, select, #statSelector, #graphSelector {
     border-radius: 5px;
+    background-color: #8acbd4;
+    color: #333;
+}
+
+.dark input, .dark textarea, .dark select, .dark #statSelector, .dark #graphSelector {
+    background-color: #333;
+    color: #8acbd4;
 }
 
 #settings_form input {
-    width: 20rem;
+    width: 25rem;
 }
 
 footer {
@@ -160,10 +201,16 @@ footer {
     bottom: 0;
     left: 0;
     width: 100%;
-    background-color: #222222;
-    color: white;
+    background-color: #222;
+    color: #62a1a4;
     padding: 0;
-    box-shadow: 0 -2px 5px rgba(0,0,0,0.2);
+    box-shadow: 0 -3px 7px rgba(0,0,0,0.6);
+}
+
+.dark footer {
+    background-color: #62a1a4;
+    color: #222;
+    box-shadow: 0 -3px 7px rgba(74,127,130,0.6);
 }
 
 footer p {

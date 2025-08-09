@@ -1,20 +1,27 @@
 import os
 import math
+import time
 import uuid
 import base64
 import smtplib
 import sqlite3
 import requests
+from plex_api_client import PlexAPI
+from urllib.parse import quote_plus
 from email.mime.text import MIMEText
 from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
-from flask import Flask, render_template, request, jsonify, Response, send_file
+from flask import Flask, render_template, request, jsonify, Response, send_file, url_for
 
 app = Flask(__name__)
-app.jinja_env.globals["version"] = "v0.6.4"
-app.jinja_env.globals["publish_date"] = "August 7, 2025"
+app.jinja_env.globals["version"] = "v0.6.5"
+app.jinja_env.globals["publish_date"] = "August 9, 2025"
 
 DB_PATH = os.path.join("database", "data.db")
+
+plex_headers = {
+    "X-Plex-Client-Identifier": str(uuid.uuid4())
+}
 
 @app.route('/favicon.ico')
 def favicon():
@@ -263,8 +270,12 @@ def proxy_art(art_path):
         }
     else:
         settings = {
-            "from_email": ""
+            "from_email": "",
+            "plex_token": ""
         }
+
+    if not settings['plex_token']:
+        return Response("Please set Plex Token in settings.", status=400)
 
     plex_token = settings['plex_token']
     plex_url = settings['plex_url'].rstrip('/')
@@ -389,17 +400,19 @@ def settings():
         smtp_server = request.form.get("smtp_server")
         smtp_port = int(request.form.get("smtp_port"))
         server_name = request.form.get("server_name")
-        plex_url = request.form.get("plex_url")
-        plex_token = request.form.get("plex_token")
         tautulli_url = request.form.get("tautulli_url")
         tautulli_api = request.form.get("tautulli_api")
 
         cursor.execute("""
-            REPLACE INTO settings
-            (id, from_email, alias_email, password, smtp_server, smtp_port, server_name, plex_url, plex_token, tautulli_url, tautulli_api)
-            VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (from_email, alias_email, password, smtp_server, smtp_port, server_name, plex_url, plex_token, tautulli_url, tautulli_api))
+            INSERT INTO settings
+            (id, from_email, alias_email, password, smtp_server, smtp_port, server_name, tautulli_url, tautulli_api)
+            VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT (id) DO UPDATE
+            SET from_email = excluded.from_email, alias_email = excluded.alias_email, password = excluded.password, smtp_server = excluded.smtp_server, smtp_port = excluded.smtp_port, server_name = excluded.server_name, tautulli_url = excluded.tautulli_url, tautulli_api = excluded.tautulli_api
+        """, (from_email, alias_email, password, smtp_server, smtp_port, server_name, tautulli_url, tautulli_api))
         conn.commit()
+        cursor.execute("SELECT plex_token FROM settings WHERE id = 1")
+        plex_token = cursor.fetchone()[0]
         conn.close()
 
         settings = {
@@ -409,7 +422,6 @@ def settings():
             "smtp_server": smtp_server,
             "smtp_port": smtp_port,
             "server_name": server_name,
-            "plex_url": plex_url,
             "plex_token": plex_token,
             "tautulli_url": tautulli_url,
             "tautulli_api": tautulli_api
@@ -444,6 +456,85 @@ def settings():
         }
 
     return render_template('settings.html', settings=settings)
+
+@app.post('/api/plex/pin')
+def plex_create_pin():
+    with PlexAPI() as plex_api:
+        res = plex_api.plex.get_pin(request={
+            "client_id": plex_headers["X-Plex-Client-Identifier"],
+            "client_name": "newsletterr",
+            "device_nickname": "newsletterr",
+            "client_version": f"{app.jinja_env.globals['version']}",
+            "platform": "Flask",
+        })
+    
+    assert res.auth_pin_container is not None
+
+    auth_url = (
+        "https://plex.tv/link?"
+        f"clientID={quote_plus(plex_headers['X-Plex-Client-Identifier'])}"
+        f"&code={quote_plus(res.auth_pin_container.code)}"
+    )
+    return jsonify({"pin_id": res.auth_pin_container.id, "code": res.auth_pin_container.code, "auth_url": auth_url, "expires_in": res.auth_pin_container.expires_in})
+
+@app.get('/api/plex/pin/<int:pin_id>')
+def plex_poll_pin(pin_id: int):
+    with PlexAPI() as plex_api:
+        res = plex_api.plex.get_token_by_pin_id(request={
+            "pin_id": pin_id,
+            "client_id": plex_headers["X-Plex-Client-Identifier"],
+            "client_name": "newsletterr",
+            "device_nickname": "newsletterr",
+            "client_version": f"{app.jinja_env.globals['version']}",
+            "platform": "Flask",
+        })
+    
+    assert res.auth_pin_container is not None
+
+    token = res.auth_pin_container.auth_token
+    if token:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO settings (id, plex_token)
+            VALUES (1, ?)
+            ON CONFLICT(id) DO UPDATE SET plex_token = excluded.plex_token
+        """, (token,))
+        conn.commit()
+        conn.close()
+
+        return jsonify({"connected": True})
+    return jsonify({"connected": False})
+
+@app.get('/api/plex/info')
+def plex_get_info():
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("SELECT plex_token FROM settings WHERE id = 1")
+    row = cursor.fetchone()
+
+    token = row[0]
+    url = "https://plex.tv/api/v2/resources"
+    headers = {
+        "Accept": "application/json",
+        "X-Plex-Client-Identifier": plex_headers['X-Plex-Client-Identifier'],
+        "X-Plex-Token": token
+    }
+    
+    response = requests.get(url, headers=headers)
+    data = response.json()
+
+    cursor.execute("""
+        INSERT INTO settings (id, server_name, plex_url)
+        VALUES (1, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET server_name = excluded.server_name, plex_url = excluded.plex_url
+    """, (data[0]['name'], data[0]['connections'][0]['uri']))
+    conn.commit()
+    conn.close()
+
+    if response.status_code == 200:
+        return jsonify({"connected": True})
+    return jsonify({"connected": False})
 
 @app.route('/about', methods=['GET'])
 def about():

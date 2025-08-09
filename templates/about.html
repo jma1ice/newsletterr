@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}about{% endblock %}
 {% block content %}
-<div class="container">
+<div class="container-fluid">
     <h1>About</h1><br>
   
     <dl class="grid grid-cols-1 sm:grid-cols-1 gap-3 text-lg leading-tight">
@@ -34,19 +34,11 @@
 
     <h2 class="text-2xl font-bold mb-4">Recent Changes</h2>
     <ul class="list-disc list-inside space-y-2 text-sm">
-        <li>Footer added</li>
-        <li>Prefilled subject based on server name</li>
-        <li>Port changed to 6397</li>
-        <li>"API Key" text on Settings page updated to "Tautulli API Key"</li>
-        <li>More rounded boxes</li>
-        <li>Version in footer</li>
-        <li>An 'about' page with version info, publish date, etc.</li>
-        <li>Longer fields on the Settings page</li>
-        <li>Added hover:underline on navbar links</li>
-        <li>(days) added to time range text</li>
-        <li>Days pulled added to successful pull text</li>
-        <li>Font, colors, and images updated</li>
-        <li>Version and publish date moved to variable in python</li>
+        <li>Clarified where to pull Tautulli API key from in readme.md</li>
+        <li>Auto fetch plex token, automation to get the server details</li>
+        <li>Remove Tautulli settings requirement for users without tautulli</li>
+        <li>Added instruction links for alias and app password setup in readme.md</li>
+        <li>Added light and dark mode toggle</li>
     </ul>
 </div>
 {% endblock %}

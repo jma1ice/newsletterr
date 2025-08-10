@@ -33,37 +33,33 @@ git clone https://github.com/jma1ice/newsletterr.git
 cd newsletterr                 # root of the project
 python -m venv .venv
 source .venv/bin/activate      # Windows: .venv\\Scripts\\activate
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
 ```
-
-> **Note**: If `requirements.txt` is missing, create one containing:  
-> `Flask==3.0`, `requests>=2.0`.
 
 ### 3. Run
 
 ```bash
-python app.py
+python newsletterr.py
 ```
 
-By default the app listens on **http://127.0.0.1:9898**.
+By default the app listens on **http://127.0.0.1:6397**.
 
 ---
 
 ## Configuration
 
 1. Navigate to **Settings** in the navbar.  
-2. Fill in:
+2. Connect to your Plex server with **Connect Plex** button.  
+3. Fill in:
    * **From** – e‑mail address that will appear as the sender  
    * **Alias (optional)** – _Send As_ alias. If blank, **From** will be used, [setup instructions](https://support.google.com/a/answer/33327?hl=en)  
    * **Password** – account or [app‑password](https://support.google.com/mail/answer/185833?hl=en) if using Gmail  
    * **SMTP Server** – e.g. `smtp.gmail.com`  
    * **SMTP Port** – `465` for SSL or `587` for TLS  
-   * **Plex Server Name** – appears in the newsletter header  
-   * **Plex Base URL** – e.g. `http://localhost:32400`  
-   * **Plex Token** – [X-Plex-Token](https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/) view XML in 'Get Info' of a library item  
+   * **Plex Server Name** – appears in the newsletter header. This is grabbed when Plex is connected, but can be overwritten if wanted  
    * **Tautulli URL** – e.g. `http://tautulli.local:8181`  
    * **Tautulli API Key** – make sure 'Enable API' is checked, and copy the API key from your Tautulli settings. e.g. http://localhost:8181/settings#tabs_tabs-web_interface  
-3. Click **Apply Settings**.  Settings are saved to `database/data.db`.
+4. Click **Apply Settings**.  Settings are saved to `database/data.db`.
 
 ---
 
@@ -73,7 +69,8 @@ By default the app listens on **http://127.0.0.1:9898**.
 2. Wait for the spinner to disappear, then the BCC, charts, and tables will populate.  
 3. Alter the BCC field to specify the recipient e‑mails (comma‑separated) if needed.  
 4. Draft the body, insert `[GRAPHS]` or `[STATS]` where appropriate.  
-5. Hit **Send Email**.  Success and error messages will show after running.
+5. Check the box on the stats and graphs that you wish to include.  
+6. Hit **Send Email**. Success and error messages will show after running.  
 
 ---
 
@@ -81,19 +78,23 @@ By default the app listens on **http://127.0.0.1:9898**.
 
 ```
 newsletterr/
-├── app.py            # Flask routes & helper functions
+├── .env              # environment variables, created at first launch
+├── newsletterr.py    # Flask routes & helper functions
 ├── templates/
+│   ├── about.html
 │   ├── base.html
 │   ├── index.html
 │   └── settings.html
 ├── static/
 │   ├── css/style.css
 │   └── img/
-|      ├── newspaper.png
-│      └── bouncing-newspaper.gif
+|      ├── Asset_94x.png
+│      ├── favicon.ico
+│      └── load.gif
 ├── database/         # created at first launch
 │   └── data.db
-└── README.md         # this file
+├── README.md         # this file
+└── requirements.txt  # pip requirements
 ```
 
 ---
@@ -104,32 +105,44 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 
 ---
 
-## To-Do
+## Upcoming Changes
 
-* Add in scheduled newsletter functionality
-* Dockerize
-* Compile EXE and ELF files
-* HTML cards and other CSS to add some life to the UI
-* Additional email templates
+### v0.6.7
 * Get recently added items
+
+### v0.7.0
+* BCC text appears on the bottom left of the main text field, should be on top or centered. Some form of field validation should be in here to make sure it's "email, email" - regex maybe? Prevent empty emails or duplicates in case the user messes with it. Come to think of it, could the users not be added in a "tag" format style, that is to say, each user entered is an 'item' with a small 'x' next to them to remove if needed. 
+* Limit maximum days to pull data, and have buttons underneath to pull last 7, 30, 60, 90, 120? Max at like 6 months? 
+* All "hours" values should be rounded down to whole numbers
+* "ARE YOU SURE?" after pressing send button
+
+### v0.8.0
+* Update functionality (new version available)
+
+### v0.9.0
+* Add in scheduled newsletter functionality
 * Mailing lists (Weekly, monthly, Movies, Shows) that you can add users to, to automate some emails. E.g. - Monthly email contains the following users, and uses the following template. 
 * Template management to go with lists - Include a few default templates that snap in the most common stats
 * Automation management (Which lists, how often?)
 * Opt out support?
-* Update functionality (new version available)
 * Checking "include XYZ in email" buttons should trigger them to be added to the previewed email in realtime, as snap-ins that can be removed on the fly as well. Maybe a button instead of a check box? 
 * Graph/stat ordering? Should it have a default ordering, or user editable?
-* BCC text appears on the bottom left of the main text field, should be on top or centered. Some form of field validation should be in here to make sure it's "email, email" - regex maybe? Prevent empty emails or duplicates in case the user messes with it. Come to think of it, could the users not be added in a "tag" format style, that is to say, each user entered is an 'item' with a small 'x' next to them to remove if needed. 
-* I don't believe I understand the placeholder boxes...
-* Limit maximum days to pull data, and have buttons underneath to pull last 7, 30, 60, 90, 120? Max at like 6 months? 
-* All "hours" values should be rounded down to whole numbers
-* "ARE YOU SURE?" after pressing send button
-* encrypt db storage
-* .py file name change to newsletterr.py?
+* For the two above this, a stat/graph pane in place of the stat/graph placeholders
+
+### v1.0
+* Dockerize
+* Compile EXE and ELF files
 
 ---
 
 ## Recent Changes
+
+### v0.6.6
+* Fix to keep preview background consistent
+* Fix to change graphs with light/dark toggle
+* Changed .py file name to newsletterr.py
+* Readme.md organized, 'to-do' now 'upcoming changes' split into like categories and sorted to specific versions, updated to reflect recent changes
+* Added db storage encryption
 
 ### v0.6.5
 * Clarified where to pull Tautulli API key from in readme.md

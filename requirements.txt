@@ -1,3 +1,5 @@
-flask
+Flask
 requests
 plex-api-client
+python-dotenv
+cryptography

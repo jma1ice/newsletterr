@@ -236,6 +236,8 @@
                 const layout = document.getElementById('layout').value;
                 const serverName = "{{ settings.server_name }}";
                 const subject = document.getElementById('subject').value;
+                const isDark = document.documentElement.classList.contains('dark');
+
                 let body = raw.replace(/\n/g, "<br>");
                 let html = "";
                 let displaySubject = subject.startsWith(serverName) 
@@ -347,22 +349,26 @@
                     case "standard":
                         html = `
                                 <link href="https://fonts.googleapis.com/css?family=IBM+Plex+Sans:400,500,600,700&display=swap" rel="stylesheet">
-                                <html><body style="font-family: IBM Plex Sans;">
-                                    <table class="body" style="border-collapse: separate; mso-table-lspace: 0pt; mso-table-rspace: 0pt; width: 90%;" border="0" cellspacing="0" cellpadding="0">
+                                <style>
+                                    :root { color-scheme: ${isDark ? 'dark' : 'light'}; }
+                                    html, body { background: ${isDark ? '#333' : '#8acbd4'}; }
+                                </style>
+                                <html><body style="font-family: IBM Plex Sans; margin: 0;">
+                                    <table class="body" style="border-collapse: separate; mso-table-lspace: 0pt; mso-table-rspace: 0pt; width: 100%;" border="0" cellspacing="0" cellpadding="0">
                                         <tbody>
                                             <tr>
-                                                <td class="preview-container" style="font-family: 'IBM Plex Sans', Helvetica, Arial, sans-serif; font-size: 14px; vertical-align: top; display: block; max-width: 925px; padding: 5px; width: 925px; margin: 0 auto !important;">
-                                                    <div class="content" style="box-sizing: border-box; display: block; margin: 0 auto; max-width: 1037px; padding: 5px;"><span class="preheader" style="color: transparent; display: none; height: 0; max-height: 0; max-width: 0; opacity: 0; overflow: hidden; mso-hide: all; visibility: hidden; width: 0;">${serverName} Newsletter</span>
+                                                <td class="preview-container" style="font-family: IBM Plex Sans; font-size: 14px; vertical-align: top; display: block;">
+                                                    <div class="content" style="box-sizing: border-box; display: block;"><span class="preheader" style="color: transparent; display: none; height: 0; max-height: 0; max-width: 0; opacity: 0; overflow: hidden; mso-hide: all; visibility: hidden; width: 0;">${serverName} Newsletter</span>
                                                         <table class="main" style="border-collapse: separate; mso-table-lspace: 0pt; mso-table-rspace: 0pt; width: 100%; background: #282A2D; border-radius: 3px; color: #ffffff;" border="0" cellspacing="0" cellpadding="3">
                                                             <tbody>
                                                                 <tr>
-                                                                    <td class="wrapper" style="font-family: 'IBM Plex Sans', Helvetica, Arial, sans-serif; font-size: 14px; vertical-align: top; box-sizing: border-box; padding: 5px; overflow: auto;">
+                                                                    <td class="wrapper" style="font-family: IBM Plex Sans; font-size: 14px; vertical-align: top; box-sizing: border-box; padding: 5px; overflow: auto;">
                                                                         <div class="header" style="width: 50%; height: 10px; text-align: center;"><img class="header-img" style="border: none; -ms-interpolation-mode: bicubic; max-width: 9%; width: 492px; height: 20px; margin-left: -35px;" src="https://d15k2d11r6t6rl.cloudfront.net/public/users/Integrators/669d5713-9b6a-46bb-bd7e-c542cff6dd6a/3bef3c50f13f4320a9e31b8be79c6ad2/Plex%20Logo%20Update%202022/plex-logo-heavy-stroke.png" width="492" height="90" /></div>
                                                                         <div class="server-name" style="font-size: 25px; text-align: center; margin-bottom: 0;">${serverName} Newsletter</div>
                                                                     </td>
                                                                 </tr>
                                                                 <tr>
-                                                                    <td class="footer" style="font-family: 'IBM Plex Sans', Helvetica, Arial, sans-serif; font-size: 12px; vertical-align: top; clear: both; margin-top: 0; text-align: center; width: 100%;">
+                                                                    <td class="footer" style="font-family: IBM Plex Sans; font-size: 12px; vertical-align: top; clear: both; margin-top: 0; text-align: center; width: 100%;">
                                                                         <h1 class="footer-bar" style="margin-left: auto; margin-right: auto; width: 250px; border-top: 1px solid #E5A00D; margin-top: 5px;">${displaySubject}</h1>
                                                                         <p>
                                                                             ${content}
@@ -380,10 +386,17 @@
                                     </table></body></html>`;
                         break;
                     default:
-                        html = `<html><body>${content}</body></html>`;
+                        html = `<style>
+                                    :root { color-scheme: ${isDark ? 'dark' : 'light'}; }
+                                    html, body { background: ${isDark ? '#333' : '#8acbd4'}; }
+                                </style>
+                                <html><body>${content}</body></html>`;
                 }
 
-                document.getElementById('preview').srcdoc = html;
+                const frame = document.getElementById('preview');
+                const doc = frame.contentDocument || frame.contentWindow.document;
+                doc.documentElement.classList.toggle('dark', isDark);
+                frame.srcdoc = html;
             }
 
             document.addEventListener('DOMContentLoaded', () => {
@@ -418,19 +431,49 @@
             });
         </script>
         <script>
+            function themeVars(isDark) {
+                return {
+                    text: isDark ? '#8acbd4' : '#333',
+                    grid: isDark ? '#e5e7eb' : '#374151',
+                    axis: isDark ? '#e5e7eb' : '#374151',
+                    bg: isDark ? '#333' : '#8acbd4',
+                };
+            }
+
             function applyChartTheme(isDark) {
-                Highcharts.setOptions(isDark ? {
-                    chart: { backgroundColor: 'transparent' },
-                    title: { style: { color: '#333' } },
-                    xAxis: { labels: { style: { color: '#333' } }, gridLineColor: '#374151' },
-                    yAxis: { labels: { style: { color: '#333' } }, gridLineColor: '#374151' },
-                    legend: { itemStyle: { color: '#333' } }
-                } : {
-                    chart: { backgroundColor: 'transparent' },
-                    title: { style: { color: '#8acbd4' } },
-                    xAxis: { labels: { style: { color: '#8acbd4' } }, gridLineColor: '#e5e7eb' },
-                    yAxis: { labels: { style: { color: '#8acbd4' } }, gridLineColor: '#e5e7eb' },
-                    legend: { itemStyle: { color: '#8acbd4' } }
+                const t = themeVars(isDark);
+
+                Highcharts.setOptions({
+                    chart: { backgroundColor: t.bg, style: { fontFamily: 'IBM Plex Sans' } },
+                    title: { style: { color: t.text } },
+                    legend: { itemStyle: { color: t.text } },
+                    xAxis: { labels: { style: { color: t.text } }, gridLineColor: t.grid, lineColor: t.axis, tickColor: t.axis },
+                    yAxis: { labels: { style: { color: t.text } }, title: { style: { color: t.text } }, gridLineColor: t.grid, lineColor: t.axis, tickColor: t.axis }
+                });
+
+                Highcharts.charts.filter(Boolean).forEach(c => {
+                    c.update({
+                        chart: { backgroundColor: t.bg },
+                        title: { style: { color: t.text } },
+                        legend: { itemStyle: { color: t.text } }
+                    });
+
+                    c.xAxis.forEach(ax => ax.update({
+                        labels: { style: { color: t.text } },
+                        gridLineColor: t.grid,
+                        lineColor: t.axis,
+                        tickColor: t.axis
+                    }));
+
+                    c.yAxis.forEach(ax => ax.update({
+                        labels: { style: { color: t.text } },
+                        title: { style: { color: t.text } },
+                        gridLineColor: t.grid,
+                        lineColor: t.axis,
+                        tickColor: t.axis
+                    }));
+
+                    c.redraw();
                 });
             }
 
@@ -439,8 +482,7 @@
 
             document.getElementById('theme-toggle')?.addEventListener('click', () => {
                 const nowDark = document.documentElement.classList.contains('dark');
-                applyChartTheme(nowDark);
-                Highcharts.charts.filter(Boolean).forEach(c => c.reflow());
+                applyChartTheme(!nowDark);
             });
 
             const graphDataList = {{ graph_data | tojson }};
@@ -460,14 +502,6 @@
                     const index = parseInt(selectedId.split('-')[1]);
                     const graphData = graphDataList[index];
 
-                    Highcharts.setOptions({
-                        chart: {
-                            style: {
-                                fontFamily: 'IBM Plex Sans'
-                            }
-                        }
-                    });
-
                     Highcharts.chart(selectedId, {
                         chart: { type: 'line' },
                         title: { text: graphCommands[index].name },
@@ -481,6 +515,9 @@
 
                     renderedCharts.add(selectedId);
                 }
+
+                const nowDark = document.documentElement.classList.contains('dark');
+                applyChartTheme(nowDark);
             });
         </script>
         <script>

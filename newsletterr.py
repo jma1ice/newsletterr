@@ -1,31 +1,56 @@
-import os
-import math
-import time
-import uuid
-import base64
-import smtplib
-import sqlite3
-import requests
-from plex_api_client import PlexAPI
-from urllib.parse import quote_plus
+import os, math, uuid, base64, smtplib, sqlite3, requests
+from cryptography.fernet import Fernet, InvalidToken
+from dotenv import load_dotenv, set_key, find_dotenv
 from email.mime.text import MIMEText
 from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
-from flask import Flask, render_template, request, jsonify, Response, send_file, url_for
+from flask import Flask, render_template, request, jsonify, Response, send_file
+from pathlib import Path
+from plex_api_client import PlexAPI
+from urllib.parse import quote_plus
 
 app = Flask(__name__)
-app.jinja_env.globals["version"] = "v0.6.5"
-app.jinja_env.globals["publish_date"] = "August 9, 2025"
+app.jinja_env.globals["version"] = "v0.6.6"
+app.jinja_env.globals["publish_date"] = "August 10, 2025"
 
 DB_PATH = os.path.join("database", "data.db")
-
 plex_headers = {
     "X-Plex-Client-Identifier": str(uuid.uuid4())
 }
+ROOT = Path(__file__).resolve().parent
+ENV_PATH = find_dotenv(usecwd=True) or str(ROOT / ".env")
 
-@app.route('/favicon.ico')
-def favicon():
-    return send_file('favicon.ico', mimetype='image/x-icon')
+load_dotenv(ENV_PATH)
+
+def ensure_data_key() -> str:
+    key = os.getenv("DATA_ENC_KEY")
+    if key:
+        return key
+
+    new_key = Fernet.generate_key().decode()
+
+    env_file = Path(ENV_PATH)
+    if not env_file.exists():
+        env_file.touch()
+        try:
+            env_file.chmod(0o600)
+        except Exception:
+            pass
+
+    set_key(str(env_file), "DATA_ENC_KEY", new_key)
+    return new_key
+
+DATA_KEY = ensure_data_key()
+fernet = Fernet(DATA_KEY)
+
+def encrypt(token: str) -> str:
+    return fernet.encrypt(token.encode()).decode()
+
+def decrypt(encrypted: str) -> str:
+    try:
+        return fernet.decrypt(encrypted.encode()).decode()
+    except InvalidToken:
+        return encrypted
 
 def init_db(db_path):
     conn = sqlite3.connect(db_path)
@@ -65,18 +90,18 @@ def apply_layout(body, graphs_html_block, stats_html_block, layout, subject, ser
             <table class="body" style="border-collapse: separate; mso-table-lspace: 0pt; mso-table-rspace: 0pt; width: 100%;" border="0" cellspacing="0" cellpadding="0">
                 <tbody>
                     <tr>
-                        <td class="container" style="font-family: 'IBM Plex Sans', Helvetica, Arial, sans-serif; font-size: 14px; vertical-align: top; display: block; max-width: 1042px; padding: 10px; width: 1042px; margin: 0 auto !important;">
+                        <td class="container" style="font-family: IBM Plex Sans; font-size: 14px; vertical-align: top; display: block; max-width: 1042px; padding: 10px; width: 1042px; margin: 0 auto !important;">
                             <div class="content" style="box-sizing: border-box; display: block; margin: 0 auto; max-width: 1037px; padding: 10px;"><span class="preheader" style="color: transparent; display: none; height: 0; max-height: 0; max-width: 0; opacity: 0; overflow: hidden; mso-hide: all; visibility: hidden; width: 0;">{server_name} Newsletter</span>
                                 <table class="main" style="border-collapse: separate; mso-table-lspace: 0pt; mso-table-rspace: 0pt; width: 100%; background: #282A2D; border-radius: 3px; color: #ffffff;" border="0" cellspacing="0" cellpadding="3">
                                     <tbody>
                                         <tr>
-                                            <td class="wrapper" style="font-family: 'IBM Plex Sans', Helvetica, Arial, sans-serif; font-size: 14px; vertical-align: top; box-sizing: border-box; padding: 5px; overflow: auto;">
+                                            <td class="wrapper" style="font-family: IBM Plex Sans; font-size: 14px; vertical-align: top; box-sizing: border-box; padding: 5px; overflow: auto;">
                                                 <div class="header" style="width: 50%; height: 10px; text-align: center;"><img class="header-img" style="border: none; -ms-interpolation-mode: bicubic; max-width: 9%; width: 492px; height: 20px; margin-left: -35px;" src="https://d15k2d11r6t6rl.cloudfront.net/public/users/Integrators/669d5713-9b6a-46bb-bd7e-c542cff6dd6a/3bef3c50f13f4320a9e31b8be79c6ad2/Plex%20Logo%20Update%202022/plex-logo-heavy-stroke.png" width="492" height="90" /></div>
                                                 <div class="server-name" style="font-size: 25px; text-align: center; margin-bottom: 0;">{server_name} Newsletter</div>
                                             </td>
                                         </tr>
                                         <tr>
-                                            <td class="footer" style="font-family: 'IBM Plex Sans', Helvetica, Arial, sans-serif; font-size: 12px; vertical-align: top; clear: both; margin-top: 0; text-align: center; width: 100%;">
+                                            <td class="footer" style="font-family: IBM Plex Sans; font-size: 12px; vertical-align: top; clear: both; margin-top: 0; text-align: center; width: 100%;">
                                                 <h1 class="footer-bar" style="margin-left: auto; margin-right: auto; width: 250px; border-top: 1px solid #E5A00D; margin-top: 5px;">{display_subject}</h1>
                                                 <p>
                                                     {body}
@@ -97,13 +122,13 @@ def apply_layout(body, graphs_html_block, stats_html_block, layout, subject, ser
 
 def run_tautulli_command(base_url, api_key, command, data_type, error, time_range='30'):
     if command == 'get_users':
-        api_url = f"{base_url}/api/v2?apikey={api_key}&cmd={command}"
+        api_url = f"{base_url}/api/v2?apikey={decrypt(api_key)}&cmd={command}"
     else:
         if command == 'get_plays_per_month':
             month_range = str(math.ceil(int(time_range) / 30))
-            api_url = f"{base_url}/api/v2?apikey={api_key}&cmd={command}&time_range={month_range}"
+            api_url = f"{base_url}/api/v2?apikey={decrypt(api_key)}&cmd={command}&time_range={month_range}"
         else:
-            api_url = f"{base_url}/api/v2?apikey={api_key}&cmd={command}&time_range={time_range}"
+            api_url = f"{base_url}/api/v2?apikey={decrypt(api_key)}&cmd={command}&time_range={time_range}"
 
     try:
         response = requests.get(api_url)
@@ -124,6 +149,10 @@ def run_tautulli_command(base_url, api_key, command, data_type, error, time_rang
             error += str(f", {data_type} Error: {e}")
 
     return [out_data, error]
+
+@app.route('/favicon.ico')
+def favicon():
+    return send_file('favicon.ico', mimetype='image/x-icon')
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
@@ -186,34 +215,23 @@ def index():
 
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    cursor.execute("""
-        SELECT
-        from_email, alias_email, password, smtp_server, smtp_port, server_name, plex_url, plex_token, tautulli_url, tautulli_api
-        FROM settings WHERE id = 1
-    """)
+    cursor.execute("SELECT server_name, tautulli_url, tautulli_api FROM settings WHERE id = 1")
     row = cursor.fetchone()
     conn.close()
 
     if row:
         settings = {
-            "from_email": row[0],
-            "alias_email": row[1],
-            "password": row[2],
-            "smtp_server": row[3],
-            "smtp_port": int(row[4]),
-            "server_name": row[5],
-            "plex_url": row[6],
-            "plex_token": row[7],
-            "tautulli_url": row[8],
-            "tautulli_api": row[9]
+            "server_name": row[0],
+            "tautulli_url": row[1],
+            "tautulli_api": row[2]
         }
     else:
         settings = {
-            "from_email": ""
+            "server_name": ""
         }
 
     if request.method == 'POST':
-        if settings['from_email'] == "":
+        if settings['server_name'] == "":
             return render_template('index.html', error='Please enter tautulli info on settings page',
                                     stats=stats, user_emails=user_emails, graph_data=graph_data,
                                     graph_commands=graph_commands, alert=alert, settings=settings)
@@ -247,53 +265,38 @@ def index():
 def proxy_art(art_path):
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    cursor.execute("""
-        SELECT
-        from_email, alias_email, password, smtp_server, smtp_port, server_name, plex_url, plex_token, tautulli_url, tautulli_api
-        FROM settings WHERE id = 1
-    """)
+    cursor.execute("SELECT plex_url, plex_token FROM settings WHERE id = 1")
     row = cursor.fetchone()
     conn.close()
 
     if row:
         settings = {
-            "from_email": row[0],
-            "alias_email": row[1],
-            "password": row[2],
-            "smtp_server": row[3],
-            "smtp_port": int(row[4]),
-            "server_name": row[5],
-            "plex_url": row[6],
-            "plex_token": row[7],
-            "tautulli_url": row[8],
-            "tautulli_api": row[9]
+            "plex_url": row[0],
+            "plex_token": row[1]
         }
     else:
         settings = {
-            "from_email": "",
+            "plex_url": "",
             "plex_token": ""
         }
 
     if not settings['plex_token']:
-        return Response("Please set Plex Token in settings.", status=400)
+        return Response("Please connect to Plex in settings.", status=400)
 
     plex_token = settings['plex_token']
     plex_url = settings['plex_url'].rstrip('/')
 
-    full_url = f"{plex_url}/{art_path}?X-Plex-Token={plex_token}"
+    full_url = f"{plex_url}/{art_path}?X-Plex-Token={decrypt(plex_token)}"
     r = requests.get(full_url, stream=True)
     return Response(r.content, content_type=r.headers['Content-Type'])
 
 @app.route('/send_email', methods=['POST'])
 def send_email():
-    alert = None
-    error = None
-
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("""
         SELECT
-        from_email, alias_email, password, smtp_server, smtp_port, server_name, tautulli_url, tautulli_api
+        from_email, alias_email, password, smtp_server, smtp_port, server_name
         FROM settings WHERE id = 1
     """)
     row = cursor.fetchone()
@@ -306,9 +309,7 @@ def send_email():
             "password": row[2],
             "smtp_server": row[3],
             "smtp_port": int(row[4]),
-            "server_name": row[5],
-            "tautulli_url": row[6],
-            "tautulli_api": row[7]
+            "server_name": row[5]
         }
     else:
         return jsonify({"error": "Please enter email info on settings page"}), 500
@@ -376,17 +377,14 @@ def send_email():
 
     try:
         with smtplib.SMTP_SSL(smtp_server, smtp_port) as server:
-            server.login(from_email, password)
+            server.login(from_email, decrypt(password))
             if alias_email == '':
                 server.sendmail(from_email, [from_email] + to_emails, msg_root.as_string())
             else:
                 server.sendmail(alias_email, [alias_email] + to_emails, msg_root.as_string())
-            #alert = "Email sent!"
         return jsonify({"success": True})
     except Exception as e:
-        #error = f"Error: {str(e)}"
         return jsonify({"error": str(e)}), 500
-    #return render_template('index.html', alert=alert, error=error)
 
 @app.route('/settings', methods=['GET', 'POST'])
 def settings():
@@ -396,12 +394,12 @@ def settings():
     if request.method == "POST":
         from_email = request.form.get("from_email")
         alias_email = request.form.get("alias_email")
-        password = request.form.get("password")
+        password = encrypt(request.form.get("password"))
         smtp_server = request.form.get("smtp_server")
         smtp_port = int(request.form.get("smtp_port"))
         server_name = request.form.get("server_name")
         tautulli_url = request.form.get("tautulli_url")
-        tautulli_api = request.form.get("tautulli_api")
+        tautulli_api = encrypt(request.form.get("tautulli_api"))
 
         cursor.execute("""
             INSERT INTO settings
@@ -418,20 +416,20 @@ def settings():
         settings = {
             "from_email": from_email,
             "alias_email": alias_email,
-            "password": password,
+            "password": decrypt(password),
             "smtp_server": smtp_server,
             "smtp_port": smtp_port,
             "server_name": server_name,
             "plex_token": plex_token,
             "tautulli_url": tautulli_url,
-            "tautulli_api": tautulli_api
+            "tautulli_api": decrypt(tautulli_api)
         }
 
         return render_template('settings.html', alert="Settings saved successfully!", settings=settings)
 
     cursor.execute("""
         SELECT
-        from_email, alias_email, password, smtp_server, smtp_port, server_name, plex_url, plex_token, tautulli_url, tautulli_api
+        from_email, alias_email, password, smtp_server, smtp_port, server_name, plex_token, tautulli_url, tautulli_api
         FROM settings WHERE id = 1
     """)
     row = cursor.fetchone()
@@ -441,14 +439,13 @@ def settings():
         settings = {
             "from_email": row[0],
             "alias_email": row[1],
-            "password": row[2],
+            "password": decrypt(row[2]),
             "smtp_server": row[3],
             "smtp_port": int(row[4]),
             "server_name": row[5],
-            "plex_url": row[6],
-            "plex_token": row[7],
-            "tautulli_url": row[8],
-            "tautulli_api": row[9]
+            "plex_token": row[6],
+            "tautulli_url": row[7],
+            "tautulli_api": decrypt(row[8])
         }
     else:
         settings = {
@@ -499,7 +496,7 @@ def plex_poll_pin(pin_id: int):
             INSERT INTO settings (id, plex_token)
             VALUES (1, ?)
             ON CONFLICT(id) DO UPDATE SET plex_token = excluded.plex_token
-        """, (token,))
+        """, (encrypt(token),))
         conn.commit()
         conn.close()
 
@@ -512,13 +509,13 @@ def plex_get_info():
     cursor = conn.cursor()
     cursor.execute("SELECT plex_token FROM settings WHERE id = 1")
     row = cursor.fetchone()
-
     token = row[0]
+
     url = "https://plex.tv/api/v2/resources"
     headers = {
         "Accept": "application/json",
         "X-Plex-Client-Identifier": plex_headers['X-Plex-Client-Identifier'],
-        "X-Plex-Token": token
+        "X-Plex-Token": decrypt(token)
     }
     
     response = requests.get(url, headers=headers)

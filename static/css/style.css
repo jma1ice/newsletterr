@@ -9,12 +9,12 @@ div, nav, footer {
     width: 60rem;
     border: 1px solid #444;
     border-radius: 8px;
-    background: #8acbd4;
+    background: #8acbd4 !important;
 }
 
 .dark .frame {
     border: 1px solid #ccc;
-    background: #333;
+    background: #333 !important;
 }
 
 body {

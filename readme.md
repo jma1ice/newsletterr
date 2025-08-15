@@ -49,7 +49,7 @@ By default the app listens on **http://127.0.0.1:6397**.
 ## Configuration
 
 1. Navigate to **Settings** in the navbar.  
-2. Connect to your Plex server with **Connect Plex** button.  
+2. Connect to your Plex server with **Connect Plex** button. This is used for media posters.  
 3. Fill in:
    * **From** – e‑mail address that will appear as the sender  
    * **Alias (optional)** – _Send As_ alias. If blank, **From** will be used, [setup instructions](https://support.google.com/a/answer/33327?hl=en)  
@@ -58,7 +58,7 @@ By default the app listens on **http://127.0.0.1:6397**.
    * **SMTP Port** – `465` for SSL or `587` for TLS  
    * **Plex Server Name** – appears in the newsletter header. This is grabbed when Plex is connected, but can be overwritten if wanted  
    * **Tautulli URL** – e.g. `http://tautulli.local:8181`  
-   * **Tautulli API Key** – make sure 'Enable API' is checked, and copy the API key from your Tautulli settings. e.g. http://localhost:8181/settings#tabs_tabs-web_interface  
+   * **Tautulli API Key** – make sure 'Enable API' is checked, and copy the API key from your [Tautulli settings.](http://localhost:8181/settings#tabs_tabs-web_interface)  
 4. Click **Apply Settings**.  Settings are saved to `database/data.db`.
 
 ---
@@ -84,7 +84,8 @@ newsletterr/
 │   ├── about.html
 │   ├── base.html
 │   ├── index.html
-│   └── settings.html
+│   ├── settings.html
+│   └── recently_added.html
 ├── static/
 │   ├── css/style.css
 │   └── img/
@@ -107,14 +108,27 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 
 ## Upcoming Changes
 
-### v0.6.7
-* Get recently added items
+### v0.6.8
+* Fix up recently added layout to match closer to the recently added section
+* Options for # recently added to pull
+* Server name into recently added layout
+* Recently added placeholder for snap insert
+* Recently added into server side email apply_layout()
+* Move html side email templates into a separate html file similar to recently_added.html
 
 ### v0.7.0
-* BCC text appears on the bottom left of the main text field, should be on top or centered. Some form of field validation should be in here to make sure it's "email, email" - regex maybe? Prevent empty emails or duplicates in case the user messes with it. Come to think of it, could the users not be added in a "tag" format style, that is to say, each user entered is an 'item' with a small 'x' next to them to remove if needed. 
-* Limit maximum days to pull data, and have buttons underneath to pull last 7, 30, 60, 90, 120? Max at like 6 months? 
-* All "hours" values should be rounded down to whole numbers
-* "ARE YOU SURE?" after pressing send button
+* Zoltarr integration
+* Limit maximum days for pull data to a year, and have buttons underneath to pull last 7, 30, 60, 90, 120, etc? 
+* Mobile optimizations, i.e.:
+```
+<style>
+   @media (max-width: 600px) {
+      .stack { display:block !important; width:100% !important; }
+      .gpx { padding-left:0 !important; padding-right:0 !important; }
+      .poster { width:100% !important; height:auto !important; }
+   }
+</style>
+```
 
 ### v0.8.0
 * Update functionality (new version available)
@@ -125,9 +139,9 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 * Template management to go with lists - Include a few default templates that snap in the most common stats
 * Automation management (Which lists, how often?)
 * Opt out support?
+* For the two below this, a stat/graph pane in place of the stat/graph placeholders
 * Checking "include XYZ in email" buttons should trigger them to be added to the previewed email in realtime, as snap-ins that can be removed on the fly as well. Maybe a button instead of a check box? 
 * Graph/stat ordering? Should it have a default ordering, or user editable?
-* For the two above this, a stat/graph pane in place of the stat/graph placeholders
 
 ### v1.0
 * Dockerize
@@ -136,6 +150,13 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 ---
 
 ## Recent Changes
+
+### v0.6.7
+* Get recently added items
+* Recently added layout first iteration
+* All "hours" values rounded to whole numbers
+* "ARE YOU SURE?" after pressing send button
+* Field validation in BCC emails. Users added in a "tag" format style. Prevent duplicate email addresses
 
 ### v0.6.6
 * Fix to keep preview background consistent

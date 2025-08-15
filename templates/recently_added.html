@@ -1,0 +1,170 @@
+{% set _raw = recent_items if recent_items is defined else recent_data if recent_data is defined else [] %}
+
+{% macro pick_thumb(it) -%}
+  {%- set _t = (it.media_type or it.type or '')|lower -%}
+  {%- if _t in ['episode','season'] -%}
+    {{- it.grandparent_thumb or it.parent_thumb or it.thumb or it.art or '' -}}
+  {%- else -%}
+    {{- it.thumb or it.art or it.parent_thumb or it.grandparent_thumb or '' -}}
+  {%- endif -%}
+{%- endmacro %}
+
+{% macro ms_to_hm(ms) -%}
+  {%- set _m = (ms|string|int // 60000) -%}
+  {%- if _m >= 60 -%}{{ (_m // 60) ~ 'h ' ~ (_m % 60) ~ 'm' }}{%- else -%}{{ _m ~ 'm' }}{%- endif -%}
+{%- endmacro %}
+
+{% macro fmt_added(it) -%}
+  {%- set _d = it.added_at or it.originally_available_at -%}
+  {{- _d or '' -}}
+{%- endmacro %}
+
+{% set ns = namespace(items=[]) %}
+{% for g in _raw %}
+  {% if g is mapping and g.recently_added is defined and g.recently_added %}
+    {% for it in g.recently_added %}
+      {% set _title = it.title or it.full_title or it.parent_title or it.grandparent_title or '(untitled)' %}
+      {% set _sub   = it.year or it.grandparent_title or it.parent_title or '' %}
+      {% set _thumb = pick_thumb(it) %}
+      {% set _item = {
+        'library': it.library_name or it.section_name or '',
+        'title': _title,
+        'sub': _sub,
+        'summary': it.tagline or it.summary or '',
+        'duration': ms_to_hm(it.duration),
+        'added': fmt_added(it),
+        'thumb': _thumb
+      } %}
+      {% set ns.items = ns.items + [_item] %}
+    {% endfor %}
+  {% elif g is mapping and (g.media_type is defined or g.type is defined) %}
+    {% set it = g %}
+    {% set _title = it.title or it.full_title or it.parent_title or it.grandparent_title or '(untitled)' %}
+    {% set _sub   = it.year or it.grandparent_title or it.parent_title or '' %}
+    {% set _thumb = pick_thumb(it) %}
+    {% set _item = {
+      'library': it.library_name or it.section_name or '',
+      'title': _title,
+      'sub': _sub,
+      'summary': it.tagline or it.summary or '',
+      'duration': ms_to_hm(it.duration),
+      'added': fmt_added(it),
+      'thumb': _thumb
+    } %}
+    {% set ns.items = ns.items + [_item] %}
+  {% endif %}
+{% endfor %}
+
+{% set columns  = columns|default(5) %}
+{% set poster_w = poster_w|default(180) %}
+{% set poster_h = poster_h|default(270) %}
+{% set cell_pct = (100 // columns) %}
+{% set list = ns.items %}
+{% set insert_after_rows = 2 %}
+
+<link href="https://fonts.googleapis.com/css?family=IBM+Plex+Sans:400,500,600,700&display=swap" rel="stylesheet">
+<style>
+    :root { color-scheme: ${isDark ? 'dark' : 'light'}; }
+    html, body { background: ${isDark ? '#333' : '#8acbd4'}; }
+</style>
+<html><body style="font-family: IBM Plex Sans; margin: 0;">
+    <table class="body" style="border-collapse: separate; mso-table-lspace: 0pt; mso-table-rspace: 0pt; width: 100%;" border="0" cellspacing="0" cellpadding="0">
+        <tbody>
+            <tr>
+                <td class="preview-container" style="font-family: IBM Plex Sans; font-size: 14px; vertical-align: top; display: block;">
+                    <div class="content" style="box-sizing: border-box; display: block;"><span class="preheader" style="color: transparent; display: none; height: 0; max-height: 0; max-width: 0; opacity: 0; overflow: hidden; mso-hide: all; visibility: hidden; width: 0;">${serverName} Newsletter</span>
+                        <table class="main" style="border-collapse: separate; mso-table-lspace: 0pt; mso-table-rspace: 0pt; width: 100%; background: #282A2D; border-radius: 3px; color: #ffffff;" border="0" cellspacing="0" cellpadding="3">
+                            <tbody>
+                                <tr>
+                                    <td class="wrapper" style="font-family: IBM Plex Sans; font-size: 14px; vertical-align: top; box-sizing: border-box; padding: 5px; overflow: auto;">
+                                        <div class="header" style="width: 50%; height: 10px; text-align: center;"><img class="header-img" style="border: none; -ms-interpolation-mode: bicubic; max-width: 9%; width: 492px; height: 20px; margin-left: -35px;" src="https://d15k2d11r6t6rl.cloudfront.net/public/users/Integrators/669d5713-9b6a-46bb-bd7e-c542cff6dd6a/3bef3c50f13f4320a9e31b8be79c6ad2/Plex%20Logo%20Update%202022/plex-logo-heavy-stroke.png" width="492" height="90" /></div>
+                                        <div class="server-name" style="font-size: 25px; text-align: center; margin-bottom: 0;">${serverName} Newsletter</div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="footer" style="font-family: IBM Plex Sans; font-size: 12px; vertical-align: top; clear: both; margin-top: 0; text-align: center; width: 100%;">
+                                        <h1 class="footer-bar" style="margin-left: auto; margin-right: auto; width: 250px; border-top: 1px solid #E5A00D; margin-top: 5px;">Recently Added</h1>
+                                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0; padding:24px 0;">
+                                        <tr>
+                                            <td align="center" style="padding:0 16px;">
+                                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%; max-width:100%; border-radius:12px; overflow:hidden; box-shadow:0 2px 8px rgba(17,24,39,0.08);">
+                                                <tr><td>
+                                                    <style>
+                                                        @media (max-width: 600px) {
+                                                            .stack { display:block !important; width:100% !important; }
+                                                            .gpx { padding-left:0 !important; padding-right:0 !important; }
+                                                            .poster { width:100% !important; height:auto !important; }
+                                                        }
+                                                    </style>
+                                                </td></tr>
+
+                                                {% if list|length == 0 %}
+                                                    <tr>
+                                                        <td style="padding:16px 24px 24px 24px; color:#374151; font-size:14px;">No recent items to show.</td>
+                                                    </tr>
+                                                {% else %}
+                                                    <h2 style="margin:0; font-size:18px; font-weight:800; line-height:1.25;">
+                                                        Movies
+                                                    </h2>
+                                                    {% for row in list|batch(columns, None) %}
+                                                        <tr>
+                                                            {% for item in row %}
+                                                                <td class="stack {% if not loop.first %}gpx{% endif %}" width="{{ cell_pct }}%" valign="top" style="width:{{ cell_pct }}%; padding:10px;">
+                                                            {% if item %}
+                                                                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #e5e7eb; border-radius:10px; overflow:hidden;">
+                                                                    <tr>
+                                                                        <td>
+                                                                            {% if item.thumb %}
+                                                                                <img src="{{ app_base_url }}/proxy-art{{ item.thumb }}" width="100%" height="100%" alt="" class="poster" style="display:block; width:100%; height:100%; object-fit:cover;">
+                                                                            {% else %}
+                                                                                <div style="display:block; width:100%; height:100%;"></div>
+                                                                            {% endif %}
+                                                                        </td>
+                                                                    </tr>
+                                                                    <tr>
+                                                                        <td style="padding:10px 12px 12px 12px; color:#111827;">
+                                                                            <div style="font-size:14px; font-weight:700; line-height:1.3;">{{ item.title }}</div>
+                                                                            <div style="font-size:11px; color:#6b7280; margin-top:4px;">
+                                                                                {% if item.library %}<span>{{ item.library }}</span>{% endif %}
+                                                                                {% if item.sub %}{% if item.library %} &nbsp;•&nbsp; {% endif %}<span>{{ item.sub }}</span>{% endif %}
+                                                                                {% if item.duration %}{% if item.library or item.sub %} &nbsp;•&nbsp; {% endif %}<span>{{ item.duration }}</span>{% endif %}
+                                                                            </div>
+                                                                            {% if item.summary %}
+                                                                                <div style="font-size:12px; color:#374151; line-height:1.45; margin-top:6px;">
+                                                                                    {{ item.summary|truncate(110, True, '…') }}
+                                                                                </div>
+                                                                            {% endif %}
+                                                                        </td>
+                                                                    </tr>
+                                                                </table>
+                                                            {% endif %}
+                                                            </td>
+                                                            {% endfor %}
+                                                        </tr>
+                                                        {% if loop.index == insert_after_rows %}
+                                                            <tr>
+                                                                <td colspan="{{ columns }}" style="padding:16px 24px 8px 24px;">
+                                                                    <h2 style="margin:0; font-size:18px; font-weight:800; line-height:1.25; text-align: center;">
+                                                                        TV Shows
+                                                                    </h2>
+                                                                </td>
+                                                            </tr>
+                                                        {% endif %}
+                                                    {% endfor %}
+                                                {% endif %}
+                                            </table>
+                                            </td>
+                                        </tr>
+                                        </table>
+                                        <div class="footer-bar" style="margin-left: auto; margin-right: auto; width: 250px; border-top: 1px solid #E5A00D; margin-top: 25px;">&nbsp;</div>
+                                        <div class="content-block powered-by" style="padding-bottom: 10px; padding-top: 0;">Generated for Plex Media Server by newsletterr</div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</body></html>

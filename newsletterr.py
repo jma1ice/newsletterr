@@ -10,8 +10,8 @@ from plex_api_client import PlexAPI
 from urllib.parse import quote_plus
 
 app = Flask(__name__)
-app.jinja_env.globals["version"] = "v0.6.6"
-app.jinja_env.globals["publish_date"] = "August 10, 2025"
+app.jinja_env.globals["version"] = "v0.6.7"
+app.jinja_env.globals["publish_date"] = "August 14, 2025"
 
 DB_PATH = os.path.join("database", "data.db")
 plex_headers = {
@@ -123,6 +123,8 @@ def apply_layout(body, graphs_html_block, stats_html_block, layout, subject, ser
 def run_tautulli_command(base_url, api_key, command, data_type, error, time_range='30'):
     if command == 'get_users':
         api_url = f"{base_url}/api/v2?apikey={decrypt(api_key)}&cmd={command}"
+    elif command == 'get_recently_added':
+        api_url = f"{base_url}/api/v2?apikey={decrypt(api_key)}&cmd={command}&count=10&media_type={data_type}"
     else:
         if command == 'get_plays_per_month':
             month_range = str(math.ceil(int(time_range) / 30))
@@ -149,10 +151,6 @@ def run_tautulli_command(base_url, api_key, command, data_type, error, time_rang
             error += str(f", {data_type} Error: {e}")
 
     return [out_data, error]
-
-@app.route('/favicon.ico')
-def favicon():
-    return send_file('favicon.ico', mimetype='image/x-icon')
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
@@ -209,7 +207,16 @@ def index():
             'name' : 'Stream Type by Top Users'
         }
     ]
+    recent_commands = [
+        {
+            'command' : 'movie'
+        },
+        {
+            'command' : 'show'
+        }
+    ]
     graph_data = []
+    recent_data = []
     error = None
     alert = None
 
@@ -237,6 +244,7 @@ def index():
                                     graph_commands=graph_commands, alert=alert, settings=settings)
         else:
             time_range = request.form.get("days_to_pull")
+            count = request.form.get("days_to_pull")
             base_url = settings['tautulli_url'].rstrip('/')
             api_key = settings['tautulli_api']
 
@@ -245,6 +253,9 @@ def index():
             for command in graph_commands:
                 gd, error = run_tautulli_command(base_url, api_key, command["command"], command["name"], error, time_range)
                 graph_data.append(gd)
+            for command in recent_commands:
+                rd, error = run_tautulli_command(base_url, api_key, 'get_recently_added', command["command"], error, count)
+                recent_data.append(rd)
             
             for user in users:
                 if user['email'] != None and user['is_active']:
@@ -254,10 +265,18 @@ def index():
 
     if graph_data == []:
         graph_data = [{},{}]
+
+    if recent_data == []:
+        recent_data = [{},{}]
+        
+    libs = ['movies', 'shows']
+
+    html_recent_grid = render_template('recently_added.html', recent_data=recent_data, app_base_url=request.url_root.rstrip('/'), heading='Recently Added')
         
     return render_template('index.html',
                            stats=stats, user_emails=user_emails,
                            graph_data=graph_data, graph_commands=graph_commands,
+                           recent_data=recent_data, libs=libs, html_recent_grid=html_recent_grid,
                            error=error, alert=alert, settings=settings
                         )
 

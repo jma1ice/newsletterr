@@ -11,7 +11,7 @@
     {% endif %}
     <div class="foreground">
         <div>
-            <table style="height: 75%; width: 100%;">
+            <table style="height: 60%; width: 100%;">
                 <tr style="height: 100%; padding: 10px;">
                     <td style="width: 20%; padding: 10px;">
                         <form method="POST" id="stats_form">
@@ -20,14 +20,23 @@
                             <button class="button">Get Stats\Users</button>
                         </form><br>
                         <form method="POST" action="/send_email">
-                            BCC: <textarea type="text" name="to_emails" id="to_emails" placeholder="Recipient Email"
-                                rows="10" cols="40" value="" required>{{ user_emails | join(', ') }}</textarea><br><br>
+                            <label class="form-label">BCC:</label>
+                            <div id="bcc_chips" class="nl-chips" role="listbox" aria-label="BCC recipients">
+                                <input id="email_chip_input"
+                                        type="text"
+                                        placeholder="Add BCC emails"
+                                        aria-label="Add recipient" />
+                            </div>
+                            <textarea name="to_emails" id="to_emails" class="d-none">
+                                {{ user_emails | join(', ') }}
+                            </textarea><br>
                             Subject: <input type="text" name="subject" id="subject" placeholder="Subject"
                                 value="{{ settings.server_name }} News" required><br><br>
                             <label for="layout">Choose a layout:</label>
                             <select id="layout" name="layout" onchange="updatePreview()">
                                 <option value="none">Plain Text</option>
                                 <option value="standard">Standard</option>
+                                <option value="recently_added">Recently Added</option>
                             </select><br><br>
                             <textarea name="email_text" id="email_text" placeholder="Write your message..." rows="10"
                                 cols="40" oninput="updatePreview()" required></textarea><br><br>
@@ -175,7 +184,7 @@
                                                                 {% endif %}
 
                                                                 {% if stat.stat_title == "Most Watched Movies" or stat.stat_title == "Most Watched TV Shows" or stat.stat_title == "Most Played Artists" or stat.stat_title == "Most Active Libraries" or stat.stat_title == "Most Active Users" or stat.stat_title == "Most Active Platforms" %}
-                                                                    <td>{{ (row.total_duration/60/60)|round(2) }}</td>
+                                                                    <td>{{ (row.total_duration / 3600) | round(0, 'ceil')  | int }}</td>
                                                                 {% elif stat.stat_title == "Most Popular Movies" or stat.stat_title == "Most Popular TV Shows" or stat.stat_title == "Most Popular Artists" %}
                                                                     <td>{{ row.users_watched }}</td>
                                                                 {% endif %}
@@ -203,7 +212,7 @@
                     </td>
                 </tr>
             </table>
-            <table style="height: 25%; width: 100%;">
+            <table style="height: 20%; width: 100%;">
                 <tr style="height: 100%; padding: 10px;">
                     <td style="width: 15%; padding: 10px;">
                         {% if graph_data != [{},{}] %}
@@ -229,7 +238,115 @@
                     </td>
                 </tr>
             </table>
+            <section>
+                <div class="flex items-end justify-between gap-3 mb-6">
+                    <h2>Recently Added</h2>
+                    <select id="ra-lib" class="border rounded px-3 py-2 dark:bg-[#333]">
+                        <option value="">All libraries</option>
+                    </select>
+                </div>
+
+                <ul id="ra-grid" class="grid grid-cols-6 gap-4" style="padding-right: 2rem;"></ul>
+
+                <div id="ra-empty" class="hidden text-center text-gray-500 dark:text-gray-400 mt-10">
+                    No items match your filters.
+                </div>
+            </section>
         </div>
+        <script>
+            const recentPayload = {{ recent_data | tojson }};
+
+            function buildThumb(path) {
+                if (!path) return '';
+                const p = path.startsWith('/') ? path : '/' + path;
+                return `/proxy-art${p}`;
+            }
+
+            function pickThumb(it) {
+                const type = (it.media_type || it.type || '').toLowerCase();
+
+                const candidates = (type === 'episode' || type === 'season')
+                    ? [it.grandparent_thumb, it.parent_thumb, it.thumb, it.art]
+                    : [it.thumb, it.art, it.parent_thumb, it.grandparent_thumb];
+
+                return candidates.find(Boolean) || '';
+            }
+
+            const flatten = (arr) => arr.flatMap(x => x?.recently_added || []);
+            const msToHMS = (ms) => {
+                ms = parseInt(ms || 0, 10);
+                const s = Math.round(ms / 1000);
+                const h = Math.floor(s/3600), m = Math.floor((s%3600)/60);
+                return h ? `${h}h ${m}m` : `${m}m`;
+            };
+            const formatDate = (d) => {
+                if (!d) return '';
+                if (/^\d+$/.test(String(d))) return new Date(parseInt(d,10)*1000).toLocaleDateString();
+                const dt = new Date(d); return isNaN(dt) ? '' : dt.toLocaleDateString();
+            };
+
+            const items = flatten(recentPayload).map(it => {
+                const title = it.title || it.full_title || it.parent_title || it.grandparent_title || '(untitled)';
+                const sub = it.year || it.grandparent_title || it.parent_title || '';
+                const thumbPath = pickThumb(it);
+                return {
+                    library: it.library_name || it.section_name || '',
+                    title,
+                    sub,
+                    summary: it.tagline || it.summary || '',
+                    duration: msToHMS(it.duration),
+                    added: formatDate(it.added_at || it.originally_available_at),
+                    thumb: thumbPath
+                };
+            });
+
+            const libSel = document.getElementById('ra-lib');
+            [...new Set(items.map(i => i.library).filter(Boolean))].sort().forEach(lib => {
+                const opt = document.createElement('option');
+                opt.value = lib; opt.textContent = lib;
+                libSel.appendChild(opt);
+            });
+
+            const grid = document.getElementById('ra-grid');
+            const empty = document.getElementById('ra-empty');
+
+            function render(list) {
+                grid.innerHTML = '';
+                list.forEach(it => {
+                    const imgURL = buildThumb(it.thumb);
+                    const li = document.createElement('li');
+                    li.className = "group rounded-2xl overflow-hidden bg-[#8acbd4] dark:bg-[#333] " + 
+                    "!shadow-[0_6px_18px_rgba(0,0,0,0.6)] hover:!shadow-[0_10px_28px_rgba(0,0,0,0.6)] " + 
+                    "dark:!shadow-[0_6px_18px_rgba(74,127,130,0.6)] dark:hover:!shadow-[0_10px_28px_rgba(74,127,130,0.6)]";
+                    li.dataset.lib = it.library;
+                    li.innerHTML = `
+                        <div class="relative aspect-[2/3] bg-gray-200 dark:bg-gray-700">
+                        ${imgURL ? `<img loading="lazy" src="${imgURL}" class="h-full w-full object-cover">` : ''}
+                        ${it.library ? `<div class="absolute top-1 right-1 text-xs px-2 py-1 rounded-full bg-black/70 text-white">${it.library}</div>` : ''}
+                        ${it.added ? `<div class="absolute bottom-1 right-1 text-[11px] text-white/90"><span class="bg-black/60 rounded px-1.5 py-0.5">${it.added}</span></div>` : ''}
+                        </div>
+                        <div class="p-3">
+                        <div class="font-semibold line-clamp-2">${it.title}</div>
+                        <div class="text-xs text-gray-500 dark:text-gray-400">
+                            ${it.sub ? it.sub + ' • ' : ''}${it.duration}
+                        </div>
+                        ${it.summary ? `<div class="mt-2 text-xs text-gray-600 dark:text-gray-300 line-clamp-5">${it.summary}</div>` : ''}
+                        </div>
+                    `;
+                    grid.appendChild(li);
+                });
+                empty.classList.toggle('hidden', list.length !== 0);
+            }
+
+            function applyFilter() {
+                const lb = libSel.value;
+                const filtered = items.filter(it => !lb || it.library === lb);
+                render(filtered);
+            }
+
+            libSel.addEventListener('input', applyFilter);
+            render(items);
+        </script>
         <script>
             async function updatePreview() {
                 const raw = document.getElementById('email_text').value;
@@ -385,6 +502,9 @@
                                         </tbody>
                                     </table></body></html>`;
                         break;
+                    case "recently_added":
+                        html = {{ html_recent_grid | tojson }};
+                        break;
                     default:
                         html = `<style>
                                     :root { color-scheme: ${isDark ? 'dark' : 'light'}; }
@@ -521,20 +641,43 @@
             });
         </script>
         <script>
+            function collectEmailsFromChips() {
+                return Array.from(document.querySelectorAll('#bcc_chips .nl-chip'))
+                    .map(ch => ch.dataset.email)
+                    .filter(Boolean);
+            }
+
             document.getElementById('sendEmailBtn').addEventListener('click', async () => {
+                const subject = document.getElementById('subject').value;
+                const email_text = document.getElementById('email_text').value;
+                const layout = document.getElementById('layout').value;
+                const graphImages = [];
+                const statImages = [];
+
+                const chipInput = document.getElementById('email_chip_input');
+                    if (chipInput && chipInput.value.trim()) {
+                        chipInput.dispatchEvent(new Event('blur'));
+                }
+
+                const toList = collectEmailsFromChips();
+                    if (!toList.length) {
+                        alert('Please add at least one recipient.');
+                        return;
+                }
+
+                const to_emails = toList.join(', ');
+
+                const ok = window.confirm(
+                    `Send email?\n\nSubject: ${subject || '(no subject)'}`
+                );
+                if (!ok) return;
+
                 showSpinner('Sending email...');
 
                 const selectedGraphs = Array.from(document.querySelectorAll('.graph-checkbox:checked'))
                     .map(cb => cb.value);
                 const selectedStats = Array.from(document.querySelectorAll('.stat-checkbox:checked'))
                     .map(cb => cb.value);
-
-                const to_emails = document.getElementById('to_emails').value;
-                const subject = document.getElementById('subject').value;
-                const email_text = document.getElementById('email_text').value;
-                const layout = document.getElementById('layout').value;
-                const graphImages = [];
-                const statImages = [];
 
                 for (let id of selectedGraphs) {
                     const chart = Highcharts.charts.find(c => c && c.renderTo.id === id);
@@ -676,6 +819,93 @@
                 imgElement.style.zIndex = '0';
                 imgElement.style.filter = 'none';
             }
+        </script>
+        <script>
+            (function () {
+                const box = document.getElementById('bcc_chips');
+                const input = document.getElementById('email_chip_input');
+                const ta = document.getElementById('to_emails');
+
+                if (!box || !input || !ta) return;
+
+                function normalize(token) {
+                    const m = String(token).match(/<([^>]+)>/);
+                    return (m ? m[1] : token).trim().toLowerCase();
+                }
+                function isEmail(s) {
+                    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
+                }
+
+                function syncHiddenFromDOM() {
+                    const list = Array.from(box.querySelectorAll('.nl-chip'))
+                    .map(ch => ch.dataset.email)
+                    .filter(Boolean);
+                    ta.value = list.join(', ');
+                    input.placeholder = list.length ? '' : 'Add BCC emails';
+                }
+
+                function makeChip(email) {
+                    const chip = document.createElement('span');
+                    chip.className = 'nl-chip';
+                    chip.dataset.email = email;
+                    chip.innerHTML = `
+                        <span>${email}</span>
+                        <button type="button" class="remove" aria-label="Remove ${email}">x</button>
+                    `;
+                    return chip;
+                }
+
+                function addEmail(email) {
+                    if (!email || !isEmail(email)) return;
+                    const sel = `.nl-chip[data-email="${CSS.escape(email)}"]`;
+                    if (box.querySelector(sel)) return;
+                    box.insertBefore(makeChip(email), input);
+                    syncHiddenFromDOM();
+                }
+
+                function addTokens(str) {
+                    String(str).split(/[,\n;\s]+/).filter(Boolean).forEach(t => {
+                        addEmail(normalize(t));
+                    });
+                }
+
+                addTokens(ta.value || '');
+
+                input.addEventListener('keydown', (e) => {
+                    if (['Enter', 'Tab'].includes(e.key) || e.key === ',' || e.key === ';') {
+                        e.preventDefault();
+                        if (input.value.trim()) { addTokens(input.value); input.value = ''; }
+                    } else if (e.key === 'Backspace' && !input.value) {
+                        const last = box.querySelector('.nl-chip:last-of-type');
+                        if (last) { last.remove(); syncHiddenFromDOM(); }
+                    }
+                });
+
+                input.addEventListener('paste', (e) => {
+                    const text = (e.clipboardData || window.clipboardData).getData('text');
+                    if (/[,\n;\s]/.test(text)) { e.preventDefault(); addTokens(text); }
+                });
+
+                input.addEventListener('blur', () => {
+                    if (input.value.trim()) { addTokens(input.value); input.value = ''; }
+                });
+
+                box.addEventListener('click', (e) => {
+                    const btn = e.target.closest('.remove');
+                    if (!btn) return;
+                    const chip = btn.closest('.nl-chip');
+                    if (chip) { chip.remove(); syncHiddenFromDOM(); }
+                });
+
+                new MutationObserver(syncHiddenFromDOM).observe(box, { childList: true });
+
+                document.getElementById('sendEmailBtn')?.addEventListener('click', () => {
+                    if (input.value.trim()) { addTokens(input.value); input.value = ''; }
+                    syncHiddenFromDOM();
+                });
+
+                syncHiddenFromDOM();
+            })();
         </script>
     </div>
 </div>

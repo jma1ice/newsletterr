@@ -16,9 +16,15 @@
                     <td style="width: 20%; padding: 10px;">
                         <form method="POST" id="stats_form">
                             <label for="days_to_pull">Time Range (days):</label>
-                            <input type="number" id="days_to_pull" name="days_to_pull" value="30" /><br><br>
+                            <input type="number" id="days_to_pull" name="days_to_pull" value="30" /><br>
                             <button class="button">Get Stats\Users</button>
-                        </form><br>
+                        </form>
+                        {% if not user_dict %}
+                            <button id="pullRecsBtn" class="button opacity-50 cursor-not-allowed" disabled>Get Recommendations</button>
+                        {% else %}
+                            <button id="pullRecsBtn" class="button">Get Recommendations</button>
+                        {% endif %}
+                        <p>Note, recommendations take 20-25 seconds per user.</p>
                         <form method="POST" action="/send_email">
                             <label class="form-label">BCC:</label>
                             <div id="bcc_chips" class="nl-chips" role="listbox" aria-label="BCC recipients">
@@ -28,7 +34,7 @@
                                         aria-label="Add recipient" />
                             </div>
                             <textarea name="to_emails" id="to_emails" class="d-none">
-                                {{ user_emails | join(', ') }}
+                                {{ user_dict.values() | join(', ') }}
                             </textarea><br>
                             Subject: <input type="text" name="subject" id="subject" placeholder="Subject"
                                 value="{{ settings.server_name }} News" required><br><br>
@@ -242,14 +248,19 @@
                 <div class="flex items-end justify-between gap-3 mb-6">
                     <h2>Recently Added</h2>
                     <select id="ra-lib" class="border rounded px-3 py-2 dark:bg-[#333]">
-                        <option value="">All libraries</option>
+                        <option value="" selected>Select A Library...</option>
+                        <option value="__ALL__">All Libraries</option>
                     </select>
                 </div>
 
-                <ul id="ra-grid" class="grid grid-cols-6 gap-4" style="padding-right: 2rem;"></ul>
+                <ul id="ra-grid" class="grid grid-cols-10 gap-4" style="padding-right: 2rem;"></ul>
 
                 <div id="ra-empty" class="hidden text-center text-gray-500 dark:text-gray-400 mt-10">
                     No items match your filters.
+                </div>
+            </section><br>
+            <section>
+                <div id="recommendations_pane">
                 </div>
             </section>
         </div>
@@ -340,12 +351,12 @@
 
             function applyFilter() {
                 const lb = libSel.value;
-                const filtered = items.filter(it => !lb || it.library === lb);
-                render(filtered);
+                if (lb === '') { render([], { showEmpty:false }); return; }
+                if (lb === '__ALL__') { render(items); return; }
+                render(items.filter(it => it.library === lb));
             }
 
             libSel.addEventListener('input', applyFilter);
-            render(items);
         </script>
         <script>
             async function updatePreview() {
@@ -639,6 +650,71 @@
                 const nowDark = document.documentElement.classList.contains('dark');
                 applyChartTheme(nowDark);
             });
+        </script>
+        <script>
+            document.getElementById('pullRecsBtn').addEventListener('click', async () => {
+                showSpinner('Pulling recommendations...');
+
+                const payload = {
+                    stats: {{ stats | tojson }},
+                    user_dict: {{ user_dict | tojson }},
+                    graph_data: {{ graph_data | tojson }},
+                    graph_commands: {{ graph_commands | tojson }},
+                    recent_data: {{ recent_data | tojson }},
+                    libs: {{ libs | tojson }},
+                    html_recent_grid: {{ html_recent_grid | tojson }},
+                    settings: {{ settings | tojson }}
+                };
+
+                try {
+                    const resp = await fetch('/pull_recommendations', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload),
+                        credentials: 'same-origin'
+                    });
+                    
+                    const data = await resp.json();
+                    if (!resp.ok || !data.ok) throw new Error(data.error || 'Error pulling recommendations.');
+
+                    const pane = document.getElementById('recommendations_pane');
+                    pane.innerHTML = data.html;
+                    initRecommendationsFilter(pane);
+                } catch (err) {
+                    console.error("Error pulling recommendations:", err);
+                    alert("Something went wrong while pulling recommendations.");
+                } finally {
+                    try { hideSpinner(); } catch(_) {}
+                }
+            });
+        </script>
+        <script>
+            function initRecommendationsFilter(rootEl) {
+                const root = rootEl?.querySelector('#recommendations') || document.getElementById('recommendations') || rootEl || document;
+                const sel = root?.querySelector('#rec-user-filter');
+                const cards = Array.from(root?.querySelectorAll('.rec-user-card') || []);
+                if (!sel || !cards.length) return;
+
+                function apply() {
+                    const opt = sel.options[sel.selectedIndex];
+                    const val = sel.value;
+
+                    if (val === "") {
+                        cards.forEach(c => c.classList.add('hidden'));
+                        return;
+                    }
+
+                    if (val === '__ALL__') {
+                        cards.forEach(c => c.classList.remove('hidden'));
+                        return;
+                    }
+
+                    cards.forEach(c => c.classList.toggle('hidden', c.dataset.user !== val));
+                };
+
+                sel.addEventListener('change', apply);
+                apply();
+            }
         </script>
         <script>
             function collectEmailsFromChips() {

@@ -10,8 +10,8 @@ from plex_api_client import PlexAPI
 from urllib.parse import quote_plus
 
 app = Flask(__name__)
-app.jinja_env.globals["version"] = "v0.6.7"
-app.jinja_env.globals["publish_date"] = "August 14, 2025"
+app.jinja_env.globals["version"] = "v0.7.0"
+app.jinja_env.globals["publish_date"] = "August 16, 2025"
 
 DB_PATH = os.path.join("database", "data.db")
 plex_headers = {
@@ -67,11 +67,24 @@ def init_db(db_path):
             plex_url TEXT,
             plex_token TEXT,
             tautulli_url TEXT,
-            tautulli_api TEXT
+            tautulli_api TEXT,
+            conjurr_url TEXT
         )
     """)
     conn.commit()
     conn.close()
+
+def migrate_schema(column_def):
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        col_name = column_def.split()[0]
+        cursor = conn.execute("PRAGMA table_info('settings')")
+        has_column = any(row[1] == col_name for row in cursor.fetchall())
+        if not has_column:
+            conn.execute(f"ALTER TABLE settings ADD COLUMN {column_def}")
+            conn.commit()
+    finally:
+        conn.close()
 
 def apply_layout(body, graphs_html_block, stats_html_block, layout, subject, server_name):
     body = body.replace('\n', '<br>')
@@ -152,11 +165,40 @@ def run_tautulli_command(base_url, api_key, command, data_type, error, time_rang
 
     return [out_data, error]
 
+def run_conjurr_command(base_url, user_dict, error):
+    if base_url == None:
+        if error == None:
+            error = "Conjurr Error: No Base URL provided"
+        else:
+            error += ", Conjurr Error: No Base URL provided"
+
+    api_base_url = f"{base_url}/recommendations?user_id="
+    recommendations_dict = {}
+
+    for user in user_dict.keys():
+        try:
+            if user == '464760465' or user == '465957587':
+                api_url = f"{api_base_url}{user}"
+                response = requests.get(api_url)
+                response.raise_for_status()
+                data = response.json()
+
+                recommendations_dict[user] = data
+            else:
+                continue
+        except requests.exceptions.RequestException as e:
+            if error == None:
+                error = str(f"Conjurr Error: {e}")
+            else:
+                error += str(f", Conjurr Error: {e}")
+
+    return [recommendations_dict, error]
+
 @app.route('/', methods=['GET', 'POST'])
 def index():
     stats = None
     users = None
-    user_emails = []
+    user_dict = {}
     graph_commands = [
         {
             'command' : 'get_concurrent_streams_by_stream_type',
@@ -240,28 +282,28 @@ def index():
     if request.method == 'POST':
         if settings['server_name'] == "":
             return render_template('index.html', error='Please enter tautulli info on settings page',
-                                    stats=stats, user_emails=user_emails, graph_data=graph_data,
+                                    stats=stats, user_dict=user_dict, graph_data=graph_data,
                                     graph_commands=graph_commands, alert=alert, settings=settings)
         else:
             time_range = request.form.get("days_to_pull")
             count = request.form.get("days_to_pull")
-            base_url = settings['tautulli_url'].rstrip('/')
-            api_key = settings['tautulli_api']
+            tautulli_base_url = settings['tautulli_url'].rstrip('/')
+            tautulli_api_key = settings['tautulli_api']
 
-            stats, error = run_tautulli_command(base_url, api_key, 'get_home_stats', 'Stats', error, time_range)
-            users, error = run_tautulli_command(base_url, api_key, 'get_users', 'Users', error)
+            stats, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_home_stats', 'Stats', error, time_range)
+            users, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_users', 'Users', error)
             for command in graph_commands:
-                gd, error = run_tautulli_command(base_url, api_key, command["command"], command["name"], error, time_range)
+                gd, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, command["command"], command["name"], error, time_range)
                 graph_data.append(gd)
             for command in recent_commands:
-                rd, error = run_tautulli_command(base_url, api_key, 'get_recently_added', command["command"], error, count)
+                rd, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_recently_added', command["command"], error, count)
                 recent_data.append(rd)
             
             for user in users:
                 if user['email'] != None and user['is_active']:
-                    user_emails.append(user['email'])
+                    user_dict[user['user_id']] = user['email']
             
-            alert = f"Users and graphs/stats for {time_range} days pulled successfully!"
+            alert = f"Users, graphs/stats for {time_range} days, recommendations, and recently added data pulled!"
 
     if graph_data == []:
         graph_data = [{},{}]
@@ -274,7 +316,7 @@ def index():
     html_recent_grid = render_template('recently_added.html', recent_data=recent_data, app_base_url=request.url_root.rstrip('/'), heading='Recently Added')
         
     return render_template('index.html',
-                           stats=stats, user_emails=user_emails,
+                           stats=stats, user_dict=user_dict,
                            graph_data=graph_data, graph_commands=graph_commands,
                            recent_data=recent_data, libs=libs, html_recent_grid=html_recent_grid,
                            error=error, alert=alert, settings=settings
@@ -308,6 +350,54 @@ def proxy_art(art_path):
     full_url = f"{plex_url}/{art_path}?X-Plex-Token={decrypt(plex_token)}"
     r = requests.get(full_url, stream=True)
     return Response(r.content, content_type=r.headers['Content-Type'])
+
+@app.route('/pull_recommendations', methods=['POST'])
+def pull_recommendations():
+    recommendations_json = {}
+    error = None
+    alert = None
+    
+    data = request.get_json()
+    stats = data['stats']
+    user_dict = data['user_dict']
+    graph_data = data['graph_data']
+    graph_commands = data['graph_commands']
+    recent_data = data['recent_data']
+    libs = data['libs']
+    html_recent_grid = data['html_recent_grid']
+    settings = data['settings']
+
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("SELECT conjurr_url FROM settings WHERE id = 1")
+    row = cursor.fetchone()
+    conn.close()
+
+    if row:
+        conjurr_settings = {
+            "conjurr_url": row[0]
+        }
+    else:
+        conjurr_settings = {
+            "conjurr_url": ""
+        }
+
+    if request.method == 'POST':
+        if conjurr_settings['conjurr_url'] == "":
+            return render_template('index.html', error='Please enter conjurr info on settings page',
+                                    stats=stats, user_dict=user_dict, graph_data=graph_data,
+                                    graph_commands=graph_commands, recent_data=recent_data,
+                                    libs=libs, html_recent_grid=html_recent_grid, settings=settings)
+        else:
+            conjurr_base_url = conjurr_settings['conjurr_url']
+            recommendations_json, error = run_conjurr_command(conjurr_base_url, user_dict, error)
+            alert = "User recommendations pulled from conjurr!"
+    
+    frag = render_template(
+        'partials/_recommendations.html',
+        recommendations_json=recommendations_json, user_dict=user_dict
+    )
+    return jsonify({"ok": True, "html": frag, "alert": alert})
 
 @app.route('/send_email', methods=['POST'])
 def send_email():
@@ -419,14 +509,15 @@ def settings():
         server_name = request.form.get("server_name")
         tautulli_url = request.form.get("tautulli_url")
         tautulli_api = encrypt(request.form.get("tautulli_api"))
+        conjurr_url = request.form.get("conjurr_url")
 
         cursor.execute("""
             INSERT INTO settings
-            (id, from_email, alias_email, password, smtp_server, smtp_port, server_name, tautulli_url, tautulli_api)
-            VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)
+            (id, from_email, alias_email, password, smtp_server, smtp_port, server_name, tautulli_url, tautulli_api, conjurr_url)
+            VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (id) DO UPDATE
-            SET from_email = excluded.from_email, alias_email = excluded.alias_email, password = excluded.password, smtp_server = excluded.smtp_server, smtp_port = excluded.smtp_port, server_name = excluded.server_name, tautulli_url = excluded.tautulli_url, tautulli_api = excluded.tautulli_api
-        """, (from_email, alias_email, password, smtp_server, smtp_port, server_name, tautulli_url, tautulli_api))
+            SET from_email = excluded.from_email, alias_email = excluded.alias_email, password = excluded.password, smtp_server = excluded.smtp_server, smtp_port = excluded.smtp_port, server_name = excluded.server_name, tautulli_url = excluded.tautulli_url, tautulli_api = excluded.tautulli_api, conjurr_url = excluded.conjurr_url
+        """, (from_email, alias_email, password, smtp_server, smtp_port, server_name, tautulli_url, tautulli_api, conjurr_url))
         conn.commit()
         cursor.execute("SELECT plex_token FROM settings WHERE id = 1")
         plex_token = cursor.fetchone()[0]
@@ -441,14 +532,15 @@ def settings():
             "server_name": server_name,
             "plex_token": plex_token,
             "tautulli_url": tautulli_url,
-            "tautulli_api": decrypt(tautulli_api)
+            "tautulli_api": decrypt(tautulli_api),
+            "conjurr_url": conjurr_url
         }
 
         return render_template('settings.html', alert="Settings saved successfully!", settings=settings)
 
     cursor.execute("""
         SELECT
-        from_email, alias_email, password, smtp_server, smtp_port, server_name, plex_token, tautulli_url, tautulli_api
+        from_email, alias_email, password, smtp_server, smtp_port, server_name, plex_token, tautulli_url, tautulli_api, conjurr_url
         FROM settings WHERE id = 1
     """)
     row = cursor.fetchone()
@@ -464,7 +556,8 @@ def settings():
             "server_name": row[5],
             "plex_token": row[6],
             "tautulli_url": row[7],
-            "tautulli_api": decrypt(row[8])
+            "tautulli_api": decrypt(row[8]),
+            "conjurr_url": row[9]
         }
     else:
         settings = {
@@ -559,4 +652,5 @@ def about():
 if __name__ == '__main__':
     os.makedirs("database", exist_ok=True)
     init_db(DB_PATH)
+    migrate_schema("conjurr_url TEXT")
     app.run(host="127.0.0.1", port=6397, debug=True)

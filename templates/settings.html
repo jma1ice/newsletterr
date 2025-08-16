@@ -57,6 +57,11 @@
                 <input type="text" id="tautulli_api" name="tautulli_api"
                     {% if settings.from_email !="" %}value="{{ settings.tautulli_api }}"{% endif %}
                     placeholder="Tautulli API Key"><br><br>
+
+                <label for="conjurr_url">Conjurr Base URL:</label><br>
+                <input type="text" id="conjurr_url" name="conjurr_url"
+                    {% if settings.from_email !="" %}value="{{ settings.conjurr_url }}"{% endif %}
+                    placeholder="http://localhost:2665"><br><br>
                 
                 <button id="apply_settings" class="button">Apply Settings</button>
             </form>

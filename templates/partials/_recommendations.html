@@ -1,0 +1,163 @@
+{% macro poster_card(p, unavailable=False) -%}
+    {% set href = p.href or '#' %}
+    {% set img = p.url or '' %}
+    {% set title = p.title or '(untitled)' %}
+    {% set year = p.year %}
+    {% set vote = p.vote %}
+    {% set runtime = p.runtime %}
+    {% set overview = p.overview %}
+    {% set mtype = (p.media_type or '')|lower %}
+
+    <li class="relative group rounded-3 overflow-hidden bg-gray-200 dark:bg-gray-700">
+        <a href="{{ href }}" target="_blank" rel="noopener" class="block">
+            <div class="aspect-[2/3]">
+                {% if img %}
+                    <img loading="lazy" src="{{ img }}" alt="{{ title }} poster"
+                        class="h-full w-full object-cover"
+                        {% if unavailable %}style="filter:grayscale(65%);opacity:.7;"{% endif %}>
+                {% else %}
+                    <div class="h-full w-full flex items-center justify-center text-xs text-gray-600 dark:text-gray-300"
+                        {% if unavailable %}style="filter:grayscale(65%);opacity:.7;"{% endif %}>
+                        No image
+                    </div>
+                {% endif %}
+            </div>
+
+            <div class="absolute top-1 left-1 text-[11px] text-white/90">
+                {% set bits = [] %}
+                {% if year %}{% set _ = bits.append(year) %}{% endif %}
+                {% if vote %}{% set _ = bits.append('★ ' ~ ('%.1f'|format(vote)|replace('.0',''))) %}{% endif %}
+                {% if bits %}<span class="bg-black/70 rounded px-1.5 py-0.5">{{ bits|join(' • ') }}</span>{% endif %}
+            </div>
+
+            {% if unavailable %}
+                <div class="absolute top-1 right-1 text-[10px] bg-rose-600/85 text-white rounded px-1.5 py-0.5">
+                    Unavailable
+                </div>
+            {% endif %}
+
+            <div class="absolute inset-x-0 bottom-0 p-2 bg-gradient-to-t from-black/70 to-transparent">
+                <div class="text-[12px] font-semibold text-white line-clamp-2">{{ title }}</div>
+                {% if runtime %}
+                    <div class="text-[11px] text-white/80">{{ runtime }}</div>
+                {% endif %}
+            </div>
+        </a>
+
+        {% if overview %}
+            <div class="absolute left-0 right-0 bottom-0 translate-y-full group-hover:translate-y-0 transition
+                        text-[10px] bg-black/80 text-white px-2 py-1 line-clamp-3">
+                {{ overview }}
+            </div>
+        {% endif %}
+    </li>
+{%- endmacro %}
+
+{% set recs = recommendations_json or {} %}
+<div id="recommendations" class="space-y-4" data-html-fragment="recommendations">
+    <div class="flex items-end justify-between gap-3 mb-6">
+        <h2>Recommendations</h2>
+        <select id="rec-user-filter" class="border rounded px-3 py-2">
+            <option value="" selected>Choose a user...</option>
+            <option value="__ALL__">All Users</option>
+            {% for user, email in user_dict | dictsort %}
+                <option value="{{ email|e }}">{{ email }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    {% if not recs %}
+        <div class="rounded-3 p-4 bg-[#8acbd4] dark:bg-[#333] text-gray-600 dark:text-gray-300">
+            No recommendations found.
+        </div>
+    {% else %}
+        <div id="rec-grid" class="grid grid-cols-1 gap-6">
+            {% for user, data in recs | dictsort %}
+                {% set movies_avail = (data.movie_posters if data.movie_posters is defined else []) %}
+                {% set movies_un = (data.movie_posters_unavailable if data.movie_posters_unavailable is defined else []) %}
+                {% set shows_avail = (data.show_posters if data.show_posters is defined else []) %}
+                {% set shows_un = (data.show_posters_unavailable if data.show_posters_unavailable is defined else []) %}
+                {% set total = movies_avail|length + movies_un|length + shows_avail|length + shows_un|length %}
+                {% set card_id = user_dict[user] %}
+                <div class="rec-user-card rounded-3 bg-[#8acbd4] dark:bg-[#333] p-4 !shadow-sm hover:!shadow-xl transition duration-150" data-user="{{ card_id|e }}">
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="font-semibold text-lg">{{ user_dict[user] }}</h3>
+                    </div>
+
+                    {% if total == 0 %}
+                        <div class="text-sm text-gray-500 dark:text-gray-400">No poster recommendations.</div>
+                    {% else %}
+                        <h4>Recommended Movies</h4>
+                        <ul class="grid grid-cols-10 gap-3">
+                            {% set COLUMNS = 10 %}
+                            {% set avail = movies_avail|length %}
+                            {% set remainder = (COLUMNS - (avail % COLUMNS)) % COLUMNS %}
+                            {% set span = remainder if remainder != 0 else COLUMNS %}
+
+                            {% for p in movies_avail %}{{ poster_card(p, False) }}{% endfor %}
+
+                            {% set un = movies_un or [] %}
+                            {% set first_row = un[:span] %}
+                            {% set rest = un[span:] %}
+
+                            {% if first_row %}
+                                <li class="col-span-full" style="grid-column: span {{ span }} / span {{ span }};">
+                                    <div class="relative rounded">
+                                        <div class="pointer-events-none absolute inset-0 rounded" style="box-shadow: 0 0 0 1px #f59e0b inset;"></div>
+                                        <ul class="grid p-1" style="display:grid; grid-template-columns:repeat({{ span }},minmax(0,1fr)); gap:{{ span / (span - 1.5) }}rem;">
+                                            {% for p in first_row %}{{ poster_card(p, True) }}{% endfor %}
+                                        </ul>
+                                    </div>
+                                </li>
+                            {% endif %}
+
+                            {% for chunk in rest|batch(COLUMNS, fill_with=None) %}
+                                <li class="col-span-full">
+                                    <div class="relative rounded">
+                                        <div class="pointer-events-none absolute inset-0 rounded" style="box-shadow: 0 0 0 1px #f59e0b inset;"></div>
+                                        <ul class="grid p-1" style="display:grid; grid-template-columns:repeat({{ COLUMNS }},minmax(0,1fr)); gap:0.75rem;">
+                                            {% for p in chunk %}{% if p %}{{ poster_card(p, True) }}{% endif %}{% endfor %}
+                                        </ul>
+                                    </div>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                        <h4>Recommended Shows</h4>
+                        <ul class="grid grid-cols-10 gap-3">
+                            {% set avail = shows_avail|length %}
+                            {% set remainder = (COLUMNS - (avail % COLUMNS)) % COLUMNS %}
+                            {% set span = remainder if remainder != 0 else COLUMNS %}
+
+                            {% for p in shows_avail %}{{ poster_card(p, False) }}{% endfor %}
+
+                            {% set un = shows_un or [] %}
+                            {% set first_row = un[:span] %}
+                            {% set rest = un[span:] %}
+
+                            {% if first_row %}
+                                <li class="col-span-full" style="grid-column: span {{ span }} / span {{ span }};">
+                                    <div class="relative rounded">
+                                        <div class="pointer-events-none absolute inset-0 rounded" style="box-shadow: 0 0 0 1px #f59e0b inset;"></div>
+                                        <ul class="grid p-1" style="display:grid; grid-template-columns:repeat({{ span }},minmax(0,1fr)); gap:{{ span / (span - 1.5) }}rem;">
+                                            {% for p in first_row %}{{ poster_card(p, True) }}{% endfor %}
+                                        </ul>
+                                    </div>
+                                </li>
+                            {% endif %}
+
+                            {% for chunk in rest|batch(COLUMNS, fill_with=None) %}
+                                <li class="col-span-full">
+                                    <div class="relative rounded">
+                                        <div class="pointer-events-none absolute inset-0 rounded" style="box-shadow: 0 0 0 1px #f59e0b inset;"></div>
+                                        <ul class="grid p-1" style="display:grid; grid-template-columns:repeat({{ COLUMNS }},minmax(0,1fr)); gap:0.75rem;">
+                                            {% for p in chunk %}{% if p %}{{ poster_card(p, True) }}{% endif %}{% endfor %}
+                                        </ul>
+                                    </div>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+</div>

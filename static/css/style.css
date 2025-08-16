@@ -79,6 +79,10 @@ body {
     color: #222;
 }
 
+.nop-ul {
+    padding: 0 !important;
+}
+
 .container-fluid {
     max-width: 1900px;
     margin: 1px auto 40px auto;

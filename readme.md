@@ -1,4 +1,4 @@
-# Newsletterr
+# newsletterr
 
 _Turn your Plex server analytics into a beautiful weekly* (or whenever‑you‑like) newsletter._
 
@@ -108,16 +108,8 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 
 ## Upcoming Changes
 
-### v0.6.8
-* Fix up recently added layout to match closer to the recently added section
-* Options for # recently added to pull
-* Server name into recently added layout
-* Recently added placeholder for snap insert
-* Recently added into server side email apply_layout()
-* Move html side email templates into a separate html file similar to recently_added.html
-
-### v0.7.0
-* Zoltarr integration
+### v0.7.1
+* Get conjurr recommendations into a layout and snap-in for emails
 * Limit maximum days for pull data to a year, and have buttons underneath to pull last 7, 30, 60, 90, 120, etc? 
 * Mobile optimizations, i.e.:
 ```
@@ -129,6 +121,14 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
    }
 </style>
 ```
+
+### v0.7.2
+* Fix up recently added layout to match closer to the recently added section
+* Options for # recently added to pull
+* Server name into recently added layout
+* Recently added placeholder for snap insert
+* Recently added into server side email apply_layout()
+* Move html side email templates into a separate html file similar to recently_added.html
 
 ### v0.8.0
 * Update functionality (new version available)
@@ -151,52 +151,9 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 
 ## Recent Changes
 
-### v0.6.7
-* Get recently added items
-* Recently added layout first iteration
-* All "hours" values rounded to whole numbers
-* "ARE YOU SURE?" after pressing send button
-* Field validation in BCC emails. Users added in a "tag" format style. Prevent duplicate email addresses
-
-### v0.6.6
-* Fix to keep preview background consistent
-* Fix to change graphs with light/dark toggle
-* Changed .py file name to newsletterr.py
-* Readme.md organized, 'to-do' now 'upcoming changes' split into like categories and sorted to specific versions, updated to reflect recent changes
-* Added db storage encryption
-
-### v0.6.5
-* Clarified where to pull Tautulli API key from in readme.md
-* Auto fetch plex token, automation to get the server details
-* Remove Tautulli settings requirement for users without tautulli
-* Added instruction links for alias and app password setup in readme.md
-* Added 'Join the discussion' footer link to discord
-* Added light and dark mode toggle
-
-### v0.6.4
-* About page cleaned up
-* Readme recent changes cleaned up
-
-### v0.6.3
-* Font, colors, and images updated
-* Version and publish date moved to variable in python
-
-### v0.6.2
-* An 'about' page with version info, publish date
-* Time Range definied with (days)
-* Added text to successful users/stats/graphs pull to indicate what was just pulled, since the field defaults back to 30 days
-
-### v0.6.1
-* "API Key" text on Settings page updated to "Tautulli API Key"
-* More rounded boxes
-* Version in the footer of each HTML page
-* Longer fields on the Settings page
-* Added hover:underline on navbar links
-
-### v0.6.0
-* Footer added
-* Prefilled subject based on server name
-* Port changed to 6397
+### v0.7.0
+* Conjurr integration first iteration
+* Make recently added area 10 wide
 
 ---
 

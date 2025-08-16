@@ -177,15 +177,12 @@ def run_conjurr_command(base_url, user_dict, error):
 
     for user in user_dict.keys():
         try:
-            if user == '464760465' or user == '465957587':
-                api_url = f"{api_base_url}{user}"
-                response = requests.get(api_url)
-                response.raise_for_status()
-                data = response.json()
+            api_url = f"{api_base_url}{user}"
+            response = requests.get(api_url)
+            response.raise_for_status()
+            data = response.json()
 
-                recommendations_dict[user] = data
-            else:
-                continue
+            recommendations_dict[user] = data
         except requests.exceptions.RequestException as e:
             if error == None:
                 error = str(f"Conjurr Error: {e}")

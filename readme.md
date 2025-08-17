@@ -2,17 +2,17 @@
 
 _Turn your Plex server analytics into a beautiful weekly* (or whenever‑you‑like) newsletter._
 
-Newsletterr is a lightweight Flask application that talks to **[Tautulli](https://tautulli.com/)**, crunches your Plex statistics, renders charts with **Highcharts**, and emails the results to your user base, all without leaving the browser.
+Newsletterr is a lightweight Flask application that talks to **[Tautulli](https://tautulli.com/)**, crunches your Plex statistics, renders charts with **Highcharts**, pulls recommendations from **[conjurr](https://github.com/yungsnuzzy/conjurr)** and emails the results to your user base, all without leaving the browser.
 
 ---
 
 ## Features
 
-* **One‑click stats pull** – choose a time‑range and let Newsletterr query Tautulli for the most‑watched items, top users, and more.  
+* **One‑click stats pull** – choose a time‑range and a recently added number and let Newsletterr query Tautulli for the most‑watched items, top users, and more.  
 * **Interactive charts & tables** – Highcharts + HTML tables are rendered in the browser, then flattened into inline images with *html2canvas* so every e‑mail client sees exactly what you see.  
 * **WYSIWYG e‑mail preview** – compose the subject & body, drop in `[GRAPHS]` or `[STATS]` tokens, and pick a layout.  
 * **SMTP delivery with BCC support** – works with Gmail (app‑password), Outlook, Mailgun, or your own server.  
-* **Secure local persistence** – all settings are kept in a tiny SQLite database inside `database/data.db`.  
+* **Secure local persistence** – all settings are kept in a tiny encrypted SQLite database inside `database/data.db`.  
 * **Zero‑install frontend** – Tailwind + Bootstrap served from a CDN; no Node toolchain required.  
 * **Friendly loading spinner** – keep users informed while running scripts complete.
 
@@ -57,20 +57,22 @@ By default the app listens on **http://127.0.0.1:6397**.
    * **SMTP Server** – e.g. `smtp.gmail.com`  
    * **SMTP Port** – `465` for SSL or `587` for TLS  
    * **Plex Server Name** – appears in the newsletter header. This is grabbed when Plex is connected, but can be overwritten if wanted  
-   * **Tautulli URL** – e.g. `http://tautulli.local:8181`  
+   * **Tautulli URL** – e.g. `http://localhost:8181`  
    * **Tautulli API Key** – make sure 'Enable API' is checked, and copy the API key from your [Tautulli settings.](http://localhost:8181/settings#tabs_tabs-web_interface)  
+   * **Conjurr URL** – e.g. `http://localhost:2665/`  
 4. Click **Apply Settings**.  Settings are saved to `database/data.db`.
 
 ---
 
 ## Sending a Newsletter
 
-1. On the **Dashboard** choose a **Time Range** in days and click **Get Stats\\Users**.  
+1. On the **Dashboard** choose a number of **Recently Added** items to pull from TV and Movies, a **Time Range** in days and click **Get Stats\\Users**.  
 2. Wait for the spinner to disappear, then the BCC, charts, and tables will populate.  
 3. Alter the BCC field to specify the recipient e‑mails (comma‑separated) if needed.  
-4. Draft the body, insert `[GRAPHS]` or `[STATS]` where appropriate.  
-5. Check the box on the stats and graphs that you wish to include.  
-6. Hit **Send Email**. Success and error messages will show after running.  
+4. After altering, if you haveconnected conjurr, you can click **Get Recommendations** to pull conjurr recommendations for the users currently listed in the BCC field.  
+5. Draft the body, insert `[GRAPHS]` or `[STATS]` where appropriate.  
+6. Check the box on the stats and graphs that you wish to include.  
+7. Hit **Send Email**. Success and error messages will show after running.  
 
 ---
 
@@ -81,6 +83,9 @@ newsletterr/
 ├── .env              # environment variables, created at first launch
 ├── newsletterr.py    # Flask routes & helper functions
 ├── templates/
+│   ├── layouts/
+│   ├── partials/
+|      ├── _recommendations.html
 │   ├── about.html
 │   ├── base.html
 │   ├── index.html
@@ -108,9 +113,15 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 
 ## Upcoming Changes
 
-### v0.7.1
-* Get conjurr recommendations into a layout and snap-in for emails
-* Limit maximum days for pull data to a year, and have buttons underneath to pull last 7, 30, 60, 90, 120, etc? 
+### v0.7.2
+* Get conjurr recommendations into a layout and snap-in for emails 
+
+### v0.7.3
+* Fix up recently added layout to match closer to the recently added section
+* Server name into recently added layout
+* Recently added placeholder for snap insert
+* Recently added into server side email apply_layout()
+* Move html side email templates into a separate html file similar to recently_added.html
 * Mobile optimizations, i.e.:
 ```
 <style>
@@ -121,14 +132,6 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
    }
 </style>
 ```
-
-### v0.7.2
-* Fix up recently added layout to match closer to the recently added section
-* Options for # recently added to pull
-* Server name into recently added layout
-* Recently added placeholder for snap insert
-* Recently added into server side email apply_layout()
-* Move html side email templates into a separate html file similar to recently_added.html
 
 ### v0.8.0
 * Update functionality (new version available)
@@ -150,6 +153,12 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 ---
 
 ## Recent Changes
+
+### v0.7.1
+* Only get recommendations for users in BCC list
+* Buttons added to pull frequent time ranges
+* Options for # recently added to pull
+* Fixed alert not showing after conjurr pull
 
 ### v0.7.0
 * Conjurr integration first iteration

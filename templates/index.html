@@ -4,10 +4,10 @@
 <div class="container-fluid">
     <h1>Dashboard</h1><br>
     {% if alert %}
-        <p style="color: #01b301; text-shadow: 1px 0 #000, 0 1px #000, -1px 0 #000, 0 -1px #000;">{{ alert }}</p>
+        <p id="alert_p" style="color: #01b301; text-shadow: 1px 0 #000, 0 1px #000, -1px 0 #000, 0 -1px #000;">{{ alert }}</p>
     {% endif %}
     {% if error %}
-        <p style="color: #770010; text-shadow: 1px 0 #000, 0 1px #000, -1px 0 #000, 0 -1px #000;">{{ error }}</p>
+        <p id="error_p" style="color: #770010; text-shadow: 1px 0 #000, 0 1px #000, -1px 0 #000, 0 -1px #000;">{{ error }}</p>
     {% endif %}
     <div class="foreground">
         <div>
@@ -15,16 +15,24 @@
                 <tr style="height: 100%; padding: 10px;">
                     <td style="width: 20%; padding: 10px;">
                         <form method="POST" id="stats_form">
+                            <label for="items_to_pull">Recently Added Items (#):</label>
+                            <input type="number" id="items_to_pull" name="items_to_pull" value="10" style="width: 8.5rem; margin-bottom: 8px;" /><br>
                             <label for="days_to_pull">Time Range (days):</label>
                             <input type="number" id="days_to_pull" name="days_to_pull" value="30" /><br>
-                            <button class="button">Get Stats\Users</button>
+                            <button id="time_range_week" type="button" class="button">7</button>
+                            <button id="time_range_month" type="button" class="button">30</button>
+                            <button id="time_range_quarter" type="button" class="button">90</button>
+                            <button id="time_range_two_q" type="button" class="button">180</button>
+                            <button id="time_range_three_q" type="button" class="button">270</button>
+                            <button id="time_range_year" type="button" class="button">365</button>
+                            <button type="submit" class="button">Get Stats\Users</button>
                         </form>
                         {% if not user_dict %}
                             <button id="pullRecsBtn" class="button opacity-50 cursor-not-allowed" disabled>Get Recommendations</button>
                         {% else %}
                             <button id="pullRecsBtn" class="button">Get Recommendations</button>
                         {% endif %}
-                        <p>Note, recommendations take 20-25 seconds per user.</p>
+                        <p>Note, recommendations take 20-25 seconds per user. After getting stats/users with the top button, recommendations will be pulled for users in the BCC list.</p>
                         <form method="POST" action="/send_email">
                             <label class="form-label">BCC:</label>
                             <div id="bcc_chips" class="nl-chips" role="listbox" aria-label="BCC recipients">
@@ -359,6 +367,38 @@
             libSel.addEventListener('input', applyFilter);
         </script>
         <script>
+            document.getElementById('time_range_week').addEventListener('click', () => {
+                document.getElementById('days_to_pull').value = 7;
+                showSpinner('Getting stats and users...');
+                document.getElementById('stats_form').submit();
+            });
+            document.getElementById('time_range_month').addEventListener('click', () => {
+                document.getElementById('days_to_pull').value = 30;
+                showSpinner('Getting stats and users...');
+                document.getElementById('stats_form').submit();
+            });
+            document.getElementById('time_range_quarter').addEventListener('click', () => {
+                document.getElementById('days_to_pull').value = 90;
+                showSpinner('Getting stats and users...');
+                document.getElementById('stats_form').submit();
+            });
+            document.getElementById('time_range_two_q').addEventListener('click', () => {
+                document.getElementById('days_to_pull').value = 180;
+                showSpinner('Getting stats and users...');
+                document.getElementById('stats_form').submit();
+            });
+            document.getElementById('time_range_three_q').addEventListener('click', () => {
+                document.getElementById('days_to_pull').value = 270;
+                showSpinner('Getting stats and users...');
+                document.getElementById('stats_form').submit();
+            });
+            document.getElementById('time_range_year').addEventListener('click', () => {
+                document.getElementById('days_to_pull').value = 365;
+                showSpinner('Getting stats and users...');
+                document.getElementById('stats_form').submit();
+            });
+        </script>
+        <script>
             async function updatePreview() {
                 const raw = document.getElementById('email_text').value;
                 const layout = document.getElementById('layout').value;
@@ -655,6 +695,25 @@
             document.getElementById('pullRecsBtn').addEventListener('click', async () => {
                 showSpinner('Pulling recommendations...');
 
+                function collectEmailsFromChips() {
+                    return Array.from(document.querySelectorAll('#bcc_chips .nl-chip'))
+                        .map(ch => ch.dataset.email)
+                        .filter(Boolean);
+                }
+
+                const chipInput = document.getElementById('email_chip_input');
+                    if (chipInput && chipInput.value.trim()) {
+                        chipInput.dispatchEvent(new Event('blur'));
+                }
+
+                const toList = collectEmailsFromChips();
+                    if (!toList.length) {
+                        alert('Please add at least one recipient.');
+                        return;
+                }
+
+                const to_emails = toList.join(', ');
+
                 const payload = {
                     stats: {{ stats | tojson }},
                     user_dict: {{ user_dict | tojson }},
@@ -663,7 +722,8 @@
                     recent_data: {{ recent_data | tojson }},
                     libs: {{ libs | tojson }},
                     html_recent_grid: {{ html_recent_grid | tojson }},
-                    settings: {{ settings | tojson }}
+                    settings: {{ settings | tojson }},
+                    to_emails
                 };
 
                 try {
@@ -677,11 +737,16 @@
                     const data = await resp.json();
                     if (!resp.ok || !data.ok) throw new Error(data.error || 'Error pulling recommendations.');
 
+                    const alert_p = document.getElementById('alert_p');
+                    alert_p.textContent = data.alert;
+
                     const pane = document.getElementById('recommendations_pane');
                     pane.innerHTML = data.html;
                     initRecommendationsFilter(pane);
                 } catch (err) {
                     console.error("Error pulling recommendations:", err);
+                    const error_p= document.getElementById('error_p');
+                    error_p.textContent = err;
                     alert("Something went wrong while pulling recommendations.");
                 } finally {
                     try { hideSpinner(); } catch(_) {}

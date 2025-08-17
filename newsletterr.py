@@ -10,8 +10,8 @@ from plex_api_client import PlexAPI
 from urllib.parse import quote_plus
 
 app = Flask(__name__)
-app.jinja_env.globals["version"] = "v0.7.0"
-app.jinja_env.globals["publish_date"] = "August 16, 2025"
+app.jinja_env.globals["version"] = "v0.7.1"
+app.jinja_env.globals["publish_date"] = "August 17, 2025"
 
 DB_PATH = os.path.join("database", "data.db")
 plex_headers = {
@@ -137,7 +137,7 @@ def run_tautulli_command(base_url, api_key, command, data_type, error, time_rang
     if command == 'get_users':
         api_url = f"{base_url}/api/v2?apikey={decrypt(api_key)}&cmd={command}"
     elif command == 'get_recently_added':
-        api_url = f"{base_url}/api/v2?apikey={decrypt(api_key)}&cmd={command}&count=10&media_type={data_type}"
+        api_url = f"{base_url}/api/v2?apikey={decrypt(api_key)}&cmd={command}&count={time_range}&media_type={data_type}"
     else:
         if command == 'get_plays_per_month':
             month_range = str(math.ceil(int(time_range) / 30))
@@ -283,7 +283,7 @@ def index():
                                     graph_commands=graph_commands, alert=alert, settings=settings)
         else:
             time_range = request.form.get("days_to_pull")
-            count = request.form.get("days_to_pull")
+            count = request.form.get("items_to_pull")
             tautulli_base_url = settings['tautulli_url'].rstrip('/')
             tautulli_api_key = settings['tautulli_api']
 
@@ -300,7 +300,7 @@ def index():
                 if user['email'] != None and user['is_active']:
                     user_dict[user['user_id']] = user['email']
             
-            alert = f"Users, graphs/stats for {time_range} days, recommendations, and recently added data pulled!"
+            alert = f"Users, graphs/stats for {time_range} days, and {count} recently added items pulled!"
 
     if graph_data == []:
         graph_data = [{},{}]
@@ -363,6 +363,7 @@ def pull_recommendations():
     libs = data['libs']
     html_recent_grid = data['html_recent_grid']
     settings = data['settings']
+    to_emails = data['to_emails']
 
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
@@ -379,6 +380,8 @@ def pull_recommendations():
             "conjurr_url": ""
         }
 
+    filtered_users = {k: v for k, v in user_dict.items() if v in to_emails}
+
     if request.method == 'POST':
         if conjurr_settings['conjurr_url'] == "":
             return render_template('index.html', error='Please enter conjurr info on settings page',
@@ -387,7 +390,7 @@ def pull_recommendations():
                                     libs=libs, html_recent_grid=html_recent_grid, settings=settings)
         else:
             conjurr_base_url = conjurr_settings['conjurr_url']
-            recommendations_json, error = run_conjurr_command(conjurr_base_url, user_dict, error)
+            recommendations_json, error = run_conjurr_command(conjurr_base_url, filtered_users, error)
             alert = "User recommendations pulled from conjurr!"
     
     frag = render_template(

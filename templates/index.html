@@ -45,7 +45,7 @@
                                 {{ user_dict.values() | join(', ') }}
                             </textarea><br>
                             Subject: <input type="text" name="subject" id="subject" placeholder="Subject"
-                                value="{{ settings.server_name }} News" required><br><br>
+                                value="{{ settings.server_name }} News" style="width: 18rem;" required><br><br>
                             <label for="layout">Choose a layout:</label>
                             <select id="layout" name="layout" onchange="updatePreview()">
                                 <option value="none">Plain Text</option>
@@ -60,6 +60,9 @@
                             <label for="stat_placeholder">Stat Placeholder:</label>
                             <input type="text" id="stat_placeholder" name="stat_placeholder" value="[STATS]"
                                 oninput="updatePreview()"><br><br>
+                            <label for="ra_placeholder">Recently Added Holder:</label>
+                            <input type="text" id="ra_placeholder" name="ra_placeholder" value="[RECENTLY_ADDED]"
+                                style="width: 10.5rem;" oninput="updatePreview()"><br><br>
                         </form>
                         <button id="sendEmailBtn" class="button">Send Email with Selected Graphs</button>
                     </td>
@@ -339,17 +342,20 @@
                     "dark:!shadow-[0_6px_18px_rgba(74,127,130,0.6)] dark:hover:!shadow-[0_10px_28px_rgba(74,127,130,0.6)]";
                     li.dataset.lib = it.library;
                     li.innerHTML = `
+                        <style>
+                            .ra-pill{ display:inline-flex; align-items:center; justify-content:center; line-height:1; }
+                        </style>
                         <div class="relative aspect-[2/3] bg-gray-200 dark:bg-gray-700">
-                        ${imgURL ? `<img loading="lazy" src="${imgURL}" class="h-full w-full object-cover">` : ''}
-                        ${it.library ? `<div class="absolute top-1 right-1 text-xs px-2 py-1 rounded-full bg-black/70 text-white">${it.library}</div>` : ''}
-                        ${it.added ? `<div class="absolute bottom-1 right-1 text-[11px] text-white/90"><span class="bg-black/60 rounded px-1.5 py-0.5">${it.added}</span></div>` : ''}
+                            ${imgURL ? `<img loading="lazy" src="${imgURL}" class="h-full w-full object-cover">` : ''}
+                            ${it.library ? `<div class="ra-pill absolute top-1 right-1 text-xs px-2 py-1 rounded-full bg-black/70 text-white"><span class="pill_text">${it.library}</span></div>` : ''}
+                            ${it.added ? `<div class="ra-pill absolute bottom-1 right-1 text-[11px] text-white/90 bg-black/60 rounded px-1.5 py-0.5"><span class="pill_text">${it.added}</span></div>` : ''}
                         </div>
                         <div class="p-3">
-                        <div class="font-semibold line-clamp-2">${it.title}</div>
-                        <div class="text-xs text-gray-500 dark:text-gray-400">
-                            ${it.sub ? it.sub + ' • ' : ''}${it.duration}
-                        </div>
-                        ${it.summary ? `<div class="mt-2 text-xs text-gray-600 dark:text-gray-300 line-clamp-5">${it.summary}</div>` : ''}
+                            <div class="font-semibold line-clamp-2">${it.title}</div>
+                            <div class="text-xs text-gray-500 dark:text-gray-400">
+                                ${it.sub ? it.sub + ' • ' : ''}${it.duration}
+                            </div>
+                            ${it.summary ? `<div class="mt-2 text-xs text-gray-600 dark:text-gray-300 line-clamp-5">${it.summary}</div>` : ''}
                         </div>
                     `;
                     grid.appendChild(li);
@@ -399,6 +405,133 @@
             });
         </script>
         <script>
+            async function waitForImages(scope){
+                const imgs = Array.from(scope.querySelectorAll('img'));
+                await Promise.all(imgs.map(img => img.complete ? 0 : new Promise(res=>{
+                    img.addEventListener('load', res, {once:true});
+                    img.addEventListener('error', res, {once:true});
+                })));
+                try { await document.fonts?.ready; } catch(_){}
+            }
+
+            async function captureRecentlyAddedPNG() {
+                const grid = document.getElementById('ra-grid');
+                if (!grid || !grid.children.length) return null;
+
+                const rect = grid.getBoundingClientRect();
+                if (!rect.width || !rect.height) return null;
+
+                await waitForImages(grid);
+
+                const bg = '#282A2D';
+
+                function renderPass(useFO){
+                    return html2canvas(grid, {
+                        useCORS: true,
+                        backgroundColor: bg,
+                        scale: window.devicePixelRatio > 1 ? 2 : 1,
+                        foreignObjectRendering: useFO,
+                        windowWidth: grid.scrollWidth,
+                        windowHeight: grid.scrollHeight,
+                        onclone: (doc) => {
+                            const g = doc.getElementById('ra-grid');
+                            if (!g) return;
+
+                            const kill = doc.createElement('style');
+                            kill.textContent = `
+                                *{ box-shadow: none !important; filter: none !important; }
+                                [class*="shadow"]{ box-shadow: none !important; }
+                                [style*="box-shadow"]{ box-shadow: none !important; }
+                            `;
+                            doc.head.appendChild(kill);
+
+                            g.querySelectorAll('*').forEach(el => {
+                                if (typeof el.className === 'string' && el.className.includes('shadow')) {
+                                    el.className = el.className.split(/\s+/).filter(t => !/shadow/i.test(t)).join(' ');
+                                }
+                            });
+
+                            g.querySelectorAll('.aspect-\\[2\\/3\\]').forEach(el => {
+                                const w = el.getBoundingClientRect().width || el.clientWidth || 0;
+                                if (w > 0) el.style.height = Math.round(w * 3 / 2) + 'px';
+                            });
+
+                            const pillNodes = g.querySelectorAll(
+                                '.absolute.top-1.right-1, .absolute.bottom-1.right-1 span, .ra-pill'
+                            );
+                            pillNodes.forEach(p => {
+                                p.style.display = 'inline-flex';
+                                p.style.alignItems = 'center';
+                                p.style.justifyContent = 'center';
+                                p.style.lineHeight = '1';
+                                if (!p.style.padding) p.style.padding = '2px 6px';
+                                p.style.minHeight = '18px';
+                                p.style.borderRadius = '9999px';
+                                const cs = doc.defaultView.getComputedStyle(p);
+                                
+                            });
+
+                            g.querySelectorAll('.pill_text').forEach(s => {
+                                s.style.position = 'relative'
+                                s.style.top = '-6px';
+                            });
+
+                            g.querySelectorAll('.font-semibold.line-clamp-2').forEach(el => {
+                                el.style.display = 'block';
+                                el.style.webkitLineClamp = 'unset';
+                                el.style.overflow = 'hidden';
+                                el.style.lineHeight = '1.5';
+                                el.style.maxHeight   = (1.75 * 2) + 'em';
+                                el.style.paddingBottom = '3px';
+                            });
+
+                            g.querySelectorAll('.p-3 > .text-xs:first-of-type').forEach(el => {
+                                el.style.lineHeight = '1.75';
+                                el.style.paddingBottom = '1px';
+                            });
+
+                            g.querySelectorAll('.line-clamp-5').forEach(el => {
+                                el.style.display = 'block';
+                                el.style.webkitLineClamp = 'unset';
+                                el.style.overflow = 'hidden';
+                                el.style.lineHeight = '1.4';
+                                el.style.maxHeight   = (1.5 * 5) + 'em';
+                                el.style.paddingBottom = '4px';
+                            });
+
+                            g.querySelectorAll('.p-3').forEach(c => {
+                                const cs = doc.defaultView.getComputedStyle(c);
+                                const pb = parseFloat(cs.paddingBottom) || 0;
+                                if (pb < 8) c.style.paddingBottom = '8px';
+                            });
+
+                            g.querySelectorAll('ul').forEach(u => { u.style.margin = '0'; u.style.padding = '0'; });
+                        }
+                    });
+                }
+
+                let canvas = await renderPass(false);
+                if (!canvas || !canvas.width || !canvas.height) {
+                    canvas = await renderPass(true);
+                }
+                if (!canvas || !canvas.width || !canvas.height) return null;
+
+                const blob = await new Promise(r => canvas.toBlob(r, 'image/png', 0.92));
+                const dataUrl = canvas.toDataURL('image/png', 0.92);
+                return { blob, dataUrl, cid: 'recently-added.png' };
+            }
+        </script>
+        <script>
+            async function insertRecentlyAddedIntoPreview(html) {
+                const ra = await captureRecentlyAddedPNG();
+                if (!ra) return html.replace('[RECENTLY_ADDED]', '');
+
+                return html.replace(
+                    '[RECENTLY_ADDED]',
+                    `<img src="${ra.dataUrl}" alt="Recently Added" style="max-width:100%;height:auto;border-radius:5px;display:block;">`
+                );
+            }
+
             async function updatePreview() {
                 const raw = document.getElementById('email_text').value;
                 const layout = document.getElementById('layout').value;
@@ -552,9 +685,46 @@
                                             </tr>
                                         </tbody>
                                     </table></body></html>`;
+                        html = await insertRecentlyAddedIntoPreview(html);
                         break;
                     case "recently_added":
-                        html = {{ html_recent_grid | tojson }};
+                        document.getElementById('subject').value = `${serverName} Recently Added`;
+                        html = `
+                                <link href="https://fonts.googleapis.com/css?family=IBM+Plex+Sans:400,500,600,700&display=swap" rel="stylesheet">
+                                <style>
+                                    :root { color-scheme: ${isDark ? 'dark' : 'light'}; }
+                                    html, body { background: ${isDark ? '#333' : '#8acbd4'}; }
+                                </style>
+                                <html><body style="font-family: IBM Plex Sans; margin: 0;">
+                                    <table class="body" style="border-collapse: separate; mso-table-lspace: 0pt; mso-table-rspace: 0pt; width: 100%;" border="0" cellspacing="0" cellpadding="0">
+                                        <tbody>
+                                            <tr>
+                                                <td class="preview-container" style="font-family: IBM Plex Sans; font-size: 14px; vertical-align: top; display: block;">
+                                                    <div class="content" style="box-sizing: border-box; display: block;"><span class="preheader" style="color: transparent; display: none; height: 0; max-height: 0; max-width: 0; opacity: 0; overflow: hidden; mso-hide: all; visibility: hidden; width: 0;">${serverName} Newsletter</span>
+                                                        <table class="main" style="border-collapse: separate; mso-table-lspace: 0pt; mso-table-rspace: 0pt; width: 100%; background: #282A2D; border-radius: 3px; color: #ffffff;" border="0" cellspacing="0" cellpadding="3">
+                                                            <tbody>
+                                                                <tr>
+                                                                    <td class="wrapper" style="font-family: IBM Plex Sans; font-size: 14px; vertical-align: top; box-sizing: border-box; padding: 5px; overflow: auto;">
+                                                                        <div class="header" style="width: 50%; height: 10px; text-align: center;"><img class="header-img" style="border: none; -ms-interpolation-mode: bicubic; max-width: 9%; width: 492px; height: 20px; margin-left: -35px;" src="https://d15k2d11r6t6rl.cloudfront.net/public/users/Integrators/669d5713-9b6a-46bb-bd7e-c542cff6dd6a/3bef3c50f13f4320a9e31b8be79c6ad2/Plex%20Logo%20Update%202022/plex-logo-heavy-stroke.png" width="492" height="90" /></div>
+                                                                        <div class="server-name" style="font-size: 25px; text-align: center; margin-bottom: 0;">${serverName} Newsletter</div>
+                                                                    </td>
+                                                                </tr>
+                                                                <tr>
+                                                                    <td class="footer" style="font-family: IBM Plex Sans; font-size: 12px; vertical-align: top; clear: both; margin-top: 0; text-align: center; width: 100%;">
+                                                                        <h1 class="footer-bar" style="margin-left: auto; margin-right: auto; width: 250px; border-top: 1px solid #E5A00D; margin-top: 5px;">Recently Added</h1>
+                                                                        [RECENTLY_ADDED]
+                                                                        <div class="footer-bar" style="margin-left: auto; margin-right: auto; width: 250px; border-top: 1px solid #E5A00D; margin-top: 25px;">&nbsp;</div>
+                                                                        <div class="content-block powered-by" style="padding-bottom: 10px; padding-top: 0;">Generated for Plex Media Server by newsletterr</div>
+                                                                    </td>
+                                                                </tr>
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table></body></html>`;
+                        html = await insertRecentlyAddedIntoPreview(html);
                         break;
                     default:
                         html = `<style>
@@ -721,7 +891,6 @@
                     graph_commands: {{ graph_commands | tojson }},
                     recent_data: {{ recent_data | tojson }},
                     libs: {{ libs | tojson }},
-                    html_recent_grid: {{ html_recent_grid | tojson }},
                     settings: {{ settings | tojson }},
                     to_emails
                 };
@@ -788,10 +957,18 @@
                     .filter(Boolean);
             }
 
+            function blobToBase64(blob) {
+                return new Promise(r => {
+                    const fr = new FileReader();
+                    fr.onload = () => r(fr.result.split(',')[1]);
+                    fr.readAsDataURL(blob);
+                });
+            }
+
             document.getElementById('sendEmailBtn').addEventListener('click', async () => {
                 const subject = document.getElementById('subject').value;
-                const email_text = document.getElementById('email_text').value;
                 const layout = document.getElementById('layout').value;
+                let email_text = document.getElementById('email_text').value;
                 const graphImages = [];
                 const statImages = [];
 
@@ -814,6 +991,17 @@
                 if (!ok) return;
 
                 showSpinner('Sending email...');
+
+                if (layout == 'recently_added') {
+                    email_text = '[RECENTLY_ADDED]';
+                }
+
+                const ra = await captureRecentlyAddedPNG();
+                if (ra) {
+                    email_text = email_text.replace('[RECENTLY_ADDED]', `<img src="cid:${ra.cid}" alt="Recently Added" style="max-width:100%;height:auto;border-radius:12px;display:block;">`);
+                } else {
+                    email_text = email_text.replace('[RECENTLY_ADDED]', '');
+                }
 
                 const selectedGraphs = Array.from(document.querySelectorAll('.graph-checkbox:checked'))
                     .map(cb => cb.value);
@@ -898,6 +1086,13 @@
                     }
                 }
 
+                const recentlyAddedImages = [];
+                if (ra) recentlyAddedImages.push({
+                    cid: ra.cid,
+                    mime: 'image/png',
+                    base64: await blobToBase64(ra.blob)
+                });
+
                 try {
                     const resp = await fetch('/send_email', {
                         method: 'POST',
@@ -908,7 +1103,8 @@
                             email_text,
                             layout,
                             graphs: graphImages,
-                            stats: statImages
+                            stats: statImages,
+                            recently_added: recentlyAddedImages
                         })
                     });
                     

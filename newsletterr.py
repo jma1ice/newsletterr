@@ -11,7 +11,7 @@ from urllib.parse import quote_plus
 
 app = Flask(__name__)
 app.jinja_env.globals["version"] = "v0.7.1"
-app.jinja_env.globals["publish_date"] = "August 16, 2025"
+app.jinja_env.globals["publish_date"] = "August 17, 2025"
 
 DB_PATH = os.path.join("database", "data.db")
 plex_headers = {

@@ -83,22 +83,19 @@ newsletterr/
 ├── .env              # environment variables, created at first launch
 ├── newsletterr.py    # Flask routes & helper functions
 ├── templates/
-│   ├── layouts/
 │   ├── partials/
-|      ├── _recommendations.html
+|   │  └── _recommendations.html
 │   ├── about.html
 │   ├── base.html
 │   ├── index.html
-│   ├── settings.html
-│   └── recently_added.html
+│   └── settings.html
 ├── static/
 │   ├── css/style.css
 │   └── img/
 |      ├── Asset_94x.png
 │      ├── favicon.ico
 │      └── load.gif
-├── database/         # created at first launch
-│   └── data.db
+├── database/data.db  # created at first launch
 ├── README.md         # this file
 └── requirements.txt  # pip requirements
 ```
@@ -113,15 +110,11 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 
 ## Upcoming Changes
 
-### v0.7.2
-* Get conjurr recommendations into a layout and snap-in for emails 
-
 ### v0.7.3
-* Fix up recently added layout to match closer to the recently added section
-* Server name into recently added layout
-* Recently added placeholder for snap insert
-* Recently added into server side email apply_layout()
-* Move html side email templates into a separate html file similar to recently_added.html
+* Get conjurr recommendations into a layout and snap-in for emails
+
+### v0.8.0
+* Update functionality (new version available)
 * Mobile optimizations, i.e.:
 ```
 <style>
@@ -132,9 +125,6 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
    }
 </style>
 ```
-
-### v0.8.0
-* Update functionality (new version available)
 
 ### v0.9.0
 * Add in scheduled newsletter functionality
@@ -153,6 +143,12 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 ---
 
 ## Recent Changes
+
+### v0.7.2
+* Recently added layout autofills subject
+* Server name into recently added layout
+* Recently added into server side email
+* Recently added placeholder for snap insert
 
 ### v0.7.1
 * Only get recommendations for users in BCC list

@@ -56,6 +56,16 @@
             <img src="/static/img/Asset_94x.png" alt="Logo" class="logo" />
         </div>
     </nav>
+    {% if update_info.is_newer %}
+        <div style="
+            position: sticky; top: 0; z-index: 1000;
+            background: #fff3cd; color: #664d03; border: 1px solid #ffecb5;
+            padding: 10px 14px; font-size: 14px;">
+            A new version {{ update_info.latest }} is available (you're on {{ update_info.current }}).
+            <a href="{{ update_info.release_url }}" target="_blank" rel="noopener">See release notes</a>
+        </div>
+    {% endif %}
+
     {% block content %}{% endblock %}
     <script>
         function showSpinner(passedText) {

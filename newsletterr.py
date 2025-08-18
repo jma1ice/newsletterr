@@ -1,10 +1,10 @@
-import os, math, uuid, base64, smtplib, sqlite3, requests
+import os, math, uuid, base64, smtplib, sqlite3, requests, time, threading
 from cryptography.fernet import Fernet, InvalidToken
 from dotenv import load_dotenv, set_key, find_dotenv
 from email.mime.text import MIMEText
 from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
-from flask import Flask, render_template, request, jsonify, Response, send_file
+from flask import Flask, render_template, request, jsonify, Response
 from pathlib import Path
 from plex_api_client import PlexAPI
 from urllib.parse import quote_plus
@@ -12,7 +12,18 @@ from urllib.parse import quote_plus
 app = Flask(__name__)
 app.jinja_env.globals["version"] = "v0.8.0"
 app.jinja_env.globals["publish_date"] = "August 18, 2025"
+app.config["GITHUB_OWNER"] = "jma1ice"
+app.config["GITHUB_REPO"] = "newsletterr"
+app.config["UPDATE_CHECK_INTERVAL_SEC"] = 60 * 60
 
+_update_cache = {
+    "latest": None,
+    "is_newer": False,
+    "release_url": None,
+    "notes": None,
+    "checked_at": 0.0,
+    "etag": None,
+}
 DB_PATH = os.path.join("database", "data.db")
 plex_headers = {
     "X-Plex-Client-Identifier": str(uuid.uuid4())
@@ -256,6 +267,74 @@ def run_conjurr_command(base_url, user_dict, error):
                 error += str(f", Conjurr Error: {e}")
 
     return [recommendations_dict, error]
+
+def _norm(v: str):
+    if not v:
+        return (0,)
+    v = v.lstrip("vV").split("+", 1)[0].split("-", 1)[0]
+    parts = []
+    for p in v.split("."):
+        try:
+            parts.append(int(p))
+        except ValueError:
+            num = ''.join(ch for ch in p if ch.isdigit())
+            parts.append(int(num) if num else 0)
+    return tuple(parts) if parts else (0,)
+
+def _check_github_latest():
+    headers = {"Accept": "application/vnd.github+json"}
+    if _update_cache["etag"]:
+        headers["If-None-Match"] = _update_cache["etag"]
+
+    url = f"https://api.github.com/repos/{app.config['GITHUB_OWNER']}/{app.config['GITHUB_REPO']}/releases/latest"
+    try:
+        r = requests.get(url, headers=headers, timeout=10)
+        if r.status_code == 304:
+            _update_cache["checked_at"] = time.time()
+            return
+        r.raise_for_status()
+        data = r.json()
+        latest_tag = data.get("tag_name") or ""
+        current = app.jinja_env.globals.get("version", "")
+        is_newer = _norm(latest_tag) > _norm(current)
+
+        _update_cache.update({
+            "latest": latest_tag,
+            "is_newer": is_newer,
+            "release_url": data.get("html_url"),
+            "notes": data.get("body", ""),
+            "checked_at": time.time(),
+            "etag": r.headers.get("ETag"),
+        })
+    except Exception:
+        _update_cache["checked_at"] = time.time()
+
+def _ensure_recent_check():
+    now = time.time()
+    if now - _update_cache["checked_at"] >= app.config["UPDATE_CHECK_INTERVAL_SEC"]:
+        _check_github_latest()
+
+def _background_update_checker():
+    while True:
+        try:
+            _check_github_latest()
+        finally:
+            time.sleep(app.config["UPDATE_CHECK_INTERVAL_SEC"])
+
+threading.Thread(target=_background_update_checker, daemon=True).start()
+
+@app.context_processor
+def inject_update_info():
+    _ensure_recent_check()
+    return {
+        "update_info": {
+            "current": app.jinja_env.globals.get("version", ""),
+            "latest": _update_cache["latest"],
+            "is_newer": _update_cache["is_newer"],
+            "release_url": _update_cache["release_url"],
+            "notes": _update_cache["notes"],
+        }
+    }
 
 @app.route('/', methods=['GET', 'POST'])
 def index():

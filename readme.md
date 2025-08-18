@@ -110,8 +110,7 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 
 ## Upcoming Changes
 
-### v0.8.0
-* Update functionality (new version available)
+### v0.8.1
 * Add width to email/preview subject section
 * Mobile optimizations, i.e.:
 ```
@@ -142,24 +141,9 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 
 ## Recent Changes
 
-### v0.7.3
-* Get conjurr recommendations into a layout and snap-in for emails
-
-### v0.7.2
-* Recently added layout autofills subject
-* Server name into recently added layout
-* Recently added into server side email
-* Recently added placeholder for snap insert
-
-### v0.7.1
-* Only get recommendations for users in BCC list
-* Buttons added to pull frequent time ranges
-* Options for # recently added to pull
-* Fixed alert not showing after conjurr pull
-
-### v0.7.0
-* Conjurr integration first iteration
-* Make recently added area 10 wide
+### v0.8.0
+* Marked optional entries in settings
+* Update banner when new version detected
 
 ---
 

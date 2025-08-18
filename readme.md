@@ -110,11 +110,9 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 
 ## Upcoming Changes
 
-### v0.7.3
-* Get conjurr recommendations into a layout and snap-in for emails
-
 ### v0.8.0
 * Update functionality (new version available)
+* Add width to email/preview subject section
 * Mobile optimizations, i.e.:
 ```
 <style>
@@ -143,6 +141,9 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 ---
 
 ## Recent Changes
+
+### v0.7.3
+* Get conjurr recommendations into a layout and snap-in for emails
 
 ### v0.7.2
 * Recently added layout autofills subject

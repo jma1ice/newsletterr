@@ -51,6 +51,7 @@
                                 <option value="none">Plain Text</option>
                                 <option value="standard">Standard</option>
                                 <option value="recently_added">Recently Added</option>
+                                <option value="recommendations">Recommendations</option>
                             </select><br><br>
                             <textarea name="email_text" id="email_text" placeholder="Write your message..." rows="10"
                                 cols="40" oninput="updatePreview()" required></textarea><br><br>
@@ -63,6 +64,9 @@
                             <label for="ra_placeholder">Recently Added Holder:</label>
                             <input type="text" id="ra_placeholder" name="ra_placeholder" value="[RECENTLY_ADDED]"
                                 style="width: 10.5rem;" oninput="updatePreview()"><br><br>
+                            <label for="recs_placeholder">Recs. Placeholder:</label>
+                            <input type="text" id="recs_placeholder" name="recs_placeholder" value="[RECOMMENDATIONS]"
+                                style="width: 12rem;" oninput="updatePreview()"><br><br>
                         </form>
                         <button id="sendEmailBtn" class="button">Send Email with Selected Graphs</button>
                     </td>
@@ -522,13 +526,122 @@
             }
         </script>
         <script>
+            async function waitImagesAndFonts(scope){
+                const imgs = Array.from(scope.querySelectorAll('img'));
+                await Promise.all(imgs.map(img => img.complete ? 0 : new Promise(res=>{
+                    img.addEventListener('load', res, {once:true});
+                    img.addEventListener('error', res, {once:true});
+                })));
+                try { await document.fonts?.ready; } catch(_) {}
+            }
+
+            async function captureRecommendationsPNG() {
+                const grid = document.getElementById('rec-grid');
+                if (!grid || !grid.children.length) return null;
+
+                const rect = grid.getBoundingClientRect();
+                if (!rect.width || !rect.height) return null;
+
+                await waitImagesAndFonts(grid);
+
+                const bg = '#282A2D';
+
+                function renderPass(useFO){
+                    return html2canvas(grid, {
+                        useCORS: true,
+                        backgroundColor: bg,
+                        scale: window.devicePixelRatio > 1 ? 2 : 1,
+                        foreignObjectRendering: useFO,
+                        windowWidth: grid.scrollWidth,
+                        windowHeight: grid.scrollHeight,
+                        onclone: (doc) => {
+                            const g = doc.getElementById('rec-grid');
+                            if (!g) return;
+
+                            g.querySelectorAll('.pill_text').forEach(s => {
+                                s.style.position = 'relative'
+                                s.style.top = '-6px';
+                            });
+
+                            g.querySelectorAll('img').forEach(img => {
+                                const src = img.getAttribute('src') || '';
+                                if (/^https?:/i.test(src)) {
+                                    img.setAttribute('crossorigin', 'anonymous');
+                                    img.setAttribute('src', `/proxy-img?u=${encodeURIComponent(src)}`);
+                                }
+                            });
+
+                            const kill = doc.createElement('style');
+                            kill.textContent = `
+                                *{ box-shadow:none !important; filter:none !important; }
+                                [class*="shadow"]{ box-shadow:none !important; }
+                                [style*="box-shadow"]{ box-shadow:none !important; }
+                            `;
+                            doc.head.appendChild(kill);
+
+                            g.querySelectorAll('.aspect-\\[2\\/3\\]').forEach(el => {
+                                const w = el.getBoundingClientRect().width || el.clientWidth || 0;
+                                if (w > 0) el.style.height = Math.round(w * 3 / 2) + 'px';
+                            });
+
+                            g.querySelectorAll('.absolute.top-1.right-1, .absolute.bottom-1.right-1 span, .ra-pill')
+                            .forEach(p => {
+                                p.style.display = 'inline-flex';
+                                p.style.alignItems = 'center';
+                                p.style.justifyContent = 'center';
+                                p.style.lineHeight = '1';
+                                if (!p.style.padding) p.style.padding = '2px 6px';
+                                p.style.minHeight = '18px';
+                                p.style.borderRadius = '9999px';
+                            });
+
+                            g.querySelectorAll('.font-semibold.line-clamp-2').forEach(el => {
+                                el.style.display = 'block';
+                                el.style.webkitLineClamp = 'unset';
+                                el.style.overflow = 'hidden';
+                                el.style.lineHeight = '1.5';
+                                el.style.maxHeight   = (1.75 * 2) + 'em';
+                                el.style.paddingBottom = '3px';
+                            });
+                            g.querySelectorAll('.line-clamp-5').forEach(el => {
+                                el.style.display = 'block';
+                                el.style.webkitLineClamp = 'unset';
+                                el.style.overflow = 'hidden';
+                                el.style.lineHeight = '1.4';
+                                el.style.maxHeight   = (1.5 * 5) + 'em';
+                                el.style.paddingBottom = '4px';
+                            });
+
+                            g.querySelectorAll('ul').forEach(u => { u.style.margin='0'; u.style.padding='0'; });
+                        }
+                    });
+                }
+
+                let canvas = await renderPass(false);
+                if (!canvas || !canvas.width || !canvas.height) canvas = await renderPass(true);
+                if (!canvas || !canvas.width || !canvas.height) return null;
+
+                const blob = await new Promise(r => canvas.toBlob(r, 'image/png', 0.92));
+                const dataUrl = canvas.toDataURL('image/png', 0.92);
+                return { blob, dataUrl, cid: 'recommendations.png' };
+            }
+        </script>
+        <script>
             async function insertRecentlyAddedIntoPreview(html) {
                 const ra = await captureRecentlyAddedPNG();
                 if (!ra) return html.replace('[RECENTLY_ADDED]', '');
-
                 return html.replace(
                     '[RECENTLY_ADDED]',
                     `<img src="${ra.dataUrl}" alt="Recently Added" style="max-width:100%;height:auto;border-radius:5px;display:block;">`
+                );
+            }
+
+            async function insertRecommendationsIntoPreview(html) {
+                const rec = await captureRecommendationsPNG();
+                if (!rec) return html.replace('[RECOMMENDATIONS]', '');
+                return html.replace(
+                    '[RECOMMENDATIONS]',
+                    `<img src="${rec.dataUrl}" alt="Recommendations" style="max-width:100%;height:auto;border-radius:5px;display:block;">`
                 );
             }
 
@@ -686,6 +799,7 @@
                                         </tbody>
                                     </table></body></html>`;
                         html = await insertRecentlyAddedIntoPreview(html);
+                        html = await insertRecommendationsIntoPreview(html);
                         break;
                     case "recently_added":
                         document.getElementById('subject').value = `${serverName} Recently Added`;
@@ -726,12 +840,53 @@
                                     </table></body></html>`;
                         html = await insertRecentlyAddedIntoPreview(html);
                         break;
+                    case "recommendations":
+                        document.getElementById('subject').value = `${serverName} Recommendations`;
+                        html = `
+                                <link href="https://fonts.googleapis.com/css?family=IBM+Plex+Sans:400,500,600,700&display=swap" rel="stylesheet">
+                                <style>
+                                    :root { color-scheme: ${isDark ? 'dark' : 'light'}; }
+                                    html, body { background: ${isDark ? '#333' : '#8acbd4'}; }
+                                </style>
+                                <html><body style="font-family: IBM Plex Sans; margin: 0;">
+                                    <table class="body" style="border-collapse: separate; mso-table-lspace: 0pt; mso-table-rspace: 0pt; width: 100%;" border="0" cellspacing="0" cellpadding="0">
+                                        <tbody>
+                                            <tr>
+                                                <td class="preview-container" style="font-family: IBM Plex Sans; font-size: 14px; vertical-align: top; display: block;">
+                                                    <div class="content" style="box-sizing: border-box; display: block;"><span class="preheader" style="color: transparent; display: none; height: 0; max-height: 0; max-width: 0; opacity: 0; overflow: hidden; mso-hide: all; visibility: hidden; width: 0;">${serverName} Newsletter</span>
+                                                        <table class="main" style="border-collapse: separate; mso-table-lspace: 0pt; mso-table-rspace: 0pt; width: 100%; background: #282A2D; border-radius: 3px; color: #ffffff;" border="0" cellspacing="0" cellpadding="3">
+                                                            <tbody>
+                                                                <tr>
+                                                                    <td class="wrapper" style="font-family: IBM Plex Sans; font-size: 14px; vertical-align: top; box-sizing: border-box; padding: 5px; overflow: auto;">
+                                                                        <div class="header" style="width: 50%; height: 10px; text-align: center;"><img class="header-img" style="border: none; -ms-interpolation-mode: bicubic; max-width: 9%; width: 492px; height: 20px; margin-left: -35px;" src="https://d15k2d11r6t6rl.cloudfront.net/public/users/Integrators/669d5713-9b6a-46bb-bd7e-c542cff6dd6a/3bef3c50f13f4320a9e31b8be79c6ad2/Plex%20Logo%20Update%202022/plex-logo-heavy-stroke.png" width="492" height="90" /></div>
+                                                                        <div class="server-name" style="font-size: 25px; text-align: center; margin-bottom: 0;">${serverName} Newsletter</div>
+                                                                    </td>
+                                                                </tr>
+                                                                <tr>
+                                                                    <td class="footer" style="font-family: IBM Plex Sans; font-size: 12px; vertical-align: top; clear: both; margin-top: 0; text-align: center; width: 100%;">
+                                                                        <h1 class="footer-bar" style="margin-left: auto; margin-right: auto; width: 250px; border-top: 1px solid #E5A00D; margin-top: 5px;">Recommended For You</h1>
+                                                                        [RECOMMENDATIONS]
+                                                                        <div class="footer-bar" style="margin-left: auto; margin-right: auto; width: 250px; border-top: 1px solid #E5A00D; margin-top: 25px;">&nbsp;</div>
+                                                                        <div class="content-block powered-by" style="padding-bottom: 10px; padding-top: 0;">Generated for Plex Media Server by newsletterr</div>
+                                                                    </td>
+                                                                </tr>
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table></body></html>`;
+                        html = await insertRecommendationsIntoPreview(html);
+                        break;
                     default:
                         html = `<style>
                                     :root { color-scheme: ${isDark ? 'dark' : 'light'}; }
                                     html, body { background: ${isDark ? '#333' : '#8acbd4'}; }
                                 </style>
                                 <html><body>${content}</body></html>`;
+                        html = await insertRecentlyAddedIntoPreview(html);
+                        html = await insertRecommendationsIntoPreview(html);
                 }
 
                 const frame = document.getElementById('preview');
@@ -996,11 +1151,22 @@
                     email_text = '[RECENTLY_ADDED]';
                 }
 
+                if (layout == 'recommendations') {
+                    email_text = '[RECOMMENDATIONS]';
+                }
+
                 const ra = await captureRecentlyAddedPNG();
                 if (ra) {
-                    email_text = email_text.replace('[RECENTLY_ADDED]', `<img src="cid:${ra.cid}" alt="Recently Added" style="max-width:100%;height:auto;border-radius:12px;display:block;">`);
+                    email_text = email_text.replace('[RECENTLY_ADDED]', `<img src="cid:${ra.cid}" alt="Recently Added" style="max-width:100%;height:auto;border-radius:5px;display:block;">`);
                 } else {
                     email_text = email_text.replace('[RECENTLY_ADDED]', '');
+                }
+
+                const recs = await captureRecommendationsPNG();
+                if (recs) {
+                    email_text = email_text.replace('[RECOMMENDATIONS]', `<img src="cid:${recs.cid}" alt="Recommendations" style="max-width:100%;height:auto;border-radius:5px;display:block;">`);
+                } else {
+                    email_text = email_text.replace('[RECOMMENDATIONS]', '');
                 }
 
                 const selectedGraphs = Array.from(document.querySelectorAll('.graph-checkbox:checked'))
@@ -1093,6 +1259,13 @@
                     base64: await blobToBase64(ra.blob)
                 });
 
+                const recommendationsImages = [];
+                if (recs) recommendationsImages.push({
+                    cid: recs.cid,
+                    mime: 'image/png',
+                    base64: await blobToBase64(recs.blob)
+                });
+
                 try {
                     const resp = await fetch('/send_email', {
                         method: 'POST',
@@ -1104,7 +1277,8 @@
                             layout,
                             graphs: graphImages,
                             stats: statImages,
-                            recently_added: recentlyAddedImages
+                            recently_added: recentlyAddedImages,
+                            recommendations: recommendationsImages
                         })
                     });
                     

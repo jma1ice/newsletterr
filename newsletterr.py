@@ -10,7 +10,7 @@ from plex_api_client import PlexAPI
 from urllib.parse import quote_plus
 
 app = Flask(__name__)
-app.jinja_env.globals["version"] = "v0.8.0"
+app.jinja_env.globals["version"] = "v0.8.1"
 app.jinja_env.globals["publish_date"] = "August 18, 2025"
 app.config["GITHUB_OWNER"] = "jma1ice"
 app.config["GITHUB_REPO"] = "newsletterr"
@@ -293,6 +293,8 @@ def _check_github_latest():
             _update_cache["checked_at"] = time.time()
             return
         r.raise_for_status()
+        if "application/json" not in r.headers.get("Content-Type", ""):
+            raise RuntimeError(f"Unexpected content type: {r.headers.get('Content-Type')}")
         data = r.json()
         latest_tag = data.get("tag_name") or ""
         current = app.jinja_env.globals.get("version", "")
@@ -306,7 +308,7 @@ def _check_github_latest():
             "checked_at": time.time(),
             "etag": r.headers.get("ETag"),
         })
-    except Exception:
+    except Exception as e:
         _update_cache["checked_at"] = time.time()
 
 def _ensure_recent_check():

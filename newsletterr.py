@@ -10,8 +10,8 @@ from plex_api_client import PlexAPI
 from urllib.parse import quote_plus
 
 app = Flask(__name__)
-app.jinja_env.globals["version"] = "v0.7.3"
-app.jinja_env.globals["publish_date"] = "August 17, 2025"
+app.jinja_env.globals["version"] = "v0.8.0"
+app.jinja_env.globals["publish_date"] = "August 18, 2025"
 
 DB_PATH = os.path.join("database", "data.db")
 plex_headers = {

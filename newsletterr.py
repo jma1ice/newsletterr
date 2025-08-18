@@ -10,7 +10,7 @@ from plex_api_client import PlexAPI
 from urllib.parse import quote_plus
 
 app = Flask(__name__)
-app.jinja_env.globals["version"] = "v0.7.2"
+app.jinja_env.globals["version"] = "v0.7.3"
 app.jinja_env.globals["publish_date"] = "August 17, 2025"
 
 DB_PATH = os.path.join("database", "data.db")
@@ -86,11 +86,12 @@ def migrate_schema(column_def):
     finally:
         conn.close()
 
-def apply_layout(body, graphs_html_block, stats_html_block, ra_html_block, layout, subject, server_name):
+def apply_layout(body, graphs_html_block, stats_html_block, ra_html_block, recs_html_block, layout, subject, server_name):
     body = body.replace('\n', '<br>')
     body = body.replace('[GRAPHS]', graphs_html_block)
     body = body.replace('[STATS]', stats_html_block)
     body = body.replace('[RECENTLY_ADDED]', ra_html_block)
+    body = body.replace('[RECOMENDATIONS]', recs_html_block)
 
     if subject.startswith(server_name):
         display_subject = subject[len(server_name):].lstrip()
@@ -131,7 +132,7 @@ def apply_layout(body, graphs_html_block, stats_html_block, ra_html_block, layou
                     </tr>
                 </tbody>
             </table></body></html>"""
-    if layout == "recently_added":
+    elif layout == "recently_added":
         return f"""
         <link href="https://fonts.googleapis.com/css?family=IBM+Plex+Sans:400,500,600,700&display=swap" rel="stylesheet">
         <html><body style="font-family: IBM Plex Sans;">
@@ -152,6 +153,38 @@ def apply_layout(body, graphs_html_block, stats_html_block, ra_html_block, layou
                                             <td class="footer" style="font-family: IBM Plex Sans; font-size: 12px; vertical-align: top; clear: both; margin-top: 0; text-align: center; width: 100%;">
                                                 <h1 class="footer-bar" style="margin-left: auto; margin-right: auto; width: 250px; border-top: 1px solid #E5A00D; margin-top: 5px;">{display_subject}</h1>
                                                 {ra_html_block}
+                                                <div class="footer-bar" style="margin-left: auto; margin-right: auto; width: 250px; border-top: 1px solid #E5A00D; margin-top: 25px;">&nbsp;</div>
+                                                <div class="content-block powered-by" style="padding-bottom: 10px; padding-top: 0;">Generated for Plex Media Server by newsletterr</div>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table></body></html>"""
+    elif layout == "recommendations":
+        return f"""
+        <link href="https://fonts.googleapis.com/css?family=IBM+Plex+Sans:400,500,600,700&display=swap" rel="stylesheet">
+        <html><body style="font-family: IBM Plex Sans;">
+            <table class="body" style="border-collapse: separate; mso-table-lspace: 0pt; mso-table-rspace: 0pt; width: 100%;" border="0" cellspacing="0" cellpadding="0">
+                <tbody>
+                    <tr>
+                        <td class="container" style="font-family: IBM Plex Sans; font-size: 14px; vertical-align: top; display: block; max-width: 1042px; padding: 10px; width: 1042px; margin: 0 auto !important;">
+                            <div class="content" style="box-sizing: border-box; display: block; margin: 0 auto; max-width: 1037px; padding: 10px;"><span class="preheader" style="color: transparent; display: none; height: 0; max-height: 0; max-width: 0; opacity: 0; overflow: hidden; mso-hide: all; visibility: hidden; width: 0;">{server_name} Newsletter</span>
+                                <table class="main" style="border-collapse: separate; mso-table-lspace: 0pt; mso-table-rspace: 0pt; width: 100%; background: #282A2D; border-radius: 3px; color: #ffffff;" border="0" cellspacing="0" cellpadding="3">
+                                    <tbody>
+                                        <tr>
+                                            <td class="wrapper" style="font-family: IBM Plex Sans; font-size: 14px; vertical-align: top; box-sizing: border-box; padding: 5px; overflow: auto;">
+                                                <div class="header" style="width: 50%; height: 10px; text-align: center;"><img class="header-img" style="border: none; -ms-interpolation-mode: bicubic; max-width: 9%; width: 492px; height: 20px; margin-left: -35px;" src="https://d15k2d11r6t6rl.cloudfront.net/public/users/Integrators/669d5713-9b6a-46bb-bd7e-c542cff6dd6a/3bef3c50f13f4320a9e31b8be79c6ad2/Plex%20Logo%20Update%202022/plex-logo-heavy-stroke.png" width="492" height="90" /></div>
+                                                <div class="server-name" style="font-size: 25px; text-align: center; margin-bottom: 0;">{server_name} Newsletter</div>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td class="footer" style="font-family: IBM Plex Sans; font-size: 12px; vertical-align: top; clear: both; margin-top: 0; text-align: center; width: 100%;">
+                                                <h1 class="footer-bar" style="margin-left: auto; margin-right: auto; width: 250px; border-top: 1px solid #E5A00D; margin-top: 5px;">{display_subject}</h1>
+                                                {recs_html_block}
                                                 <div class="footer-bar" style="margin-left: auto; margin-right: auto; width: 250px; border-top: 1px solid #E5A00D; margin-top: 25px;">&nbsp;</div>
                                                 <div class="content-block powered-by" style="padding-bottom: 10px; padding-top: 0;">Generated for Plex Media Server by newsletterr</div>
                                             </td>
@@ -379,6 +412,15 @@ def proxy_art(art_path):
     r = requests.get(full_url, stream=True)
     return Response(r.content, content_type=r.headers['Content-Type'])
 
+@app.get("/proxy-img")
+def proxy_img():
+    url = request.args.get("u", "")
+    if not url.startswith(("http://","https://")):
+        return Response(status=400)
+    r = requests.get(url, timeout=15)
+    ct = r.headers.get("Content-Type", "image/jpeg")
+    return Response(r.content, headers={"Content-Type": ct, "Cache-Control": "public, max-age=86400"})
+
 @app.route('/pull_recommendations', methods=['POST'])
 def pull_recommendations():
     recommendations_json = {}
@@ -392,7 +434,6 @@ def pull_recommendations():
     graph_commands = data['graph_commands']
     recent_data = data['recent_data']
     libs = data['libs']
-    html_recent_grid = data['html_recent_grid']
     settings = data['settings']
     to_emails = data['to_emails']
 
@@ -418,7 +459,7 @@ def pull_recommendations():
             return render_template('index.html', error='Please enter conjurr info on settings page',
                                     stats=stats, user_dict=user_dict, graph_data=graph_data,
                                     graph_commands=graph_commands, recent_data=recent_data,
-                                    libs=libs, html_recent_grid=html_recent_grid, settings=settings)
+                                    libs=libs, settings=settings)
         else:
             conjurr_base_url = conjurr_settings['conjurr_url']
             recommendations_json, error = run_conjurr_command(conjurr_base_url, filtered_users, error)
@@ -459,6 +500,7 @@ def send_email():
     graphs = data['graphs']
     stats = data['stats']
     recently_added = data['recently_added']
+    recommendations = data['recommendations']
     from_email = settings['from_email']
     alias_email = settings['alias_email']
     password = settings['password']
@@ -525,7 +567,20 @@ def send_email():
         msg_root.attach(img)
     ra_html_block = ''.join(html_ra)
 
-    html_content = apply_layout(email_text, graphs_html_block, stats_html_block, ra_html_block, layout, subject, server_name)
+    html_recs = []
+    for rec in recommendations:
+        raw = base64.b64decode(rec.get('base64',''))
+        subtype = (rec.get('mime','image/png').split('/',1)[-1]) or 'png'
+
+        img = MIMEImage(raw, _subtype=subtype)
+        cid = rec.get('cid','asset.png')
+        html_recs.append(f'<p><img src="cid:{cid}" style="max-width: 100%;"></p>')
+        img.add_header('Content-ID', f'<{cid}>')
+        img.add_header('Content-Disposition', 'inline', filename=cid)
+        msg_root.attach(img)
+    recs_html_block = ''.join(html_recs)
+
+    html_content = apply_layout(email_text, graphs_html_block, stats_html_block, ra_html_block, recs_html_block, layout, subject, server_name)
 
     msg_alternative.attach(MIMEText(html_content, 'html'))
 

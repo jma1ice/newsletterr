@@ -113,8 +113,7 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 
 ## Upcoming Changes
 
-### v0.8.3
-* Add width to email/preview subject section
+### v0.8.4
 * Mobile optimizations, i.e.:
 ```
 <style>
@@ -144,6 +143,9 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 
 ## Recent Changes
 
+### v0.8.3
+* Added width to email/preview subject section
+
 ### v0.8.2
 * yml fixed for github>discord bot
 
@@ -162,6 +164,6 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 * [Tautulli](https://tautulli.com/) for the Plex charts, users, and graphs  
 * [Highcharts](https://www.highcharts.com/) for charting  
 * [Tailwind CSS](https://tailwindcss.com/) & [Bootstrap](https://getbootstrap.com/) for styling
-* [conjurr]() for user watchlist based recommendations  
+* [conjurr](https://github.com/yungsnuzzy/conjurr) for user watchlist based recommendations  
 
 Happy streaming!

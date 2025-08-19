@@ -143,6 +143,7 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 
 ### v0.8.1
 * Fixed some issues with update checker
+* Added release bot yaml
 
 ### v0.8.0
 * Marked optional entries in settings

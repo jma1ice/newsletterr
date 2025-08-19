@@ -1,4 +1,5 @@
 import os, math, uuid, base64, smtplib, sqlite3, requests, time
+from datetime import datetime, timezone
 from cryptography.fernet import Fernet, InvalidToken
 from dotenv import load_dotenv, set_key, find_dotenv
 from email.mime.text import MIMEText
@@ -950,13 +951,25 @@ def email_history():
         
         email_list = []
         for email in emails:
+            # Convert UTC timestamp to local time
+            try:
+                # Parse the SQLite timestamp
+                utc_dt = datetime.fromisoformat(email[5].replace('Z', '+00:00'))
+                # Convert to local time
+                local_dt = utc_dt.replace(tzinfo=timezone.utc).astimezone()
+                # Format as readable string
+                formatted_time = local_dt.strftime('%Y-%m-%d %I:%M:%S %p')
+            except:
+                # Fallback to original timestamp if parsing fails
+                formatted_time = email[5]
+            
             email_list.append({
                 'id': email[0],
                 'subject': email[1],
                 'recipients': email[2],
                 'content_size_kb': email[3],
                 'recipient_count': email[4],
-                'sent_at': email[5]
+                'sent_at': formatted_time
             })
         
         return render_template('email_history.html', emails=email_list)

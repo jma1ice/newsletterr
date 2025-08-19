@@ -1,4 +1,4 @@
-import os, math, uuid, base64, smtplib, sqlite3, requests
+import os, math, uuid, base64, smtplib, sqlite3, requests, time
 from cryptography.fernet import Fernet, InvalidToken
 from dotenv import load_dotenv, set_key, find_dotenv
 from email.mime.text import MIMEText
@@ -13,9 +13,19 @@ from urllib.parse import quote_plus
 
 app = Flask(__name__)
 app.jinja_env.globals["version"] = "v0.7.3"
+
+# Cache configuration
+CACHE_DURATION = 300  # 5 minutes in seconds
+cache_storage = {
+    'stats': {'data': None, 'timestamp': 0},
+    'users': {'data': None, 'timestamp': 0},
+    'graph_data': {'data': None, 'timestamp': 0},
+    'recent_data': {'data': None, 'timestamp': 0}
+}
 app.jinja_env.globals["publish_date"] = "August 17, 2025"
 
 DB_PATH = os.path.join("database", "data.db")
+EMAIL_LISTS_DB_PATH = os.path.join("database", "email_lists.db")
 plex_headers = {
     "X-Plex-Client-Identifier": str(uuid.uuid4())
 }
@@ -23,6 +33,34 @@ ROOT = Path(__file__).resolve().parent
 ENV_PATH = find_dotenv(usecwd=True) or str(ROOT / ".env")
 
 load_dotenv(ENV_PATH)
+
+def is_cache_valid(cache_key):
+    """Check if cache data is still valid"""
+    cache_entry = cache_storage.get(cache_key)
+    if cache_entry and cache_entry['data'] is not None:
+        return time.time() - cache_entry['timestamp'] < CACHE_DURATION
+    return False
+
+def get_cached_data(cache_key):
+    """Get cached data if valid"""
+    if is_cache_valid(cache_key):
+        return cache_storage[cache_key]['data']
+    return None
+
+def set_cached_data(cache_key, data):
+    """Store data in cache with current timestamp"""
+    cache_storage[cache_key] = {
+        'data': data,
+        'timestamp': time.time()
+    }
+
+def clear_cache(cache_key=None):
+    """Clear specific cache or all cache if no key specified"""
+    if cache_key:
+        cache_storage[cache_key] = {'data': None, 'timestamp': 0}
+    else:
+        for key in cache_storage:
+            cache_storage[key] = {'data': None, 'timestamp': 0}
 
 def ensure_data_key() -> str:
     key = os.getenv("DATA_ENC_KEY")
@@ -49,6 +87,8 @@ def encrypt(token: str) -> str:
     return fernet.encrypt(token.encode()).decode()
 
 def decrypt(encrypted: str) -> str:
+    if encrypted is None:
+        return ""
     try:
         return fernet.decrypt(encrypted.encode()).decode()
     except InvalidToken:
@@ -76,6 +116,21 @@ def init_db(db_path):
     conn.commit()
     conn.close()
 
+def init_email_lists_db(db_path):
+    """Initialize the email lists database"""
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS email_lists (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT UNIQUE NOT NULL,
+            emails TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.commit()
+    conn.close()
+
 def migrate_schema(column_def):
     conn = sqlite3.connect(DB_PATH)
     try:
@@ -87,6 +142,36 @@ def migrate_schema(column_def):
             conn.commit()
     finally:
         conn.close()
+
+def get_saved_email_lists():
+    """Get all saved email lists"""
+    conn = sqlite3.connect(EMAIL_LISTS_DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, name, emails FROM email_lists ORDER BY name")
+    lists = cursor.fetchall()
+    conn.close()
+    return [{'id': row[0], 'name': row[1], 'emails': row[2]} for row in lists]
+
+def save_email_list(name, emails):
+    """Save a new email list"""
+    conn = sqlite3.connect(EMAIL_LISTS_DB_PATH)
+    cursor = conn.cursor()
+    try:
+        cursor.execute("INSERT INTO email_lists (name, emails) VALUES (?, ?)", (name, emails))
+        conn.commit()
+        return True
+    except sqlite3.IntegrityError:
+        return False  # Name already exists
+    finally:
+        conn.close()
+
+def delete_email_list(list_id):
+    """Delete an email list by ID"""
+    conn = sqlite3.connect(EMAIL_LISTS_DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM email_lists WHERE id = ?", (list_id,))
+    conn.commit()
+    conn.close()
 
 def apply_layout(body, graphs_html_block, stats_html_block, ra_html_block, recs_html_block, layout, subject, server_name):
     body = body.replace('\n', '<br>')
@@ -124,7 +209,7 @@ def apply_layout(body, graphs_html_block, stats_html_block, ra_html_block, recs_
                                                     {body}
                                                 </p>
                                                 <div class="footer-bar" style="margin-left: auto; margin-right: auto; width: 250px; border-top: 1px solid #E5A00D; margin-top: 25px;">&nbsp;</div>
-                                                <div class="content-block powered-by" style="padding-bottom: 10px; padding-top: 0;">Generated for Plex Media Server by newsletterr</div>
+                                                <div class="content-block powered-by" style="padding-bottom: 10px; padding-top: 0;">Generated for Plex Media Server by <a href="https://github.com/jma1ice/newsletterr" style="color: #E5A00D; text-decoration: none;">newsletterr</a></div>
                                             </td>
                                         </tr>
                                     </tbody>
@@ -156,7 +241,7 @@ def apply_layout(body, graphs_html_block, stats_html_block, ra_html_block, recs_
                                                 <h1 class="footer-bar" style="margin-left: auto; margin-right: auto; width: 250px; border-top: 1px solid #E5A00D; margin-top: 5px;">{display_subject}</h1>
                                                 {ra_html_block}
                                                 <div class="footer-bar" style="margin-left: auto; margin-right: auto; width: 250px; border-top: 1px solid #E5A00D; margin-top: 25px;">&nbsp;</div>
-                                                <div class="content-block powered-by" style="padding-bottom: 10px; padding-top: 0;">Generated for Plex Media Server by newsletterr</div>
+                                                <div class="content-block powered-by" style="padding-bottom: 10px; padding-top: 0;">Generated for Plex Media Server by <a href="https://github.com/jma1ice/newsletterr" style="color: #E5A00D; text-decoration: none;">newsletterr</a></div>
                                             </td>
                                         </tr>
                                     </tbody>
@@ -188,7 +273,7 @@ def apply_layout(body, graphs_html_block, stats_html_block, ra_html_block, recs_
                                                 <h1 class="footer-bar" style="margin-left: auto; margin-right: auto; width: 250px; border-top: 1px solid #E5A00D; margin-top: 5px;">{display_subject}</h1>
                                                 {recs_html_block}
                                                 <div class="footer-bar" style="margin-left: auto; margin-right: auto; width: 250px; border-top: 1px solid #E5A00D; margin-top: 25px;">&nbsp;</div>
-                                                <div class="content-block powered-by" style="padding-bottom: 10px; padding-top: 0;">Generated for Plex Media Server by newsletterr</div>
+                                                <div class="content-block powered-by" style="padding-bottom: 10px; padding-top: 0;">Generated for Plex Media Server by <a href="https://github.com/jma1ice/newsletterr" style="color: #E5A00D; text-decoration: none;">newsletterr</a></div>
                                             </td>
                                         </tr>
                                     </tbody>
@@ -355,20 +440,53 @@ def index():
             tautulli_base_url = settings['tautulli_url'].rstrip('/')
             tautulli_api_key = settings['tautulli_api']
 
-            stats, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_home_stats', 'Stats', error, time_range)
-            users, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_users', 'Users', error)
-            for command in graph_commands:
-                gd, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, command["command"], command["name"], error, time_range)
-                graph_data.append(gd)
-            for command in recent_commands:
-                rd, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_recently_added', command["command"], error, count)
-                recent_data.append(rd)
+            # Check cache first for stats
+            stats = get_cached_data('stats')
+            if stats is None:
+                stats, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_home_stats', 'Stats', error, time_range)
+                set_cached_data('stats', stats)
+            
+            # Check cache first for users
+            users = get_cached_data('users')
+            if users is None:
+                users, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_users', 'Users', error)
+                set_cached_data('users', users)
+            
+            # Check cache first for graph data
+            cached_graph_data = get_cached_data('graph_data')
+            if cached_graph_data is None:
+                for command in graph_commands:
+                    gd, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, command["command"], command["name"], error, time_range)
+                    graph_data.append(gd)
+                set_cached_data('graph_data', graph_data)
+            else:
+                graph_data = cached_graph_data
+            
+            # Check cache first for recent data
+            cached_recent_data = get_cached_data('recent_data')
+            if cached_recent_data is None:
+                for command in recent_commands:
+                    rd, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_recently_added', command["command"], error, count)
+                    recent_data.append(rd)
+                set_cached_data('recent_data', recent_data)
+            else:
+                recent_data = cached_recent_data
             
             for user in users:
                 if user['email'] != None and user['is_active']:
                     user_dict[user['user_id']] = user['email']
             
-            alert = f"Users, graphs/stats for {time_range} days, and {count} recently added items pulled!"
+            # Update alert to show cache status
+            cache_status = []
+            if is_cache_valid('stats'): cache_status.append("stats")
+            if is_cache_valid('users'): cache_status.append("users") 
+            if is_cache_valid('graph_data'): cache_status.append("graphs")
+            if is_cache_valid('recent_data'): cache_status.append("recent items")
+            
+            if cache_status:
+                alert = f"Data loaded! Used cached: {', '.join(cache_status)}. Fresh data for {time_range} days, and {count} recently added items."
+            else:
+                alert = f"Users, graphs/stats for {time_range} days, and {count} recently added items pulled fresh!"
 
     if graph_data == []:
         graph_data = [{},{}]
@@ -377,12 +495,19 @@ def index():
         recent_data = [{},{}]
         
     libs = ['movies', 'shows']
+    
+    # Get saved email lists
+    try:
+        email_lists = get_saved_email_lists()
+    except:
+        email_lists = []
         
     return render_template('index.html',
                            stats=stats, user_dict=user_dict,
                            graph_data=graph_data, graph_commands=graph_commands,
                            recent_data=recent_data, libs=libs,
-                           error=error, alert=alert, settings=settings
+                           error=error, alert=alert, settings=settings,
+                           email_lists=email_lists
                         )
 
 @app.route('/proxy-art/<path:art_path>')
@@ -487,22 +612,32 @@ def send_email():
 
     if row:
         settings = {
-            "from_email": row[0],
-            "alias_email": row[1],
-            "password": row[2],
-            "smtp_server": row[3],
-            "smtp_port": int(row[4]),
-            "server_name": row[5]
+            "from_email": row[0] or "",
+            "alias_email": row[1] or "",
+            "password": row[2] or "",
+            "smtp_server": row[3] or "",
+            "smtp_port": int(row[4]) if row[4] is not None else 587,
+            "server_name": row[5] or ""
         }
     else:
         return jsonify({"error": "Please enter email info on settings page"}), 500
 
     data = request.get_json()
+    
+    # Debug logging
+    print(f"DEBUG: Received email request")
+    print(f"DEBUG: Subject: {data.get('subject', 'No subject')}")
+    print(f"DEBUG: To emails: {data.get('to_emails', 'No recipients')}")
+    print(f"DEBUG: Email HTML length: {len(data.get('email_html', ''))}")
+    print(f"DEBUG: Number of images: {len(data.get('all_images', []))}")
+    
+    if data.get('all_images'):
+        for i, img in enumerate(data.get('all_images', [])):
+            print(f"DEBUG: Image {i}: CID={img.get('cid')}, MIME={img.get('mime')}, Data length={len(img.get('data', ''))}")
 
-    graphs = data['graphs']
-    stats = data['stats']
-    recently_added = data['recently_added']
-    recommendations = data['recommendations']
+    # Get the new format data
+    all_images = data.get('all_images', [])
+    email_html = data.get('email_html', '')
     from_email = settings['from_email']
     alias_email = settings['alias_email']
     password = settings['password']
@@ -511,8 +646,6 @@ def send_email():
     server_name = settings['server_name']
     to_emails = data['to_emails'].split(", ")
     subject = data['subject']
-    email_text = data['email_text']
-    layout = data.get('layout', 'none')
 
     msg_root = MIMEMultipart('related')
     msg_root['Subject'] = subject
@@ -526,63 +659,33 @@ def send_email():
     msg_alternative = MIMEMultipart('alternative')
     msg_root.attach(msg_alternative)
 
-    html_graphs = []
-    for graph in graphs:
-        cid = str(uuid.uuid4())
+    # Process all images and attach them with CID references
+    for image_data in all_images:
+        try:
+            # Extract base64 data (remove data:image/png;base64, prefix if present)
+            base64_data = image_data['data']
+            if base64_data.startswith('data:'):
+                base64_data = base64_data.split(',')[1]
+            
+            # Decode the image
+            raw_image_data = base64.b64decode(base64_data)
+            
+            # Determine the image format
+            mime_type = image_data.get('mime', 'image/png')
+            subtype = mime_type.split('/')[-1] if '/' in mime_type else 'png'
+            
+            # Create the image attachment
+            image_part = MIMEImage(raw_image_data, _subtype=subtype)
+            cid = image_data['cid']
+            image_part.add_header('Content-ID', f'<{cid}>')
+            image_part.add_header('Content-Disposition', 'inline', filename=f'{cid}.{subtype}')
+            msg_root.attach(image_part)
+        except Exception as e:
+            print(f"Error processing image {image_data.get('cid', 'unknown')}: {str(e)}")
+            continue
 
-        html_graphs.append(f'<p><img src="cid:{cid}" style="max-width: 100%;"></p>')
-
-        base64_data = graph['img'].split(',')[1]
-        image_data = base64.b64decode(base64_data)
-
-        image_part = MIMEImage(image_data, _subtype='png')
-        image_part.add_header('Content-ID', f'<{cid}>')
-        image_part.add_header('Content-Disposition', 'inline', filename=f'{cid}.png')
-        msg_root.attach(image_part)
-    graphs_html_block = ''.join(html_graphs)
-
-    html_stats = []
-    for stat in stats:
-        cid = str(uuid.uuid4())
-
-        html_stats.append(f'<p><img src="cid:{cid}" style="max-width: 100%;"></p>')
-
-        base64_data = stat['img'].split(',')[1]
-        image_data = base64.b64decode(base64_data)
-
-        image_part = MIMEImage(image_data, _subtype='png')
-        image_part.add_header('Content-ID', f'<{cid}>')
-        image_part.add_header('Content-Disposition', 'inline', filename=f'{cid}.png')
-        msg_root.attach(image_part)
-    stats_html_block = ''.join(html_stats)
-
-    html_ra = []
-    for ra_image in recently_added:
-        raw = base64.b64decode(ra_image.get('base64',''))
-        subtype = (ra_image.get('mime','image/png').split('/',1)[-1]) or 'png'
-
-        img = MIMEImage(raw, _subtype=subtype)
-        cid = ra_image.get('cid','asset.png')
-        html_ra.append(f'<p><img src="cid:{cid}" style="max-width: 100%;"></p>')
-        img.add_header('Content-ID', f'<{cid}>')
-        img.add_header('Content-Disposition', 'inline', filename=cid)
-        msg_root.attach(img)
-    ra_html_block = ''.join(html_ra)
-
-    html_recs = []
-    for rec in recommendations:
-        raw = base64.b64decode(rec.get('base64',''))
-        subtype = (rec.get('mime','image/png').split('/',1)[-1]) or 'png'
-
-        img = MIMEImage(raw, _subtype=subtype)
-        cid = rec.get('cid','asset.png')
-        html_recs.append(f'<p><img src="cid:{cid}" style="max-width: 100%;"></p>')
-        img.add_header('Content-ID', f'<{cid}>')
-        img.add_header('Content-Disposition', 'inline', filename=cid)
-        msg_root.attach(img)
-    recs_html_block = ''.join(html_recs)
-
-    html_content = apply_layout(email_text, graphs_html_block, stats_html_block, ra_html_block, recs_html_block, layout, subject, server_name)
+    # Use the complete HTML content from the preview
+    html_content = email_html
 
     msg_alternative.attach(MIMEText(html_content, 'html'))
 
@@ -650,16 +753,16 @@ def settings():
 
     if row:
         settings = {
-            "from_email": row[0],
-            "alias_email": row[1],
+            "from_email": row[0] or "",
+            "alias_email": row[1] or "",
             "password": decrypt(row[2]),
-            "smtp_server": row[3],
-            "smtp_port": int(row[4]),
-            "server_name": row[5],
-            "plex_token": row[6],
-            "tautulli_url": row[7],
+            "smtp_server": row[3] or "",
+            "smtp_port": int(row[4]) if row[4] is not None else 587,
+            "server_name": row[5] or "",
+            "plex_token": row[6] or "",
+            "tautulli_url": row[7] or "",
             "tautulli_api": decrypt(row[8]),
-            "conjurr_url": row[9]
+            "conjurr_url": row[9] or ""
         }
     else:
         settings = {
@@ -751,8 +854,66 @@ def plex_get_info():
 def about():
     return render_template('about.html')
 
+@app.route('/clear_cache', methods=['POST'])
+def clear_cache_route():
+    """Clear the data cache and return a JSON response"""
+    clear_cache()
+    return jsonify({"status": "success", "message": "Cache cleared successfully"})
+
+@app.route('/cache_status', methods=['GET'])
+def cache_status():
+    """Get cache status information"""
+    status = {}
+    for key in cache_storage:
+        status[key] = {
+            'has_data': cache_storage[key]['data'] is not None,
+            'is_valid': is_cache_valid(key),
+            'age_seconds': int(time.time() - cache_storage[key]['timestamp']) if cache_storage[key]['timestamp'] > 0 else 0
+        }
+    return jsonify(status)
+
+@app.route('/email_lists', methods=['GET'])
+def get_email_lists():
+    """Get all saved email lists"""
+    try:
+        lists = get_saved_email_lists()
+        return jsonify({"status": "success", "lists": lists})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/email_lists', methods=['POST'])
+def save_email_list_route():
+    """Save a new email list"""
+    try:
+        data = request.get_json()
+        name = data.get('name', '').strip()
+        emails = data.get('emails', '').strip()
+        
+        if not name:
+            return jsonify({"status": "error", "message": "List name is required"}), 400
+        if not emails:
+            return jsonify({"status": "error", "message": "Email list cannot be empty"}), 400
+            
+        success = save_email_list(name, emails)
+        if success:
+            return jsonify({"status": "success", "message": f"List '{name}' saved successfully"})
+        else:
+            return jsonify({"status": "error", "message": f"List name '{name}' already exists"}), 400
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/email_lists/<int:list_id>', methods=['DELETE'])
+def delete_email_list_route(list_id):
+    """Delete an email list"""
+    try:
+        delete_email_list(list_id)
+        return jsonify({"status": "success", "message": "List deleted successfully"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 if __name__ == '__main__':
     os.makedirs("database", exist_ok=True)
     init_db(DB_PATH)
+    init_email_lists_db(EMAIL_LISTS_DB_PATH)
     migrate_schema("conjurr_url TEXT")
     app.run(host="127.0.0.1", port=6397, debug=True)

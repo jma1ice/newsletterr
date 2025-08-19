@@ -1,8 +1,13 @@
 {% extends "base.html" %}
-{% block title %}dashboard{% endblock %}
+{% block title %}newsletterr{% endblock %}
 {% block content %}
 <div class="container-fluid">
-    <h1>Dashboard</h1><br>
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h1 style="font-weight: bold;">Newsletterr Dashboard</h1>
+        <button id="sendEmailBtn" class="btn btn-success btn-lg px-5 py-3" style="font-size: 1.6rem; font-weight: 700; min-width: 220px; box-shadow: 0 4px 8px rgba(0,0,0,0.2);">
+            📧 Send Email
+        </button>
+    </div>
     {% if alert %}
         <p id="alert_p" style="color: #01b301; text-shadow: 1px 0 #000, 0 1px #000, -1px 0 #000, 0 -1px #000;">{{ alert }}</p>
     {% endif %}
@@ -13,7 +18,7 @@
         <div>
             <table style="height: 60%; width: 100%;">
                 <tr style="height: 100%; padding: 10px;">
-                    <td style="width: 20%; padding: 10px;">
+                    <td style="width: 20%; padding: 10px; vertical-align: top;">
                         <form method="POST" id="stats_form">
                             <label for="items_to_pull">Recently Added Items (#):</label>
                             <input type="number" id="items_to_pull" name="items_to_pull" value="10" style="width: 8.5rem; margin-bottom: 8px;" /><br>
@@ -26,30 +31,72 @@
                             <button id="time_range_three_q" type="button" class="button">270</button>
                             <button id="time_range_year" type="button" class="button">365</button>
                             <button type="submit" class="button">Get Stats\Users</button>
+                            <button id="clear_cache_btn" type="button" class="button" 
+                                    style="background-color: #dc3545; margin-top: 5px;"
+                                    title="Clear cached data to force fresh fetch">Clear Cache</button>
                         </form>
+                        <!-- Expandable BCC Email Section -->
+                        <div class="card mb-3" style="margin-top: 20px;">
+                            <div class="card-header d-flex justify-content-between align-items-center" 
+                                 style="cursor: pointer;" 
+                                 onclick="document.getElementById('bcc-collapse').classList.toggle('d-none')">
+                                <h5 class="mb-0">Email Recipients</h5>
+                                <span id="bcc-toggle-icon" style="transition: transform 0.3s;">▼</span>
+                            </div>
+                            <div id="bcc-collapse" class="card-body">
+                                <form method="POST" action="/send_email">
+                                    <!-- Email List Management -->
+                                    <div class="mb-3">
+                                        <label class="form-label">Email Lists:</label>
+                                        <div class="d-flex gap-2 align-items-center">
+                                            <select id="email_list_selector" class="form-select" style="flex: 1;">
+                                                <option value="(Save new list)">(Save new list)</option>
+                                                <option value="ALL">ALL</option>
+                                                <option value="Custom" selected>Custom</option>
+                                                {% for list in email_lists|sort(attribute='name') %}
+                                                <option value="{{ list.id }}" data-emails="{{ list.emails }}">{{ list.name }}</option>
+                                                {% endfor %}
+                                            </select>
+                                            <button id="delete_list_btn" type="button" class="btn btn-sm btn-danger d-none">Delete</button>
+                                        </div>
+                                        
+                                        <!-- Save New List Input (initially hidden) -->
+                                        <div id="save_list_container" class="mt-2 d-none">
+                                            <div class="d-flex gap-2">
+                                                <input type="text" id="new_list_name" class="form-control" placeholder="Enter list name" />
+                                                <button id="save_list_btn" type="button" class="btn btn-sm btn-success">Save</button>
+                                                <button id="cancel_save_btn" type="button" class="btn btn-sm btn-secondary">Cancel</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <label class="form-label">BCC:</label>
+                                    <div id="bcc_chips" class="nl-chips" role="listbox" aria-label="BCC recipients">
+                                        <input id="email_chip_input"
+                                                type="text"
+                                                placeholder="Add BCC emails"
+                                                aria-label="Add recipient" />
+                                    </div>
+                                    <textarea name="to_emails" id="to_emails" class="d-none">
+                                        {{ user_dict.values() | join(', ') }}
+                                    </textarea>
+                                </form>
+                            </div>
+                        </div>
+
                         {% if not user_dict %}
                             <button id="pullRecsBtn" class="button opacity-50 cursor-not-allowed" disabled>Get Recommendations</button>
                         {% else %}
                             <button id="pullRecsBtn" class="button">Get Recommendations</button>
                         {% endif %}
                         <p>Note, recommendations take 20-25 seconds per user. After getting stats/users with the top button, recommendations will be pulled for users in the BCC list.</p>
-                        <form method="POST" action="/send_email">
-                            <label class="form-label">BCC:</label>
-                            <div id="bcc_chips" class="nl-chips" role="listbox" aria-label="BCC recipients">
-                                <input id="email_chip_input"
-                                        type="text"
-                                        placeholder="Add BCC emails"
-                                        aria-label="Add recipient" />
-                            </div>
-                            <textarea name="to_emails" id="to_emails" class="d-none">
-                                {{ user_dict.values() | join(', ') }}
-                            </textarea><br>
+                        <form method="POST" action="/send_email" style="margin-top: 0;">
                             Subject: <input type="text" name="subject" id="subject" placeholder="Subject"
                                 value="{{ settings.server_name }} News" style="width: 18rem;" required><br><br>
                             <label for="layout">Choose a layout:</label>
                             <select id="layout" name="layout" onchange="updatePreview()">
                                 <option value="none">Plain Text</option>
-                                <option value="standard">Standard</option>
+                                <option value="standard" selected>Standard</option>
                                 <option value="recently_added">Recently Added</option>
                                 <option value="recommendations">Recommendations</option>
                             </select><br><br>
@@ -68,28 +115,85 @@
                             <input type="text" id="recs_placeholder" name="recs_placeholder" value="[RECOMMENDATIONS]"
                                 style="width: 12rem;" oninput="updatePreview()"><br><br>
                         </form>
-                        <button id="sendEmailBtn" class="button">Send Email with Selected Graphs</button>
                     </td>
-                    <td style="width: 40%; padding: 10px;">
+                    <td style="width: 40%; padding: 10px; vertical-align: top; position: sticky; top: 80px;">
                         Preview: <iframe class="frame" id="preview"></iframe>
                     </td>
-                    <td style="width: 40%; padding: 10px;">
-                        {% if stats %}
-                            <h2>Select a Stat Category</h2>
-                            <select id="statSelector" class="form-select w-50 mb-4">
-                                <option selected>Choose an option...</option>
-                                {% for stat in stats %}
-                                    <option value="stat-{{ loop.index0 }}">{{ stat.stat_title }}</option>
-                                {% endfor %}
-                            </select>
-                            {% for stat in stats %}
-                                <div class="stat-checkbox-container d-none" id="checkbox-stat-{{ loop.index0 }}">
-                                    <label>
-                                        <input type="checkbox" class="stat-checkbox" value="stat-{{ loop.index0 }}">
-                                        Include {{ stat.stat_title }} in email
-                                    </label>
+                    <td style="width: 60%; padding: 10px; vertical-align: top;">
+                        <!-- Selected Items Pane -->
+                        <div id="selected-items-pane">
+                            <h2>Snap-ins</h2>
+                            <div id="selected-items-list" class="border rounded p-3 mb-4" style="min-height: 100px; background: #f8f9fa;">
+                                <div id="selected-items-empty" class="text-muted text-center py-3">
+                                    No items selected. Use the buttons below to add items to your email.
                                 </div>
-                                <div id="stat-{{ loop.index0 }}" class="stat-table d-none">
+                            </div>
+                        </div>
+
+                        <!-- Stats and Graphs side by side -->
+                        <div class="row">
+                            <!-- Available Stats Column -->
+                            <div class="col-md-6">
+                                {% if stats %}
+                                    <h2>Available Stats</h2>
+                                    <div class="row">
+                                        {% for stat in stats %}
+                                            <div class="col-12 mb-2">
+                                                <div class="d-flex justify-content-between align-items-center p-2 border rounded">
+                                                    <span style="font-size: 0.9rem;">{{ stat.stat_title }}</span>
+                                                    <div>
+                                                        <button type="button" class="btn btn-outline-primary btn-sm me-1 view-stat-btn" 
+                                                                data-target="stat-{{ loop.index0 }}" style="font-size: 0.8rem; padding: 0.25rem 0.5rem;">
+                                                            View
+                                                        </button>
+                                                        <button type="button" class="btn btn-primary btn-sm add-stat-btn" 
+                                                                data-id="stat-{{ loop.index0 }}" 
+                                                                data-name="{{ stat.stat_title }}"
+                                                                data-type="stat" style="font-size: 0.8rem; padding: 0.25rem 0.5rem;">
+                                                            Add
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            
+                            <!-- Available Graphs Column -->
+                            <div class="col-md-6">
+                                {% if graph_data != [{},{}] %}
+                                    <h2>Available Graphs</h2>
+                                    <div class="row">
+                                        {% for graph in graph_data %}
+                                            <div class="col-12 mb-2">
+                                                <div class="d-flex justify-content-between align-items-center p-2 border rounded">
+                                                    <span style="font-size: 0.9rem;">{{ graph_commands[loop.index0].name }}</span>
+                                                    <div>
+                                                        <button type="button" class="btn btn-outline-primary btn-sm me-1 view-graph-btn" 
+                                                                data-target="graph-{{ loop.index0 }}" style="font-size: 0.8rem; padding: 0.25rem 0.5rem;">
+                                                            View
+                                                        </button>
+                                                        <button type="button" class="btn btn-primary btn-sm add-graph-btn" 
+                                                                data-id="graph-{{ loop.index0 }}" 
+                                                                data-name="{{ graph_commands[loop.index0].name }}"
+                                                                data-type="graph" style="font-size: 0.8rem; padding: 0.25rem 0.5rem;">
+                                                            Add
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- Stats Preview -->
+                        {% if stats %}
+                            <div id="stat-preview" class="mt-3" style="display: none;">
+                                {% for stat in stats %}
+                                    <div id="stat-{{ loop.index0 }}" class="stat-table d-none">
                                     <div class="card my-4">
                                         <div class="card-header bg-primary text-white">
                                             {{ stat.stat_title }}
@@ -230,32 +334,15 @@
                                 </div>
                             {% endfor %}
                         {% endif %}
-                    </td>
-                </tr>
-            </table>
-            <table style="height: 20%; width: 100%;">
-                <tr style="height: 100%; padding: 10px;">
-                    <td style="width: 15%; padding: 10px;">
+
+                        <!-- Graphs Preview -->
                         {% if graph_data != [{},{}] %}
-                            <h2>Select a Graph</h2>
-                            <select id="graphSelector" class="form-select w-100 mb-4">
-                                <option selected>Choose an option...</option>
+                            <div id="graph-preview" class="mt-3" style="display: none;">
                                 {% for graph in graph_data %}
-                                    <option value="graph-{{ loop.index0 }}">{{ graph_commands[loop.index0].name }}</option>
+                                    <div class="graph-table d-none" id="graph-{{ loop.index0 }}"></div>
                                 {% endfor %}
-                            </select>
-                        {% endif %}
-                    </td>
-                    <td style="width: 85%; padding: 10px;">
-                        {% for graph in graph_data %}
-                            <div class="graph-checkbox-container d-none" id="checkbox-graph-{{ loop.index0 }}">
-                                <label>
-                                    <input type="checkbox" class="graph-checkbox" value="graph-{{ loop.index0 }}">
-                                    Include {{ graph_commands[loop.index0].name }} in email
-                                </label>
                             </div>
-                            <div class="graph-table d-none" id="graph-{{ loop.index0 }}"></div>
-                        {% endfor %}
+                        {% endif %}
                     </td>
                 </tr>
             </table>
@@ -627,6 +714,9 @@
             }
         </script>
         <script>
+            // Global variable for selected items
+            let selectedItems = [];
+
             async function insertRecentlyAddedIntoPreview(html) {
                 const ra = await captureRecentlyAddedPNG();
                 if (!ra) return html.replace('[RECENTLY_ADDED]', '');
@@ -646,117 +736,184 @@
             }
 
             async function updatePreview() {
-                const raw = document.getElementById('email_text').value;
-                const layout = document.getElementById('layout').value;
-                const serverName = "{{ settings.server_name }}";
-                const subject = document.getElementById('subject').value;
-                const isDark = document.documentElement.classList.contains('dark');
-
-                let body = raw.replace(/\n/g, "<br>");
-                let html = "";
-                let displaySubject = subject.startsWith(serverName) 
-                    ? subject.slice(serverName.length).trimStart()
-                    : subject;
-
-                const selectedGraphs = Array.from(document.querySelectorAll('.graph-checkbox:checked'))
-                    .map(cb => cb.value);
-                const selectedStats = Array.from(document.querySelectorAll('.stat-checkbox:checked'))
-                    .map(cb => cb.value);
-
-                let graphImagesHTML = "";
-                for (let id of selectedGraphs) {
-                    const chart = Highcharts.charts.find(c => c && c.renderTo.id === id);
-                    if (chart) {
-                        const svg = chart.getSVG();
-                        const canvas = document.createElement("canvas");
-                        const ctx = canvas.getContext("2d");
-                        const img = new Image();
-
-                        await new Promise((resolve, reject) => {
-                            img.onload = () => {
-                                canvas.width = img.width;
-                                canvas.height = img.height;
-                                ctx.drawImage(img, 0, 0);
-                                const dataUrl = canvas.toDataURL("image/png");
-                                graphImagesHTML += `<img src="${dataUrl}" style="max-width: 100%; margin-bottom: 10px;">`;
-                                resolve();
-                            };
-                            img.onerror = reject;
-                            img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)));
-                        });
+                try {
+                    console.log('updatePreview called with selectedItems:', selectedItems);
+                    
+                    // Safety check
+                    if (typeof selectedItems === 'undefined') {
+                        console.error('selectedItems is undefined in updatePreview');
+                        return;
                     }
-                }
+                    
+                    const raw = document.getElementById('email_text').value;
+                    const layout = document.getElementById('layout').value;
+                    const serverName = "{{ settings.server_name }}";
+                    const subject = document.getElementById('subject').value;
+                    const isDark = document.documentElement.classList.contains('dark');
 
-                let statImagesHTML = "";
-                for (let id of selectedStats) {
-                    const tableElement = document.getElementById(id);
-                    if (tableElement) {
-                        const wasHidden = tableElement.classList.contains('d-none');
-                        if (wasHidden) {
-                            tableElement.classList.remove('d-none');
-                        }
-                        await new Promise(resolve => setTimeout(resolve, 150));
+                    console.log('Email text raw:', raw);
+                    console.log('Layout:', layout);
+                    console.log('Server name:', serverName);
+                    console.log('Subject:', subject);
 
-                        const original = document.getElementById(id);
-                        if (!original) continue;
+                    let body = raw.replace(/\n/g, "<br>");
+                    let html = "";
+                    let displaySubject = subject.startsWith(serverName) 
+                        ? subject.slice(serverName.length).trimStart()
+                        : subject;
 
-                        const clone = original.cloneNode(true);
-                        const tempWrapper = document.createElement('div');
-
-                        clone.style.display = 'inline-block';
-                        clone.style.width = 'auto';
-
-                        const table = clone.querySelector('.content-table');
-                        if (table) {
-                            table.style.width = 'auto';
-                        }
-
-                        tempWrapper.style.position = 'fixed';
-                        tempWrapper.style.top = '-10000px';
-                        tempWrapper.style.left = '0';
-                        tempWrapper.style.zIndex = '-1';
-                        tempWrapper.style.overflow = 'hidden';
-                        tempWrapper.appendChild(clone);
-                        document.body.appendChild(tempWrapper);
-
-                        const blurImage = clone.querySelector('.bg-blur');
-                        if (blurImage) {
-                            await blurImageElement(blurImage);
-                        }
-
-                        await new Promise(resolve => setTimeout(resolve, 50));
-                        
-                        const canvas = await html2canvas(clone, {
-                            backgroundColor: null,
-                            scale: 1,
-                            useCORS: true
-                        });
-
-                        const dataUrl = canvas.toDataURL("image/png");
-                        statImagesHTML += `<img src="${dataUrl}" style="max-width: 100%; margin-bottom: 10px;">`;
-
-                        document.body.removeChild(tempWrapper);
-
-                        if (wasHidden) {
-                            tableElement.classList.add('d-none');
-                        }
-                    }
-                }
+                    const selectedGraphs = selectedItems.filter(item => item.type === 'graph').map(item => item.id);
+                    const selectedStats = selectedItems.filter(item => item.type === 'stat').map(item => item.id);
+                    
+                    console.log('selectedGraphs:', selectedGraphs);
+                    console.log('selectedStats:', selectedStats);
 
                 const graphPlaceholder = document.getElementById('graph_placeholder').value;
                 const statPlaceholder = document.getElementById('stat_placeholder').value;
-                let gContent = body;
+
+                let allItemsHTML = "";
+                
+                // Process ALL items in the exact order they appear in selectedItems array
+                for (let item of selectedItems) {
+                    if (item.type === 'graph') {
+                        const chart = Highcharts.charts.find(c => c && c.renderTo.id === item.id);
+                        if (chart) {
+                            try {
+                                const svg = chart.getSVG();
+                                const canvas = document.createElement("canvas");
+                                const ctx = canvas.getContext("2d");
+                                const img = new Image();
+
+                                await new Promise((resolve, reject) => {
+                                    img.onload = () => {
+                                        canvas.width = img.width;
+                                        canvas.height = img.height;
+                                        ctx.drawImage(img, 0, 0);
+                                        const dataUrl = canvas.toDataURL("image/png");
+                                        allItemsHTML += `<img src="${dataUrl}" style="max-width: 100%; margin-bottom: 10px;">`;
+                                        resolve();
+                                    };
+                                    img.onerror = (error) => {
+                                        console.warn('Failed to load graph image for', item.id, error);
+                                        resolve(); // Don't reject, just skip this graph
+                                    };
+                                    img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)));
+                                });
+                            } catch (error) {
+                                console.warn('Error processing graph', item.id, error);
+                            }
+                        }
+                    } else if (item.type === 'stat') {
+                        const tableElement = document.getElementById(item.id);
+                        if (tableElement) {
+                            try {
+                                const wasHidden = tableElement.classList.contains('d-none');
+                                if (wasHidden) {
+                                    tableElement.classList.remove('d-none');
+                                }
+                                await new Promise(resolve => setTimeout(resolve, 150));
+
+                                const original = document.getElementById(item.id);
+                                if (!original) continue;
+
+                                const clone = original.cloneNode(true);
+                                const tempWrapper = document.createElement('div');
+
+                                clone.style.display = 'inline-block';
+                                clone.style.width = 'auto';
+
+                                const table = clone.querySelector('.content-table');
+                                if (table) {
+                                    table.style.width = 'auto';
+                                }
+
+                                tempWrapper.style.position = 'fixed';
+                                tempWrapper.style.top = '-10000px';
+                                tempWrapper.style.left = '0';
+                                tempWrapper.style.zIndex = '-1';
+                                tempWrapper.style.overflow = 'hidden';
+                                tempWrapper.appendChild(clone);
+                                document.body.appendChild(tempWrapper);
+
+                                const blurImage = clone.querySelector('.bg-blur');
+                                if (blurImage) {
+                                    await blurImageElement(blurImage);
+                                }
+
+                                await new Promise(resolve => setTimeout(resolve, 50));
+                                
+                                const canvas = await html2canvas(clone, {
+                                    backgroundColor: null,
+                                    scale: 1,
+                                    useCORS: true
+                                });
+
+                                const dataUrl = canvas.toDataURL("image/png");
+                                allItemsHTML += `<img src="${dataUrl}" style="max-width: 100%; margin-bottom: 10px;">`;
+
+                                document.body.removeChild(tempWrapper);
+
+                                if (wasHidden) {
+                                    tableElement.classList.add('d-none');
+                                }
+                            } catch (error) {
+                                console.warn('Error processing stat', item.id, error);
+                                // Clean up if something went wrong
+                                try {
+                                    if (document.body.contains(tempWrapper)) {
+                                        document.body.removeChild(tempWrapper);
+                                    }
+                                    if (wasHidden && tableElement) {
+                                        tableElement.classList.add('d-none');
+                                    }
+                                } catch (cleanupError) {
+                                    console.warn('Error during stat cleanup', cleanupError);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Now assign the ordered HTML to the appropriate placeholders
+                let graphImagesHTML = "";
+                let statImagesHTML = "";
+                
+                // Determine which placeholder should get all the content
+                if (raw.includes(graphPlaceholder) && raw.includes(statPlaceholder)) {
+                    // If both placeholders exist, put all content in whichever comes first
+                    const graphIndex = raw.indexOf(graphPlaceholder);
+                    const statIndex = raw.indexOf(statPlaceholder);
+                    
+                    if (graphIndex < statIndex) {
+                        graphImagesHTML = allItemsHTML;
+                        statImagesHTML = "";
+                    } else {
+                        graphImagesHTML = "";
+                        statImagesHTML = allItemsHTML;
+                    }
+                } else if (raw.includes(graphPlaceholder)) {
+                    // Only graph placeholder exists, put all content there
+                    graphImagesHTML = allItemsHTML;
+                } else if (raw.includes(statPlaceholder)) {
+                    // Only stat placeholder exists, put all content there
+                    statImagesHTML = allItemsHTML;
+                } else {
+                    // No placeholders found, content will be added in default layout
+                    graphImagesHTML = allItemsHTML;
+                }
+
+                let content = body;
 
                 if (raw.includes(graphPlaceholder)) {
-                    gContent = body.replace(graphPlaceholder, graphImagesHTML);
+                    content = body.replace(graphPlaceholder, graphImagesHTML);
                 } else {
-                    gContent = `${body}`;
+                    content = `${body}`;
                 }
 
                 if (raw.includes(statPlaceholder)) {
-                    content = gContent.replace(statPlaceholder, statImagesHTML);
+                    content = content.replace(statPlaceholder, statImagesHTML);
                 } else {
-                    content = `${gContent}`;
+                    content = `${content}`;
                 }
 
                 switch (layout) {
@@ -784,11 +941,13 @@
                                                                 <tr>
                                                                     <td class="footer" style="font-family: IBM Plex Sans; font-size: 12px; vertical-align: top; clear: both; margin-top: 0; text-align: center; width: 100%;">
                                                                         <h1 class="footer-bar" style="margin-left: auto; margin-right: auto; width: 250px; border-top: 1px solid #E5A00D; margin-top: 5px;">${displaySubject}</h1>
-                                                                        <p>
+                                                                        <p style="margin: 20px 0;">
                                                                             ${content}
                                                                         </p>
+                                                                        ${graphImagesHTML}
+                                                                        ${statImagesHTML}
                                                                         <div class="footer-bar" style="margin-left: auto; margin-right: auto; width: 250px; border-top: 1px solid #E5A00D; margin-top: 25px;">&nbsp;</div>
-                                                                        <div class="content-block powered-by" style="padding-bottom: 10px; padding-top: 0;">Generated for Plex Media Server by newsletterr</div>
+                                                                        <div class="content-block powered-by" style="padding-bottom: 10px; padding-top: 0;">Generated for Plex Media Server by <a href="https://github.com/jma1ice/newsletterr" style="color: #E5A00D; text-decoration: none;">newsletterr</a></div>
                                                                     </td>
                                                                 </tr>
                                                             </tbody>
@@ -826,9 +985,14 @@
                                                                 <tr>
                                                                     <td class="footer" style="font-family: IBM Plex Sans; font-size: 12px; vertical-align: top; clear: both; margin-top: 0; text-align: center; width: 100%;">
                                                                         <h1 class="footer-bar" style="margin-left: auto; margin-right: auto; width: 250px; border-top: 1px solid #E5A00D; margin-top: 5px;">Recently Added</h1>
+                                                                        <p style="margin: 20px 0;">
+                                                                            ${content}
+                                                                        </p>
+                                                                        ${graphImagesHTML}
+                                                                        ${statImagesHTML}
                                                                         [RECENTLY_ADDED]
                                                                         <div class="footer-bar" style="margin-left: auto; margin-right: auto; width: 250px; border-top: 1px solid #E5A00D; margin-top: 25px;">&nbsp;</div>
-                                                                        <div class="content-block powered-by" style="padding-bottom: 10px; padding-top: 0;">Generated for Plex Media Server by newsletterr</div>
+                                                                        <div class="content-block powered-by" style="padding-bottom: 10px; padding-top: 0;">Generated for Plex Media Server by <a href="https://github.com/jma1ice/newsletterr" style="color: #E5A00D; text-decoration: none;">newsletterr</a></div>
                                                                     </td>
                                                                 </tr>
                                                             </tbody>
@@ -865,9 +1029,14 @@
                                                                 <tr>
                                                                     <td class="footer" style="font-family: IBM Plex Sans; font-size: 12px; vertical-align: top; clear: both; margin-top: 0; text-align: center; width: 100%;">
                                                                         <h1 class="footer-bar" style="margin-left: auto; margin-right: auto; width: 250px; border-top: 1px solid #E5A00D; margin-top: 5px;">Recommended For You</h1>
+                                                                        <p style="margin: 20px 0;">
+                                                                            ${content}
+                                                                        </p>
+                                                                        ${graphImagesHTML}
+                                                                        ${statImagesHTML}
                                                                         [RECOMMENDATIONS]
                                                                         <div class="footer-bar" style="margin-left: auto; margin-right: auto; width: 250px; border-top: 1px solid #E5A00D; margin-top: 25px;">&nbsp;</div>
-                                                                        <div class="content-block powered-by" style="padding-bottom: 10px; padding-top: 0;">Generated for Plex Media Server by newsletterr</div>
+                                                                        <div class="content-block powered-by" style="padding-bottom: 10px; padding-top: 0;">Generated for Plex Media Server by <a href="https://github.com/jma1ice/newsletterr" style="color: #E5A00D; text-decoration: none;">newsletterr</a></div>
                                                                     </td>
                                                                 </tr>
                                                             </tbody>
@@ -884,46 +1053,174 @@
                                     :root { color-scheme: ${isDark ? 'dark' : 'light'}; }
                                     html, body { background: ${isDark ? '#333' : '#8acbd4'}; }
                                 </style>
-                                <html><body>${content}</body></html>`;
+                                <html><body>
+                                    <div style="font-family: IBM Plex Sans; padding: 20px;">
+                                        ${content}
+                                        ${graphImagesHTML}
+                                        ${statImagesHTML}
+                                    </div>
+                                </body></html>`;
                         html = await insertRecentlyAddedIntoPreview(html);
                         html = await insertRecommendationsIntoPreview(html);
                 }
 
                 const frame = document.getElementById('preview');
-                const doc = frame.contentDocument || frame.contentWindow.document;
-                doc.documentElement.classList.toggle('dark', isDark);
+                console.log('Frame element:', frame);
+                if (!frame) {
+                    console.error('Preview iframe not found!');
+                    return;
+                }
+                
+                console.log('HTML content length:', html.length);
+                console.log('HTML content preview:', html.substring(0, 200) + '...');
+                
+                // Set the HTML content first
                 frame.srcdoc = html;
+                
+                // Function to auto-resize iframe based on content
+                function resizeIframe() {
+                    try {
+                        const doc = frame.contentDocument || frame.contentWindow.document;
+                        if (doc && doc.body) {
+                            const contentHeight = Math.max(
+                                doc.body.scrollHeight,
+                                doc.body.offsetHeight,
+                                doc.documentElement.clientHeight,
+                                doc.documentElement.scrollHeight,
+                                doc.documentElement.offsetHeight
+                            );
+                            
+                            // Apply min and max height constraints
+                            const minHeight = 480; // 30rem in pixels (assuming 16px base)
+                            const maxHeight = 960; // 60rem in pixels
+                            const newHeight = Math.max(minHeight, Math.min(maxHeight, contentHeight + 20)); // +20 for padding
+                            
+                            frame.style.height = newHeight + 'px';
+                            console.log('Iframe resized to:', newHeight + 'px', 'Content height:', contentHeight);
+                        }
+                    } catch (e) {
+                        console.log('Could not resize iframe:', e);
+                    }
+                }
+                
+                // Wait for the iframe to load, then apply dark mode and resize
+                frame.onload = function() {
+                    try {
+                        const doc = frame.contentDocument || frame.contentWindow.document;
+                        if (doc && doc.documentElement) {
+                            if (isDark) {
+                                doc.documentElement.classList.add('dark');
+                            }
+                            // Resize after a short delay to ensure content is fully rendered
+                            setTimeout(resizeIframe, 100);
+                        }
+                    } catch (e) {
+                        console.log('Could not apply dark mode or resize iframe:', e);
+                    }
+                };
+                
+                console.log('Preview updated successfully');
+                } catch (error) {
+                    console.error('Error in updatePreview:', error);
+                    console.error('Error stack:', error.stack);
+                    // Don't let the error break the preview - show something basic
+                    const frame = document.getElementById('preview');
+                    if (frame) {
+                        frame.srcdoc = `<html><body><p>Error updating preview: ${error.message}</p><p>Check console for details</p></body></html>`;
+                    }
+                }
             }
 
+            // Debounce function to limit how often updatePreview is called
+            function debounce(func, wait) {
+                let timeout;
+                return function executedFunction(...args) {
+                    const later = () => {
+                        clearTimeout(timeout);
+                        func(...args);
+                    };
+                    clearTimeout(timeout);
+                    timeout = setTimeout(later, wait);
+                };
+            }
+
+            // Create debounced version of updatePreview (wait 300ms after user stops typing)
+            const debouncedUpdatePreview = debounce(updatePreview, 300);
+
             document.addEventListener('DOMContentLoaded', () => {
-                document.getElementById('email_text').addEventListener('input', updatePreview);
+                // Use debounced version for text input to prevent excessive calls
+                document.getElementById('email_text').addEventListener('input', debouncedUpdatePreview);
+                // Layout changes should be immediate since they're less frequent
                 document.getElementById('layout').addEventListener('change', updatePreview);
-                document.querySelectorAll('.graph-checkbox').forEach(cb => {
-                    cb.addEventListener('change', updatePreview);
-                });
-                document.querySelectorAll('.stat-checkbox').forEach(cb => {
-                    cb.addEventListener('change', updatePreview);
-                });
+                
+                // Test preview on load
+                console.log('DOM loaded, testing preview...');
+                const frame = document.getElementById('preview');
+                if (frame) {
+                    frame.srcdoc = '<html><body><h1>Test Preview</h1><p>If you can see this, the iframe is working.</p></body></html>';
+                    console.log('Test preview set');
+                } else {
+                    console.error('Preview iframe not found on DOM load!');
+                }
+                
+                // Also run initial preview update
+                setTimeout(() => {
+                    console.log('Running initial updatePreview...');
+                    updatePreview();
+                }, 100);
             });
         </script>
         <script>
-            document.getElementById('statSelector').addEventListener('change', function () {
-                const selectedId = this.value;
-                document.querySelectorAll('.stat-table').forEach(el => {el.classList.add('d-none');});
-                document.querySelectorAll('.stat-checkbox-container').forEach(el => el.classList.add('d-none'));
+            // Handle stat view buttons
+            document.addEventListener('click', (e) => {
+                if (e.target.classList.contains('view-stat-btn')) {
+                    const targetId = e.target.dataset.target;
+                    const previewDiv = document.getElementById('stat-preview');
+                    const allStats = document.querySelectorAll('.stat-table');
+                    
+                    // Hide all stats
+                    allStats.forEach(el => el.classList.add('d-none'));
+                    
+                    // Show selected stat
+                    document.getElementById(targetId).classList.remove('d-none');
+                    previewDiv.style.display = 'block';
+                }
+                
+                if (e.target.classList.contains('view-graph-btn')) {
+                    const targetId = e.target.dataset.target;
+                    const previewDiv = document.getElementById('graph-preview');
+                    const allGraphs = document.querySelectorAll('.graph-table');
+                    
+                    // Hide all graphs
+                    allGraphs.forEach(el => el.classList.add('d-none'));
+                    
+                    // Show selected graph and render it if not already rendered
+                    const container = document.getElementById(targetId);
+                    container.classList.remove('d-none');
+                    previewDiv.style.display = 'block';
+                    
+                    // Render chart if not already rendered
+                    if (!renderedCharts.has(targetId)) {
+                        const index = parseInt(targetId.split('-')[1]);
+                        const graphData = graphDataList[index];
 
-                document.getElementById(selectedId).classList.remove('d-none');
-                document.getElementById(`checkbox-${selectedId}`).classList.remove('d-none');
-            });
-        </script>
-        <script>
-            document.getElementById('graphSelector').addEventListener('change', function () {
-                const selectedId = this.value;
-                document.querySelectorAll('.graph-table').forEach(el => el.classList.add('d-none'));
-                document.querySelectorAll('.graph-checkbox-container').forEach(el => el.classList.add('d-none'));
+                        Highcharts.chart(targetId, {
+                            chart: { type: 'line' },
+                            title: { text: graphCommands[index].name },
+                            exporting: {
+                                enabled: true
+                            },
+                            xAxis: { categories: graphData.categories },
+                            yAxis: { title: { text: 'Plays' } },
+                            series: graphData.series
+                        });
 
-                document.getElementById(selectedId).classList.remove('d-none');
-                document.getElementById(`checkbox-${selectedId}`).classList.remove('d-none');
+                        renderedCharts.add(targetId);
+                    }
+                    
+                    const nowDark = document.documentElement.classList.contains('dark');
+                    applyChartTheme(nowDark);
+                }
             });
         </script>
         <script>
@@ -1015,6 +1312,178 @@
                 const nowDark = document.documentElement.classList.contains('dark');
                 applyChartTheme(nowDark);
             });
+        </script>
+        <script>
+            // Selected Items Management
+            function updateSelectedItemsDisplay() {
+                const container = document.getElementById('selected-items-list');
+                
+                if (selectedItems.length === 0) {
+                    container.innerHTML = '<div id="selected-items-empty" class="text-muted text-center py-3">No items selected. Use the buttons below to add items to your email.</div>';
+                } else {
+                    container.innerHTML = selectedItems.map((item, index) => `
+                        <div class="selected-item d-flex justify-content-between align-items-center p-2 mb-2 border rounded bg-light" 
+                             data-index="${index}" draggable="true" style="padding-left: 32px !important;">
+                            <span class="item-name">${item.name}</span>
+                            <div>
+                                <span class="badge badge-secondary me-2">${item.type}</span>
+                                <button type="button" class="btn btn-sm btn-outline-danger remove-item-btn" data-index="${index}">×</button>
+                            </div>
+                        </div>
+                    `).join('');
+                    
+                    // Add drag and drop functionality
+                    setupDragAndDrop();
+                }
+                
+                // Update preview
+                updatePreview();
+            }
+
+            function addItem(id, name, type) {
+                // Check if item already exists
+                if (selectedItems.find(item => item.id === id)) {
+                    return false;
+                }
+                
+                // If adding a graph, ensure it's rendered first
+                if (type === 'graph' && !renderedCharts.has(id)) {
+                    try {
+                        const index = parseInt(id.split('-')[1]);
+                        const graphData = graphDataList[index];
+
+                        Highcharts.chart(id, {
+                            chart: { type: 'line' },
+                            title: { text: graphCommands[index].name },
+                            exporting: {
+                                enabled: true
+                            },
+                            xAxis: { categories: graphData.categories },
+                            yAxis: { title: { text: 'Plays' } },
+                            series: graphData.series
+                        });
+
+                        renderedCharts.add(id);
+                        
+                        // Apply current theme
+                        const nowDark = document.documentElement.classList.contains('dark');
+                        applyChartTheme(nowDark);
+                        
+                        console.log('Auto-rendered graph:', id);
+                    } catch (error) {
+                        console.warn('Failed to auto-render graph', id, error);
+                    }
+                }
+                
+                selectedItems.push({ id, name, type });
+                updateSelectedItemsDisplay();
+                return true;
+            }
+
+            function removeItem(index) {
+                const removedItem = selectedItems[index];
+                selectedItems.splice(index, 1);
+                updateSelectedItemsDisplay();
+                
+                // Reset button state
+                const button = document.querySelector(`[data-id="${removedItem.id}"]`);
+                if (button) {
+                    button.textContent = `Add`;
+                    button.classList.remove('btn-success');
+                    button.classList.add('btn-primary');
+                    button.disabled = false;
+                }
+            }
+
+            function setupDragAndDrop() {
+                const items = document.querySelectorAll('.selected-item');
+                let draggedElement = null;
+                
+                items.forEach((item, index) => {
+                    item.addEventListener('dragstart', (e) => {
+                        draggedElement = item;
+                        e.dataTransfer.setData('text/plain', index);
+                        e.dataTransfer.effectAllowed = 'move';
+                        
+                        // Add dragging class with a small delay for smooth transition
+                        setTimeout(() => {
+                            item.classList.add('dragging');
+                        }, 0);
+                    });
+                    
+                    item.addEventListener('dragend', () => {
+                        item.classList.remove('dragging');
+                        // Remove drag-over class from all items
+                        items.forEach(i => i.classList.remove('drag-over'));
+                        draggedElement = null;
+                    });
+                    
+                    item.addEventListener('dragenter', (e) => {
+                        e.preventDefault();
+                        if (draggedElement && draggedElement !== item) {
+                            item.classList.add('drag-over');
+                        }
+                    });
+                    
+                    item.addEventListener('dragleave', (e) => {
+                        // Only remove drag-over if we're actually leaving the element
+                        if (!item.contains(e.relatedTarget)) {
+                            item.classList.remove('drag-over');
+                        }
+                    });
+                    
+                    item.addEventListener('dragover', (e) => {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = 'move';
+                    });
+                    
+                    item.addEventListener('drop', (e) => {
+                        e.preventDefault();
+                        item.classList.remove('drag-over');
+                        
+                        const draggedIndex = parseInt(e.dataTransfer.getData('text/plain'));
+                        const targetIndex = parseInt(item.dataset.index);
+                        
+                        if (draggedIndex !== targetIndex) {
+                            // Reorder items
+                            const draggedItem = selectedItems[draggedIndex];
+                            selectedItems.splice(draggedIndex, 1);
+                            selectedItems.splice(targetIndex, 0, draggedItem);
+                            updateSelectedItemsDisplay();
+                        }
+                    });
+                });
+            }
+
+            // Event listeners for add buttons
+            document.addEventListener('click', (e) => {
+                if (e.target.classList.contains('add-stat-btn') || e.target.classList.contains('add-graph-btn')) {
+                    const id = e.target.dataset.id;
+                    const name = e.target.dataset.name;
+                    const type = e.target.dataset.type;
+                    
+                    console.log('Adding item:', { id, name, type });
+                    console.log('Current selectedItems before:', selectedItems);
+                    
+                    if (addItem(id, name, type)) {
+                        e.target.textContent = `Added`;
+                        e.target.classList.remove('btn-primary');
+                        e.target.classList.add('btn-success');
+                        e.target.disabled = true;
+                        console.log('Item added successfully. Current selectedItems:', selectedItems);
+                    } else {
+                        console.log('Item already exists');
+                    }
+                }
+                
+                if (e.target.classList.contains('remove-item-btn')) {
+                    const index = parseInt(e.target.dataset.index);
+                    removeItem(index);
+                }
+            });
+
+            // Initialize
+            updateSelectedItemsDisplay();
         </script>
         <script>
             document.getElementById('pullRecsBtn').addEventListener('click', async () => {
@@ -1124,8 +1593,6 @@
                 const subject = document.getElementById('subject').value;
                 const layout = document.getElementById('layout').value;
                 let email_text = document.getElementById('email_text').value;
-                const graphImages = [];
-                const statImages = [];
 
                 const chipInput = document.getElementById('email_chip_input');
                     if (chipInput && chipInput.value.trim()) {
@@ -1141,151 +1608,157 @@
                 const to_emails = toList.join(', ');
 
                 const ok = window.confirm(
-                    `Send email?\n\nSubject: ${subject || '(no subject)'}`
+                    `Send email?\n\nSubject: ${subject || '(no subject)'}\n\nRecipients (${toList.length}):\n${toList.join('\n')}`
                 );
                 if (!ok) return;
 
-                showSpinner('Sending email...');
+                showSpinner('Preparing email content...');
 
-                if (layout == 'recently_added') {
-                    email_text = '[RECENTLY_ADDED]';
-                }
-
-                if (layout == 'recommendations') {
-                    email_text = '[RECOMMENDATIONS]';
-                }
-
-                const ra = await captureRecentlyAddedPNG();
-                if (ra) {
-                    email_text = email_text.replace('[RECENTLY_ADDED]', `<img src="cid:${ra.cid}" alt="Recently Added" style="max-width:100%;height:auto;border-radius:5px;display:block;">`);
-                } else {
-                    email_text = email_text.replace('[RECENTLY_ADDED]', '');
-                }
-
-                const recs = await captureRecommendationsPNG();
-                if (recs) {
-                    email_text = email_text.replace('[RECOMMENDATIONS]', `<img src="cid:${recs.cid}" alt="Recommendations" style="max-width:100%;height:auto;border-radius:5px;display:block;">`);
-                } else {
-                    email_text = email_text.replace('[RECOMMENDATIONS]', '');
-                }
-
-                const selectedGraphs = Array.from(document.querySelectorAll('.graph-checkbox:checked'))
-                    .map(cb => cb.value);
-                const selectedStats = Array.from(document.querySelectorAll('.stat-checkbox:checked'))
-                    .map(cb => cb.value);
-
-                for (let id of selectedGraphs) {
-                    const chart = Highcharts.charts.find(c => c && c.renderTo.id === id);
-                    if (chart) {
-                        const svg = chart.getSVG();
-                        const canvas = document.createElement("canvas");
-                        const ctx = canvas.getContext("2d");
-                        const img = new Image();
-
-                        await new Promise((resolve, reject) => {
-                            img.onload = () => {
-                                canvas.width = img.width;
-                                canvas.height = img.height;
-                                ctx.drawImage(img, 0, 0);
-                                const dataUrl = canvas.toDataURL("image/png");
-                                graphImages.push({ id, img: dataUrl });
-                                resolve();
-                            };
-                            img.onerror = reject;
-                            img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)));
-                        });
-                    }
-                }
-
-                for (let id of selectedStats) {
-                    const tableElement = document.getElementById(id);
-                    if (tableElement) {
-                        const wasHidden = tableElement.classList.contains('d-none');
-                        if (wasHidden) {
-                            tableElement.classList.remove('d-none');
-                        }
-                        await new Promise(resolve => setTimeout(resolve, 150));
-
-                        const original = document.getElementById(id);
-                        if (!original) continue;
-
-                        const clone = original.cloneNode(true);
-                        const tempWrapper = document.createElement('div');
-
-                        clone.style.display = 'inline-block';
-                        clone.style.width = 'auto';
-
-                        const table = clone.querySelector('.content-table');
-                        if (table) {
-                            table.style.width = 'auto';
-                        }
-
-                        tempWrapper.style.position = 'fixed';
-                        tempWrapper.style.top = '-10000px';
-                        tempWrapper.style.left = '0';
-                        tempWrapper.style.zIndex = '-1';
-                        tempWrapper.style.overflow = 'hidden';
-                        tempWrapper.appendChild(clone);
-                        document.body.appendChild(tempWrapper);
-
-                        const blurImage = clone.querySelector('.bg-blur');
-                        if (blurImage) {
-                            await blurImageElement(blurImage);
-                        }
-
-                        await new Promise(resolve => setTimeout(resolve, 50));
-                        
-                        const canvas = await html2canvas(clone, {
-                            backgroundColor: null,
-                            scale: 1,
-                            useCORS: true
-                        });
-
-                        const dataUrl = canvas.toDataURL("image/png");
-                        statImages.push({ id, img: dataUrl });
-
-                        document.body.removeChild(tempWrapper);
-
-                        if (wasHidden) {
-                            tableElement.classList.add('d-none');
-                        }
-                    }
-                }
-
-                const recentlyAddedImages = [];
-                if (ra) recentlyAddedImages.push({
-                    cid: ra.cid,
-                    mime: 'image/png',
-                    base64: await blobToBase64(ra.blob)
-                });
-
-                const recommendationsImages = [];
-                if (recs) recommendationsImages.push({
-                    cid: recs.cid,
-                    mime: 'image/png',
-                    base64: await blobToBase64(recs.blob)
-                });
+                // Extract actual HTML content from preview iframe
+                let emailHTML = '';
+                let emailImages = [];
 
                 try {
+                    const previewFrame = document.getElementById('preview');
+                    console.log('Preview frame found:', !!previewFrame);
+                    
+                    const previewDoc = previewFrame.contentDocument || previewFrame.contentWindow.document;
+                    console.log('Preview document found:', !!previewDoc);
+                    console.log('Preview body found:', !!previewDoc?.body);
+                    
+                    if (previewDoc && previewDoc.body) {
+                        // Wait a moment for content to fully load
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                        
+                        // Get the actual HTML content from the preview
+                        const previewHTML = previewDoc.documentElement.outerHTML;
+                        console.log('Preview HTML length:', previewHTML.length);
+                        console.log('Preview HTML preview:', previewHTML.substring(0, 500));
+                        
+                        // Process any Highcharts graphs by converting them to images
+                        const charts = previewDoc.querySelectorAll('[data-highcharts-chart]');
+                        console.log('Found charts:', charts.length);
+                        
+                        let processedHTML = previewHTML;
+                        
+                        // Convert each chart to an image and replace in HTML
+                        for (let i = 0; i < charts.length; i++) {
+                            const chart = charts[i];
+                            const chartId = chart.id || `chart-${i}`;
+                            
+                            try {
+                                // Get the Highcharts instance
+                                const chartInstance = Highcharts.charts.find(c => c && c.container === chart);
+                                if (chartInstance) {
+                                    // Export chart as SVG then convert to image
+                                    const svgData = chartInstance.getSVG();
+                                    const canvas = document.createElement('canvas');
+                                    const ctx = canvas.getContext('2d');
+                                    const img = new Image();
+                                    
+                                    // Convert SVG to canvas
+                                    const svgBlob = new Blob([svgData], {type: 'image/svg+xml'});
+                                    const url = URL.createObjectURL(svgBlob);
+                                    
+                                    await new Promise((resolve, reject) => {
+                                        img.onload = () => {
+                                            canvas.width = img.width || 800;
+                                            canvas.height = img.height || 400;
+                                            ctx.drawImage(img, 0, 0);
+                                            
+                                            const imageData = canvas.toDataURL('image/png');
+                                            const cid = `chart-${i}`;
+                                            
+                                            emailImages.push({
+                                                cid: cid,
+                                                mime: 'image/png',
+                                                data: imageData
+                                            });
+                                            
+                                            // Replace the chart div with an img tag
+                                            processedHTML = processedHTML.replace(
+                                                chart.outerHTML,
+                                                `<img src="cid:${cid}" alt="Chart" style="max-width:100%;height:auto;">`
+                                            );
+                                            
+                                            URL.revokeObjectURL(url);
+                                            resolve();
+                                        };
+                                        img.onerror = reject;
+                                        img.src = url;
+                                    });
+                                }
+                            } catch (chartError) {
+                                console.warn('Error processing chart:', chartError);
+                            }
+                        }
+                        
+                        // Clean up the HTML for email
+                        emailHTML = processedHTML
+                            .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '') // Remove scripts
+                            .replace(/style="[^"]*"/gi, (match) => {
+                                // Keep only basic styles, remove complex CSS
+                                return match.includes('color') || match.includes('font') || match.includes('text-align') || 
+                                       match.includes('background') || match.includes('padding') || match.includes('margin') ||
+                                       match.includes('width') || match.includes('height') ? match : '';
+                            });
+                        
+                        console.log('Processed email HTML length:', emailHTML.length);
+                        
+                        console.log('Email content prepared successfully');
+                    } else {
+                        throw new Error('Could not access preview content');
+                    }
+                } catch (error) {
+                    console.error('Error preparing email content:', error);
+                    // Fallback to basic text email
+                    emailHTML = `
+                        <!DOCTYPE html>
+                        <html>
+                        <head>
+                            <meta charset="UTF-8">
+                            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                            <title>${subject || 'Newsletter'}</title>
+                        </head>
+                        <body style="font-family: Arial, sans-serif; padding: 20px; line-height: 1.6;">
+                            <h2>${subject || 'Newsletter'}</h2>
+                            <div>${email_text.replace(/\n/g, '<br>')}</div>
+                        </body>
+                        </html>
+                    `;
+                    console.log('Using fallback HTML:', emailHTML);
+                }
+
+                showSpinner('Sending email...');
+
+                try {
+                    console.log('Sending email with data:', {
+                        to_emails,
+                        subject,
+                        email_html_length: emailHTML.length,
+                        layout,
+                        all_images_count: emailImages.length
+                    });
+                    
                     const resp = await fetch('/send_email', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             to_emails,
                             subject,
-                            email_text,
+                            email_html: emailHTML,
                             layout,
-                            graphs: graphImages,
-                            stats: statImages,
-                            recently_added: recentlyAddedImages,
-                            recommendations: recommendationsImages
+                            all_images: emailImages
                         })
                     });
                     
+                    console.log('Response status:', resp.status);
+                    
                     if (resp.ok) {
-                        alert("Email sent!");
+                        alert(`Email sent successfully to ${toList.length} recipient${toList.length !== 1 ? 's' : ''}!`);
                     } else {
                         const data = await resp.json();
+                        console.error('Server error response:', data);
                         alert("Error sending email: " + data.error);
                     }
                 } catch (err) {
@@ -1417,6 +1890,241 @@
 
                 syncHiddenFromDOM();
             })();
+        </script>
+        <script>
+            // Email List Management
+            document.addEventListener('DOMContentLoaded', () => {
+                const selector = document.getElementById('email_list_selector');
+                const deleteBtn = document.getElementById('delete_list_btn');
+                const saveContainer = document.getElementById('save_list_container');
+                const newListNameInput = document.getElementById('new_list_name');
+                const saveBtn = document.getElementById('save_list_btn');
+                const cancelBtn = document.getElementById('cancel_save_btn');
+                const bccChipsContainer = document.getElementById('bcc_chips');
+                const emailInput = document.getElementById('email_chip_input');
+                
+                const allUserEmails = {{ user_dict.values() | list | tojson }};
+                
+                function collectEmailsFromChips() {
+                    return Array.from(document.querySelectorAll('#bcc_chips .nl-chip'))
+                        .map(ch => ch.dataset.email)
+                        .filter(Boolean);
+                }
+                
+                function clearAllChips() {
+                    document.querySelectorAll('#bcc_chips .nl-chip').forEach(chip => chip.remove());
+                }
+                
+                function addEmailChip(email) {
+                    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return;
+                    const sel = `.nl-chip[data-email="${CSS.escape(email)}"]`;
+                    if (bccChipsContainer.querySelector(sel)) return;
+                    
+                    const chip = document.createElement('span');
+                    chip.className = 'nl-chip';
+                    chip.dataset.email = email;
+                    chip.innerHTML = `
+                        <span>${email}</span>
+                        <button type="button" class="remove" aria-label="Remove ${email}">x</button>
+                    `;
+                    bccChipsContainer.insertBefore(chip, emailInput);
+                }
+                
+                function setReadOnlyMode(readOnly) {
+                    const chips = document.querySelectorAll('#bcc_chips .nl-chip .remove');
+                    chips.forEach(btn => {
+                        btn.style.display = readOnly ? 'none' : 'inline';
+                    });
+                    emailInput.disabled = readOnly;
+                    if (readOnly) {
+                        emailInput.placeholder = 'Read-only mode';
+                    } else {
+                        emailInput.placeholder = 'Add BCC emails';
+                    }
+                }
+                
+                // Handle list selection change
+                selector.addEventListener('change', async () => {
+                    const selectedValue = selector.value;
+                    
+                    // Hide delete button and save container by default
+                    deleteBtn.classList.add('d-none');
+                    saveContainer.classList.add('d-none');
+                    
+                    if (selectedValue === 'Custom') {
+                        setReadOnlyMode(false);
+                        // Keep current emails
+                    } else if (selectedValue === 'ALL') {
+                        clearAllChips();
+                        allUserEmails.forEach(email => addEmailChip(email));
+                        setReadOnlyMode(true);
+                    } else if (selectedValue === '(Save new list)') {
+                        saveContainer.classList.remove('d-none');
+                        newListNameInput.focus();
+                        setReadOnlyMode(false);
+                    } else {
+                        // Load saved list
+                        const option = selector.querySelector(`option[value="${selectedValue}"]`);
+                        if (option) {
+                            const emails = option.dataset.emails;
+                            clearAllChips();
+                            emails.split(', ').forEach(email => addEmailChip(email.trim()));
+                            deleteBtn.classList.remove('d-none');
+                            setReadOnlyMode(false);
+                        }
+                    }
+                });
+                
+                // Handle save new list
+                saveBtn.addEventListener('click', async () => {
+                    const name = newListNameInput.value.trim();
+                    if (!name) {
+                        alert('Please enter a list name');
+                        return;
+                    }
+                    
+                    const emails = collectEmailsFromChips();
+                    if (emails.length === 0) {
+                        alert('Cannot save empty email list');
+                        return;
+                    }
+                    
+                    try {
+                        const response = await fetch('/email_lists', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                name: name,
+                                emails: emails.join(', ')
+                            })
+                        });
+                        
+                        const result = await response.json();
+                        if (result.status === 'success') {
+                            // Add new option to selector
+                            const newOption = document.createElement('option');
+                            newOption.value = 'temp_' + Date.now(); // Temporary ID
+                            newOption.textContent = name;
+                            newOption.dataset.emails = emails.join(', ');
+                            selector.insertBefore(newOption, selector.querySelector('option[value="(Save new list)"]'));
+                            
+                            // Select the new list and hide save container
+                            selector.value = newOption.value;
+                            saveContainer.classList.add('d-none');
+                            newListNameInput.value = '';
+                            deleteBtn.classList.remove('d-none');
+                            
+                            alert(result.message);
+                            
+                            // Refresh the page to get proper IDs from server
+                            setTimeout(() => window.location.reload(), 1000);
+                        } else {
+                            alert(result.message);
+                        }
+                    } catch (error) {
+                        alert('Error saving list: ' + error.message);
+                    }
+                });
+                
+                // Handle cancel save
+                cancelBtn.addEventListener('click', () => {
+                    saveContainer.classList.add('d-none');
+                    newListNameInput.value = '';
+                    selector.value = 'Custom';
+                });
+                
+                // Handle delete list
+                deleteBtn.addEventListener('click', async () => {
+                    const selectedValue = selector.value;
+                    const option = selector.querySelector(`option[value="${selectedValue}"]`);
+                    
+                    if (!option || !confirm(`Delete list "${option.textContent}"?`)) return;
+                    
+                    try {
+                        const response = await fetch(`/email_lists/${selectedValue}`, {
+                            method: 'DELETE'
+                        });
+                        
+                        const result = await response.json();
+                        if (result.status === 'success') {
+                            option.remove();
+                            selector.value = 'Custom';
+                            deleteBtn.classList.add('d-none');
+                            alert(result.message);
+                        } else {
+                            alert(result.message);
+                        }
+                    } catch (error) {
+                        alert('Error deleting list: ' + error.message);
+                    }
+                });
+                
+                // Initialize with Custom mode
+                setReadOnlyMode(false);
+            });
+        </script>
+        <script>
+            // Handle BCC collapse toggle
+            document.addEventListener('DOMContentLoaded', () => {
+                const bccHeader = document.querySelector('[onclick*="bcc-collapse"]');
+                if (bccHeader) {
+                    bccHeader.addEventListener('click', () => {
+                        const icon = document.getElementById('bcc-toggle-icon');
+                        const collapse = document.getElementById('bcc-collapse');
+                        if (collapse.classList.contains('d-none')) {
+                            icon.style.transform = 'rotate(0deg)';
+                            icon.textContent = '▼';
+                        } else {
+                            icon.style.transform = 'rotate(-90deg)';
+                            icon.textContent = '▶';
+                        }
+                    });
+                }
+                
+                // Initially collapse the BCC section
+                document.getElementById('bcc-collapse').classList.add('d-none');
+                document.getElementById('bcc-toggle-icon').style.transform = 'rotate(-90deg)';
+                document.getElementById('bcc-toggle-icon').textContent = '▶';
+                
+                // Handle cache clear button
+                const clearCacheBtn = document.getElementById('clear_cache_btn');
+                if (clearCacheBtn) {
+                    clearCacheBtn.addEventListener('click', async () => {
+                        try {
+                            clearCacheBtn.textContent = 'Clearing...';
+                            clearCacheBtn.disabled = true;
+                            
+                            const response = await fetch('/clear_cache', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                }
+                            });
+                            
+                            if (response.ok) {
+                                const result = await response.json();
+                                clearCacheBtn.textContent = 'Cleared!';
+                                clearCacheBtn.style.backgroundColor = '#28a745';
+                                setTimeout(() => {
+                                    clearCacheBtn.textContent = 'Clear Cache';
+                                    clearCacheBtn.style.backgroundColor = '#dc3545';
+                                    clearCacheBtn.disabled = false;
+                                }, 2000);
+                            } else {
+                                throw new Error('Failed to clear cache');
+                            }
+                        } catch (error) {
+                            console.error('Error clearing cache:', error);
+                            clearCacheBtn.textContent = 'Error';
+                            clearCacheBtn.style.backgroundColor = '#dc3545';
+                            setTimeout(() => {
+                                clearCacheBtn.textContent = 'Clear Cache';
+                                clearCacheBtn.disabled = false;
+                            }, 2000);
+                        }
+                    });
+                }
+            });
         </script>
     </div>
 </div>

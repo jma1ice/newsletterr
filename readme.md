@@ -137,6 +137,7 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 * (Done) clean up UI, move stats/graphs
 * Graph titles need to specify the date range
 * (Done) made "newsletterr" footer a link
+* (Done) pop-out email preview
 
 ### v1.0
 * Dockerize

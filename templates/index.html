@@ -117,7 +117,13 @@
                         </form>
                     </td>
                     <td style="width: 40%; padding: 10px; vertical-align: top; position: sticky; top: 80px;">
-                        Preview: <iframe class="frame" id="preview"></iframe>
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span>Preview:</span>
+                            <button id="popout-preview-btn" class="btn btn-outline-primary btn-sm" title="Open preview in new window">
+                                🗗 Pop-out
+                            </button>
+                        </div>
+                        <iframe class="frame" id="preview"></iframe>
                     </td>
                     <td style="width: 60%; padding: 10px; vertical-align: top;">
                         <!-- Selected Items Pane -->
@@ -2305,6 +2311,33 @@
                         console.error('Error deleting template:', error);
                         alert('Error deleting template');
                     }
+                }
+            });
+
+            // Pop-out preview functionality
+            document.getElementById('popout-preview-btn').addEventListener('click', function() {
+                const frame = document.getElementById('preview');
+                if (!frame || !frame.srcdoc) {
+                    alert('No preview content available');
+                    return;
+                }
+                
+                // Create a new window
+                const popupWindow = window.open('', 'EmailPreview', 'width=800,height=600,scrollbars=yes,resizable=yes');
+                
+                if (popupWindow) {
+                    // Write the preview content to the new window
+                    popupWindow.document.open();
+                    popupWindow.document.write(frame.srcdoc);
+                    popupWindow.document.close();
+                    
+                    // Set window title
+                    popupWindow.document.title = 'Email Preview';
+                    
+                    // Focus the new window
+                    popupWindow.focus();
+                } else {
+                    alert('Pop-up blocked! Please allow pop-ups for this site to use the preview feature.');
                 }
             });
 

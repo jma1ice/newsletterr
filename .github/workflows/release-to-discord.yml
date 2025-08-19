@@ -13,7 +13,7 @@ jobs:
         if: github.event.action == 'published' && !github.event.release.prerelease
         uses: SethCohen/github-releases-to-discord@v1.15.1
         with:
-          webhook: ${{ secrets.DISCORD_WEBHOOK }}
+          webhook_url: ${{ secrets.WEBHOOK_URL }}
           username: "Release Bot"
           # This shows above the embed. The action auto-builds a nice embed from the release.
           content: "🎉 **New release:** ${{ github.event.release.tag_name }}"
@@ -23,7 +23,7 @@ jobs:
         if: github.event.action == 'edited' && !github.event.release.prerelease
         uses: SethCohen/github-releases-to-discord@v1.15.1
         with:
-          webhook: ${{ secrets.DISCORD_WEBHOOK }}
+          webhook_url: ${{ secrets.WEBHOOK_URL }}
           username: "Release Bot"
           content: "✏️ **Release updated:** ${{ github.event.release.tag_name }}"
 

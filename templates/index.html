@@ -2256,6 +2256,39 @@
                     // Load template items
                     selectedItems = [...items];
                     
+                    // Render any graphs that need to be rendered
+                    selectedItems.forEach(item => {
+                        if (item.type === 'graph' && !renderedCharts.has(item.id)) {
+                            try {
+                                const index = parseInt(item.id.split('-')[1]);
+                                const graphData = graphDataList[index];
+
+                                if (graphData && graphCommands[index]) {
+                                    Highcharts.chart(item.id, {
+                                        chart: { type: 'line' },
+                                        title: { text: graphCommands[index].name },
+                                        exporting: {
+                                            enabled: true
+                                        },
+                                        xAxis: { categories: graphData.categories },
+                                        yAxis: { title: { text: 'Plays' } },
+                                        series: graphData.series
+                                    });
+
+                                    renderedCharts.add(item.id);
+                                    
+                                    // Apply current theme
+                                    const nowDark = document.documentElement.classList.contains('dark');
+                                    applyChartTheme(nowDark);
+                                    
+                                    console.log('Auto-rendered graph during template load:', item.id);
+                                }
+                            } catch (error) {
+                                console.warn('Failed to auto-render graph during template load', item.id, error);
+                            }
+                        }
+                    });
+                    
                     // Update button states for selected items
                     selectedItems.forEach(item => {
                         const button = document.querySelector(`[data-id="${item.id}"]`);

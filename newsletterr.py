@@ -9,10 +9,9 @@ from pathlib import Path
 from plex_api_client import PlexAPI
 from urllib.parse import quote_plus
 
-##jmw test add line
-
 app = Flask(__name__)
 app.jinja_env.globals["version"] = "v0.7.3"
+app.jinja_env.globals["publish_date"] = "August 17, 2025"
 
 # Cache configuration
 CACHE_DURATION = 300  # 5 minutes in seconds
@@ -22,11 +21,11 @@ cache_storage = {
     'graph_data': {'data': None, 'timestamp': 0},
     'recent_data': {'data': None, 'timestamp': 0}
 }
-app.jinja_env.globals["publish_date"] = "August 17, 2025"
 
 DB_PATH = os.path.join("database", "data.db")
 EMAIL_LISTS_DB_PATH = os.path.join("database", "email_lists.db")
 EMAIL_TEMPLATES_DB_PATH = os.path.join("database", "email_templates.db")
+EMAIL_HISTORY_DB_PATH = os.path.join("database", "email_history.db")
 plex_headers = {
     "X-Plex-Client-Identifier": str(uuid.uuid4())
 }
@@ -146,6 +145,24 @@ def init_email_templates_db(db_path):
             layout TEXT DEFAULT 'standard',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+def init_email_history_db(db_path):
+    """Initialize the email history database"""
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS email_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            subject TEXT NOT NULL,
+            recipients TEXT NOT NULL,
+            email_content TEXT,
+            content_size_kb REAL,
+            recipient_count INTEGER,
+            sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
     conn.commit()
@@ -449,6 +466,26 @@ def index():
             "server_name": ""
         }
 
+    # Load cached data if available (for both GET and POST requests)
+    if settings['server_name'] != "":
+        # Check cache for stats
+        stats = get_cached_data('stats')
+        
+        # Check cache for users
+        users = get_cached_data('users')
+        
+        # Check cache for graph data
+        graph_data = get_cached_data('graph_data') or []
+        
+        # Check cache for recent data
+        recent_data = get_cached_data('recent_data') or []
+        
+        # Build user_dict if we have users
+        if users:
+            for user in users:
+                if user['email'] != None and user['is_active']:
+                    user_dict[user['user_id']] = user['email']
+
     if request.method == 'POST':
         if settings['server_name'] == "":
             return render_template('index.html', error='Please enter tautulli info on settings page',
@@ -461,37 +498,33 @@ def index():
             tautulli_api_key = settings['tautulli_api']
 
             # Check cache first for stats
-            stats = get_cached_data('stats')
             if stats is None:
                 stats, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_home_stats', 'Stats', error, time_range)
                 set_cached_data('stats', stats)
             
             # Check cache first for users
-            users = get_cached_data('users')
             if users is None:
                 users, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_users', 'Users', error)
                 set_cached_data('users', users)
             
             # Check cache first for graph data
-            cached_graph_data = get_cached_data('graph_data')
-            if cached_graph_data is None:
+            if not graph_data:
+                graph_data = []
                 for command in graph_commands:
                     gd, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, command["command"], command["name"], error, time_range)
                     graph_data.append(gd)
                 set_cached_data('graph_data', graph_data)
-            else:
-                graph_data = cached_graph_data
             
             # Check cache first for recent data
-            cached_recent_data = get_cached_data('recent_data')
-            if cached_recent_data is None:
+            if not recent_data:
+                recent_data = []
                 for command in recent_commands:
                     rd, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_recently_added', command["command"], error, count)
                     recent_data.append(rd)
                 set_cached_data('recent_data', recent_data)
-            else:
-                recent_data = cached_recent_data
             
+            # Update user_dict with fresh users data
+            user_dict = {}
             for user in users:
                 if user['email'] != None and user['is_active']:
                     user_dict[user['user_id']] = user['email']
@@ -712,10 +745,37 @@ def send_email():
     try:
         with smtplib.SMTP_SSL(smtp_server, smtp_port) as server:
             server.login(from_email, decrypt(password))
+            
+            # Calculate email size in KB
+            email_content = msg_root.as_string()
+            content_size_kb = len(email_content.encode('utf-8')) / 1024
+            
             if alias_email == '':
-                server.sendmail(from_email, [from_email] + to_emails, msg_root.as_string())
+                server.sendmail(from_email, [from_email] + to_emails, email_content)
+                all_recipients = [from_email] + to_emails
             else:
-                server.sendmail(alias_email, [alias_email] + to_emails, msg_root.as_string())
+                server.sendmail(alias_email, [alias_email] + to_emails, email_content)
+                all_recipients = [alias_email] + to_emails
+            
+            # Save to email history
+            try:
+                history_conn = sqlite3.connect(EMAIL_HISTORY_DB_PATH)
+                history_cursor = history_conn.cursor()
+                history_cursor.execute("""
+                    INSERT INTO email_history (subject, recipients, email_content, content_size_kb, recipient_count)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (
+                    subject,
+                    ', '.join(all_recipients),
+                    email_content,
+                    round(content_size_kb, 2),
+                    len(all_recipients)
+                ))
+                history_conn.commit()
+                history_conn.close()
+            except Exception as history_error:
+                print(f"Error saving email history: {history_error}")
+            
         return jsonify({"success": True})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -874,6 +934,58 @@ def plex_get_info():
 def about():
     return render_template('about.html')
 
+@app.route('/email_history', methods=['GET'])
+def email_history():
+    """Display email history page"""
+    try:
+        conn = sqlite3.connect(EMAIL_HISTORY_DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT id, subject, recipients, content_size_kb, recipient_count, sent_at 
+            FROM email_history 
+            ORDER BY sent_at DESC
+        """)
+        emails = cursor.fetchall()
+        conn.close()
+        
+        email_list = []
+        for email in emails:
+            email_list.append({
+                'id': email[0],
+                'subject': email[1],
+                'recipients': email[2],
+                'content_size_kb': email[3],
+                'recipient_count': email[4],
+                'sent_at': email[5]
+            })
+        
+        return render_template('email_history.html', emails=email_list)
+    except Exception as e:
+        print(f"Error loading email history: {e}")
+        return render_template('email_history.html', emails=[])
+
+@app.route('/email_history/recipients/<int:email_id>', methods=['GET'])
+def get_email_recipients(email_id):
+    """Get recipients for a specific email"""
+    try:
+        conn = sqlite3.connect(EMAIL_HISTORY_DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT recipients, subject FROM email_history WHERE id = ?", (email_id,))
+        result = cursor.fetchone()
+        conn.close()
+        
+        if result:
+            recipients = result[0].split(', ') if result[0] else []
+            return jsonify({
+                'subject': result[1],
+                'recipients': recipients
+            })
+        else:
+            return jsonify({'error': 'Email not found'}), 404
+    except Exception as e:
+        print(f"Error getting recipients: {e}")
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/clear_cache', methods=['POST'])
 def clear_cache_route():
     """Clear the data cache and return a JSON response"""
@@ -1023,5 +1135,6 @@ if __name__ == '__main__':
     init_db(DB_PATH)
     init_email_lists_db(EMAIL_LISTS_DB_PATH)
     init_email_templates_db(EMAIL_TEMPLATES_DB_PATH)
+    init_email_history_db(EMAIL_HISTORY_DB_PATH)
     migrate_schema("conjurr_url TEXT")
     app.run(host="127.0.0.1", port=6397, debug=True)

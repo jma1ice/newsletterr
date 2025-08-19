@@ -3,7 +3,7 @@
 
 {% block content %}
 <div class="container-fluid">
-    <h1 style="font-weight: bold;">Email History</h1>
+    <h1>Email History</h1>
     <p class="text-muted mb-4">View all sent emails and their recipients</p>
 
     {% if emails %}
@@ -50,7 +50,7 @@
             <h4 class="alert-heading">No Email History</h4>
             <p>No emails have been sent yet. Email history will appear here after you send your first newsletter.</p>
             <hr>
-            <p class="mb-0"><a href="{{ url_for('index') }}" class="btn btn-primary">Send Your First Newsletter</a></p>
+            <p class="mb-0"><a href="{{ url_for('index') }}" class="button">Send Your First Newsletter</a></p>
         </div>
     {% endif %}
 </div>

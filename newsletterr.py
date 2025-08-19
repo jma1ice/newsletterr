@@ -1,18 +1,20 @@
-import os, math, uuid, base64, smtplib, sqlite3, requests, time, threading
+import os, math, uuid, base64, smtplib, sqlite3, requests, time, threading, re
+from bs4 import BeautifulSoup
 from datetime import datetime, timezone
 from cryptography.fernet import Fernet, InvalidToken
 from dotenv import load_dotenv, set_key, find_dotenv
 from email.mime.text import MIMEText
 from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
+from email.utils import make_msgid
 from flask import Flask, render_template, request, jsonify, Response
 from pathlib import Path
 from plex_api_client import PlexAPI
 from urllib.parse import quote_plus
 
 app = Flask(__name__)
-app.jinja_env.globals["version"] = "v0.8.5 betajmw"
-app.jinja_env.globals["publish_date"] = "August 18, 2025"
+app.jinja_env.globals["version"] = "v0.8.6"
+app.jinja_env.globals["publish_date"] = "August 19, 2025"
 
 # Cache configuration
 CACHE_DURATION = 300  # 5 minutes in seconds
@@ -45,6 +47,10 @@ plex_headers = {
 }
 ROOT = Path(__file__).resolve().parent
 ENV_PATH = find_dotenv(usecwd=True) or str(ROOT / ".env")
+DATA_IMG_RE = re.compile(
+    r'^data:(image/(png|jpeg|jpg|gif|webp));base64,([A-Za-z0-9+/=]+)$',
+    re.IGNORECASE
+)
 
 load_dotenv(ENV_PATH)
 
@@ -394,6 +400,42 @@ def run_conjurr_command(base_url, user_dict, error):
                 error += str(f", Conjurr Error: {e}")
 
     return [recommendations_dict, error]
+
+def inline_data_images_to_cid(html: str, msg_root, cid_prefix="img"):
+    """
+    - Finds <img src="data:image/...;base64,...."> in html
+    - Replaces src with cid:<generated>
+    - Attaches each image to msg_root (multipart/related)
+    Returns (new_html, list_of_cids)
+    """
+    soup = BeautifulSoup(html or "", "html.parser")
+    cids = []
+
+    for img in soup.find_all("img"):
+        src = (img.get("src") or "").strip()
+        m = DATA_IMG_RE.match(src)
+        if not m:
+            continue
+        mime, subtype, b64 = m.group(1), m.group(2).lower(), m.group(3)
+        if subtype == "jpg":
+            subtype = "jpeg"
+
+        # Decode and attach
+        raw = base64.b64decode(b64)
+        cid = make_msgid(domain="newsletterr.local")[1:-1]  # strip <>; simple token
+        img["src"] = f"cid:{cid}"
+
+        part = MIMEImage(raw, _subtype=subtype)
+        part.add_header("Content-ID", f"<{cid}>")
+        part.add_header("Content-Disposition", "inline", filename=f"{cid}.{subtype}")
+        msg_root.attach(part)
+        cids.append(cid)
+
+    return str(soup), cids
+
+def ensure_cids_match_html(html: str, attachments_cids: list[str]):
+    missing = [cid for cid in attachments_cids if f'src="cid:{cid}"' not in html]
+    return missing  # for logging / debugging only
 
 def _norm(v: str):
     if not v:
@@ -796,7 +838,13 @@ def send_email():
     msg_alternative = MIMEMultipart('alternative')
     msg_root.attach(msg_alternative)
 
+    # Use the complete HTML content from the preview
+    html_content = email_html
+
+    html_content, _cids_from_data = inline_data_images_to_cid(html_content, msg_root)
+
     # Process all images and attach them with CID references
+    attached_cids = []
     for image_data in all_images:
         try:
             # Extract base64 data (remove data:image/png;base64, prefix if present)
@@ -810,6 +858,8 @@ def send_email():
             # Determine the image format
             mime_type = image_data.get('mime', 'image/png')
             subtype = mime_type.split('/')[-1] if '/' in mime_type else 'png'
+            if subtype == 'jpg':
+                subtype = 'jpeg'
             
             # Create the image attachment
             image_part = MIMEImage(raw_image_data, _subtype=subtype)
@@ -817,14 +867,16 @@ def send_email():
             image_part.add_header('Content-ID', f'<{cid}>')
             image_part.add_header('Content-Disposition', 'inline', filename=f'{cid}.{subtype}')
             msg_root.attach(image_part)
+            attached_cids.append(cid)
         except Exception as e:
             print(f"Error processing image {image_data.get('cid', 'unknown')}: {str(e)}")
             continue
+    
+    # Add a plain-text alternative first (some clients like it)
+    plain = re.sub(r'<[^>]+>', ' ', html_content)  # crude strip of tags
+    msg_alternative.attach(MIMEText(plain, 'plain', 'utf-8'))
 
-    # Use the complete HTML content from the preview
-    html_content = email_html
-
-    msg_alternative.attach(MIMEText(html_content, 'html'))
+    msg_alternative.attach(MIMEText(html_content, 'html', 'utf-8'))
 
     try:
         with smtplib.SMTP_SSL(smtp_server, smtp_port) as server:

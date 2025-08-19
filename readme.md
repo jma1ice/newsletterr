@@ -110,7 +110,7 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 
 ## Upcoming Changes
 
-### v0.8.1
+### v0.8.2
 * Add width to email/preview subject section
 * Mobile optimizations, i.e.:
 ```
@@ -140,6 +140,10 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 ---
 
 ## Recent Changes
+
+### v0.8.1
+* Fixed some issues with update checker
+* Added release bot yaml
 
 ### v0.8.0
 * Marked optional entries in settings

@@ -10,7 +10,7 @@ from plex_api_client import PlexAPI
 from urllib.parse import quote_plus
 
 app = Flask(__name__)
-app.jinja_env.globals["version"] = "v0.8.1"
+app.jinja_env.globals["version"] = "v0.8.2"
 app.jinja_env.globals["publish_date"] = "August 18, 2025"
 app.config["GITHUB_OWNER"] = "jma1ice"
 app.config["GITHUB_REPO"] = "newsletterr"

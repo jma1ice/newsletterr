@@ -1,4 +1,5 @@
 import os, math, uuid, base64, smtplib, sqlite3, requests, time, threading
+from datetime import datetime, timezone
 from cryptography.fernet import Fernet, InvalidToken
 from dotenv import load_dotenv, set_key, find_dotenv
 from email.mime.text import MIMEText
@@ -10,8 +11,18 @@ from plex_api_client import PlexAPI
 from urllib.parse import quote_plus
 
 app = Flask(__name__)
-app.jinja_env.globals["version"] = "v0.8.3"
+app.jinja_env.globals["version"] = "v0.8.5 betajmw"
 app.jinja_env.globals["publish_date"] = "August 18, 2025"
+
+# Cache configuration
+CACHE_DURATION = 300  # 5 minutes in seconds
+cache_storage = {
+    'stats': {'data': None, 'timestamp': 0},
+    'users': {'data': None, 'timestamp': 0},
+    'graph_data': {'data': None, 'timestamp': 0},
+    'recent_data': {'data': None, 'timestamp': 0}
+}
+
 app.config["GITHUB_OWNER"] = "jma1ice"
 app.config["GITHUB_REPO"] = "newsletterr"
 app.config["UPDATE_CHECK_INTERVAL_SEC"] = 60 * 60
@@ -24,7 +35,11 @@ _update_cache = {
     "checked_at": 0.0,
     "etag": None,
 }
+
 DB_PATH = os.path.join("database", "data.db")
+EMAIL_LISTS_DB_PATH = os.path.join("database", "email_lists.db")
+EMAIL_TEMPLATES_DB_PATH = os.path.join("database", "email_templates.db")
+EMAIL_HISTORY_DB_PATH = os.path.join("database", "email_history.db")
 plex_headers = {
     "X-Plex-Client-Identifier": str(uuid.uuid4())
 }
@@ -32,6 +47,34 @@ ROOT = Path(__file__).resolve().parent
 ENV_PATH = find_dotenv(usecwd=True) or str(ROOT / ".env")
 
 load_dotenv(ENV_PATH)
+
+def is_cache_valid(cache_key):
+    """Check if cache data is still valid"""
+    cache_entry = cache_storage.get(cache_key)
+    if cache_entry and cache_entry['data'] is not None:
+        return time.time() - cache_entry['timestamp'] < CACHE_DURATION
+    return False
+
+def get_cached_data(cache_key):
+    """Get cached data if valid"""
+    if is_cache_valid(cache_key):
+        return cache_storage[cache_key]['data']
+    return None
+
+def set_cached_data(cache_key, data):
+    """Store data in cache with current timestamp"""
+    cache_storage[cache_key] = {
+        'data': data,
+        'timestamp': time.time()
+    }
+
+def clear_cache(cache_key=None):
+    """Clear specific cache or all cache if no key specified"""
+    if cache_key:
+        cache_storage[cache_key] = {'data': None, 'timestamp': 0}
+    else:
+        for key in cache_storage:
+            cache_storage[key] = {'data': None, 'timestamp': 0}
 
 def ensure_data_key() -> str:
     key = os.getenv("DATA_ENC_KEY")
@@ -58,6 +101,8 @@ def encrypt(token: str) -> str:
     return fernet.encrypt(token.encode()).decode()
 
 def decrypt(encrypted: str) -> str:
+    if encrypted is None:
+        return ""
     try:
         return fernet.decrypt(encrypted.encode()).decode()
     except InvalidToken:
@@ -85,6 +130,58 @@ def init_db(db_path):
     conn.commit()
     conn.close()
 
+def init_email_lists_db(db_path):
+    """Initialize the email lists database"""
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS email_lists (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT UNIQUE NOT NULL,
+            emails TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+def init_email_templates_db(db_path):
+    """Initialize the email templates database"""
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS email_templates (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT UNIQUE NOT NULL,
+            selected_items TEXT NOT NULL,
+            email_text TEXT,
+            subject TEXT,
+            layout TEXT DEFAULT 'standard',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+def init_email_history_db(db_path):
+    """Initialize the email history database"""
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS email_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            subject TEXT NOT NULL,
+            recipients TEXT NOT NULL,
+            email_content TEXT,
+            content_size_kb REAL,
+            recipient_count INTEGER,
+            sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.commit()
+    conn.close()
+
 def migrate_schema(column_def):
     conn = sqlite3.connect(DB_PATH)
     try:
@@ -96,6 +193,36 @@ def migrate_schema(column_def):
             conn.commit()
     finally:
         conn.close()
+
+def get_saved_email_lists():
+    """Get all saved email lists"""
+    conn = sqlite3.connect(EMAIL_LISTS_DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, name, emails FROM email_lists ORDER BY name")
+    lists = cursor.fetchall()
+    conn.close()
+    return [{'id': row[0], 'name': row[1], 'emails': row[2]} for row in lists]
+
+def save_email_list(name, emails):
+    """Save a new email list"""
+    conn = sqlite3.connect(EMAIL_LISTS_DB_PATH)
+    cursor = conn.cursor()
+    try:
+        cursor.execute("INSERT INTO email_lists (name, emails) VALUES (?, ?)", (name, emails))
+        conn.commit()
+        return True
+    except sqlite3.IntegrityError:
+        return False  # Name already exists
+    finally:
+        conn.close()
+
+def delete_email_list(list_id):
+    """Delete an email list by ID"""
+    conn = sqlite3.connect(EMAIL_LISTS_DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM email_lists WHERE id = ?", (list_id,))
+    conn.commit()
+    conn.close()
 
 def apply_layout(body, graphs_html_block, stats_html_block, ra_html_block, recs_html_block, layout, subject, server_name):
     body = body.replace('\n', '<br>')
@@ -133,7 +260,7 @@ def apply_layout(body, graphs_html_block, stats_html_block, ra_html_block, recs_
                                                     {body}
                                                 </p>
                                                 <div class="footer-bar" style="margin-left: auto; margin-right: auto; width: 250px; border-top: 1px solid #E5A00D; margin-top: 25px;">&nbsp;</div>
-                                                <div class="content-block powered-by" style="padding-bottom: 10px; padding-top: 0;">Generated for Plex Media Server by newsletterr</div>
+                                                <div class="content-block powered-by" style="padding-bottom: 10px; padding-top: 0;">Generated for Plex Media Server by <a href="https://github.com/jma1ice/newsletterr" style="color: #E5A00D; text-decoration: none;">newsletterr</a></div>
                                             </td>
                                         </tr>
                                     </tbody>
@@ -165,7 +292,7 @@ def apply_layout(body, graphs_html_block, stats_html_block, ra_html_block, recs_
                                                 <h1 class="footer-bar" style="margin-left: auto; margin-right: auto; width: 300px; border-top: 1px solid #E5A00D; margin-top: 5px;">{display_subject}</h1>
                                                 {ra_html_block}
                                                 <div class="footer-bar" style="margin-left: auto; margin-right: auto; width: 250px; border-top: 1px solid #E5A00D; margin-top: 25px;">&nbsp;</div>
-                                                <div class="content-block powered-by" style="padding-bottom: 10px; padding-top: 0;">Generated for Plex Media Server by newsletterr</div>
+                                                <div class="content-block powered-by" style="padding-bottom: 10px; padding-top: 0;">Generated for Plex Media Server by <a href="https://github.com/jma1ice/newsletterr" style="color: #E5A00D; text-decoration: none;">newsletterr</a></div>
                                             </td>
                                         </tr>
                                     </tbody>
@@ -197,7 +324,7 @@ def apply_layout(body, graphs_html_block, stats_html_block, ra_html_block, recs_
                                                 <h1 class="footer-bar" style="margin-left: auto; margin-right: auto; width: 300px; border-top: 1px solid #E5A00D; margin-top: 5px;">Recommended For You</h1>
                                                 {recs_html_block}
                                                 <div class="footer-bar" style="margin-left: auto; margin-right: auto; width: 250px; border-top: 1px solid #E5A00D; margin-top: 25px;">&nbsp;</div>
-                                                <div class="content-block powered-by" style="padding-bottom: 10px; padding-top: 0;">Generated for Plex Media Server by newsletterr</div>
+                                                <div class="content-block powered-by" style="padding-bottom: 10px; padding-top: 0;">Generated for Plex Media Server by <a href="https://github.com/jma1ice/newsletterr" style="color: #E5A00D; text-decoration: none;">newsletterr</a></div>
                                             </td>
                                         </tr>
                                     </tbody>
@@ -423,6 +550,26 @@ def index():
             "server_name": ""
         }
 
+    # Load cached data if available (for both GET and POST requests)
+    if settings['server_name'] != "":
+        # Check cache for stats
+        stats = get_cached_data('stats')
+        
+        # Check cache for users
+        users = get_cached_data('users')
+        
+        # Check cache for graph data
+        graph_data = get_cached_data('graph_data') or []
+        
+        # Check cache for recent data
+        recent_data = get_cached_data('recent_data') or []
+        
+        # Build user_dict if we have users
+        if users:
+            for user in users:
+                if user['email'] != None and user['is_active']:
+                    user_dict[user['user_id']] = user['email']
+
     if request.method == 'POST':
         if settings['server_name'] == "":
             return render_template('index.html', error='Please enter tautulli info on settings page',
@@ -434,20 +581,49 @@ def index():
             tautulli_base_url = settings['tautulli_url'].rstrip('/')
             tautulli_api_key = settings['tautulli_api']
 
-            stats, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_home_stats', 'Stats', error, time_range)
-            users, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_users', 'Users', error)
-            for command in graph_commands:
-                gd, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, command["command"], command["name"], error, time_range)
-                graph_data.append(gd)
-            for command in recent_commands:
-                rd, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_recently_added', command["command"], error, count)
-                recent_data.append(rd)
+            # Check cache first for stats
+            if stats is None:
+                stats, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_home_stats', 'Stats', error, time_range)
+                set_cached_data('stats', stats)
             
+            # Check cache first for users
+            if users is None:
+                users, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_users', 'Users', error)
+                set_cached_data('users', users)
+            
+            # Check cache first for graph data
+            if not graph_data:
+                graph_data = []
+                for command in graph_commands:
+                    gd, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, command["command"], command["name"], error, time_range)
+                    graph_data.append(gd)
+                set_cached_data('graph_data', graph_data)
+            
+            # Check cache first for recent data
+            if not recent_data:
+                recent_data = []
+                for command in recent_commands:
+                    rd, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_recently_added', command["command"], error, count)
+                    recent_data.append(rd)
+                set_cached_data('recent_data', recent_data)
+            
+            # Update user_dict with fresh users data
+            user_dict = {}
             for user in users:
                 if user['email'] != None and user['is_active']:
                     user_dict[user['user_id']] = user['email']
             
-            alert = f"Users, graphs/stats for {time_range} days, and {count} recently added items pulled!"
+            # Update alert to show cache status
+            cache_status = []
+            if is_cache_valid('stats'): cache_status.append("stats")
+            if is_cache_valid('users'): cache_status.append("users") 
+            if is_cache_valid('graph_data'): cache_status.append("graphs")
+            if is_cache_valid('recent_data'): cache_status.append("recent items")
+            
+            if cache_status:
+                alert = f"Data loaded! Used cached: {', '.join(cache_status)}. Fresh data for {time_range} days, and {count} recently added items."
+            else:
+                alert = f"Users, graphs/stats for {time_range} days, and {count} recently added items pulled fresh!"
 
     if graph_data == []:
         graph_data = [{},{}]
@@ -456,12 +632,19 @@ def index():
         recent_data = [{},{}]
         
     libs = ['movies', 'shows']
+    
+    # Get saved email lists
+    try:
+        email_lists = get_saved_email_lists()
+    except:
+        email_lists = []
         
     return render_template('index.html',
                            stats=stats, user_dict=user_dict,
                            graph_data=graph_data, graph_commands=graph_commands,
                            recent_data=recent_data, libs=libs,
-                           error=error, alert=alert, settings=settings
+                           error=error, alert=alert, settings=settings,
+                           email_lists=email_lists
                         )
 
 @app.route('/proxy-art/<path:art_path>')
@@ -566,22 +749,32 @@ def send_email():
 
     if row:
         settings = {
-            "from_email": row[0],
-            "alias_email": row[1],
-            "password": row[2],
-            "smtp_server": row[3],
-            "smtp_port": int(row[4]),
-            "server_name": row[5]
+            "from_email": row[0] or "",
+            "alias_email": row[1] or "",
+            "password": row[2] or "",
+            "smtp_server": row[3] or "",
+            "smtp_port": int(row[4]) if row[4] is not None else 587,
+            "server_name": row[5] or ""
         }
     else:
         return jsonify({"error": "Please enter email info on settings page"}), 500
 
     data = request.get_json()
+    
+    # Debug logging
+    print(f"DEBUG: Received email request")
+    print(f"DEBUG: Subject: {data.get('subject', 'No subject')}")
+    print(f"DEBUG: To emails: {data.get('to_emails', 'No recipients')}")
+    print(f"DEBUG: Email HTML length: {len(data.get('email_html', ''))}")
+    print(f"DEBUG: Number of images: {len(data.get('all_images', []))}")
+    
+    if data.get('all_images'):
+        for i, img in enumerate(data.get('all_images', [])):
+            print(f"DEBUG: Image {i}: CID={img.get('cid')}, MIME={img.get('mime')}, Data length={len(img.get('data', ''))}")
 
-    graphs = data['graphs']
-    stats = data['stats']
-    recently_added = data['recently_added']
-    recommendations = data['recommendations']
+    # Get the new format data
+    all_images = data.get('all_images', [])
+    email_html = data.get('email_html', '')
     from_email = settings['from_email']
     alias_email = settings['alias_email']
     password = settings['password']
@@ -590,8 +783,6 @@ def send_email():
     server_name = settings['server_name']
     to_emails = data['to_emails'].split(", ")
     subject = data['subject']
-    email_text = data['email_text']
-    layout = data.get('layout', 'none')
 
     msg_root = MIMEMultipart('related')
     msg_root['Subject'] = subject
@@ -605,73 +796,70 @@ def send_email():
     msg_alternative = MIMEMultipart('alternative')
     msg_root.attach(msg_alternative)
 
-    html_graphs = []
-    for graph in graphs:
-        cid = str(uuid.uuid4())
+    # Process all images and attach them with CID references
+    for image_data in all_images:
+        try:
+            # Extract base64 data (remove data:image/png;base64, prefix if present)
+            base64_data = image_data['data']
+            if base64_data.startswith('data:'):
+                base64_data = base64_data.split(',')[1]
+            
+            # Decode the image
+            raw_image_data = base64.b64decode(base64_data)
+            
+            # Determine the image format
+            mime_type = image_data.get('mime', 'image/png')
+            subtype = mime_type.split('/')[-1] if '/' in mime_type else 'png'
+            
+            # Create the image attachment
+            image_part = MIMEImage(raw_image_data, _subtype=subtype)
+            cid = image_data['cid']
+            image_part.add_header('Content-ID', f'<{cid}>')
+            image_part.add_header('Content-Disposition', 'inline', filename=f'{cid}.{subtype}')
+            msg_root.attach(image_part)
+        except Exception as e:
+            print(f"Error processing image {image_data.get('cid', 'unknown')}: {str(e)}")
+            continue
 
-        html_graphs.append(f'<p><img src="cid:{cid}" style="max-width: 100%;"></p>')
-
-        base64_data = graph['img'].split(',')[1]
-        image_data = base64.b64decode(base64_data)
-
-        image_part = MIMEImage(image_data, _subtype='png')
-        image_part.add_header('Content-ID', f'<{cid}>')
-        image_part.add_header('Content-Disposition', 'inline', filename=f'{cid}.png')
-        msg_root.attach(image_part)
-    graphs_html_block = ''.join(html_graphs)
-
-    html_stats = []
-    for stat in stats:
-        cid = str(uuid.uuid4())
-
-        html_stats.append(f'<p><img src="cid:{cid}" style="max-width: 100%;"></p>')
-
-        base64_data = stat['img'].split(',')[1]
-        image_data = base64.b64decode(base64_data)
-
-        image_part = MIMEImage(image_data, _subtype='png')
-        image_part.add_header('Content-ID', f'<{cid}>')
-        image_part.add_header('Content-Disposition', 'inline', filename=f'{cid}.png')
-        msg_root.attach(image_part)
-    stats_html_block = ''.join(html_stats)
-
-    html_ra = []
-    for ra_image in recently_added:
-        raw = base64.b64decode(ra_image.get('base64',''))
-        subtype = (ra_image.get('mime','image/png').split('/',1)[-1]) or 'png'
-
-        img = MIMEImage(raw, _subtype=subtype)
-        cid = ra_image.get('cid','asset.png')
-        html_ra.append(f'<p><img src="cid:{cid}" style="max-width: 100%;"></p>')
-        img.add_header('Content-ID', f'<{cid}>')
-        img.add_header('Content-Disposition', 'inline', filename=cid)
-        msg_root.attach(img)
-    ra_html_block = ''.join(html_ra)
-
-    html_recs = []
-    for rec in recommendations:
-        raw = base64.b64decode(rec.get('base64',''))
-        subtype = (rec.get('mime','image/png').split('/',1)[-1]) or 'png'
-
-        img = MIMEImage(raw, _subtype=subtype)
-        cid = rec.get('cid','asset.png')
-        html_recs.append(f'<p><img src="cid:{cid}" style="max-width: 100%;"></p>')
-        img.add_header('Content-ID', f'<{cid}>')
-        img.add_header('Content-Disposition', 'inline', filename=cid)
-        msg_root.attach(img)
-    recs_html_block = ''.join(html_recs)
-
-    html_content = apply_layout(email_text, graphs_html_block, stats_html_block, ra_html_block, recs_html_block, layout, subject, server_name)
+    # Use the complete HTML content from the preview
+    html_content = email_html
 
     msg_alternative.attach(MIMEText(html_content, 'html'))
 
     try:
         with smtplib.SMTP_SSL(smtp_server, smtp_port) as server:
             server.login(from_email, decrypt(password))
+            
+            # Calculate email size in KB
+            email_content = msg_root.as_string()
+            content_size_kb = len(email_content.encode('utf-8')) / 1024
+            
             if alias_email == '':
-                server.sendmail(from_email, [from_email] + to_emails, msg_root.as_string())
+                server.sendmail(from_email, [from_email] + to_emails, email_content)
+                all_recipients = [from_email] + to_emails
             else:
-                server.sendmail(alias_email, [alias_email] + to_emails, msg_root.as_string())
+                server.sendmail(alias_email, [alias_email] + to_emails, email_content)
+                all_recipients = [alias_email] + to_emails
+            
+            # Save to email history
+            try:
+                history_conn = sqlite3.connect(EMAIL_HISTORY_DB_PATH)
+                history_cursor = history_conn.cursor()
+                history_cursor.execute("""
+                    INSERT INTO email_history (subject, recipients, email_content, content_size_kb, recipient_count)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (
+                    subject,
+                    ', '.join(all_recipients),
+                    email_content,
+                    round(content_size_kb, 2),
+                    len(all_recipients)
+                ))
+                history_conn.commit()
+                history_conn.close()
+            except Exception as history_error:
+                print(f"Error saving email history: {history_error}")
+            
         return jsonify({"success": True})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -729,16 +917,16 @@ def settings():
 
     if row:
         settings = {
-            "from_email": row[0],
-            "alias_email": row[1],
+            "from_email": row[0] or "",
+            "alias_email": row[1] or "",
             "password": decrypt(row[2]),
-            "smtp_server": row[3],
-            "smtp_port": int(row[4]),
-            "server_name": row[5],
-            "plex_token": row[6],
-            "tautulli_url": row[7],
+            "smtp_server": row[3] or "",
+            "smtp_port": int(row[4]) if row[4] is not None else 587,
+            "server_name": row[5] or "",
+            "plex_token": row[6] or "",
+            "tautulli_url": row[7] or "",
             "tautulli_api": decrypt(row[8]),
-            "conjurr_url": row[9]
+            "conjurr_url": row[9] or ""
         }
     else:
         settings = {
@@ -830,8 +1018,219 @@ def plex_get_info():
 def about():
     return render_template('about.html')
 
+@app.route('/email_history', methods=['GET'])
+def email_history():
+    """Display email history page"""
+    try:
+        conn = sqlite3.connect(EMAIL_HISTORY_DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT id, subject, recipients, content_size_kb, recipient_count, sent_at 
+            FROM email_history 
+            ORDER BY sent_at DESC
+        """)
+        emails = cursor.fetchall()
+        conn.close()
+        
+        email_list = []
+        for email in emails:
+            # Convert UTC timestamp to local time
+            try:
+                # Parse the SQLite timestamp
+                utc_dt = datetime.fromisoformat(email[5].replace('Z', '+00:00'))
+                # Convert to local time
+                local_dt = utc_dt.replace(tzinfo=timezone.utc).astimezone()
+                # Format as readable string
+                formatted_time = local_dt.strftime('%Y-%m-%d %I:%M:%S %p')
+            except:
+                # Fallback to original timestamp if parsing fails
+                formatted_time = email[5]
+            
+            email_list.append({
+                'id': email[0],
+                'subject': email[1],
+                'recipients': email[2],
+                'content_size_kb': email[3],
+                'recipient_count': email[4],
+                'sent_at': formatted_time
+            })
+        
+        return render_template('email_history.html', emails=email_list)
+    except Exception as e:
+        print(f"Error loading email history: {e}")
+        return render_template('email_history.html', emails=[])
+
+@app.route('/email_history/recipients/<int:email_id>', methods=['GET'])
+def get_email_recipients(email_id):
+    """Get recipients for a specific email"""
+    try:
+        conn = sqlite3.connect(EMAIL_HISTORY_DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT recipients, subject FROM email_history WHERE id = ?", (email_id,))
+        result = cursor.fetchone()
+        conn.close()
+        
+        if result:
+            recipients = result[0].split(', ') if result[0] else []
+            return jsonify({
+                'subject': result[1],
+                'recipients': recipients
+            })
+        else:
+            return jsonify({'error': 'Email not found'}), 404
+    except Exception as e:
+        print(f"Error getting recipients: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/clear_cache', methods=['POST'])
+def clear_cache_route():
+    """Clear the data cache and return a JSON response"""
+    clear_cache()
+    return jsonify({"status": "success", "message": "Cache cleared successfully"})
+
+@app.route('/cache_status', methods=['GET'])
+def cache_status():
+    """Get cache status information"""
+    status = {}
+    for key in cache_storage:
+        status[key] = {
+            'has_data': cache_storage[key]['data'] is not None,
+            'is_valid': is_cache_valid(key),
+            'age_seconds': int(time.time() - cache_storage[key]['timestamp']) if cache_storage[key]['timestamp'] > 0 else 0
+        }
+    return jsonify(status)
+
+@app.route('/email_lists', methods=['GET'])
+def get_email_lists():
+    """Get all saved email lists"""
+    try:
+        lists = get_saved_email_lists()
+        return jsonify({"status": "success", "lists": lists})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/email_lists', methods=['POST'])
+def save_email_list_route():
+    """Save a new email list"""
+    try:
+        data = request.get_json()
+        name = data.get('name', '').strip()
+        emails = data.get('emails', '').strip()
+        
+        if not name:
+            return jsonify({"status": "error", "message": "List name is required"}), 400
+        if not emails:
+            return jsonify({"status": "error", "message": "Email list cannot be empty"}), 400
+            
+        success = save_email_list(name, emails)
+        if success:
+            return jsonify({"status": "success", "message": f"List '{name}' saved successfully"})
+        else:
+            return jsonify({"status": "error", "message": f"List name '{name}' already exists"}), 400
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/email_lists/<int:list_id>', methods=['DELETE'])
+def delete_email_list_route(list_id):
+    """Delete an email list"""
+    try:
+        delete_email_list(list_id)
+        return jsonify({"status": "success", "message": "List deleted successfully"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+# Email Template Routes
+@app.route('/email_templates', methods=['GET'])
+def get_email_templates():
+    """Get all email templates"""
+    try:
+        conn = sqlite3.connect(EMAIL_TEMPLATES_DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, name, selected_items, email_text, subject, layout FROM email_templates ORDER BY name")
+        templates = cursor.fetchall()
+        conn.close()
+        
+        template_list = []
+        for template in templates:
+            template_list.append({
+                'id': template[0],
+                'name': template[1],
+                'selected_items': template[2],
+                'email_text': template[3],
+                'subject': template[4],
+                'layout': template[5]
+            })
+        
+        return jsonify(template_list)
+    except Exception as e:
+        print(f"Error getting templates: {e}")
+        return jsonify([])
+
+@app.route('/email_templates', methods=['POST'])
+def save_email_template():
+    """Save a new email template"""
+    try:
+        data = request.get_json()
+        name = data.get('name', '').strip()
+        selected_items = data.get('selected_items', '[]')  # JSON string
+        email_text = data.get('email_text', '')
+        subject = data.get('subject', '')
+        layout = data.get('layout', 'standard')
+        
+        if not name:
+            return jsonify({"status": "error", "message": "Template name is required"}), 400
+        
+        conn = sqlite3.connect(EMAIL_TEMPLATES_DB_PATH)
+        cursor = conn.cursor()
+        
+        # Check if template with this name already exists
+        cursor.execute("SELECT id FROM email_templates WHERE name = ?", (name,))
+        existing = cursor.fetchone()
+        
+        if existing:
+            # Update existing template
+            cursor.execute("""
+                UPDATE email_templates 
+                SET selected_items = ?, email_text = ?, subject = ?, layout = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE name = ?
+            """, (selected_items, email_text, subject, layout, name))
+            message = "Template updated successfully"
+        else:
+            # Create new template
+            cursor.execute("""
+                INSERT INTO email_templates (name, selected_items, email_text, subject, layout)
+                VALUES (?, ?, ?, ?, ?)
+            """, (name, selected_items, email_text, subject, layout))
+            message = "Template saved successfully"
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({"status": "success", "message": message})
+    except Exception as e:
+        print(f"Error saving template: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/email_templates/<int:template_id>', methods=['DELETE'])
+def delete_email_template(template_id):
+    """Delete an email template"""
+    try:
+        conn = sqlite3.connect(EMAIL_TEMPLATES_DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM email_templates WHERE id = ?", (template_id,))
+        conn.commit()
+        conn.close()
+        
+        return jsonify({"status": "success", "message": "Template deleted successfully"})
+    except Exception as e:
+        print(f"Error deleting template: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 if __name__ == '__main__':
     os.makedirs("database", exist_ok=True)
     init_db(DB_PATH)
+    init_email_lists_db(EMAIL_LISTS_DB_PATH)
+    init_email_templates_db(EMAIL_TEMPLATES_DB_PATH)
+    init_email_history_db(EMAIL_HISTORY_DB_PATH)
     migrate_schema("conjurr_url TEXT")
     app.run(host="127.0.0.1", port=6397, debug=True)

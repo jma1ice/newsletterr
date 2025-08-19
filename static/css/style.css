@@ -5,11 +5,17 @@ div, nav, footer {
 }
 
 .frame {
-    height: 50rem;
-    width: 60rem;
+    height: 30rem;
+    min-height: 30rem;
+    max-height: 60rem;
+    width: 100%;
+    max-width: 60rem;
     border: 1px solid #444;
     border-radius: 8px;
     background: #8acbd4 !important;
+    position: sticky;
+    top: 80px;
+    overflow: auto;
 }
 
 .dark .frame {
@@ -263,6 +269,47 @@ input, textarea, select, #statSelector, #graphSelector {
     color: inherit;
 }
 
+/* Card theming for Email Recipients section */
+.card {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+.card-header {
+    background-color: #e9ecef !important;
+    border-bottom: 1px solid #dee2e6;
+    padding: 12px 16px;
+    border-radius: 8px 8px 0 0;
+    color: #495057;
+}
+
+.card-body {
+    padding: 16px;
+    background-color: #f8f9fa;
+    border-radius: 0 0 8px 8px;
+}
+
+.dark .card {
+    background-color: #4a4a4a;
+    border-color: #666;
+}
+
+.dark .card-header {
+    background-color: #555 !important;
+    border-bottom-color: #666;
+    color: #8acbd4;
+}
+
+.dark .card-body {
+    background-color: #4a4a4a;
+}
+
+.dark .form-label {
+    color: #8acbd4;
+}
+
 footer {
     position: fixed;
     z-index: 2;
@@ -292,4 +339,95 @@ footer p {
 
 .right-foot {
     float: right;
+}
+
+/* Selected Items Styling */
+.selected-item {
+    cursor: move;
+    transition: background-color 0.2s;
+}
+
+.selected-item:hover {
+    background-color: #e9ecef !important;
+}
+
+.selected-item.dragging {
+    opacity: 0.6;
+    transform: rotate(2deg) scale(1.02);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+    border: 2px solid #007bff;
+    z-index: 1000;
+    cursor: grabbing !important;
+    transition: none;
+}
+
+.selected-item {
+    cursor: grab;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.selected-item:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.selected-item.drag-over {
+    border-top: 3px solid #007bff;
+    transform: translateY(2px);
+}
+
+.selected-item::before {
+    content: "⋮⋮";
+    position: absolute;
+    left: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #999;
+    font-size: 14px;
+    line-height: 0.8;
+    opacity: 0.7;
+}
+
+.selected-item:hover::before {
+    opacity: 1;
+    color: #007bff;
+}
+
+.dark .selected-item {
+    background-color: #4a4a4a !important;
+    border-color: #666 !important;
+    color: #8acbd4;
+}
+
+.dark .selected-item:hover {
+    background-color: #555 !important;
+}
+
+.dark .selected-item.dragging {
+    border-color: #17a2b8;
+    box-shadow: 0 8px 25px rgba(23, 162, 184, 0.3);
+}
+
+.dark .selected-item.drag-over {
+    border-top-color: #17a2b8;
+}
+
+.dark .selected-item::before {
+    color: #999;
+}
+
+.dark .selected-item:hover::before {
+    color: #17a2b8;
+}
+
+#selected-items-list {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.dark #selected-items-list {
+    background-color: #4a4a4a !important;
+    border-color: #666 !important;
+    color: #8acbd4;
 }

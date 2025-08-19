@@ -131,9 +131,14 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 * Template management to go with lists - Include a few default templates that snap in the most common stats
 * Automation management (Which lists, how often?)
 * Opt out support?
-* For the two below this, a stat/graph pane in place of the stat/graph placeholders
-* Checking "include XYZ in email" buttons should trigger them to be added to the previewed email in realtime, as snap-ins that can be removed on the fly as well. Maybe a button instead of a check box? 
-* Graph/stat ordering? Should it have a default ordering, or user editable?
+* (Done) Checking "include XYZ in email" buttons should trigger them to be added to the previewed email in realtime, as snap-ins that can be removed on the fly as well. Maybe a button instead of a check box? 
+* (Done) Graph/stat ordering? Should it have a default ordering, or user editable? 
+* (Done) Email history - list of when emails were sent, and to whom
+* (Done) Email BCC list management
+* (Done) clean up UI, move stats/graphs
+* Graph titles need to specify the date range
+* (Done) made "newsletterr" footer a link
+* (Done) pop-out email preview
 
 ### v1.0
 * Dockerize

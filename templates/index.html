@@ -122,7 +122,19 @@
                     <td style="width: 60%; padding: 10px; vertical-align: top;">
                         <!-- Selected Items Pane -->
                         <div id="selected-items-pane">
-                            <h2>Snap-ins</h2>
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h2>Snap-ins</h2>
+                                <div class="d-flex gap-2 align-items-center">
+                                    <label for="template-selector" class="form-label mb-0">Template:</label>
+                                    <select id="template-selector" class="form-select" style="width: 200px;">
+                                        <option value="">Custom</option>
+                                        <option value="save-template">(Save template)</option>
+                                    </select>
+                                    <button id="delete-template-btn" class="btn btn-outline-danger btn-sm" style="display: none;">
+                                        🗑️ Delete
+                                    </button>
+                                </div>
+                            </div>
                             <div id="selected-items-list" class="border rounded p-3 mb-4" style="min-height: 100px; background: #f8f9fa;">
                                 <div id="selected-items-empty" class="text-muted text-center py-3">
                                     No items selected. Use the buttons below to add items to your email.
@@ -2124,6 +2136,181 @@
                         }
                     });
                 }
+            });
+
+            // Email Template Management
+            let emailTemplates = [];
+
+            // Load templates on page load
+            async function loadEmailTemplates() {
+                try {
+                    const response = await fetch('/email_templates');
+                    emailTemplates = await response.json();
+                    updateTemplateDropdown();
+                } catch (error) {
+                    console.error('Error loading templates:', error);
+                }
+            }
+
+            function updateTemplateDropdown() {
+                const selector = document.getElementById('template-selector');
+                
+                // Clear existing options except first two
+                while (selector.children.length > 2) {
+                    selector.removeChild(selector.lastChild);
+                }
+                
+                // Add templates in alphabetical order
+                emailTemplates.forEach(template => {
+                    const option = document.createElement('option');
+                    option.value = template.id;
+                    option.textContent = template.name;
+                    selector.appendChild(option);
+                });
+            }
+
+            // Template selector change handler
+            document.getElementById('template-selector').addEventListener('change', async function() {
+                const value = this.value;
+                const deleteBtn = document.getElementById('delete-template-btn');
+                
+                if (value === 'save-template') {
+                    // Show save template dialog
+                    const templateName = prompt('Enter template name:');
+                    if (templateName && templateName.trim()) {
+                        await saveCurrentTemplate(templateName.trim());
+                    }
+                    // Reset to Custom
+                    this.value = '';
+                    deleteBtn.style.display = 'none';
+                } else if (value === '') {
+                    // Custom - clear everything
+                    deleteBtn.style.display = 'none';
+                } else {
+                    // Load template
+                    const templateId = parseInt(value);
+                    const template = emailTemplates.find(t => t.id === templateId);
+                    if (template) {
+                        loadTemplate(template);
+                        deleteBtn.style.display = 'inline-block';
+                        deleteBtn.dataset.templateId = templateId;
+                    }
+                }
+            });
+
+            // Save current template
+            async function saveCurrentTemplate(name) {
+                try {
+                    const templateData = {
+                        name: name,
+                        selected_items: JSON.stringify(selectedItems),
+                        email_text: document.getElementById('email_text').value,
+                        subject: document.getElementById('subject').value,
+                        layout: document.getElementById('layout').value
+                    };
+
+                    const response = await fetch('/email_templates', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(templateData)
+                    });
+
+                    const result = await response.json();
+                    if (result.status === 'success') {
+                        console.log('Template saved successfully');
+                        await loadEmailTemplates(); // Reload templates
+                    } else {
+                        alert('Error saving template: ' + result.message);
+                    }
+                } catch (error) {
+                    console.error('Error saving template:', error);
+                    alert('Error saving template');
+                }
+            }
+
+            // Load template into form
+            function loadTemplate(template) {
+                try {
+                    // Parse selected items
+                    const items = JSON.parse(template.selected_items);
+                    
+                    // Clear current selection
+                    selectedItems = [];
+                    
+                    // Reset all buttons to original state
+                    document.querySelectorAll('.add-stat-btn, .add-graph-btn').forEach(btn => {
+                        btn.textContent = 'Add';
+                        btn.classList.remove('btn-success');
+                        btn.classList.add('btn-primary');
+                        btn.disabled = false;
+                    });
+                    
+                    // Load template items
+                    selectedItems = [...items];
+                    
+                    // Update button states for selected items
+                    selectedItems.forEach(item => {
+                        const button = document.querySelector(`[data-id="${item.id}"]`);
+                        if (button) {
+                            button.textContent = 'Added';
+                            button.classList.remove('btn-primary');
+                            button.classList.add('btn-success');
+                            button.disabled = true;
+                        }
+                    });
+                    
+                    // Load form fields
+                    document.getElementById('email_text').value = template.email_text || '';
+                    document.getElementById('subject').value = template.subject || '';
+                    document.getElementById('layout').value = template.layout || 'standard';
+                    
+                    // Update display and preview
+                    updateSelectedItemsDisplay();
+                    
+                    console.log('Template loaded:', template.name);
+                } catch (error) {
+                    console.error('Error loading template:', error);
+                    alert('Error loading template');
+                }
+            }
+
+            // Delete template
+            document.getElementById('delete-template-btn').addEventListener('click', async function() {
+                const templateId = this.dataset.templateId;
+                if (!templateId) return;
+                
+                const template = emailTemplates.find(t => t.id == templateId);
+                if (!template) return;
+                
+                if (confirm(`Are you sure you want to delete the template "${template.name}"?`)) {
+                    try {
+                        const response = await fetch(`/email_templates/${templateId}`, {
+                            method: 'DELETE'
+                        });
+                        
+                        const result = await response.json();
+                        if (result.status === 'success') {
+                            console.log('Template deleted successfully');
+                            await loadEmailTemplates(); // Reload templates
+                            
+                            // Reset to Custom
+                            document.getElementById('template-selector').value = '';
+                            this.style.display = 'none';
+                        } else {
+                            alert('Error deleting template: ' + result.message);
+                        }
+                    } catch (error) {
+                        console.error('Error deleting template:', error);
+                        alert('Error deleting template');
+                    }
+                }
+            });
+
+            // Load templates on page load
+            document.addEventListener('DOMContentLoaded', () => {
+                loadEmailTemplates();
             });
         </script>
     </div>

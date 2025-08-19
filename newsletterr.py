@@ -26,6 +26,7 @@ app.jinja_env.globals["publish_date"] = "August 17, 2025"
 
 DB_PATH = os.path.join("database", "data.db")
 EMAIL_LISTS_DB_PATH = os.path.join("database", "email_lists.db")
+EMAIL_TEMPLATES_DB_PATH = os.path.join("database", "email_templates.db")
 plex_headers = {
     "X-Plex-Client-Identifier": str(uuid.uuid4())
 }
@@ -126,6 +127,25 @@ def init_email_lists_db(db_path):
             name TEXT UNIQUE NOT NULL,
             emails TEXT NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+def init_email_templates_db(db_path):
+    """Initialize the email templates database"""
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS email_templates (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT UNIQUE NOT NULL,
+            selected_items TEXT NOT NULL,
+            email_text TEXT,
+            subject TEXT,
+            layout TEXT DEFAULT 'standard',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
     conn.commit()
@@ -911,9 +931,97 @@ def delete_email_list_route(list_id):
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
+# Email Template Routes
+@app.route('/email_templates', methods=['GET'])
+def get_email_templates():
+    """Get all email templates"""
+    try:
+        conn = sqlite3.connect(EMAIL_TEMPLATES_DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, name, selected_items, email_text, subject, layout FROM email_templates ORDER BY name")
+        templates = cursor.fetchall()
+        conn.close()
+        
+        template_list = []
+        for template in templates:
+            template_list.append({
+                'id': template[0],
+                'name': template[1],
+                'selected_items': template[2],
+                'email_text': template[3],
+                'subject': template[4],
+                'layout': template[5]
+            })
+        
+        return jsonify(template_list)
+    except Exception as e:
+        print(f"Error getting templates: {e}")
+        return jsonify([])
+
+@app.route('/email_templates', methods=['POST'])
+def save_email_template():
+    """Save a new email template"""
+    try:
+        data = request.get_json()
+        name = data.get('name', '').strip()
+        selected_items = data.get('selected_items', '[]')  # JSON string
+        email_text = data.get('email_text', '')
+        subject = data.get('subject', '')
+        layout = data.get('layout', 'standard')
+        
+        if not name:
+            return jsonify({"status": "error", "message": "Template name is required"}), 400
+        
+        conn = sqlite3.connect(EMAIL_TEMPLATES_DB_PATH)
+        cursor = conn.cursor()
+        
+        # Check if template with this name already exists
+        cursor.execute("SELECT id FROM email_templates WHERE name = ?", (name,))
+        existing = cursor.fetchone()
+        
+        if existing:
+            # Update existing template
+            cursor.execute("""
+                UPDATE email_templates 
+                SET selected_items = ?, email_text = ?, subject = ?, layout = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE name = ?
+            """, (selected_items, email_text, subject, layout, name))
+            message = "Template updated successfully"
+        else:
+            # Create new template
+            cursor.execute("""
+                INSERT INTO email_templates (name, selected_items, email_text, subject, layout)
+                VALUES (?, ?, ?, ?, ?)
+            """, (name, selected_items, email_text, subject, layout))
+            message = "Template saved successfully"
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({"status": "success", "message": message})
+    except Exception as e:
+        print(f"Error saving template: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/email_templates/<int:template_id>', methods=['DELETE'])
+def delete_email_template(template_id):
+    """Delete an email template"""
+    try:
+        conn = sqlite3.connect(EMAIL_TEMPLATES_DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM email_templates WHERE id = ?", (template_id,))
+        conn.commit()
+        conn.close()
+        
+        return jsonify({"status": "success", "message": "Template deleted successfully"})
+    except Exception as e:
+        print(f"Error deleting template: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 if __name__ == '__main__':
     os.makedirs("database", exist_ok=True)
     init_db(DB_PATH)
     init_email_lists_db(EMAIL_LISTS_DB_PATH)
+    init_email_templates_db(EMAIL_TEMPLATES_DB_PATH)
     migrate_schema("conjurr_url TEXT")
     app.run(host="127.0.0.1", port=6397, debug=True)

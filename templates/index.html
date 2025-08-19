@@ -90,7 +90,21 @@
                             <button id="pullRecsBtn" class="button">Get Recommendations</button>
                         {% endif %}
                         <p>Note, recommendations take 20-25 seconds per user. After getting stats/users with the top button, recommendations will be pulled for users in the BCC list.</p>
+
                         <form method="POST" action="/send_email" style="margin-top: 0;">
+
+
+                            <label for="bcc_chips" class="form-label">BCC:</label>
+                            <div id="bcc_chips" class="nl-chips" role="listbox" aria-label="BCC recipients">
+                                <input id="email_chip_input"
+                                        type="text"
+                                        placeholder="Add BCC emails"
+                                        aria-label="Add recipient" />
+                            </div>
+                            <textarea name="to_emails" id="to_emails" class="d-none">
+                                {{ user_dict.values() | join(', ') }}
+                            </textarea><br>
+
                             Subject: <input type="text" name="subject" id="subject" placeholder="Subject"
                                 value="{{ settings.server_name }} News" style="width: 18rem;" required><br><br>
                             <label for="layout">Choose a layout:</label>
@@ -958,7 +972,8 @@
                                                                 </tr>
                                                                 <tr>
                                                                     <td class="footer" style="font-family: IBM Plex Sans; font-size: 12px; vertical-align: top; clear: both; margin-top: 0; text-align: center; width: 100%;">
-                                                                        <h1 class="footer-bar" style="margin-left: auto; margin-right: auto; width: 250px; border-top: 1px solid #E5A00D; margin-top: 5px;">${displaySubject}</h1>
+
+                                                                        <h1 class="footer-bar" style="margin-left: auto; margin-right: auto; width: 300px; border-top: 1px solid #E5A00D; margin-top: 5px;">${displaySubject}</h1>
                                                                         <p style="margin: 20px 0;">
                                                                             ${content}
                                                                         </p>
@@ -1002,7 +1017,8 @@
                                                                 </tr>
                                                                 <tr>
                                                                     <td class="footer" style="font-family: IBM Plex Sans; font-size: 12px; vertical-align: top; clear: both; margin-top: 0; text-align: center; width: 100%;">
-                                                                        <h1 class="footer-bar" style="margin-left: auto; margin-right: auto; width: 250px; border-top: 1px solid #E5A00D; margin-top: 5px;">Recently Added</h1>
+
+                                                                        <h1 class="footer-bar" style="margin-left: auto; margin-right: auto; width: 300px; border-top: 1px solid #E5A00D; margin-top: 5px;">Recently Added</h1>
                                                                         <p style="margin: 20px 0;">
                                                                             ${content}
                                                                         </p>
@@ -1046,7 +1062,7 @@
                                                                 </tr>
                                                                 <tr>
                                                                     <td class="footer" style="font-family: IBM Plex Sans; font-size: 12px; vertical-align: top; clear: both; margin-top: 0; text-align: center; width: 100%;">
-                                                                        <h1 class="footer-bar" style="margin-left: auto; margin-right: auto; width: 250px; border-top: 1px solid #E5A00D; margin-top: 5px;">Recommended For You</h1>
+                                                                        <h1 class="footer-bar" style="margin-left: auto; margin-right: auto; width: 300px; border-top: 1px solid #E5A00D; margin-top: 5px;">Recommended For You</h1>
                                                                         <p style="margin: 20px 0;">
                                                                             ${content}
                                                                         </p>

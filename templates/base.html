@@ -33,6 +33,15 @@
             <li><a href="{{ url_for('settings') }}" class="hover:underline">settings</a></li>
             <li><a href="{{ url_for('about') }}" class="hover:underline">about</a></li>
         </ul>
+        {% if update_info.is_newer %}
+            <div style="
+                position: sticky; top: 0; z-index: 1000;
+                background: #fff3cd; color: #664d03; border: 1px solid #ffecb5;
+                padding: 10px 14px; font-size: 14px;">
+                A new version {{ update_info.latest }} is available.
+                <a href="{{ update_info.release_url }}" target="_blank" rel="noopener">See release notes</a>
+            </div>
+        {% endif %}
         <div style="display: flex;">
             <button id="theme-toggle" type="button" role="switch" aria-checked="false" aria-label="Toggle dark mode" class="relative inline-flex h-8 w-16 items-center rounded-full bg-gray-200 dark:bg-gray-700 transition-colors focus:outline-none transform -translate-x-2 translate-y-2.5">
                 <span class="pointer-events-none absolute inset-0 z-20 flex items-center justify-between px-1">

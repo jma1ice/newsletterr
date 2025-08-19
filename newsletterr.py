@@ -1,11 +1,11 @@
-import os, math, uuid, base64, smtplib, sqlite3, requests, time
+import os, math, uuid, base64, smtplib, sqlite3, requests, time, threading
 from datetime import datetime, timezone
 from cryptography.fernet import Fernet, InvalidToken
 from dotenv import load_dotenv, set_key, find_dotenv
 from email.mime.text import MIMEText
 from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
-from flask import Flask, render_template, request, jsonify, Response, send_file
+from flask import Flask, render_template, request, jsonify, Response
 from pathlib import Path
 from plex_api_client import PlexAPI
 from urllib.parse import quote_plus
@@ -21,6 +21,19 @@ cache_storage = {
     'users': {'data': None, 'timestamp': 0},
     'graph_data': {'data': None, 'timestamp': 0},
     'recent_data': {'data': None, 'timestamp': 0}
+}
+
+app.config["GITHUB_OWNER"] = "jma1ice"
+app.config["GITHUB_REPO"] = "newsletterr"
+app.config["UPDATE_CHECK_INTERVAL_SEC"] = 60 * 60
+
+_update_cache = {
+    "latest": None,
+    "is_newer": False,
+    "release_url": None,
+    "notes": None,
+    "checked_at": 0.0,
+    "etag": None,
 }
 
 DB_PATH = os.path.join("database", "data.db")
@@ -242,7 +255,7 @@ def apply_layout(body, graphs_html_block, stats_html_block, ra_html_block, recs_
                                         </tr>
                                         <tr>
                                             <td class="footer" style="font-family: IBM Plex Sans; font-size: 12px; vertical-align: top; clear: both; margin-top: 0; text-align: center; width: 100%;">
-                                                <h1 class="footer-bar" style="margin-left: auto; margin-right: auto; width: 250px; border-top: 1px solid #E5A00D; margin-top: 5px;">{display_subject}</h1>
+                                                <h1 class="footer-bar" style="margin-left: auto; margin-right: auto; width: 300px; border-top: 1px solid #E5A00D; margin-top: 5px;">{display_subject}</h1>
                                                 <p>
                                                     {body}
                                                 </p>
@@ -276,7 +289,7 @@ def apply_layout(body, graphs_html_block, stats_html_block, ra_html_block, recs_
                                         </tr>
                                         <tr>
                                             <td class="footer" style="font-family: IBM Plex Sans; font-size: 12px; vertical-align: top; clear: both; margin-top: 0; text-align: center; width: 100%;">
-                                                <h1 class="footer-bar" style="margin-left: auto; margin-right: auto; width: 250px; border-top: 1px solid #E5A00D; margin-top: 5px;">{display_subject}</h1>
+                                                <h1 class="footer-bar" style="margin-left: auto; margin-right: auto; width: 300px; border-top: 1px solid #E5A00D; margin-top: 5px;">{display_subject}</h1>
                                                 {ra_html_block}
                                                 <div class="footer-bar" style="margin-left: auto; margin-right: auto; width: 250px; border-top: 1px solid #E5A00D; margin-top: 25px;">&nbsp;</div>
                                                 <div class="content-block powered-by" style="padding-bottom: 10px; padding-top: 0;">Generated for Plex Media Server by <a href="https://github.com/jma1ice/newsletterr" style="color: #E5A00D; text-decoration: none;">newsletterr</a></div>
@@ -308,7 +321,7 @@ def apply_layout(body, graphs_html_block, stats_html_block, ra_html_block, recs_
                                         </tr>
                                         <tr>
                                             <td class="footer" style="font-family: IBM Plex Sans; font-size: 12px; vertical-align: top; clear: both; margin-top: 0; text-align: center; width: 100%;">
-                                                <h1 class="footer-bar" style="margin-left: auto; margin-right: auto; width: 250px; border-top: 1px solid #E5A00D; margin-top: 5px;">{display_subject}</h1>
+                                                <h1 class="footer-bar" style="margin-left: auto; margin-right: auto; width: 300px; border-top: 1px solid #E5A00D; margin-top: 5px;">Recommended For You</h1>
                                                 {recs_html_block}
                                                 <div class="footer-bar" style="margin-left: auto; margin-right: auto; width: 250px; border-top: 1px solid #E5A00D; margin-top: 25px;">&nbsp;</div>
                                                 <div class="content-block powered-by" style="padding-bottom: 10px; padding-top: 0;">Generated for Plex Media Server by <a href="https://github.com/jma1ice/newsletterr" style="color: #E5A00D; text-decoration: none;">newsletterr</a></div>
@@ -381,6 +394,76 @@ def run_conjurr_command(base_url, user_dict, error):
                 error += str(f", Conjurr Error: {e}")
 
     return [recommendations_dict, error]
+
+def _norm(v: str):
+    if not v:
+        return (0,)
+    v = v.lstrip("vV").split("+", 1)[0].split("-", 1)[0]
+    parts = []
+    for p in v.split("."):
+        try:
+            parts.append(int(p))
+        except ValueError:
+            num = ''.join(ch for ch in p if ch.isdigit())
+            parts.append(int(num) if num else 0)
+    return tuple(parts) if parts else (0,)
+
+def _check_github_latest():
+    headers = {"Accept": "application/vnd.github+json"}
+    if _update_cache["etag"]:
+        headers["If-None-Match"] = _update_cache["etag"]
+
+    url = f"https://api.github.com/repos/{app.config['GITHUB_OWNER']}/{app.config['GITHUB_REPO']}/releases/latest"
+    try:
+        r = requests.get(url, headers=headers, timeout=10)
+        if r.status_code == 304:
+            _update_cache["checked_at"] = time.time()
+            return
+        r.raise_for_status()
+        if "application/json" not in r.headers.get("Content-Type", ""):
+            raise RuntimeError(f"Unexpected content type: {r.headers.get('Content-Type')}")
+        data = r.json()
+        latest_tag = data.get("tag_name") or ""
+        current = app.jinja_env.globals.get("version", "")
+        is_newer = _norm(latest_tag) > _norm(current)
+
+        _update_cache.update({
+            "latest": latest_tag,
+            "is_newer": is_newer,
+            "release_url": data.get("html_url"),
+            "notes": data.get("body", ""),
+            "checked_at": time.time(),
+            "etag": r.headers.get("ETag"),
+        })
+    except Exception as e:
+        _update_cache["checked_at"] = time.time()
+
+def _ensure_recent_check():
+    now = time.time()
+    if now - _update_cache["checked_at"] >= app.config["UPDATE_CHECK_INTERVAL_SEC"]:
+        _check_github_latest()
+
+def _background_update_checker():
+    while True:
+        try:
+            _check_github_latest()
+        finally:
+            time.sleep(app.config["UPDATE_CHECK_INTERVAL_SEC"])
+
+threading.Thread(target=_background_update_checker, daemon=True).start()
+
+@app.context_processor
+def inject_update_info():
+    _ensure_recent_check()
+    return {
+        "update_info": {
+            "current": app.jinja_env.globals.get("version", ""),
+            "latest": _update_cache["latest"],
+            "is_newer": _update_cache["is_newer"],
+            "release_url": _update_cache["release_url"],
+            "notes": _update_cache["notes"],
+        }
+    }
 
 @app.route('/', methods=['GET', 'POST'])
 def index():

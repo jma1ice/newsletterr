@@ -23,7 +23,7 @@
                     {% if settings.from_email !="" %}value="{{ settings.from_email }}"{% endif %}
                     placeholder="Your Email" required><br><br>
 
-                <label for="alias_email">Send-As Alias:</label><br>
+                <label for="alias_email">Send-As Alias (Optional):</label><br>
                 <input type="email" id="alias_email" name="alias_email"
                     {% if settings.from_email !="" %}value="{{ settings.alias_email }}"{% endif %}
                     placeholder="Blank if no alias"><br><br>
@@ -48,17 +48,17 @@
                     {% if settings.from_email !="" %}value="{{ settings.server_name }}"{% endif %}
                     placeholder="Paramount Plex" required><br><br>
 
-                <label for="tautulli_url">Tautulli Base URL:</label><br>
+                <label for="tautulli_url">Tautulli Base URL (Optional):</label><br>
                 <input type="text" id="tautulli_url" name="tautulli_url"
                     {% if settings.from_email !="" %}value="{{ settings.tautulli_url }}"{% endif %}
                     placeholder="http://localhost:8181"><br><br>
 
-                <label for="tautulli_api">Tautulli API Key:</label><br>
+                <label for="tautulli_api">Tautulli API Key (Optional):</label><br>
                 <input type="text" id="tautulli_api" name="tautulli_api"
                     {% if settings.from_email !="" %}value="{{ settings.tautulli_api }}"{% endif %}
                     placeholder="Tautulli API Key"><br><br>
 
-                <label for="conjurr_url">Conjurr Base URL:</label><br>
+                <label for="conjurr_url">Conjurr Base URL (Optional):</label><br>
                 <input type="text" id="conjurr_url" name="conjurr_url"
                     {% if settings.from_email !="" %}value="{{ settings.conjurr_url }}"{% endif %}
                     placeholder="http://localhost:2665"><br><br>

@@ -118,8 +118,9 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 
 ## Upcoming Changes
 
-### v0.8.7
+### v0.8.8
 * Donate button
+* Light mode dash fixes
 * Mobile optimizations, i.e.:
 ```
 <style>
@@ -136,7 +137,6 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 * Mailing lists (Weekly, monthly, Movies, Shows) that you can add users to, to automate some emails. E.g. - Monthly email contains the following users, and uses the following template. 
 * Template management to go with lists - Include a few default templates that snap in the most common stats
 * Automation management (Which lists, how often?)
-* Opt out support?
 * Graph titles need to specify the date range
 
 ### v1.0.0
@@ -146,10 +146,15 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 ### v1.1.0
 * Get fonts showing on Gmail receive side
 * Api/webhooks
+* Opt out support
 
 ---
 
 ## Recent Changes
+
+### v0.8.7
+* Removed graph/stat placeholders
+* Got graphs and stats on separate lines
 
 ### v0.8.6
 * Got images to show in both Spark and Gmail

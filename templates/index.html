@@ -3,7 +3,7 @@
 {% block content %}
 <div class="container-fluid">
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <h1>newsletterr Dashboard</h1>
+        <h1>newsletterr dashboard</h1>
         <button id="sendEmailBtn" class="btn btn-success btn-lg px-5 py-3" style="font-size: 1.6rem; font-weight: 700; min-width: 220px; box-shadow: 0 4px 8px rgba(0,0,0,0.2);">
             📧 Send Email
         </button>
@@ -103,12 +103,6 @@
                             </select><br><br>
                             <textarea name="email_text" id="email_text" placeholder="Write your message..." rows="10"
                                 cols="40" oninput="updatePreview()" required></textarea><br><br>
-                            <label for="graph_placeholder">Graph Placeholder:</label>
-                            <input type="text" id="graph_placeholder" name="graph_placeholder" value="[GRAPHS]"
-                                oninput="updatePreview()"><br><br>
-                            <label for="stat_placeholder">Stat Placeholder:</label>
-                            <input type="text" id="stat_placeholder" name="stat_placeholder" value="[STATS]"
-                                oninput="updatePreview()"><br><br>
                             <label for="ra_placeholder">Recently Added Holder:</label>
                             <input type="text" id="ra_placeholder" name="ra_placeholder" value="[RECENTLY_ADDED]"
                                 style="width: 10.5rem;" oninput="updatePreview()"><br><br>
@@ -787,10 +781,8 @@
                     console.log('selectedGraphs:', selectedGraphs);
                     console.log('selectedStats:', selectedStats);
 
-                const graphPlaceholder = document.getElementById('graph_placeholder').value;
-                const statPlaceholder = document.getElementById('stat_placeholder').value;
-
                 let allItemsHTML = "";
+                let insertedBreakBeforeStats = false;
                 
                 // Process ALL items in the exact order they appear in selectedItems array
                 for (let item of selectedItems) {
@@ -823,6 +815,10 @@
                             }
                         }
                     } else if (item.type === 'stat') {
+                        if (!insertedBreakBeforeStats) {
+                            allItemsHTML += `<div style="height:16px;line-height:16px;font-size:16px">&nbsp;</div>`;
+                            insertedBreakBeforeStats = true;
+                        }
                         const tableElement = document.getElementById(item.id);
                         if (tableElement) {
                             try {
@@ -894,46 +890,10 @@
                 }
 
                 // Now assign the ordered HTML to the appropriate placeholders
-                let graphImagesHTML = "";
+                let graphImagesHTML = allItemsHTML;
                 let statImagesHTML = "";
-                
-                // Determine which placeholder should get all the content
-                if (raw.includes(graphPlaceholder) && raw.includes(statPlaceholder)) {
-                    // If both placeholders exist, put all content in whichever comes first
-                    const graphIndex = raw.indexOf(graphPlaceholder);
-                    const statIndex = raw.indexOf(statPlaceholder);
-                    
-                    if (graphIndex < statIndex) {
-                        graphImagesHTML = allItemsHTML;
-                        statImagesHTML = "";
-                    } else {
-                        graphImagesHTML = "";
-                        statImagesHTML = allItemsHTML;
-                    }
-                } else if (raw.includes(graphPlaceholder)) {
-                    // Only graph placeholder exists, put all content there
-                    graphImagesHTML = allItemsHTML;
-                } else if (raw.includes(statPlaceholder)) {
-                    // Only stat placeholder exists, put all content there
-                    statImagesHTML = allItemsHTML;
-                } else {
-                    // No placeholders found, content will be added in default layout
-                    graphImagesHTML = allItemsHTML;
-                }
 
                 let content = body;
-
-                if (raw.includes(graphPlaceholder)) {
-                    content = body.replace(graphPlaceholder, graphImagesHTML);
-                } else {
-                    content = `${body}`;
-                }
-
-                if (raw.includes(statPlaceholder)) {
-                    content = content.replace(statPlaceholder, statImagesHTML);
-                } else {
-                    content = `${content}`;
-                }
 
                 switch (layout) {
                     case "standard":

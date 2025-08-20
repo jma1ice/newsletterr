@@ -438,7 +438,6 @@ footer p {
     padding: 4px 8px !important;
     border-radius: 12px !important;
     cursor: help !important;
-    display: inline-flex !important;
     align-items: center !important;
     gap: 3px !important;
     font-weight: 500 !important;

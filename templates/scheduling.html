@@ -1,0 +1,917 @@
+{% extends "base.html" %}
+{% block title %}Email Scheduling{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h1 style="font-weight: bold;">Email Scheduling</h1>
+        <button id="add-schedule-btn" class="btn btn-success btn-lg px-4 py-2" data-bs-toggle="modal" data-bs-target="#scheduleModal" style="font-size: 1.2rem; font-weight: 600; min-width: 180px; box-shadow: 0 4px 8px rgba(0,0,0,0.2);">
+            ➕ Add Schedule
+        </button>
+    </div>
+    <p class="text-muted mb-4">Manage automated email schedules. Emails will be sent automatically based on your configured schedules.</p>
+
+    {% if schedules %}
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Schedule Name</th>
+                        <th>Email List</th>
+                        <th>Template</th>
+                        <th>Frequency</th>
+                        <th>Data Range</th>
+                        <th>Start Date</th>
+                        <th>Send Time</th>
+                        <th>Next Send</th>
+                        <th>Last Sent</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for schedule in schedules %}
+                        <tr>
+                            <td>
+                                <strong>{{ schedule.name }}</strong>
+                            </td>
+                            <td>
+                                <span class="badge bg-primary">{{ schedule.email_list_name or 'Unknown' }}</span>
+                            </td>
+                            <td>
+                                <span class="badge bg-info">{{ schedule.template_name or 'Unknown' }}</span>
+                            </td>
+                            <td>{{ schedule.frequency.title() }}</td>
+                            <td>
+                                <span class="badge bg-secondary">{{ schedule.date_range or 7 }} days</span>
+                            </td>
+                            <td>
+                                <span class="text-muted">{{ schedule.start_date }}</span>
+                            </td>
+                            <td>
+                                <span class="badge bg-dark">{{ schedule.send_time or '09:00' }}</span>
+                            </td>
+                            <td>
+                                <span class="text-muted">{{ schedule.next_send or 'Not scheduled' }}</span>
+                            </td>
+                            <td>
+                                <span class="text-muted">{{ schedule.last_sent or 'Never' }}</span>
+                            </td>
+                            <td>
+                                <span class="badge {{ 'bg-success' if schedule.is_active else 'bg-secondary' }}">
+                                    {{ 'Active' if schedule.is_active else 'Inactive' }}
+                                </span>
+                            </td>
+                            <td>
+                                <div class="btn-group btn-group-sm" role="group">
+                                    <button class="btn btn-outline-primary btn-sm edit-schedule-btn" 
+                                            data-schedule-id="{{ schedule.id }}" 
+                                            data-schedule-name="{{ schedule.name }}"
+                                            data-email-list-id="{{ schedule.email_list_id }}"
+                                            data-template-id="{{ schedule.template_id }}"
+                                            data-frequency="{{ schedule.frequency }}"
+                                            data-start-date="{{ schedule.start_date }}"
+                                            data-send-time="{{ schedule.send_time or '09:00' }}"
+                                            data-date-range="{{ schedule.date_range or 7 }}"
+                                            data-bs-toggle="modal" 
+                                            data-bs-target="#scheduleModal">
+                                        ✏️ Edit
+                                    </button>
+                                    <button class="btn btn-outline-info btn-sm send-now-btn" 
+                                            data-schedule-id="{{ schedule.id }}" 
+                                            data-schedule-name="{{ schedule.name }}">
+                                        📤 Send Now
+                                    </button>
+                                    <button class="btn btn-outline-secondary btn-sm preview-schedule-btn" 
+                                            data-schedule-id="{{ schedule.id }}" 
+                                            data-schedule-name="{{ schedule.name }}">
+                                        👁️ Preview
+                                    </button>
+                                    {% if schedule.is_active %}
+                                        <button class="btn btn-outline-warning btn-sm toggle-schedule-btn" 
+                                                data-schedule-id="{{ schedule.id }}" 
+                                                data-current-status="{{ schedule.is_active|lower }}">
+                                            ⏸️ Pause
+                                        </button>
+                                    {% else %}
+                                        <button class="btn btn-outline-success btn-sm toggle-schedule-btn" 
+                                                data-schedule-id="{{ schedule.id }}" 
+                                                data-current-status="{{ schedule.is_active|lower }}">
+                                            ▶️ Resume
+                                        </button>
+                                    {% endif %}
+                                    <button class="btn btn-outline-danger btn-sm delete-schedule-btn" 
+                                            data-schedule-id="{{ schedule.id }}" 
+                                            data-schedule-name="{{ schedule.name }}">
+                                        🗑️ Delete
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="alert alert-info" role="alert">
+            <h4 class="alert-heading">No Schedules Created</h4>
+            <p>You haven't created any email schedules yet. Email schedules allow you to automatically send newsletters at regular intervals.</p>
+            <hr>
+            <p class="mb-0">
+                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#scheduleModal">
+                    Create Your First Schedule
+                </button>
+            </p>
+        </div>
+    {% endif %}
+
+    <!-- Calendar View -->
+    <div class="row mt-5">
+        <div class="col-12 d-flex justify-content-center">
+            <div class="card theme-card calendar-card">
+                <div class="card-header theme-card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Schedule Calendar</h5>
+                    <div class="d-flex align-items-center">
+                        <button id="prev-month" class="btn btn-sm btn-outline-primary me-2">‹</button>
+                        <span id="current-month" class="fw-bold me-2"></span>
+                        <button id="next-month" class="btn btn-sm btn-outline-primary me-2">›</button>
+                        <button id="today-month" class="btn btn-sm btn-outline-secondary" title="Go to current month">📅 Today</button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div id="calendar-container">
+                        <!-- Calendar will be rendered here -->
+                    </div>
+                    <div class="mt-2 text-center">
+                        <small class="text-muted">
+                            <span class="calendar-dot me-2"></span> = Scheduled email
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add/Edit Schedule Modal -->
+<div class="modal fade" id="scheduleModal" tabindex="-1" aria-labelledby="scheduleModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content theme-modal">
+            <div class="modal-header theme-modal-header">
+                <h5 class="modal-title" id="scheduleModalLabel">Create New Email Schedule</h5>
+                <button type="button" class="btn-close theme-btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="schedule-form">
+                    <input type="hidden" id="schedule-id" value="">
+                    <div class="mb-3">
+                        <label for="schedule-name" class="form-label">Schedule Name</label>
+                        <input type="text" class="form-control theme-input" id="schedule-name" required 
+                               placeholder="e.g., Weekly Newsletter">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="email-list-select" class="form-label">Email List</label>
+                        <select class="form-select theme-input" id="email-list-select" required>
+                            <option value="">Select an email list...</option>
+                            {% for email_list in email_lists %}
+                                <option value="{{ email_list.id }}">{{ email_list.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="template-select" class="form-label">Email Template</label>
+                        <select class="form-select theme-input" id="template-select" required>
+                            <option value="">Select an email template...</option>
+                            {% for template in templates %}
+                                <option value="{{ template.id }}">{{ template.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="frequency-select" class="form-label">Frequency</label>
+                        <select class="form-select theme-input" id="frequency-select" required>
+                            <option value="">Select frequency...</option>
+                            <option value="daily">Daily</option>
+                            <option value="weekly">Weekly</option>
+                            <option value="monthly">Monthly</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="date-range-select" class="form-label">Data Range (Days)</label>
+                        <select class="form-select theme-input" id="date-range-select" required>
+                            <option value="">Select data range...</option>
+                            <option value="1">1 day (Today only)</option>
+                            <option value="3">3 days</option>
+                            <option value="7" selected>7 days (1 week)</option>
+                            <option value="14">14 days (2 weeks)</option>
+                            <option value="30">30 days (1 month)</option>
+                            <option value="60">60 days (2 months)</option>
+                            <option value="90">90 days (3 months)</option>
+                        </select>
+                        <div class="form-text">How many days of Tautulli data to include in stats and graphs</div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="start-date" class="form-label">Start Date</label>
+                            <input type="date" class="form-control theme-input" id="start-date" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="send-time" class="form-label">Send Time</label>
+                            <input type="time" class="form-control theme-input" id="send-time" value="09:00" required>
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-info theme-alert" role="alert">
+                        <strong>Note:</strong> The schedule will become active immediately upon creation. The first email will be sent according to your specified start date and frequency.
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer theme-modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="save-schedule-btn">Create Schedule</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Theme-aware styling for scheduling page */
+.theme-modal {
+    background-color: var(--bs-body-bg);
+    color: var(--bs-body-color);
+}
+
+.theme-modal-header,
+.theme-modal-footer {
+    border-color: var(--bs-border-color);
+}
+
+.theme-card {
+    background-color: var(--bs-body-bg);
+    color: var(--bs-body-color);
+    border-color: var(--bs-border-color);
+}
+
+.theme-card-header {
+    border-color: var(--bs-border-color);
+}
+
+/* Calendar styling */
+.calendar-card {
+    max-width: 650px;
+    width: 100%;
+}
+
+.calendar-card .card-body {
+    padding: 1.5rem;
+    overflow: hidden;
+}
+
+.calendar-container {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 1px;
+    background-color: var(--bs-border-color);
+    border: 1px solid var(--bs-border-color);
+    aspect-ratio: 1;
+    width: 100%;
+    max-width: 600px;
+    margin: 0 auto;
+    box-sizing: border-box;
+}
+
+.calendar-header {
+    background-color: var(--bs-primary);
+    color: white;
+    padding: 8px 4px;
+    text-align: center;
+    font-weight: bold;
+    font-size: 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.calendar-day {
+    background-color: var(--bs-body-bg);
+    padding: 2px;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: flex-start;
+    min-height: 0;
+    aspect-ratio: 1;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+.calendar-day.other-month {
+    color: var(--bs-secondary);
+    background-color: var(--bs-light);
+}
+
+.calendar-day.today {
+    background-color: rgba(var(--bs-primary-rgb), 0.1);
+    border: 2px solid var(--bs-primary);
+}
+
+.calendar-day-number {
+    font-size: 0.7rem;
+    font-weight: bold;
+    line-height: 1;
+}
+
+.calendar-dot {
+    width: 15px;
+    height: 15px;
+    background-color: #0066cc;
+    border-radius: 50%;
+    display: inline-block;
+    margin-top: 1px;
+    cursor: pointer;
+}
+
+.calendar-dots {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1px;
+    margin-top: auto;
+    max-height: 15px;
+    overflow: hidden;
+}
+
+/* Today button styling */
+#today-month {
+    font-size: 0.8rem;
+    padding: 0.25rem 0.5rem;
+    white-space: nowrap;
+}
+
+#today-month:hover {
+    background-color: var(--bs-secondary);
+    border-color: var(--bs-secondary);
+    color: white;
+}
+
+/* Tooltip styling */
+.schedule-tooltip {
+    position: absolute;
+    background-color: #333;
+    color: white;
+    padding: 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    z-index: 1000;
+    white-space: nowrap;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+/* Light mode styling */
+body:not(.dark) .theme-modal {
+    background-color: #fff;
+    color: #333;
+    border: 1px solid #62a1a4;
+}
+
+body:not(.dark) .theme-card {
+    background-color: #fff;
+    color: #333;
+    border: 1px solid #62a1a4;
+}
+
+body:not(.dark) .theme-card-header {
+    background-color: #8acbd4;
+    color: #333;
+    border-color: #62a1a4;
+}
+
+body:not(.dark) .theme-modal-header,
+body:not(.dark) .theme-modal-footer {
+    border-color: #62a1a4;
+}
+
+body:not(.dark) .theme-input {
+    background-color: #8acbd4;
+    color: #333;
+    border-color: #62a1a4;
+}
+
+body:not(.dark) .theme-input:focus {
+    background-color: #8acbd4;
+    color: #333;
+    border-color: #333;
+    box-shadow: 0 0 0 0.2rem rgba(51, 51, 51, 0.25);
+}
+
+body:not(.dark) .theme-input::placeholder {
+    color: rgba(51, 51, 51, 0.7);
+}
+
+body:not(.dark) .theme-alert {
+    background-color: #e3f7fa;
+    border-color: #62a1a4;
+    color: #333;
+}
+
+body:not(.dark) .calendar-day.other-month {
+    background-color: #f8f9fa;
+    color: #6c757d;
+}
+
+body:not(.dark) .theme-alert {
+    background-color: #e3f7fa;
+    border-color: #62a1a4;
+    color: #333;
+}
+
+/* Dark mode styling */
+.dark .theme-modal {
+    background-color: #333 !important;
+    color: #8acbd4 !important;
+    border: 1px solid #555;
+}
+
+.dark .theme-card {
+    background-color: #333 !important;
+    color: #8acbd4 !important;
+    border: 1px solid #555;
+}
+
+.dark .theme-card-header {
+    background-color: #2c2c2c !important;
+    color: #8acbd4 !important;
+    border-color: #555 !important;
+}
+
+.dark .theme-modal-header,
+.dark .theme-modal-footer {
+    border-color: #555 !important;
+}
+
+.dark .theme-input {
+    background-color: #333;
+    color: #8acbd4;
+    border-color: #555;
+}
+
+.dark .theme-input:focus {
+    background-color: #333;
+    color: #8acbd4;
+    border-color: #8acbd4;
+    box-shadow: 0 0 0 0.2rem rgba(138, 203, 212, 0.25);
+}
+
+.dark .theme-input::placeholder {
+    color: rgba(138, 203, 212, 0.7);
+}
+
+.dark .theme-btn-close {
+    filter: invert(1) grayscale(100%) brightness(200%);
+}
+
+.dark .theme-alert {
+    background-color: rgba(138, 203, 212, 0.1);
+    border-color: #8acbd4;
+    color: #8acbd4;
+}
+
+.dark .calendar-day {
+    background-color: #2c2c2c;
+    color: #8acbd4;
+}
+
+.dark .calendar-day.other-month {
+    background-color: #1a1a1a;
+    color: #666;
+}
+
+/* Table styling improvements */
+.table {
+    background-color: transparent;
+}
+
+.badge {
+    font-size: 0.75em;
+}
+
+.btn-group-sm > .btn {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+}
+
+/* Custom button styling to match theme */
+.btn-outline-warning:hover {
+    background-color: #ffc107;
+    border-color: #ffc107;
+    color: #000;
+}
+
+.btn-outline-success:hover {
+    background-color: #198754;
+    border-color: #198754;
+    color: #fff;
+}
+
+.btn-outline-danger:hover {
+    background-color: #dc3545;
+    border-color: #dc3545;
+    color: #fff;
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    let currentDate = new Date();
+    let calendarData = {};
+    
+    // Set default start date to today
+    const startDateInput = document.getElementById('start-date');
+    const today = new Date();
+    startDateInput.value = today.toISOString().split('T')[0];
+    
+    // Calendar functions
+    function formatDate(date) {
+        return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    }
+    
+    function getDaysInMonth(date) {
+        return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+    }
+    
+    function getFirstDayOfMonth(date) {
+        return new Date(date.getFullYear(), date.getMonth(), 1).getDay();
+    }
+    
+    function getCalendarDates(date) {
+        const year = date.getFullYear();
+        const month = date.getMonth();
+        const daysInMonth = getDaysInMonth(date);
+        const firstDay = getFirstDayOfMonth(date);
+        
+        const dates = [];
+        
+        // Previous month's trailing days
+        const prevMonth = new Date(year, month - 1, 0);
+        for (let i = firstDay - 1; i >= 0; i--) {
+            dates.push({
+                date: prevMonth.getDate() - i,
+                month: 'prev',
+                fullDate: new Date(prevMonth.getFullYear(), prevMonth.getMonth(), prevMonth.getDate() - i)
+            });
+        }
+        
+        // Current month's days
+        for (let date = 1; date <= daysInMonth; date++) {
+            dates.push({
+                date: date,
+                month: 'current',
+                fullDate: new Date(year, month, date)
+            });
+        }
+        
+        // Next month's leading days
+        const remainingDays = 42 - dates.length; // 6 weeks * 7 days
+        for (let date = 1; date <= remainingDays; date++) {
+            dates.push({
+                date: date,
+                month: 'next',
+                fullDate: new Date(year, month + 1, date)
+            });
+        }
+        
+        return dates;
+    }
+    
+    async function loadCalendarData() {
+        try {
+            const response = await fetch(`/scheduling/calendar-data?month=${currentDate.getMonth() + 1}&year=${currentDate.getFullYear()}`);
+            const result = await response.json();
+            if (result.status === 'success') {
+                calendarData = result.data;
+                renderCalendar();
+            }
+        } catch (error) {
+            console.error('Error loading calendar data:', error);
+        }
+    }
+    
+    function renderCalendar() {
+        const container = document.getElementById('calendar-container');
+        const monthSpan = document.getElementById('current-month');
+        
+        monthSpan.textContent = formatDate(currentDate);
+        
+        // Clear previous calendar
+        container.innerHTML = '';
+        container.className = 'calendar-container';
+        
+        // Add day headers
+        const dayHeaders = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        dayHeaders.forEach(day => {
+            const header = document.createElement('div');
+            header.className = 'calendar-header';
+            header.textContent = day;
+            container.appendChild(header);
+        });
+        
+        // Add calendar days
+        const dates = getCalendarDates(currentDate);
+        const today = new Date();
+        
+        dates.forEach(dateObj => {
+            const dayElement = document.createElement('div');
+            dayElement.className = 'calendar-day';
+            
+            if (dateObj.month !== 'current') {
+                dayElement.classList.add('other-month');
+            }
+            
+            // Check if it's today
+            if (dateObj.fullDate.toDateString() === today.toDateString()) {
+                dayElement.classList.add('today');
+            }
+            
+            // Add day number
+            const dayNumber = document.createElement('div');
+            dayNumber.className = 'calendar-day-number';
+            dayNumber.textContent = dateObj.date;
+            dayElement.appendChild(dayNumber);
+            
+            // Add schedule dots
+            const dateKey = dateObj.fullDate.toISOString().split('T')[0];
+            if (calendarData[dateKey] && calendarData[dateKey].length > 0) {
+                const dotsContainer = document.createElement('div');
+                dotsContainer.className = 'calendar-dots';
+                
+                calendarData[dateKey].forEach(schedule => {
+                    const dot = document.createElement('div');
+                    dot.className = 'calendar-dot';
+                    dot.title = `${schedule.name} at ${schedule.time}`;
+                    
+                    // Add hover tooltip
+                    dot.addEventListener('mouseenter', function(e) {
+                        showTooltip(e, `${schedule.name} at ${schedule.time}`);
+                    });
+                    
+                    dot.addEventListener('mouseleave', function() {
+                        hideTooltip();
+                    });
+                    
+                    dotsContainer.appendChild(dot);
+                });
+                
+                dayElement.appendChild(dotsContainer);
+            }
+            
+            container.appendChild(dayElement);
+        });
+    }
+    
+    function showTooltip(event, text) {
+        const tooltip = document.createElement('div');
+        tooltip.className = 'schedule-tooltip';
+        tooltip.textContent = text;
+        tooltip.style.left = event.pageX + 10 + 'px';
+        tooltip.style.top = event.pageY - 30 + 'px';
+        document.body.appendChild(tooltip);
+    }
+    
+    function hideTooltip() {
+        const tooltip = document.querySelector('.schedule-tooltip');
+        if (tooltip) {
+            tooltip.remove();
+        }
+    }
+    
+    // Calendar navigation
+    document.getElementById('prev-month').addEventListener('click', function() {
+        currentDate.setMonth(currentDate.getMonth() - 1);
+        loadCalendarData();
+    });
+    
+    document.getElementById('next-month').addEventListener('click', function() {
+        currentDate.setMonth(currentDate.getMonth() + 1);
+        loadCalendarData();
+    });
+    
+    // Today button - jump to current month
+    document.getElementById('today-month').addEventListener('click', function() {
+        const today = new Date();
+        currentDate.setFullYear(today.getFullYear());
+        currentDate.setMonth(today.getMonth());
+        loadCalendarData();
+    });
+    
+    // Initial calendar load
+    loadCalendarData();
+    
+    // Modal functions
+    function resetModal() {
+        document.getElementById('scheduleModalLabel').textContent = 'Create New Email Schedule';
+        document.getElementById('save-schedule-btn').textContent = 'Create Schedule';
+        document.getElementById('schedule-id').value = '';
+        document.getElementById('schedule-name').value = '';
+        document.getElementById('email-list-select').value = '';
+        document.getElementById('template-select').value = '';
+        document.getElementById('frequency-select').value = '';
+        document.getElementById('start-date').value = new Date().toISOString().split('T')[0];
+        document.getElementById('send-time').value = '09:00';
+        document.getElementById('date-range-select').value = '7';
+    }
+    
+    function populateEditModal(scheduleData) {
+        document.getElementById('scheduleModalLabel').textContent = 'Edit Email Schedule';
+        document.getElementById('save-schedule-btn').textContent = 'Update Schedule';
+        document.getElementById('schedule-id').value = scheduleData.scheduleId;
+        document.getElementById('schedule-name').value = scheduleData.scheduleName;
+        document.getElementById('email-list-select').value = scheduleData.emailListId;
+        document.getElementById('template-select').value = scheduleData.templateId;
+        document.getElementById('frequency-select').value = scheduleData.frequency;
+        document.getElementById('start-date').value = scheduleData.startDate;
+        document.getElementById('send-time').value = scheduleData.sendTime;
+        document.getElementById('date-range-select').value = scheduleData.dateRange || '7';
+    }
+    
+    // Add schedule button (create new)
+    document.getElementById('add-schedule-btn').addEventListener('click', function() {
+        resetModal();
+    });
+    
+    // Edit schedule buttons
+    document.querySelectorAll('.edit-schedule-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const scheduleData = {
+                scheduleId: this.dataset.scheduleId,
+                scheduleName: this.dataset.scheduleName,
+                emailListId: this.dataset.emailListId,
+                templateId: this.dataset.templateId,
+                frequency: this.dataset.frequency,
+                startDate: this.dataset.startDate,
+                sendTime: this.dataset.sendTime,
+                dateRange: this.dataset.dateRange
+            };
+            populateEditModal(scheduleData);
+        });
+    });
+    
+    // Save schedule (handles both create and edit)
+    document.getElementById('save-schedule-btn').addEventListener('click', async function() {
+        const scheduleId = document.getElementById('schedule-id').value;
+        const name = document.getElementById('schedule-name').value.trim();
+        const emailListId = document.getElementById('email-list-select').value;
+        const templateId = document.getElementById('template-select').value;
+        const frequency = document.getElementById('frequency-select').value;
+        const startDate = document.getElementById('start-date').value;
+        const sendTime = document.getElementById('send-time').value;
+        const dateRange = document.getElementById('date-range-select').value;
+        
+        if (!name || !emailListId || !templateId || !frequency || !startDate || !sendTime || !dateRange) {
+            alert('Please fill in all fields');
+            return;
+        }
+        
+        const isEdit = scheduleId !== '';
+        const url = isEdit ? `/scheduling/${scheduleId}` : '/scheduling/create';
+        const method = isEdit ? 'PUT' : 'POST';
+        
+        try {
+            const response = await fetch(url, {
+                method: method,
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    name: name,
+                    email_list_id: parseInt(emailListId),
+                    template_id: parseInt(templateId),
+                    frequency: frequency,
+                    start_date: startDate,
+                    send_time: sendTime,
+                    date_range: parseInt(dateRange)
+                })
+            });
+            
+            const result = await response.json();
+            if (result.status === 'success') {
+                alert(result.message);
+                location.reload();
+            } else {
+                alert('Error: ' + result.message);
+            }
+        } catch (error) {
+            alert(`Error ${isEdit ? 'updating' : 'creating'} schedule: ` + error.message);
+        }
+    });
+    
+    // Toggle schedule status
+    document.querySelectorAll('.toggle-schedule-btn').forEach(button => {
+        button.addEventListener('click', async function() {
+            const scheduleId = this.dataset.scheduleId;
+            const currentStatus = this.dataset.currentStatus === 'true';
+            const newStatus = !currentStatus;
+            
+            try {
+                const response = await fetch(`/scheduling/${scheduleId}/toggle`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        is_active: newStatus
+                    })
+                });
+                
+                const result = await response.json();
+                if (result.status === 'success') {
+                    location.reload();
+                } else {
+                    alert('Error: ' + result.message);
+                }
+            } catch (error) {
+                alert('Error toggling schedule: ' + error.message);
+            }
+        });
+    });
+    
+    // Delete schedule
+    document.querySelectorAll('.delete-schedule-btn').forEach(button => {
+        button.addEventListener('click', async function() {
+            const scheduleId = this.dataset.scheduleId;
+            const scheduleName = this.dataset.scheduleName;
+            
+            if (confirm(`Are you sure you want to delete the schedule "${scheduleName}"? This action cannot be undone.`)) {
+                try {
+                    const response = await fetch(`/scheduling/${scheduleId}`, {
+                        method: 'DELETE'
+                    });
+                    
+                    const result = await response.json();
+                    if (result.status === 'success') {
+                        location.reload();
+                    } else {
+                        alert('Error: ' + result.message);
+                    }
+                } catch (error) {
+                    alert('Error deleting schedule: ' + error.message);
+                }
+            }
+        });
+    });
+    
+    // Send Now button
+    document.querySelectorAll('.send-now-btn').forEach(button => {
+        button.addEventListener('click', async function() {
+            const scheduleId = this.dataset.scheduleId;
+            const scheduleName = this.dataset.scheduleName;
+            
+            if (confirm(`Send "${scheduleName}" now? This will not affect the regular schedule.`)) {
+                // Show loading state
+                const originalText = this.textContent;
+                this.textContent = '📤 Sending...';
+                this.disabled = true;
+                
+                try {
+                    const response = await fetch(`/scheduling/${scheduleId}/send-now`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        }
+                    });
+                    
+                    const result = await response.json();
+                    if (result.status === 'success') {
+                        alert('✅ ' + result.message);
+                    } else {
+                        alert('❌ Error: ' + result.message);
+                    }
+                } catch (error) {
+                    alert('❌ Error sending email: ' + error.message);
+                } finally {
+                    // Restore button state
+                    this.textContent = originalText;
+                    this.disabled = false;
+                }
+            }
+        });
+    });
+    
+    // Preview button
+    document.querySelectorAll('.preview-schedule-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const scheduleId = this.dataset.scheduleId;
+            const scheduleName = this.dataset.scheduleName;
+            
+            // Open preview in a new window
+            const previewUrl = `/scheduling/${scheduleId}/preview-page?schedule_id=${scheduleId}`;
+            window.open(previewUrl, '_blank', 'width=1000,height=800,scrollbars=yes,resizable=yes');
+        });
+    });
+});
+</script>
+{% endblock %}

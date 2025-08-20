@@ -35,6 +35,37 @@
                                     style="background-color: #dc3545; margin-top: 5px;"
                                     title="Clear cached data to force fresh fetch">Clear Cache</button>
                         </form>
+                        
+                        <!-- Cache Status Display -->
+                        {% if cache_info %}
+                        <div class="card mt-3" style="border: 1px solid #dee2e6;">
+                            <div class="card-header d-flex justify-content-between align-items-center" 
+                                 style="cursor: pointer; padding: 8px 12px; background-color: #f8f9fa;" 
+                                 onclick="document.getElementById('cache-status-collapse').classList.toggle('d-none')">
+                                <h6 class="mb-0" style="font-size: 0.85rem;">Cache Status</h6>
+                                <span style="font-size: 0.8rem;">▼</span>
+                            </div>
+                            <div id="cache-status-collapse" class="card-body d-none" style="padding: 8px 12px; font-size: 0.8rem;">
+                                {% for key, info in cache_info.items() %}
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <span style="text-transform: capitalize;">{{ key.replace('_', ' ') }}:</span>
+                                    {% if info.exists %}
+                                        {% if info.is_fresh %}
+                                            <span class="text-success">✓ Fresh ({{ "%.1f"|format(info.age_hours) }}h)</span>
+                                        {% elif info.is_usable %}
+                                            <span class="text-warning">⚠ Old ({{ "%.1f"|format(info.age_hours) }}h)</span>
+                                        {% else %}
+                                            <span class="text-danger">✗ Expired</span>
+                                        {% endif %}
+                                    {% else %}
+                                        <span class="text-muted">○ None</span>
+                                    {% endif %}
+                                </div>
+                                {% endfor %}
+                                <small class="text-muted d-block mt-2">Cache refreshes daily automatically. Use "Get Stats\Users" to refresh manually.</small>
+                            </div>
+                        </div>
+                        {% endif %}
                         <!-- Expandable BCC Email Section -->
                         <div class="card mb-3" style="margin-top: 20px;">
                             <div class="card-header d-flex justify-content-between align-items-center" 
@@ -114,8 +145,6 @@
                                 <option value="recently_added">Recently Added</option>
                                 <option value="recommendations">Recommendations</option>
                             </select><br><br>
-                            <textarea name="email_text" id="email_text" placeholder="Write your message..." rows="10"
-                                cols="40" oninput="updatePreview()" required></textarea><br><br>
                             <label for="graph_placeholder">Graph Placeholder:</label>
                             <input type="text" id="graph_placeholder" name="graph_placeholder" value="[GRAPHS]"
                                 oninput="updatePreview()"><br><br>
@@ -145,6 +174,9 @@
                             <div class="d-flex justify-content-between align-items-center mb-3">
                                 <h2>Snap-ins</h2>
                                 <div class="d-flex gap-2 align-items-center">
+                                    <button id="reset-template-btn" class="btn btn-outline-secondary btn-sm" title="Clear all items and reset to Custom template">
+                                        🔄 Reset
+                                    </button>
                                     <label for="template-selector" class="form-label mb-0">Template:</label>
                                     <select id="template-selector" class="form-select" style="width: 200px;">
                                         <option value="">Custom</option>
@@ -158,6 +190,27 @@
                             <div id="selected-items-list" class="border rounded p-3 mb-4" style="min-height: 100px; background: #f8f9fa;">
                                 <div id="selected-items-empty" class="text-muted text-center py-3">
                                     No items selected. Use the buttons below to add items to your email.
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Text Blocks Section -->
+                        <div class="mb-4">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h2>Text Blocks</h2>
+                                <div class="d-flex gap-2">
+                                    <button type="button" class="btn btn-outline-primary btn-sm" id="add-title-btn" title="Add a title block with large heading text">
+                                        + Title
+                                    </button>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm" id="add-intro-btn" title="Add introduction text about server membership">
+                                        + Intro
+                                    </button>
+                                    <button type="button" class="btn btn-primary btn-sm" id="add-text-block-btn">
+                                        + Text Block
+                                    </button>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm" id="add-outro-btn" title="Add closing thank you message">
+                                        + Outro
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -194,8 +247,8 @@
                             
                             <!-- Available Graphs Column -->
                             <div class="col-md-6">
+                                <h2>Available Graphs</h2>
                                 {% if graph_data != [{},{}] %}
-                                    <h2>Available Graphs</h2>
                                     <div class="row">
                                         {% for graph in graph_data %}
                                             <div class="col-12 mb-2">
@@ -216,6 +269,11 @@
                                                 </div>
                                             </div>
                                         {% endfor %}
+                                    </div>
+                                {% else %}
+                                    <div class="alert alert-info" style="font-size: 0.9rem; padding: 0.75rem;">
+                                        <i class="fas fa-info-circle me-2"></i>
+                                        No graph data available. Click <strong>"Get Stats\Users"</strong> to load data.
                                     </div>
                                 {% endif %}
                             </div>
@@ -777,18 +835,16 @@
                         return;
                     }
                     
-                    const raw = document.getElementById('email_text').value;
+                    // Process all items in order to build the complete content
                     const layout = document.getElementById('layout').value;
                     const serverName = "{{ settings.server_name }}";
                     const subject = document.getElementById('subject').value;
                     const isDark = document.documentElement.classList.contains('dark');
 
-                    console.log('Email text raw:', raw);
                     console.log('Layout:', layout);
                     console.log('Server name:', serverName);
                     console.log('Subject:', subject);
 
-                    let body = raw.replace(/\n/g, "<br>");
                     let html = "";
                     let displaySubject = subject.startsWith(serverName) 
                         ? subject.slice(serverName.length).trimStart()
@@ -807,7 +863,21 @@
                 
                 // Process ALL items in the exact order they appear in selectedItems array
                 for (let item of selectedItems) {
-                    if (item.type === 'graph') {
+                    if (item.type === 'textblock') {
+                        // Add text block content directly to the HTML stream
+                        const content = getTextBlockContent(item.id);
+                        if (content && content.trim().length > 0) {
+                            const formattedContent = content.trim().replace(/\n/g, "<br>");
+                            allItemsHTML += `<div style="margin-bottom: 15px;">${formattedContent}</div>`;
+                        }
+                    } else if (item.type === 'titleblock') {
+                        // Add title block with larger styling
+                        const content = getTextBlockContent(item.id);
+                        if (content && content.trim().length > 0) {
+                            const formattedContent = content.trim().replace(/\n/g, "<br>");
+                            allItemsHTML += `<div style="margin-bottom: 20px; font-size: 1.5em; font-weight: bold; text-align: center;">${formattedContent}</div>`;
+                        }
+                    } else if (item.type === 'graph') {
                         const chart = Highcharts.charts.find(c => c && c.renderTo.id === item.id);
                         if (chart) {
                             try {
@@ -906,47 +976,9 @@
                     }
                 }
 
-                // Now assign the ordered HTML to the appropriate placeholders
-                let graphImagesHTML = "";
-                let statImagesHTML = "";
-                
-                // Determine which placeholder should get all the content
-                if (raw.includes(graphPlaceholder) && raw.includes(statPlaceholder)) {
-                    // If both placeholders exist, put all content in whichever comes first
-                    const graphIndex = raw.indexOf(graphPlaceholder);
-                    const statIndex = raw.indexOf(statPlaceholder);
-                    
-                    if (graphIndex < statIndex) {
-                        graphImagesHTML = allItemsHTML;
-                        statImagesHTML = "";
-                    } else {
-                        graphImagesHTML = "";
-                        statImagesHTML = allItemsHTML;
-                    }
-                } else if (raw.includes(graphPlaceholder)) {
-                    // Only graph placeholder exists, put all content there
-                    graphImagesHTML = allItemsHTML;
-                } else if (raw.includes(statPlaceholder)) {
-                    // Only stat placeholder exists, put all content there
-                    statImagesHTML = allItemsHTML;
-                } else {
-                    // No placeholders found, content will be added in default layout
-                    graphImagesHTML = allItemsHTML;
-                }
-
-                let content = body;
-
-                if (raw.includes(graphPlaceholder)) {
-                    content = body.replace(graphPlaceholder, graphImagesHTML);
-                } else {
-                    content = `${body}`;
-                }
-
-                if (raw.includes(statPlaceholder)) {
-                    content = content.replace(statPlaceholder, statImagesHTML);
-                } else {
-                    content = `${content}`;
-                }
+                // Now allItemsHTML contains all content in the correct order
+                // For layouts, we'll use this content directly
+                let content = allItemsHTML || "";
 
                 switch (layout) {
                     case "standard":
@@ -977,8 +1009,6 @@
                                                                         <p style="margin: 20px 0;">
                                                                             ${content}
                                                                         </p>
-                                                                        ${graphImagesHTML}
-                                                                        ${statImagesHTML}
                                                                         <div class="footer-bar" style="margin-left: auto; margin-right: auto; width: 250px; border-top: 1px solid #E5A00D; margin-top: 25px;">&nbsp;</div>
                                                                         <div class="content-block powered-by" style="padding-bottom: 10px; padding-top: 0;">Generated for Plex Media Server by <a href="https://github.com/jma1ice/newsletterr" style="color: #E5A00D; text-decoration: none;">newsletterr</a></div>
                                                                     </td>
@@ -1022,8 +1052,6 @@
                                                                         <p style="margin: 20px 0;">
                                                                             ${content}
                                                                         </p>
-                                                                        ${graphImagesHTML}
-                                                                        ${statImagesHTML}
                                                                         [RECENTLY_ADDED]
                                                                         <div class="footer-bar" style="margin-left: auto; margin-right: auto; width: 250px; border-top: 1px solid #E5A00D; margin-top: 25px;">&nbsp;</div>
                                                                         <div class="content-block powered-by" style="padding-bottom: 10px; padding-top: 0;">Generated for Plex Media Server by <a href="https://github.com/jma1ice/newsletterr" style="color: #E5A00D; text-decoration: none;">newsletterr</a></div>
@@ -1066,8 +1094,6 @@
                                                                         <p style="margin: 20px 0;">
                                                                             ${content}
                                                                         </p>
-                                                                        ${graphImagesHTML}
-                                                                        ${statImagesHTML}
                                                                         [RECOMMENDATIONS]
                                                                         <div class="footer-bar" style="margin-left: auto; margin-right: auto; width: 250px; border-top: 1px solid #E5A00D; margin-top: 25px;">&nbsp;</div>
                                                                         <div class="content-block powered-by" style="padding-bottom: 10px; padding-top: 0;">Generated for Plex Media Server by <a href="https://github.com/jma1ice/newsletterr" style="color: #E5A00D; text-decoration: none;">newsletterr</a></div>
@@ -1090,8 +1116,6 @@
                                 <html><body>
                                     <div style="font-family: IBM Plex Sans; padding: 20px;">
                                         ${content}
-                                        ${graphImagesHTML}
-                                        ${statImagesHTML}
                                     </div>
                                 </body></html>`;
                         html = await insertRecentlyAddedIntoPreview(html);
@@ -1355,16 +1379,48 @@
                 if (selectedItems.length === 0) {
                     container.innerHTML = '<div id="selected-items-empty" class="text-muted text-center py-3">No items selected. Use the buttons below to add items to your email.</div>';
                 } else {
-                    container.innerHTML = selectedItems.map((item, index) => `
-                        <div class="selected-item d-flex justify-content-between align-items-center p-2 mb-2 border rounded bg-light" 
-                             data-index="${index}" draggable="true" style="padding-left: 32px !important;">
-                            <span class="item-name">${item.name}</span>
-                            <div>
-                                <span class="badge badge-secondary me-2">${item.type}</span>
-                                <button type="button" class="btn btn-sm btn-outline-danger remove-item-btn" data-index="${index}">×</button>
-                            </div>
-                        </div>
-                    `).join('');
+                    // Build HTML for all items in the exact order they appear in selectedItems
+                    let htmlContent = '';
+                    
+                    selectedItems.forEach((item, index) => {
+                        if (item.type === 'textblock' || item.type === 'titleblock') {
+                            // Store the current content before rebuilding
+                            const currentContent = getTextBlockContent(item.id) || '';
+                            const badgeStyle = item.type === 'titleblock' ? 'badge-warning' : 'badge-secondary';
+                            const placeholderText = item.type === 'titleblock' ? 'Enter your title here...' : 'Enter your text here...';
+                            htmlContent += `
+                                <div class="selected-item d-flex flex-column p-2 mb-2 border rounded bg-light" 
+                                     data-index="${index}" draggable="true">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <span class="item-name">${item.name}</span>
+                                        <div>
+                                            <span class="badge ${badgeStyle} me-2">${item.type}</span>
+                                            <button type="button" class="btn btn-sm btn-outline-danger remove-item-btn" data-index="${index}">×</button>
+                                        </div>
+                                    </div>
+                                    <textarea 
+                                        data-textblock-id="${item.id}" 
+                                        class="form-control text-block-editor" 
+                                        style="height: 60px; font-size: 0.9rem; resize: vertical;"
+                                        placeholder="${placeholderText}"
+                                        oninput="updateTextBlockName('${item.id}', ${index})">${currentContent}</textarea>
+                                </div>
+                            `;
+                        } else {
+                            htmlContent += `
+                                <div class="selected-item d-flex justify-content-between align-items-center p-2 mb-2 border rounded bg-light" 
+                                     data-index="${index}" draggable="true" style="padding-left: 32px !important;">
+                                    <span class="item-name">${item.name}</span>
+                                    <div>
+                                        <span class="badge badge-secondary me-2">${item.type}</span>
+                                        <button type="button" class="btn btn-sm btn-outline-danger remove-item-btn" data-index="${index}">×</button>
+                                    </div>
+                                </div>
+                            `;
+                        }
+                    });
+                    
+                    container.innerHTML = htmlContent;
                     
                     // Add drag and drop functionality
                     setupDragAndDrop();
@@ -1489,8 +1545,138 @@
                 });
             }
 
+            // Text Block functionality
+            let textBlockCounter = 0;
+            let titleBlockCounter = 0;
+            
+            function createTextBlock() {
+                textBlockCounter++;
+                const textBlockId = `text-block-${textBlockCounter}`;
+                const textContent = '';
+                const displayName = 'New text block';
+                
+                if (addItem(textBlockId, displayName, 'textblock')) {
+                    return textBlockId;
+                }
+                return null;
+            }
+            
+            function getTextBlockContent(textBlockId) {
+                const textarea = document.querySelector(`[data-textblock-id="${textBlockId}"]`);
+                return textarea ? textarea.value : '';
+            }
+            
+            function setTextBlockContent(textBlockId, content) {
+                const textarea = document.querySelector(`[data-textblock-id="${textBlockId}"]`);
+                if (textarea) {
+                    textarea.value = content;
+                    // Update the display name after setting content
+                    const index = selectedItems.findIndex(item => item.id === textBlockId);
+                    if (index !== -1) {
+                        selectedItems[index].name = getTextBlockDisplayName(content);
+                        // Update the UI name display without triggering updateSelectedItemsDisplay
+                        const nameSpan = document.querySelector(`[data-index="${index}"] .item-name`);
+                        if (nameSpan) {
+                            nameSpan.textContent = selectedItems[index].name;
+                        }
+                    }
+                }
+            }
+            
+            function getTextBlockDisplayName(content) {
+                const firstLine = content.split('\n')[0].trim();
+                if (firstLine.length === 0) return 'Empty text block';
+                return firstLine.length > 30 ? firstLine.substring(0, 30) + '...' : firstLine;
+            }
+            
+            function updateTextBlockName(textBlockId, index) {
+                const content = getTextBlockContent(textBlockId);
+                const newName = getTextBlockDisplayName(content);
+                
+                // Update the item name in selectedItems
+                if (selectedItems[index]) {
+                    selectedItems[index].name = newName;
+                    
+                    // Update the display name in the UI
+                    const nameSpan = document.querySelector(`[data-index="${index}"] .item-name`);
+                    if (nameSpan) {
+                        nameSpan.textContent = newName;
+                    }
+                }
+                
+                // Update preview with debounce to prevent infinite loops
+                clearTimeout(window.previewUpdateTimeout);
+                window.previewUpdateTimeout = setTimeout(updatePreview, 300);
+            }
+
+            // Create specialized text blocks
+            function createIntroBlock() {
+                textBlockCounter++;
+                const textBlockId = `intro-block-${textBlockCounter}`;
+                const serverName = "{{ settings.server_name }}";
+                const introContent = `You are receiving this email because you are a member of ${serverName}.`;
+                const displayName = 'Intro: Member message';
+                
+                if (addItem(textBlockId, displayName, 'textblock')) {
+                    // Set the content after the block is created
+                    setTimeout(() => {
+                        setTextBlockContent(textBlockId, introContent);
+                    }, 100);
+                    return textBlockId;
+                }
+                return null;
+            }
+            
+            function createOutroBlock() {
+                textBlockCounter++;
+                const textBlockId = `outro-block-${textBlockCounter}`;
+                const outroContent = 'Thanks for using Plex and for reading this newsletterr email!';
+                const displayName = 'Outro: Thank you message';
+                
+                if (addItem(textBlockId, displayName, 'textblock')) {
+                    // Set the content after the block is created
+                    setTimeout(() => {
+                        setTextBlockContent(textBlockId, outroContent);
+                    }, 100);
+                    return textBlockId;
+                }
+                return null;
+            }
+            
+            function createTitleBlock() {
+                titleBlockCounter++;
+                const textBlockId = `title-block-${titleBlockCounter}`;
+                const titleContent = 'Newsletter Title';
+                const displayName = 'Title: Newsletter Title';
+                
+                if (addItem(textBlockId, displayName, 'titleblock')) {
+                    // Set the content after the block is created
+                    setTimeout(() => {
+                        setTextBlockContent(textBlockId, titleContent);
+                    }, 100);
+                    return textBlockId;
+                }
+                return null;
+            }
+
             // Event listeners for add buttons
             document.addEventListener('click', (e) => {
+                if (e.target.id === 'add-text-block-btn') {
+                    createTextBlock();
+                }
+                
+                if (e.target.id === 'add-intro-btn') {
+                    createIntroBlock();
+                }
+                
+                if (e.target.id === 'add-outro-btn') {
+                    createOutroBlock();
+                }
+                
+                if (e.target.id === 'add-title-btn') {
+                    createTitleBlock();
+                }
+                
                 if (e.target.classList.contains('add-stat-btn') || e.target.classList.contains('add-graph-btn')) {
                     const id = e.target.dataset.id;
                     const name = e.target.dataset.name;
@@ -1626,7 +1812,14 @@
             document.getElementById('sendEmailBtn').addEventListener('click', async () => {
                 const subject = document.getElementById('subject').value;
                 const layout = document.getElementById('layout').value;
-                let email_text = document.getElementById('email_text').value;
+                
+                // Collect text from all text blocks
+                const textBlocks = selectedItems
+                    .filter(item => item.type === 'textblock')
+                    .map(item => getTextBlockContent(item.id))
+                    .filter(content => content.trim().length > 0);
+                
+                let email_text = textBlocks.join('\n\n');
 
                 const chipInput = document.getElementById('email_chip_input');
                     if (chipInput && chipInput.value.trim()) {
@@ -2220,13 +2413,59 @@
                 }
             });
 
+            // Reset button handler
+            document.getElementById('reset-template-btn').addEventListener('click', function() {
+                // Confirm the reset action
+                if (confirm('Are you sure you want to reset? This will clear all selected items and reset to Custom template.')) {
+                    // Clear all selected items
+                    selectedItems.length = 0;
+                    
+                    // Reset template selector to Custom
+                    document.getElementById('template-selector').value = '';
+                    
+                    // Hide delete button
+                    document.getElementById('delete-template-btn').style.display = 'none';
+                    
+                    // Reset all add buttons to original state
+                    document.querySelectorAll('.add-stat-btn, .add-graph-btn').forEach(btn => {
+                        btn.textContent = 'Add';
+                        btn.classList.remove('btn-success');
+                        btn.classList.add('btn-primary');
+                        btn.disabled = false;
+                    });
+                    
+                    // Update the display
+                    updateSelectedItemsDisplay();
+                    
+                    // Reset text block counter
+                    textBlockCounter = 0;
+                }
+            });
+
             // Save current template
             async function saveCurrentTemplate(name) {
                 try {
+                    // Collect text from all text blocks (including title blocks)
+                    const textBlocks = selectedItems
+                        .filter(item => item.type === 'textblock' || item.type === 'titleblock')
+                        .map(item => getTextBlockContent(item.id))
+                        .filter(content => content.trim().length > 0);
+                    
+                    // Also store individual text block contents in selected_items for better processing
+                    const itemsWithContent = selectedItems.map(item => {
+                        if (item.type === 'textblock' || item.type === 'titleblock') {
+                            return {
+                                ...item,
+                                content: getTextBlockContent(item.id) || ''
+                            };
+                        }
+                        return item;
+                    });
+                    
                     const templateData = {
                         name: name,
-                        selected_items: JSON.stringify(selectedItems),
-                        email_text: document.getElementById('email_text').value,
+                        selected_items: JSON.stringify(itemsWithContent),
+                        email_text: textBlocks.join('\n\n'),
                         subject: document.getElementById('subject').value,
                         layout: document.getElementById('layout').value
                     };
@@ -2269,8 +2508,35 @@
                         btn.disabled = false;
                     });
                     
-                    // Load template items
-                    selectedItems = [...items];
+                    // Load template items in order, preserving types and content
+                    selectedItems = items.map(item => {
+                        // For text and title blocks, restore the content
+                        if ((item.type === 'textblock' || item.type === 'titleblock') && item.content) {
+                            // Ensure we have the right counter for new blocks
+                            if (item.type === 'textblock' && item.id.startsWith('text-block-')) {
+                                const counter = parseInt(item.id.split('-')[2]);
+                                if (counter >= textBlockCounter) {
+                                    textBlockCounter = counter;
+                                }
+                            } else if (item.type === 'titleblock' && item.id.startsWith('title-block-')) {
+                                const counter = parseInt(item.id.split('-')[2]);
+                                if (counter >= titleBlockCounter) {
+                                    titleBlockCounter = counter;
+                                }
+                            } else if (item.type === 'textblock' && item.id.startsWith('intro-block-')) {
+                                const counter = parseInt(item.id.split('-')[2]);
+                                if (counter >= textBlockCounter) {
+                                    textBlockCounter = counter;
+                                }
+                            } else if (item.type === 'textblock' && item.id.startsWith('outro-block-')) {
+                                const counter = parseInt(item.id.split('-')[2]);
+                                if (counter >= textBlockCounter) {
+                                    textBlockCounter = counter;
+                                }
+                            }
+                        }
+                        return { ...item };
+                    });
                     
                     // Render any graphs that need to be rendered
                     selectedItems.forEach(item => {
@@ -2317,12 +2583,22 @@
                     });
                     
                     // Load form fields
-                    document.getElementById('email_text').value = template.email_text || '';
                     document.getElementById('subject').value = template.subject || '';
                     document.getElementById('layout').value = template.layout || 'standard';
                     
                     // Update display and preview
                     updateSelectedItemsDisplay();
+                    
+                    // After the display is updated, set the content for text/title blocks
+                    setTimeout(() => {
+                        selectedItems.forEach(item => {
+                            if ((item.type === 'textblock' || item.type === 'titleblock') && item.content) {
+                                setTextBlockContent(item.id, item.content);
+                            }
+                        });
+                        // Update preview after content is set
+                        updatePreview();
+                    }, 100);
                     
                     console.log('Template loaded:', template.name);
                 } catch (error) {

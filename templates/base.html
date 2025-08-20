@@ -30,8 +30,22 @@
         <ul id="navLinks">
             <li><a href="{{ url_for('index') }}" class="hover:underline">newsletterr</a></li>
             <li><a href="{{ url_for('email_history') }}" class="hover:underline">email history</a></li>
+            <li><a href="{{ url_for('scheduling') }}" class="hover:underline">scheduling</a></li>
             <li><a href="{{ url_for('settings') }}" class="hover:underline">settings</a></li>
             <li><a href="{{ url_for('about') }}" class="hover:underline">about</a></li>
+            <!-- Cache Status Indicator -->
+            <li style="margin-left: 20px;">
+                {% set cache_status = get_cache_status() %}
+                <span class="cache-status-badge {{ cache_status.class }}" 
+                      title="{{ cache_status.status }}">
+                    <i class="fas fa-database"></i>
+                    {% if cache_status.has_data %}
+                        {{ cache_status.age_display }}
+                    {% else %}
+                        no data
+                    {% endif %}
+                </span>
+            </li>
         </ul>
         {% if update_info.is_newer %}
             <div style="
@@ -42,27 +56,29 @@
                 <a href="{{ update_info.release_url }}" target="_blank" rel="noopener">See release notes</a>
             </div>
         {% endif %}
-        <div style="display: flex;">
+        <div style="display: flex; align-items: center; gap: 10px;">
             <button id="theme-toggle" type="button" role="switch" aria-checked="false" aria-label="Toggle dark mode" class="relative inline-flex h-8 w-16 items-center rounded-full bg-gray-200 dark:bg-gray-700 transition-colors focus:outline-none transform -translate-x-2 translate-y-2.5">
                 <span class="pointer-events-none absolute inset-0 z-20 flex items-center justify-between px-1">
-                    <svg class="h-5 w-5 text-amber-400 transition-opacity duration-100 ease-in-out dark:!opacity-0 transform translate-x-1 translate-y-0.5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                        <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.5">
-                            <path d="M8 1.11133V2.00022" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path>
-                            <path d="M12.8711 3.12891L12.2427 3.75735" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path>
-                            <path d="M14.8889 8H14" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path>
-                            <path d="M12.8711 12.8711L12.2427 12.2427" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path>
-                            <path d="M8 14.8889V14" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path>
-                            <path d="M3.12891 12.8711L3.75735 12.2427" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path>
-                            <path d="M1.11133 8H2.00022" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path>
-                            <path d="M3.12891 3.12891L3.75735 3.75735" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path>
-                            <path d="M8.00043 11.7782C10.0868 11.7782 11.7782 10.0868 11.7782 8.00043C11.7782 5.91402 10.0868 4.22266 8.00043 4.22266C5.91402 4.22266 4.22266 5.91402 4.22266 8.00043C4.22266 10.0868 5.91402 11.7782 8.00043 11.7782Z" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"></path>
+                    <!-- Sun icon for light mode -->
+                    <svg class="h-6 w-6 text-orange-500 transition-opacity duration-200 ease-in-out dark:!opacity-0 transform translate-x-0.5 translate-y-0" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="filter: drop-shadow(0 1px 2px rgba(0,0,0,0.3));">
+                        <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="2">
+                            <path d="M12 1V3" stroke-width="2" stroke-linecap="round"></path>
+                            <path d="M19.07 4.93L17.66 6.34" stroke-width="2" stroke-linecap="round"></path>
+                            <path d="M23 12H21" stroke-width="2" stroke-linecap="round"></path>
+                            <path d="M19.07 19.07L17.66 17.66" stroke-width="2" stroke-linecap="round"></path>
+                            <path d="M12 23V21" stroke-width="2" stroke-linecap="round"></path>
+                            <path d="M4.93 19.07L6.34 17.66" stroke-width="2" stroke-linecap="round"></path>
+                            <path d="M1 12H3" stroke-width="2" stroke-linecap="round"></path>
+                            <path d="M4.93 4.93L6.34 6.34" stroke-width="2" stroke-linecap="round"></path>
+                            <circle cx="12" cy="12" r="4" stroke-width="2"></circle>
                         </g>
                     </svg>
-                    <svg class="h-5 w-5 text-blue-100 transition-opacity duration-100 ease-in-out opacity-0 dark:!opacity-100 transform -translate-x-1.5 translate-y-0" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                        <path d="M21 12.79A9 9 0 1111.21 3a7 7 0 109.79 9.79z"/>
+                    <!-- Moon icon for dark mode -->
+                    <svg class="h-6 w-6 text-slate-800 transition-opacity duration-200 ease-in-out opacity-0 dark:!opacity-100 transform -translate-x-0.5 translate-y-0" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="filter: drop-shadow(0 1px 2px rgba(0,0,0,0.3));">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" stroke="currentColor" stroke-width="1" fill="currentColor"/>
                     </svg>
                 </span>
-                <span class="absolute z-10 inline-block h-6 w-6 rounded-full bg-white shadow transform transition will-change-transform translate-x-1 dark:translate-x-8"></span>
+                <span class="absolute z-10 inline-block h-6 w-6 rounded-full bg-white shadow-lg transform transition-all duration-200 will-change-transform translate-x-1 dark:translate-x-8 dark:bg-gray-800"></span>
             </button>
             <img src="/static/img/Asset_94x.png" alt="Logo" class="logo" />
         </div>

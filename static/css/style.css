@@ -431,3 +431,69 @@ footer p {
     border-color: #666 !important;
     color: #8acbd4;
 }
+
+/* Cache Status Badge Styles */
+.cache-status-badge {
+    font-size: 11px !important;
+    padding: 4px 8px !important;
+    border-radius: 12px !important;
+    cursor: help !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 3px !important;
+    font-weight: 500 !important;
+    border: 1px solid !important;
+}
+
+.cache-status-badge.text-success {
+    background-color: #d4edda !important;
+    color: #155724 !important;
+    border-color: #c3e6cb !important;
+}
+
+.cache-status-badge.text-warning {
+    background-color: #fff3cd !important;
+    color: #856404 !important;
+    border-color: #ffeaa7 !important;
+}
+
+.cache-status-badge.text-danger {
+    background-color: #f8d7da !important;
+    color: #721c24 !important;
+    border-color: #f5c6cb !important;
+}
+
+.cache-status-badge.text-muted {
+    background-color: #f8f9fa !important;
+    color: #6c757d !important;
+    border-color: #dee2e6 !important;
+}
+
+.cache-status-badge i {
+    font-size: 9px !important;
+}
+
+/* Dark mode adjustments for cache status badge */
+.dark .cache-status-badge.text-success {
+    background-color: rgba(25, 135, 84, 0.15) !important;
+    color: #75b798 !important;
+    border-color: rgba(25, 135, 84, 0.3) !important;
+}
+
+.dark .cache-status-badge.text-warning {
+    background-color: rgba(255, 193, 7, 0.15) !important;
+    color: #ffc107 !important;
+    border-color: rgba(255, 193, 7, 0.3) !important;
+}
+
+.dark .cache-status-badge.text-danger {
+    background-color: rgba(220, 53, 69, 0.15) !important;
+    color: #f1aeb5 !important;
+    border-color: rgba(220, 53, 69, 0.3) !important;
+}
+
+.dark .cache-status-badge.text-muted {
+    background-color: rgba(108, 117, 125, 0.15) !important;
+    color: #adb5bd !important;
+    border-color: rgba(108, 117, 125, 0.3) !important;
+}

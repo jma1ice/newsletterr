@@ -856,14 +856,14 @@ def generate_email_content(template_id, settings, date_range=7):
         # Get template
         templates_conn = sqlite3.connect(DB_PATH)
         templates_cursor = templates_conn.cursor()
-        templates_cursor.execute("SELECT name, subject, email_text, layout, selected_items FROM email_templates WHERE id = ?", (template_id,))
+        templates_cursor.execute("SELECT name, subject, email_text, selected_items FROM email_templates WHERE id = ?", (template_id,))
         template_result = templates_cursor.fetchone()
         templates_conn.close()
         
         if not template_result:
             return None, None, "Template not found"
         
-        template_name, subject, email_text, layout, selected_items_json = template_result
+        template_name, subject, email_text, selected_items_json = template_result
         
         # Parse selected items
         try:
@@ -1066,7 +1066,7 @@ def generate_email_content(template_id, settings, date_range=7):
             final_content = email_text or ""
         
         # Apply layout with the assembled content
-        processed_body = apply_layout(final_content, "", "", "", "", layout or 'standard', subject, settings['server_name'])
+        processed_body = apply_layout(final_content, "", "", "", "", subject, settings['server_name'])
         
         return template_name, subject, processed_body
         
@@ -1225,7 +1225,8 @@ def send_scheduled_email(schedule_id, email_list_id, template_id):
         traceback.print_exc()
         return False
 
-def apply_layout(body, graphs_html_block, stats_html_block, ra_html_block, recs_html_block, layout, subject, server_name):
+def apply_layout(body, graphs_html_block, stats_html_block, ra_html_block, recs_html_block, subject, server_name):
+    # Layout functionality deprecated - using standard layout only
     body = body.replace('\n', '<br>')
     body = body.replace('[GRAPHS]', graphs_html_block)
     body = body.replace('[STATS]', stats_html_block)
@@ -1237,106 +1238,40 @@ def apply_layout(body, graphs_html_block, stats_html_block, ra_html_block, recs_
     else:
         display_subject = subject
 
-    if layout == "standard":
-        return f"""
-        <link href="https://fonts.googleapis.com/css?family=IBM+Plex+Sans:400,500,600,700&display=swap" rel="stylesheet">
-        <html><body style="font-family: IBM Plex Sans;">
-            <table class="body" style="border-collapse: separate; mso-table-lspace: 0pt; mso-table-rspace: 0pt; width: 100%;" border="0" cellspacing="0" cellpadding="0">
-                <tbody>
-                    <tr>
-                        <td class="container" style="font-family: IBM Plex Sans; font-size: 14px; vertical-align: top; display: block; max-width: 1042px; padding: 10px; width: 1042px; margin: 0 auto !important;">
-                            <div class="content" style="box-sizing: border-box; display: block; margin: 0 auto; max-width: 1037px; padding: 10px;"><span class="preheader" style="color: transparent; display: none; height: 0; max-height: 0; max-width: 0; opacity: 0; overflow: hidden; mso-hide: all; visibility: hidden; width: 0;">{server_name} Newsletter</span>
-                                <table class="main" style="border-collapse: separate; mso-table-lspace: 0pt; mso-table-rspace: 0pt; width: 100%; background: #282A2D; border-radius: 3px; color: #ffffff;" border="0" cellspacing="0" cellpadding="3">
-                                    <tbody>
-                                        <tr>
-                                            <td class="wrapper" style="font-family: IBM Plex Sans; font-size: 14px; vertical-align: top; box-sizing: border-box; padding: 5px; overflow: auto;">
-                                                <div class="header" style="width: 50%; height: 10px; text-align: center;"><img class="header-img" style="border: none; -ms-interpolation-mode: bicubic; max-width: 9%; width: 492px; height: 20px; margin-left: -35px;" src="https://d15k2d11r6t6rl.cloudfront.net/public/users/Integrators/669d5713-9b6a-46bb-bd7e-c542cff6dd6a/3bef3c50f13f4320a9e31b8be79c6ad2/Plex%20Logo%20Update%202022/plex-logo-heavy-stroke.png" width="492" height="90" /></div>
-                                                <div class="server-name" style="font-size: 25px; text-align: center; margin-bottom: 0;">{server_name} Newsletter</div>
-                                            </td>
-                                        </tr>
-                                        <tr>
-                                            <td class="footer" style="font-family: IBM Plex Sans; font-size: 12px; vertical-align: top; clear: both; margin-top: 0; text-align: center; width: 100%;">
-                                                <h1 class="footer-bar" style="margin-left: auto; margin-right: auto; width: 300px; border-top: 1px solid #E5A00D; margin-top: 5px;">{display_subject}</h1>
-                                                <p>
-                                                    {body}
-                                                </p>
-                                                <div class="footer-bar" style="margin-left: auto; margin-right: auto; width: 250px; border-top: 1px solid #E5A00D; margin-top: 25px;">&nbsp;</div>
-                                                <div class="content-block powered-by" style="padding-bottom: 10px; padding-top: 0;">Generated for Plex Media Server by <a href="https://github.com/jma1ice/newsletterr" style="color: #E5A00D; text-decoration: none;">newsletterr</a></div>
-                                            </td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </td>
-                    </tr>
-                </tbody>
-            </table></body></html>"""
-    elif layout == "recently_added":
-        return f"""
-        <link href="https://fonts.googleapis.com/css?family=IBM+Plex+Sans:400,500,600,700&display=swap" rel="stylesheet">
-        <html><body style="font-family: IBM Plex Sans;">
-            <table class="body" style="border-collapse: separate; mso-table-lspace: 0pt; mso-table-rspace: 0pt; width: 100%;" border="0" cellspacing="0" cellpadding="0">
-                <tbody>
-                    <tr>
-                        <td class="container" style="font-family: IBM Plex Sans; font-size: 14px; vertical-align: top; display: block; max-width: 1042px; padding: 10px; width: 1042px; margin: 0 auto !important;">
-                            <div class="content" style="box-sizing: border-box; display: block; margin: 0 auto; max-width: 1037px; padding: 10px;"><span class="preheader" style="color: transparent; display: none; height: 0; max-height: 0; max-width: 0; opacity: 0; overflow: hidden; mso-hide: all; visibility: hidden; width: 0;">{server_name} Newsletter</span>
-                                <table class="main" style="border-collapse: separate; mso-table-lspace: 0pt; mso-table-rspace: 0pt; width: 100%; background: #282A2D; border-radius: 3px; color: #ffffff;" border="0" cellspacing="0" cellpadding="3">
-                                    <tbody>
-                                        <tr>
-                                            <td class="wrapper" style="font-family: IBM Plex Sans; font-size: 14px; vertical-align: top; box-sizing: border-box; padding: 5px; overflow: auto;">
-                                                <div class="header" style="width: 50%; height: 10px; text-align: center;"><img class="header-img" style="border: none; -ms-interpolation-mode: bicubic; max-width: 9%; width: 492px; height: 20px; margin-left: -35px;" src="https://d15k2d11r6t6rl.cloudfront.net/public/users/Integrators/669d5713-9b6a-46bb-bd7e-c542cff6dd6a/3bef3c50f13f4320a9e31b8be79c6ad2/Plex%20Logo%20Update%202022/plex-logo-heavy-stroke.png" width="492" height="90" /></div>
-                                                <div class="server-name" style="font-size: 25px; text-align: center; margin-bottom: 0;">{server_name} Newsletter</div>
-                                            </td>
-                                        </tr>
-                                        <tr>
-                                            <td class="footer" style="font-family: IBM Plex Sans; font-size: 12px; vertical-align: top; clear: both; margin-top: 0; text-align: center; width: 100%;">
-                                                <h1 class="footer-bar" style="margin-left: auto; margin-right: auto; width: 300px; border-top: 1px solid #E5A00D; margin-top: 5px;">{display_subject}</h1>
-                                                {ra_html_block}
-                                                <div class="footer-bar" style="margin-left: auto; margin-right: auto; width: 250px; border-top: 1px solid #E5A00D; margin-top: 25px;">&nbsp;</div>
-                                                <div class="content-block powered-by" style="padding-bottom: 10px; padding-top: 0;">Generated for Plex Media Server by <a href="https://github.com/jma1ice/newsletterr" style="color: #E5A00D; text-decoration: none;">newsletterr</a></div>
-                                            </td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </td>
-                    </tr>
-                </tbody>
-            </table></body></html>"""
-    elif layout == "recommendations":
-        return f"""
-        <link href="https://fonts.googleapis.com/css?family=IBM+Plex+Sans:400,500,600,700&display=swap" rel="stylesheet">
-        <html><body style="font-family: IBM Plex Sans;">
-            <table class="body" style="border-collapse: separate; mso-table-lspace: 0pt; mso-table-rspace: 0pt; width: 100%;" border="0" cellspacing="0" cellpadding="0">
-                <tbody>
-                    <tr>
-                        <td class="container" style="font-family: IBM Plex Sans; font-size: 14px; vertical-align: top; display: block; max-width: 1042px; padding: 10px; width: 1042px; margin: 0 auto !important;">
-                            <div class="content" style="box-sizing: border-box; display: block; margin: 0 auto; max-width: 1037px; padding: 10px;"><span class="preheader" style="color: transparent; display: none; height: 0; max-height: 0; max-width: 0; opacity: 0; overflow: hidden; mso-hide: all; visibility: hidden; width: 0;">{server_name} Newsletter</span>
-                                <table class="main" style="border-collapse: separate; mso-table-lspace: 0pt; mso-table-rspace: 0pt; width: 100%; background: #282A2D; border-radius: 3px; color: #ffffff;" border="0" cellspacing="0" cellpadding="3">
-                                    <tbody>
-                                        <tr>
-                                            <td class="wrapper" style="font-family: IBM Plex Sans; font-size: 14px; vertical-align: top; box-sizing: border-box; padding: 5px; overflow: auto;">
-                                                <div class="header" style="width: 50%; height: 10px; text-align: center;"><img class="header-img" style="border: none; -ms-interpolation-mode: bicubic; max-width: 9%; width: 492px; height: 20px; margin-left: -35px;" src="https://d15k2d11r6t6rl.cloudfront.net/public/users/Integrators/669d5713-9b6a-46bb-bd7e-c542cff6dd6a/3bef3c50f13f4320a9e31b8be79c6ad2/Plex%20Logo%20Update%202022/plex-logo-heavy-stroke.png" width="492" height="90" /></div>
-                                                <div class="server-name" style="font-size: 25px; text-align: center; margin-bottom: 0;">{server_name} Newsletter</div>
-                                            </td>
-                                        </tr>
-                                        <tr>
-                                            <td class="footer" style="font-family: IBM Plex Sans; font-size: 12px; vertical-align: top; clear: both; margin-top: 0; text-align: center; width: 100%;">
-                                                <h1 class="footer-bar" style="margin-left: auto; margin-right: auto; width: 300px; border-top: 1px solid #E5A00D; margin-top: 5px;">Recommended For You</h1>
-                                                {recs_html_block}
-                                                <div class="footer-bar" style="margin-left: auto; margin-right: auto; width: 250px; border-top: 1px solid #E5A00D; margin-top: 25px;">&nbsp;</div>
-                                                <div class="content-block powered-by" style="padding-bottom: 10px; padding-top: 0;">Generated for Plex Media Server by <a href="https://github.com/jma1ice/newsletterr" style="color: #E5A00D; text-decoration: none;">newsletterr</a></div>
-                                            </td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </td>
-                    </tr>
-                </tbody>
-            </table></body></html>"""
-    else:
-        return body
+    # Always use standard layout (layout parameter ignored)
+    return f"""
+    <link href="https://fonts.googleapis.com/css?family=IBM+Plex+Sans:400,500,600,700&display=swap" rel="stylesheet">
+    <html><body style="font-family: IBM Plex Sans;">
+        <table class="body" style="border-collapse: separate; mso-table-lspace: 0pt; mso-table-rspace: 0pt; width: 100%;" border="0" cellspacing="0" cellpadding="0">
+            <tbody>
+                <tr>
+                    <td class="container" style="font-family: IBM Plex Sans; font-size: 14px; vertical-align: top; display: block; max-width: 1042px; padding: 10px; width: 1042px; margin: 0 auto !important;">
+                        <div class="content" style="box-sizing: border-box; display: block; margin: 0 auto; max-width: 1037px; padding: 10px;"><span class="preheader" style="color: transparent; display: none; height: 0; max-height: 0; max-width: 0; opacity: 0; overflow: hidden; mso-hide: all; visibility: hidden; width: 0;">{server_name} Newsletter</span>
+                            <table class="main" style="border-collapse: separate; mso-table-lspace: 0pt; mso-table-rspace: 0pt; width: 100%; background: #282A2D; border-radius: 3px; color: #ffffff;" border="0" cellspacing="0" cellpadding="3">
+                                <tbody>
+                                    <tr>
+                                        <td class="wrapper" style="font-family: IBM Plex Sans; font-size: 14px; vertical-align: top; box-sizing: border-box; padding: 5px; overflow: auto;">
+                                            <div class="header" style="width: 50%; height: 10px; text-align: center;"><img class="header-img" style="border: none; -ms-interpolation-mode: bicubic; max-width: 9%; width: 492px; height: 20px; margin-left: -35px;" src="https://d15k2d11r6t6rl.cloudfront.net/public/users/Integrators/669d5713-9b6a-46bb-bd7e-c542cff6dd6a/3bef3c50f13f4320a9e31b8be79c6ad2/Plex%20Logo%20Update%202022/plex-logo-heavy-stroke.png" width="492" height="90" /></div>
+                                            <div class="server-name" style="font-size: 25px; text-align: center; margin-bottom: 0;">{server_name} Newsletter</div>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td class="footer" style="font-family: IBM Plex Sans; font-size: 12px; vertical-align: top; clear: both; margin-top: 0; text-align: center; width: 100%;">
+                                            <h1 class="footer-bar" style="margin-left: auto; margin-right: auto; width: 300px; border-top: 1px solid #E5A00D; margin-top: 5px;">{display_subject}</h1>
+                                            <p>
+                                                {body}
+                                            </p>
+                                            <div class="footer-bar" style="margin-left: auto; margin-right: auto; width: 250px; border-top: 1px solid #E5A00D; margin-top: 25px;">&nbsp;</div>
+                                            <div class="content-block powered-by" style="padding-bottom: 10px; padding-top: 0;">Generated for Plex Media Server by <a href="https://github.com/jma1ice/newsletterr" style="color: #E5A00D; text-decoration: none;">newsletterr</a></div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </td>
+                </tr>
+            </tbody>
+        </table></body></html>"""
 
 def run_tautulli_command(base_url, api_key, command, data_type, error, time_range='30'):
     out_data = None  # Initialize to prevent NameError
@@ -2265,14 +2200,14 @@ def preview_schedule(schedule_id):
         # Get template details
         templates_conn = sqlite3.connect(DB_PATH)
         templates_cursor = templates_conn.cursor()
-        templates_cursor.execute("SELECT name, subject, email_text, layout, selected_items FROM email_templates WHERE id = ?", (template_id,))
+        templates_cursor.execute("SELECT name, subject, email_text, selected_items FROM email_templates WHERE id = ?", (template_id,))
         template_result = templates_cursor.fetchone()
         templates_conn.close()
         
         if not template_result:
             return jsonify({"status": "error", "message": "Template not found"}), 404
         
-        template_name, subject, email_text, layout, selected_items_json = template_result
+        template_name, subject, email_text, selected_items_json = template_result
         
         # Parse selected items
         try:
@@ -2401,7 +2336,6 @@ def preview_schedule(schedule_id):
             "template_name": template_name,
             "subject": subject,
             "email_text": email_text,
-            "layout": layout or 'standard',
             "selected_items": selected_items,
             "date_range": date_range,
             "settings": settings,
@@ -2648,7 +2582,7 @@ def get_email_templates():
     try:
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
-        cursor.execute("SELECT id, name, selected_items, email_text, subject, layout FROM email_templates ORDER BY name")
+        cursor.execute("SELECT id, name, selected_items, email_text, subject FROM email_templates ORDER BY name")
         templates = cursor.fetchall()
         conn.close()
         
@@ -2659,8 +2593,7 @@ def get_email_templates():
                 'name': template[1],
                 'selected_items': template[2],
                 'email_text': template[3],
-                'subject': template[4],
-                'layout': template[5]
+                'subject': template[4]
             })
         
         return jsonify(template_list)
@@ -2677,7 +2610,6 @@ def save_email_template():
         selected_items = data.get('selected_items', '[]')  # JSON string
         email_text = data.get('email_text', '')
         subject = data.get('subject', '')
-        layout = data.get('layout', 'standard')
         
         if not name:
             return jsonify({"status": "error", "message": "Template name is required"}), 400
@@ -2693,16 +2625,16 @@ def save_email_template():
             # Update existing template
             cursor.execute("""
                 UPDATE email_templates 
-                SET selected_items = ?, email_text = ?, subject = ?, layout = ?, updated_at = CURRENT_TIMESTAMP
+                SET selected_items = ?, email_text = ?, subject = ?, updated_at = CURRENT_TIMESTAMP
                 WHERE name = ?
-            """, (selected_items, email_text, subject, layout, name))
+            """, (selected_items, email_text, subject, name))
             message = "Template updated successfully"
         else:
             # Create new template
             cursor.execute("""
-                INSERT INTO email_templates (name, selected_items, email_text, subject, layout)
-                VALUES (?, ?, ?, ?, ?)
-            """, (name, selected_items, email_text, subject, layout))
+                INSERT INTO email_templates (name, selected_items, email_text, subject)
+                VALUES (?, ?, ?, ?)
+            """, (name, selected_items, email_text, subject))
             message = "Template saved successfully"
         
         conn.commit()

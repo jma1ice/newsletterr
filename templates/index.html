@@ -138,25 +138,6 @@
 
                             Subject: <input type="text" name="subject" id="subject" placeholder="Subject"
                                 value="{{ settings.server_name }} News" style="width: 18rem;" required><br><br>
-                            <label for="layout">Choose a layout:</label>
-                            <select id="layout" name="layout" onchange="updatePreview()">
-                                <option value="none">Plain Text</option>
-                                <option value="standard" selected>Standard</option>
-                                <option value="recently_added">Recently Added</option>
-                                <option value="recommendations">Recommendations</option>
-                            </select><br><br>
-                            <label for="graph_placeholder">Graph Placeholder:</label>
-                            <input type="text" id="graph_placeholder" name="graph_placeholder" value="[GRAPHS]"
-                                oninput="updatePreview()"><br><br>
-                            <label for="stat_placeholder">Stat Placeholder:</label>
-                            <input type="text" id="stat_placeholder" name="stat_placeholder" value="[STATS]"
-                                oninput="updatePreview()"><br><br>
-                            <label for="ra_placeholder">Recently Added Holder:</label>
-                            <input type="text" id="ra_placeholder" name="ra_placeholder" value="[RECENTLY_ADDED]"
-                                style="width: 10.5rem;" oninput="updatePreview()"><br><br>
-                            <label for="recs_placeholder">Recs. Placeholder:</label>
-                            <input type="text" id="recs_placeholder" name="recs_placeholder" value="[RECOMMENDATIONS]"
-                                style="width: 12rem;" oninput="updatePreview()"><br><br>
                         </form>
                     </td>
                     <td style="width: 40%; padding: 10px; vertical-align: top; position: sticky; top: 80px;">
@@ -836,12 +817,10 @@
                     }
                     
                     // Process all items in order to build the complete content
-                    const layout = document.getElementById('layout').value;
                     const serverName = "{{ settings.server_name }}";
                     const subject = document.getElementById('subject').value;
                     const isDark = document.documentElement.classList.contains('dark');
 
-                    console.log('Layout:', layout);
                     console.log('Server name:', serverName);
                     console.log('Subject:', subject);
 
@@ -855,9 +834,6 @@
                     
                     console.log('selectedGraphs:', selectedGraphs);
                     console.log('selectedStats:', selectedStats);
-
-                const graphPlaceholder = document.getElementById('graph_placeholder').value;
-                const statPlaceholder = document.getElementById('stat_placeholder').value;
 
                 let allItemsHTML = "";
                 
@@ -977,150 +953,49 @@
                 }
 
                 // Now allItemsHTML contains all content in the correct order
-                // For layouts, we'll use this content directly
+                // Use the content directly with the standard layout
                 let content = allItemsHTML || "";
 
-                switch (layout) {
-                    case "standard":
-                        html = `
-                                <link href="https://fonts.googleapis.com/css?family=IBM+Plex+Sans:400,500,600,700&display=swap" rel="stylesheet">
-                                <style>
-                                    :root { color-scheme: ${isDark ? 'dark' : 'light'}; }
-                                    html, body { background: ${isDark ? '#333' : '#8acbd4'}; }
-                                </style>
-                                <html><body style="font-family: IBM Plex Sans; margin: 0;">
-                                    <table class="body" style="border-collapse: separate; mso-table-lspace: 0pt; mso-table-rspace: 0pt; width: 100%;" border="0" cellspacing="0" cellpadding="0">
-                                        <tbody>
-                                            <tr>
-                                                <td class="preview-container" style="font-family: IBM Plex Sans; font-size: 14px; vertical-align: top; display: block;">
-                                                    <div class="content" style="box-sizing: border-box; display: block;"><span class="preheader" style="color: transparent; display: none; height: 0; max-height: 0; max-width: 0; opacity: 0; overflow: hidden; mso-hide: all; visibility: hidden; width: 0;">${serverName} Newsletter</span>
-                                                        <table class="main" style="border-collapse: separate; mso-table-lspace: 0pt; mso-table-rspace: 0pt; width: 100%; background: #282A2D; border-radius: 3px; color: #ffffff;" border="0" cellspacing="0" cellpadding="3">
-                                                            <tbody>
-                                                                <tr>
-                                                                    <td class="wrapper" style="font-family: IBM Plex Sans; font-size: 14px; vertical-align: top; box-sizing: border-box; padding: 5px; overflow: auto;">
-                                                                        <div class="header" style="width: 50%; height: 10px; text-align: center;"><img class="header-img" style="border: none; -ms-interpolation-mode: bicubic; max-width: 9%; width: 492px; height: 20px; margin-left: -35px;" src="https://d15k2d11r6t6rl.cloudfront.net/public/users/Integrators/669d5713-9b6a-46bb-bd7e-c542cff6dd6a/3bef3c50f13f4320a9e31b8be79c6ad2/Plex%20Logo%20Update%202022/plex-logo-heavy-stroke.png" width="492" height="90" /></div>
-                                                                        <div class="server-name" style="font-size: 25px; text-align: center; margin-bottom: 0;">${serverName} Newsletter</div>
-                                                                    </td>
-                                                                </tr>
-                                                                <tr>
-                                                                    <td class="footer" style="font-family: IBM Plex Sans; font-size: 12px; vertical-align: top; clear: both; margin-top: 0; text-align: center; width: 100%;">
+                html = `
+                        <link href="https://fonts.googleapis.com/css?family=IBM+Plex+Sans:400,500,600,700&display=swap" rel="stylesheet">
+                        <style>
+                            :root { color-scheme: ${isDark ? 'dark' : 'light'}; }
+                            html, body { background: ${isDark ? '#333' : '#8acbd4'}; }
+                        </style>
+                        <html><body style="font-family: IBM Plex Sans; margin: 0;">
+                            <table class="body" style="border-collapse: separate; mso-table-lspace: 0pt; mso-table-rspace: 0pt; width: 100%;" border="0" cellspacing="0" cellpadding="0">
+                                <tbody>
+                                    <tr>
+                                        <td class="preview-container" style="font-family: IBM Plex Sans; font-size: 14px; vertical-align: top; display: block;">
+                                            <div class="content" style="box-sizing: border-box; display: block;"><span class="preheader" style="color: transparent; display: none; height: 0; max-height: 0; max-width: 0; opacity: 0; overflow: hidden; mso-hide: all; visibility: hidden; width: 0;">${serverName} Newsletter</span>
+                                                <table class="main" style="border-collapse: separate; mso-table-lspace: 0pt; mso-table-rspace: 0pt; width: 100%; background: #282A2D; border-radius: 3px; color: #ffffff;" border="0" cellspacing="0" cellpadding="3">
+                                                    <tbody>
+                                                        <tr>
+                                                            <td class="wrapper" style="font-family: IBM Plex Sans; font-size: 14px; vertical-align: top; box-sizing: border-box; padding: 5px; overflow: auto;">
+                                                                <div class="header" style="width: 50%; height: 10px; text-align: center;"><img class="header-img" style="border: none; -ms-interpolation-mode: bicubic; max-width: 9%; width: 492px; height: 20px; margin-left: -35px;" src="https://d15k2d11r6t6rl.cloudfront.net/public/users/Integrators/669d5713-9b6a-46bb-bd7e-c542cff6dd6a/3bef3c50f13f4320a9e31b8be79c6ad2/Plex%20Logo%20Update%202022/plex-logo-heavy-stroke.png" width="492" height="90" /></div>
+                                                                <div class="server-name" style="font-size: 25px; text-align: center; margin-bottom: 0;">${serverName} Newsletter</div>
+                                                            </td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td class="footer" style="font-family: IBM Plex Sans; font-size: 12px; vertical-align: top; clear: both; margin-top: 0; text-align: center; width: 100%;">
 
-                                                                        <h1 class="footer-bar" style="margin-left: auto; margin-right: auto; width: 300px; border-top: 1px solid #E5A00D; margin-top: 5px;">${displaySubject}</h1>
-                                                                        <p style="margin: 20px 0;">
-                                                                            ${content}
-                                                                        </p>
-                                                                        <div class="footer-bar" style="margin-left: auto; margin-right: auto; width: 250px; border-top: 1px solid #E5A00D; margin-top: 25px;">&nbsp;</div>
-                                                                        <div class="content-block powered-by" style="padding-bottom: 10px; padding-top: 0;">Generated for Plex Media Server by <a href="https://github.com/jma1ice/newsletterr" style="color: #E5A00D; text-decoration: none;">newsletterr</a></div>
-                                                                    </td>
-                                                                </tr>
-                                                            </tbody>
-                                                        </table>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        </tbody>
-                                    </table></body></html>`;
-                        html = await insertRecentlyAddedIntoPreview(html);
-                        html = await insertRecommendationsIntoPreview(html);
-                        break;
-                    case "recently_added":
-                        document.getElementById('subject').value = `${serverName} Recently Added`;
-                        html = `
-                                <link href="https://fonts.googleapis.com/css?family=IBM+Plex+Sans:400,500,600,700&display=swap" rel="stylesheet">
-                                <style>
-                                    :root { color-scheme: ${isDark ? 'dark' : 'light'}; }
-                                    html, body { background: ${isDark ? '#333' : '#8acbd4'}; }
-                                </style>
-                                <html><body style="font-family: IBM Plex Sans; margin: 0;">
-                                    <table class="body" style="border-collapse: separate; mso-table-lspace: 0pt; mso-table-rspace: 0pt; width: 100%;" border="0" cellspacing="0" cellpadding="0">
-                                        <tbody>
-                                            <tr>
-                                                <td class="preview-container" style="font-family: IBM Plex Sans; font-size: 14px; vertical-align: top; display: block;">
-                                                    <div class="content" style="box-sizing: border-box; display: block;"><span class="preheader" style="color: transparent; display: none; height: 0; max-height: 0; max-width: 0; opacity: 0; overflow: hidden; mso-hide: all; visibility: hidden; width: 0;">${serverName} Newsletter</span>
-                                                        <table class="main" style="border-collapse: separate; mso-table-lspace: 0pt; mso-table-rspace: 0pt; width: 100%; background: #282A2D; border-radius: 3px; color: #ffffff;" border="0" cellspacing="0" cellpadding="3">
-                                                            <tbody>
-                                                                <tr>
-                                                                    <td class="wrapper" style="font-family: IBM Plex Sans; font-size: 14px; vertical-align: top; box-sizing: border-box; padding: 5px; overflow: auto;">
-                                                                        <div class="header" style="width: 50%; height: 10px; text-align: center;"><img class="header-img" style="border: none; -ms-interpolation-mode: bicubic; max-width: 9%; width: 492px; height: 20px; margin-left: -35px;" src="https://d15k2d11r6t6rl.cloudfront.net/public/users/Integrators/669d5713-9b6a-46bb-bd7e-c542cff6dd6a/3bef3c50f13f4320a9e31b8be79c6ad2/Plex%20Logo%20Update%202022/plex-logo-heavy-stroke.png" width="492" height="90" /></div>
-                                                                        <div class="server-name" style="font-size: 25px; text-align: center; margin-bottom: 0;">${serverName} Newsletter</div>
-                                                                    </td>
-                                                                </tr>
-                                                                <tr>
-                                                                    <td class="footer" style="font-family: IBM Plex Sans; font-size: 12px; vertical-align: top; clear: both; margin-top: 0; text-align: center; width: 100%;">
-
-                                                                        <h1 class="footer-bar" style="margin-left: auto; margin-right: auto; width: 300px; border-top: 1px solid #E5A00D; margin-top: 5px;">Recently Added</h1>
-                                                                        <p style="margin: 20px 0;">
-                                                                            ${content}
-                                                                        </p>
-                                                                        [RECENTLY_ADDED]
-                                                                        <div class="footer-bar" style="margin-left: auto; margin-right: auto; width: 250px; border-top: 1px solid #E5A00D; margin-top: 25px;">&nbsp;</div>
-                                                                        <div class="content-block powered-by" style="padding-bottom: 10px; padding-top: 0;">Generated for Plex Media Server by <a href="https://github.com/jma1ice/newsletterr" style="color: #E5A00D; text-decoration: none;">newsletterr</a></div>
-                                                                    </td>
-                                                                </tr>
-                                                            </tbody>
-                                                        </table>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        </tbody>
-                                    </table></body></html>`;
-                        html = await insertRecentlyAddedIntoPreview(html);
-                        break;
-                    case "recommendations":
-                        document.getElementById('subject').value = `${serverName} Recommendations`;
-                        html = `
-                                <link href="https://fonts.googleapis.com/css?family=IBM+Plex+Sans:400,500,600,700&display=swap" rel="stylesheet">
-                                <style>
-                                    :root { color-scheme: ${isDark ? 'dark' : 'light'}; }
-                                    html, body { background: ${isDark ? '#333' : '#8acbd4'}; }
-                                </style>
-                                <html><body style="font-family: IBM Plex Sans; margin: 0;">
-                                    <table class="body" style="border-collapse: separate; mso-table-lspace: 0pt; mso-table-rspace: 0pt; width: 100%;" border="0" cellspacing="0" cellpadding="0">
-                                        <tbody>
-                                            <tr>
-                                                <td class="preview-container" style="font-family: IBM Plex Sans; font-size: 14px; vertical-align: top; display: block;">
-                                                    <div class="content" style="box-sizing: border-box; display: block;"><span class="preheader" style="color: transparent; display: none; height: 0; max-height: 0; max-width: 0; opacity: 0; overflow: hidden; mso-hide: all; visibility: hidden; width: 0;">${serverName} Newsletter</span>
-                                                        <table class="main" style="border-collapse: separate; mso-table-lspace: 0pt; mso-table-rspace: 0pt; width: 100%; background: #282A2D; border-radius: 3px; color: #ffffff;" border="0" cellspacing="0" cellpadding="3">
-                                                            <tbody>
-                                                                <tr>
-                                                                    <td class="wrapper" style="font-family: IBM Plex Sans; font-size: 14px; vertical-align: top; box-sizing: border-box; padding: 5px; overflow: auto;">
-                                                                        <div class="header" style="width: 50%; height: 10px; text-align: center;"><img class="header-img" style="border: none; -ms-interpolation-mode: bicubic; max-width: 9%; width: 492px; height: 20px; margin-left: -35px;" src="https://d15k2d11r6t6rl.cloudfront.net/public/users/Integrators/669d5713-9b6a-46bb-bd7e-c542cff6dd6a/3bef3c50f13f4320a9e31b8be79c6ad2/Plex%20Logo%20Update%202022/plex-logo-heavy-stroke.png" width="492" height="90" /></div>
-                                                                        <div class="server-name" style="font-size: 25px; text-align: center; margin-bottom: 0;">${serverName} Newsletter</div>
-                                                                    </td>
-                                                                </tr>
-                                                                <tr>
-                                                                    <td class="footer" style="font-family: IBM Plex Sans; font-size: 12px; vertical-align: top; clear: both; margin-top: 0; text-align: center; width: 100%;">
-                                                                        <h1 class="footer-bar" style="margin-left: auto; margin-right: auto; width: 300px; border-top: 1px solid #E5A00D; margin-top: 5px;">Recommended For You</h1>
-                                                                        <p style="margin: 20px 0;">
-                                                                            ${content}
-                                                                        </p>
-                                                                        [RECOMMENDATIONS]
-                                                                        <div class="footer-bar" style="margin-left: auto; margin-right: auto; width: 250px; border-top: 1px solid #E5A00D; margin-top: 25px;">&nbsp;</div>
-                                                                        <div class="content-block powered-by" style="padding-bottom: 10px; padding-top: 0;">Generated for Plex Media Server by <a href="https://github.com/jma1ice/newsletterr" style="color: #E5A00D; text-decoration: none;">newsletterr</a></div>
-                                                                    </td>
-                                                                </tr>
-                                                            </tbody>
-                                                        </table>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        </tbody>
-                                    </table></body></html>`;
-                        html = await insertRecommendationsIntoPreview(html);
-                        break;
-                    default:
-                        html = `<style>
-                                    :root { color-scheme: ${isDark ? 'dark' : 'light'}; }
-                                    html, body { background: ${isDark ? '#333' : '#8acbd4'}; }
-                                </style>
-                                <html><body>
-                                    <div style="font-family: IBM Plex Sans; padding: 20px;">
-                                        ${content}
-                                    </div>
-                                </body></html>`;
-                        html = await insertRecentlyAddedIntoPreview(html);
-                        html = await insertRecommendationsIntoPreview(html);
-                }
+                                                                <h1 class="footer-bar" style="margin-left: auto; margin-right: auto; width: 300px; border-top: 1px solid #E5A00D; margin-top: 5px;">${displaySubject}</h1>
+                                                                <p style="margin: 20px 0;">
+                                                                    ${content}
+                                                                </p>
+                                                                <div class="footer-bar" style="margin-left: auto; margin-right: auto; width: 250px; border-top: 1px solid #E5A00D; margin-top: 25px;">&nbsp;</div>
+                                                                <div class="content-block powered-by" style="padding-bottom: 10px; padding-top: 0;">Generated for Plex Media Server by <a href="https://github.com/jma1ice/newsletterr" style="color: #E5A00D; text-decoration: none;">newsletterr</a></div>
+                                                            </td>
+                                                        </tr>
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table></body></html>`;
+                html = await insertRecentlyAddedIntoPreview(html);
+                html = await insertRecommendationsIntoPreview(html);
 
                 const frame = document.getElementById('preview');
                 console.log('Frame element:', frame);
@@ -1208,8 +1083,6 @@
             document.addEventListener('DOMContentLoaded', () => {
                 // Use debounced version for text input to prevent excessive calls
                 document.getElementById('email_text').addEventListener('input', debouncedUpdatePreview);
-                // Layout changes should be immediate since they're less frequent
-                document.getElementById('layout').addEventListener('change', updatePreview);
                 
                 // Test preview on load
                 console.log('DOM loaded, testing preview...');
@@ -1811,7 +1684,6 @@
 
             document.getElementById('sendEmailBtn').addEventListener('click', async () => {
                 const subject = document.getElementById('subject').value;
-                const layout = document.getElementById('layout').value;
                 
                 // Collect text from all text blocks
                 const textBlocks = selectedItems
@@ -1963,7 +1835,6 @@
                         to_emails,
                         subject,
                         email_html_length: emailHTML.length,
-                        layout,
                         all_images_count: emailImages.length
                     });
                     
@@ -1974,7 +1845,6 @@
                             to_emails,
                             subject,
                             email_html: emailHTML,
-                            layout,
                             all_images: emailImages
                         })
                     });
@@ -2466,8 +2336,7 @@
                         name: name,
                         selected_items: JSON.stringify(itemsWithContent),
                         email_text: textBlocks.join('\n\n'),
-                        subject: document.getElementById('subject').value,
-                        layout: document.getElementById('layout').value
+                        subject: document.getElementById('subject').value
                     };
 
                     const response = await fetch('/email_templates', {
@@ -2584,7 +2453,6 @@
                     
                     // Load form fields
                     document.getElementById('subject').value = template.subject || '';
-                    document.getElementById('layout').value = template.layout || 'standard';
                     
                     // Update display and preview
                     updateSelectedItemsDisplay();

@@ -26,6 +26,24 @@
                     <div id="error" class="alert alert-danger" style="display: none;"></div>
                     
                     <div id="preview-section" style="display: none;">
+                        <!-- Snap-ins Section (like main page) -->
+                        <div class="row mb-4">
+                            <div class="col-lg-12">
+                                <div class="card theme-card">
+                                    <div class="card-header theme-card-header">
+                                        <h5 class="mb-0">📋 Snap-ins (Selected Items)</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <div id="selected-items-list" class="border rounded p-3" style="min-height: 100px; background: #f8f9fa;">
+                                            <div id="selected-items-empty" class="text-muted text-center py-3">
+                                                Loading selected items...
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
                         <!-- Hidden form elements to store template data -->
                         <input type="hidden" id="subject" value="">
                         <input type="hidden" id="email_text" value="">
@@ -117,6 +135,9 @@ async function loadPreview() {
         // Generate stats and graphs HTML
         await generateStatsAndGraphs();
         console.log('After generateStatsAndGraphs');
+        
+        // Display selected items in Snap-ins section
+        displaySelectedItems();
         
         // Generate the email preview
         await updatePreview();
@@ -289,6 +310,58 @@ async function generateStatsAndGraphs() {
     }
 }
 
+function displaySelectedItems() {
+    const container = document.getElementById('selected-items-list');
+    
+    if (!selectedItems || selectedItems.length === 0) {
+        container.innerHTML = '<div id="selected-items-empty" class="text-muted text-center py-3">No items selected for this template.</div>';
+        return;
+    }
+    
+    // Build HTML for all items (same format as main page)
+    let htmlContent = '';
+    
+    selectedItems.forEach((item, index) => {
+        if (item.type === 'textblock' || item.type === 'titleblock') {
+            const badgeStyle = item.type === 'titleblock' ? 'badge-warning' : 'badge-secondary';
+            const content = item.content || '';
+            
+            htmlContent += `
+                <div class="selected-item d-flex flex-column p-2 mb-2 border rounded bg-light" data-index="${index}">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="item-name">${item.name}</span>
+                        <span class="badge ${badgeStyle}">${item.type}</span>
+                    </div>
+                    <div class="form-control text-block-content" style="height: 60px; font-size: 0.9rem; background: #f8f9fa; border: 1px solid #dee2e6; padding: 8px; border-radius: 4px; overflow-y: auto;">
+                        ${content || '<em class="text-muted">No content</em>'}
+                    </div>
+                </div>
+            `;
+        } else {
+            htmlContent += `
+                <div class="selected-item d-flex justify-content-between align-items-center p-2 mb-2 border rounded bg-light" data-index="${index}">
+                    <span class="item-name">${item.name}</span>
+                    <span class="badge badge-secondary">${item.type}</span>
+                </div>
+            `;
+        }
+    });
+    
+    container.innerHTML = htmlContent;
+}
+
+// Helper function for blurring background images (needed for updatePreview)
+async function blurImageElement(imgElement) {
+    return new Promise((resolve) => {
+        if (imgElement.complete) {
+            resolve();
+        } else {
+            imgElement.onload = () => resolve();
+            imgElement.onerror = () => resolve();
+        }
+    });
+}
+
 // Full version with Highcharts support from index.html
 async function updatePreview() {
     try {
@@ -340,13 +413,9 @@ async function updatePreview() {
                     allItemsHTML += `<div style="margin-bottom: 20px; font-size: 1.5em; font-weight: bold; text-align: center;">${formattedContent}</div>`;
                 }
             } else if (item.type === 'stat') {
-                console.log('Processing stat item:', item.id);
                 const tableElement = document.getElementById(item.id);
-                console.log('Found stat element:', !!tableElement);
                 if (tableElement) {
-                    console.log('Element content preview:', tableElement.innerHTML.substring(0, 100));
                     try {
-                        // Convert stat table to image using html2canvas
                         const wasHidden = tableElement.classList.contains('d-none');
                         if (wasHidden) {
                             tableElement.classList.remove('d-none');
@@ -388,16 +457,14 @@ async function updatePreview() {
                             useCORS: true
                         });
 
+                        const dataUrl = canvas.toDataURL("image/png");
+                        allItemsHTML += `<img src="${dataUrl}" style="max-width: 100%; margin-bottom: 10px;">`;
+
                         document.body.removeChild(tempWrapper);
 
                         if (wasHidden) {
                             tableElement.classList.add('d-none');
                         }
-                        
-                        console.log('Successfully created canvas for stat:', item.id);
-                        
-                        const dataUrl = canvas.toDataURL("image/png");
-                        allItemsHTML += `<img src="${dataUrl}" style="max-width: 100%; margin-bottom: 10px;">`;
                     } catch (error) {
                         console.warn('Error processing stat', item.id, error);
                         // Clean up if something went wrong
@@ -411,6 +478,8 @@ async function updatePreview() {
                         } catch (cleanupError) {
                             console.warn('Error during stat cleanup', cleanupError);
                         }
+                    }
+                }
                         // Enhanced fallback with stat data
                         const statIndex = parseInt(item.id.split('-')[1]);
                         const statData = stats[statIndex];

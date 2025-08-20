@@ -70,6 +70,35 @@ let selectedItems = [];
 let graphCommands = [];
 let recentCommands = [];
 
+// Blur image function for stat background processing
+async function blurImageElement(imgElement) {
+    const tempImg = new Image();
+    tempImg.crossOrigin = 'anonymous';
+    tempImg.src = imgElement.src;
+
+    await new Promise((resolve, reject) => {
+        tempImg.onload = resolve;
+        tempImg.onerror = reject;
+    });
+
+    const rect = imgElement.getBoundingClientRect();
+    const canvas = document.createElement('canvas');
+    canvas.width = rect.width || 800;
+    canvas.height = rect.height || 450;
+
+    const ctx = canvas.getContext('2d');
+    ctx.filter = 'blur(4px) brightness(0.75)';
+    ctx.drawImage(tempImg, 0, 0, canvas.width, canvas.height);
+
+    const blurredDataURL = canvas.toDataURL('image/png');
+    imgElement.src = blurredDataURL;
+    imgElement.style.position = 'absolute';
+    imgElement.style.width = '100%';
+    imgElement.style.height = '100%';
+    imgElement.style.objectFit = 'cover';
+    imgElement.style.zIndex = '0';
+}
+
 async function loadPreview() {
     try {
         if (!scheduleId) {
@@ -663,58 +692,44 @@ async function updatePreview() {
         // For layouts, we'll use this content directly
         let content = allItemsHTML || "";
 
-        switch (layout) {
-            case "standard":
-                html = `
-                        <link href="https://fonts.googleapis.com/css?family=IBM+Plex+Sans:400,500,600,700&display=swap" rel="stylesheet">
-                        <style>
-                            :root { color-scheme: ${isDark ? 'dark' : 'light'}; }
-                            html, body { background: ${isDark ? '#333' : '#8acbd4'}; }
-                        </style>
-                        <html><body style="font-family: IBM Plex Sans; margin: 0;">
-                            <table class="body" style="border-collapse: separate; mso-table-lspace: 0pt; mso-table-rspace: 0pt; width: 100%;" border="0" cellspacing="0" cellpadding="0">
-                                <tbody>
-                                    <tr>
-                                        <td class="preview-container" style="font-family: IBM Plex Sans; font-size: 14px; vertical-align: top; display: block;">
-                                            <div class="content" style="box-sizing: border-box; display: block;"><span class="preheader" style="color: transparent; display: none; height: 0; max-height: 0; max-width: 0; opacity: 0; overflow: hidden; mso-hide: all; visibility: hidden; width: 0;">${serverName} Newsletter</span>
-                                                <table class="main" style="border-collapse: separate; mso-table-lspace: 0pt; mso-table-rspace: 0pt; width: 100%; background: #282A2D; border-radius: 3px; color: #ffffff;" border="0" cellspacing="0" cellpadding="3">
-                                                    <tbody>
-                                                        <tr>
-                                                            <td class="wrapper" style="font-family: IBM Plex Sans; font-size: 14px; vertical-align: top; box-sizing: border-box; padding: 5px; overflow: auto;">
-                                                                <div class="header" style="width: 50%; height: 10px; text-align: center;"><img class="header-img" style="border: none; -ms-interpolation-mode: bicubic; max-width: 9%; width: 492px; height: 20px; margin-left: -35px;" src="https://d15k2d11r6t6rl.cloudfront.net/public/users/Integrators/669d5713-9b6a-46bb-bd7e-c542cff6dd6a/3bef3c50f13f4320a9e31b8be79c6ad2/Plex%20Logo%20Update%202022/plex-logo-heavy-stroke.png" width="492" height="90" /></div>
-                                                                <div class="server-name" style="font-size: 25px; text-align: center; margin-bottom: 0;">${serverName} Newsletter</div>
-                                                            </td>
-                                                        </tr>
-                                                        <tr>
-                                                            <td class="footer" style="font-family: IBM Plex Sans; font-size: 12px; vertical-align: top; clear: both; margin-top: 0; text-align: center; width: 100%;">
-
-                                                                <h1 class="footer-bar" style="margin-left: auto; margin-right: auto; width: 300px; border-top: 1px solid #E5A00D; margin-top: 5px;">${displaySubject}</h1>
-                                                                <p style="margin: 20px 0;">
-                                                                    ${content}
-                                                                </p>
-                                                                <div class="footer-bar" style="margin-left: auto; margin-right: auto; width: 250px; border-top: 1px solid #E5A00D; margin-top: 25px;">&nbsp;</div>
-                                                                <div class="content-block powered-by" style="padding-bottom: 10px; padding-top: 0;">Generated for Plex Media Server by <a href="https://github.com/jma1ice/newsletterr" style="color: #E5A00D; text-decoration: none;">newsletterr</a></div>
-                                                            </td>
-                                                        </tr>
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table></body></html>`;
-                break;
-            default:
-                html = `<style>
-                            :root { color-scheme: ${isDark ? 'dark' : 'light'}; }
-                            html, body { background: ${isDark ? '#333' : '#8acbd4'}; }
-                        </style>
-                        <html><body>
-                            <div style="font-family: IBM Plex Sans; padding: 20px;">
-                                ${content}
-                            </div>
-                        </body></html>`;
-        }
+        // Use the exact same template structure as apply_layout function and main page preview
+        html = `
+            <link href="https://fonts.googleapis.com/css?family=IBM+Plex+Sans:400,500,600,700&display=swap" rel="stylesheet">
+            <style>
+                :root { color-scheme: ${isDark ? 'dark' : 'light'}; }
+                html, body { background: ${isDark ? '#333' : '#8acbd4'}; }
+            </style>
+            <html><body style="font-family: IBM Plex Sans; margin: 0;">
+                <table class="body" style="border-collapse: separate; mso-table-lspace: 0pt; mso-table-rspace: 0pt; width: 100%;" border="0" cellspacing="0" cellpadding="0">
+                    <tbody>
+                        <tr>
+                            <td class="container" style="font-family: IBM Plex Sans; font-size: 14px; vertical-align: top; display: block; max-width: 1042px; padding: 10px; width: 1042px; margin: 0 auto !important;">
+                                <div class="content" style="box-sizing: border-box; display: block; margin: 0 auto; max-width: 1037px; padding: 10px;"><span class="preheader" style="color: transparent; display: none; height: 0; max-height: 0; max-width: 0; opacity: 0; overflow: hidden; mso-hide: all; visibility: hidden; width: 0;">${serverName} Newsletter</span>
+                                    <table class="main" style="border-collapse: separate; mso-table-lspace: 0pt; mso-table-rspace: 0pt; width: 100%; background: #282A2D; border-radius: 3px; color: #ffffff;" border="0" cellspacing="0" cellpadding="3">
+                                        <tbody>
+                                            <tr>
+                                                <td class="wrapper" style="font-family: IBM Plex Sans; font-size: 14px; vertical-align: top; box-sizing: border-box; padding: 5px; overflow: auto;">
+                                                    <div class="header" style="width: 50%; height: 10px; text-align: center;"><img class="header-img" style="border: none; -ms-interpolation-mode: bicubic; max-width: 9%; width: 492px; height: 20px; margin-left: -35px;" src="https://d15k2d11r6t6rl.cloudfront.net/public/users/Integrators/669d5713-9b6a-46bb-bd7e-c542cff6dd6a/3bef3c50f13f4320a9e31b8be79c6ad2/Plex%20Logo%20Update%202022/plex-logo-heavy-stroke.png" width="492" height="90" /></div>
+                                                    <div class="server-name" style="font-size: 25px; text-align: center; margin-bottom: 0;">${serverName} Newsletter</div>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="footer" style="font-family: IBM Plex Sans; font-size: 12px; vertical-align: top; clear: both; margin-top: 0; text-align: center; width: 100%;">
+                                                    <h1 class="footer-bar" style="margin-left: auto; margin-right: auto; width: 300px; border-top: 1px solid #E5A00D; margin-top: 5px;">${displaySubject}</h1>
+                                                    <p>
+                                                        ${content}
+                                                    </p>
+                                                    <div class="footer-bar" style="margin-left: auto; margin-right: auto; width: 250px; border-top: 1px solid #E5A00D; margin-top: 25px;">&nbsp;</div>
+                                                    <div class="content-block powered-by" style="padding-bottom: 10px; padding-top: 0;">Generated for Plex Media Server by <a href="https://github.com/jma1ice/newsletterr" style="color: #E5A00D; text-decoration: none;">newsletterr</a></div>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table></body></html>`;
 
         const frame = document.getElementById('preview');
         console.log('Frame element:', frame);

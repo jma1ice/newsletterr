@@ -1206,10 +1206,9 @@ def send_scheduled_email(schedule_id, email_list_id, template_id):
             # Log to email_history
             history_conn = sqlite3.connect(DB_PATH)
             history_cursor = history_conn.cursor()
-            history_cursor.execute('''INSERT INTO email_history (template_name, email_list, date_sent, recipient_count, content_size_kb, subject, recipients)
-                         VALUES (?, ?, ?, ?, ?, ?, ?)''', 
-                      (template_name, 'Scheduled', datetime.now().strftime('%Y-%m-%d %H:%M:%S'), 
-                       len(all_recipients), content_size_kb, f"[SCHEDULED] {subject}", ', '.join(all_recipients)))
+            history_cursor.execute('''INSERT INTO email_history (subject, recipients, email_content, content_size_kb, recipient_count)
+                         VALUES (?, ?, ?, ?, ?)''', 
+                      (f"[SCHEDULED] {subject}", ', '.join(all_recipients), email_content[:1000], content_size_kb, len(all_recipients)))
             history_conn.commit()
             history_conn.close()
             

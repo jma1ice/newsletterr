@@ -30,12 +30,18 @@ def get_global_cache_status():
                 oldest_age = max(oldest_age, info['age_hours'])
                 
                 # Try to get date range from cache params safely
-                if info.get('params') and 'days' in info['params']:
-                    days = info['params']['days']
-                    if days == 1:
-                        date_range_display = '1 day'
-                    else:
-                        date_range_display = f'{days} days'
+                if info.get('params'):
+                    # Check for both 'time_range' and 'days' parameter names
+                    days = info['params'].get('time_range') or info['params'].get('days')
+                    if days:
+                        try:
+                            days = int(days)
+                            if days == 1:
+                                date_range_display = '1 day'
+                            else:
+                                date_range_display = f'{days} days'
+                        except (ValueError, TypeError):
+                            pass  # Keep default if conversion fails
         
         if not has_any_data:
             return {'has_data': False, 'status': 'No cached data', 'age_display': 'no data', 'class': 'text-muted'}

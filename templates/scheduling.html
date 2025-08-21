@@ -64,7 +64,7 @@
                             </td>
                             <td>
                                 <div class="btn-group btn-group-sm" role="group">
-                                    <button class="btn btn-outline-primary btn-sm edit-schedule-btn" 
+                                    <button class="btn btn-primary btn-sm edit-schedule-btn" 
                                             data-schedule-id="{{ schedule.id }}" 
                                             data-schedule-name="{{ schedule.name }}"
                                             data-email-list-id="{{ schedule.email_list_id }}"
@@ -77,30 +77,30 @@
                                             data-bs-target="#scheduleModal">
                                         ✏️ Edit
                                     </button>
-                                    <button class="btn btn-outline-info btn-sm send-now-btn" 
+                                    <button class="btn btn-info btn-sm send-now-btn" 
                                             data-schedule-id="{{ schedule.id }}" 
                                             data-schedule-name="{{ schedule.name }}">
                                         📤 Send Now
                                     </button>
-                                    <button class="btn btn-outline-secondary btn-sm preview-schedule-btn" 
+                                    <button class="btn btn-secondary btn-sm preview-schedule-btn" 
                                             data-schedule-id="{{ schedule.id }}" 
                                             data-schedule-name="{{ schedule.name }}">
                                         👁️ Preview
                                     </button>
                                     {% if schedule.is_active %}
-                                        <button class="btn btn-outline-warning btn-sm toggle-schedule-btn" 
+                                        <button class="btn btn-warning btn-sm toggle-schedule-btn" 
                                                 data-schedule-id="{{ schedule.id }}" 
                                                 data-current-status="{{ schedule.is_active|lower }}">
                                             ⏸️ Pause
                                         </button>
                                     {% else %}
-                                        <button class="btn btn-outline-success btn-sm toggle-schedule-btn" 
+                                        <button class="btn btn-success btn-sm toggle-schedule-btn" 
                                                 data-schedule-id="{{ schedule.id }}" 
                                                 data-current-status="{{ schedule.is_active|lower }}">
                                             ▶️ Resume
                                         </button>
                                     {% endif %}
-                                    <button class="btn btn-outline-danger btn-sm delete-schedule-btn" 
+                                    <button class="btn btn-danger btn-sm delete-schedule-btn" 
                                             data-schedule-id="{{ schedule.id }}" 
                                             data-schedule-name="{{ schedule.name }}">
                                         🗑️ Delete

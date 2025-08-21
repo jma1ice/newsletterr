@@ -7,7 +7,7 @@ from email.mime.text import MIMEText
 from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
 from email.utils import make_msgid
-from flask import Flask, render_template, request, jsonify, Response
+from flask import Flask, render_template, request, jsonify, Response, redirect, url_for
 from pathlib import Path
 from plex_api_client import PlexAPI
 from urllib.parse import quote_plus
@@ -287,9 +287,19 @@ def init_db(db_path):
             email_content TEXT,
             content_size_kb REAL,
             recipient_count INTEGER,
-            sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            template_name TEXT  -- Name of template used (NULL/Manual for legacy/manual sends)
         )
     """)
+
+    # Backwards compatibility: add template_name column if missing
+    try:
+        cursor.execute("PRAGMA table_info(email_history)")
+        cols = [r[1] for r in cursor.fetchall()]
+        if 'template_name' not in cols:
+            cursor.execute("ALTER TABLE email_history ADD COLUMN template_name TEXT")
+    except Exception as _e:
+        print(f"Warning: could not ensure template_name column exists: {_e}")
     
     # Email schedules table
     cursor.execute("""
@@ -1210,13 +1220,16 @@ def send_scheduled_email(schedule_id, email_list_id, template_id):
             print(f"Email sent successfully to {len(all_recipients)} recipients")
             
             # Log to email_history
-            history_conn = sqlite3.connect(DB_PATH)
-            history_cursor = history_conn.cursor()
-            history_cursor.execute('''INSERT INTO email_history (subject, recipients, email_content, content_size_kb, recipient_count)
-                         VALUES (?, ?, ?, ?, ?)''', 
-                      (f"[SCHEDULED] {subject}", ', '.join(all_recipients), email_content[:1000], content_size_kb, len(all_recipients)))
-            history_conn.commit()
-            history_conn.close()
+            try:
+                history_conn = sqlite3.connect(DB_PATH)
+                history_cursor = history_conn.cursor()
+                history_cursor.execute('''INSERT INTO email_history (subject, recipients, email_content, content_size_kb, recipient_count, template_name)
+                                VALUES (?, ?, ?, ?, ?, ?)''',
+                                (f"[SCHEDULED] {subject}", ', '.join(all_recipients), email_content[:1000], content_size_kb, len(all_recipients), template_name))
+                history_conn.commit()
+                history_conn.close()
+            except Exception as log_err:
+                print(f"Error logging scheduled email history: {log_err}")
             
             return True
             
@@ -1848,14 +1861,15 @@ def send_email():
                 history_conn = sqlite3.connect(DB_PATH)
                 history_cursor = history_conn.cursor()
                 history_cursor.execute("""
-                    INSERT INTO email_history (subject, recipients, email_content, content_size_kb, recipient_count)
-                    VALUES (?, ?, ?, ?, ?)
+                    INSERT INTO email_history (subject, recipients, email_content, content_size_kb, recipient_count, template_name)
+                    VALUES (?, ?, ?, ?, ?, ?)
                 """, (
                     subject,
                     ', '.join(all_recipients),
                     email_content,
                     round(content_size_kb, 2),
-                    len(all_recipients)
+                    len(all_recipients),
+                    'Manual'
                 ))
                 history_conn.commit()
                 history_conn.close()
@@ -2027,7 +2041,7 @@ def email_history():
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         cursor.execute("""
-            SELECT id, subject, recipients, content_size_kb, recipient_count, sent_at 
+            SELECT id, subject, recipients, content_size_kb, recipient_count, sent_at, template_name
             FROM email_history 
             ORDER BY sent_at DESC
         """)
@@ -2054,13 +2068,28 @@ def email_history():
                 'recipients': email[2],
                 'content_size_kb': email[3],
                 'recipient_count': email[4],
-                'sent_at': formatted_time
+                'sent_at': formatted_time,
+                'template_name': email[6] if len(email) > 6 and email[6] else 'Manual'
             })
         
         return render_template('email_history.html', emails=email_list)
     except Exception as e:
         print(f"Error loading email history: {e}")
         return render_template('email_history.html', emails=[])
+
+@app.route('/email_history/clear', methods=['POST'])
+def clear_email_history():
+    """Clear all email history entries."""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM email_history")
+        conn.commit()
+        conn.close()
+        return redirect(url_for('email_history'))
+    except Exception as e:
+        print(f"Error clearing email history: {e}")
+        return redirect(url_for('email_history'))
 
 @app.route('/email_history/recipients/<int:email_id>', methods=['GET'])
 def get_email_recipients(email_id):

@@ -512,6 +512,8 @@ def delete_email_list(list_id):
 def get_email_schedules():
     """Get all email schedules with email list and template names"""
     from datetime import datetime
+    # Month abbreviations with trailing periods per UI spec
+    MONTH_ABBR_PERIOD = ["Jan.", "Feb.", "Mar.", "Apr.", "May.", "Jun.", "Jul.", "Aug.", "Sep.", "Oct.", "Nov.", "Dec."]
     
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
@@ -531,31 +533,45 @@ def get_email_schedules():
     
     result = []
     for schedule in schedules:
-        # Format next_send for display
+        # next_send format: "Sunday Sep. 21, 2025  09:00" (24h, two spaces before time)
         next_send_formatted = None
         if schedule[8]:  # next_send
             try:
                 next_dt = datetime.fromisoformat(schedule[8])
-                next_send_formatted = next_dt.strftime('%A, %B %d, %Y at %I:%M %p')
-            except:
-                next_send_formatted = schedule[8]  # Fallback to raw value
-        
-        # Format last_sent for display  
+                weekday = next_dt.strftime('%A')
+                month_abbr = MONTH_ABBR_PERIOD[next_dt.month - 1]
+                next_send_formatted = f"{weekday} {month_abbr} {next_dt.day}, {next_dt.year}  {next_dt.strftime('%H:%M')}"
+            except Exception:
+                next_send_formatted = schedule[8]
+
+        # last_sent format same as next_send format
         last_sent_formatted = None
         if schedule[7]:  # last_sent
             try:
                 last_dt = datetime.fromisoformat(schedule[7])
-                last_sent_formatted = last_dt.strftime('%A, %B %d, %Y at %I:%M %p')
-            except:
-                last_sent_formatted = schedule[7]  # Fallback to raw value
-        
+                weekday = last_dt.strftime('%A')
+                month_abbr = MONTH_ABBR_PERIOD[last_dt.month - 1]
+                last_sent_formatted = f"{weekday} {month_abbr} {last_dt.day}, {last_dt.year}  {last_dt.strftime('%H:%M')}"
+            except Exception:
+                last_sent_formatted = schedule[7]
+
+        # start_date display format: "Mar. 27, 2025"
+        start_date_raw = schedule[5]
+        start_date_formatted = start_date_raw
+        try:
+            start_dt = datetime.fromisoformat(start_date_raw)
+            start_date_formatted = f"{MONTH_ABBR_PERIOD[start_dt.month - 1]} {start_dt.day}, {start_dt.year}"
+        except Exception:
+            pass
+
         result.append({
             'id': schedule[0],
             'name': schedule[1],
             'email_list_id': schedule[2],
             'template_id': schedule[3],
             'frequency': schedule[4],
-            'start_date': schedule[5],
+            'start_date': start_date_raw,  # keep raw for form editing
+            'start_date_formatted': start_date_formatted,
             'send_time': schedule[6],
             'last_sent': last_sent_formatted or 'Never',
             'next_send': next_send_formatted or 'Not scheduled',

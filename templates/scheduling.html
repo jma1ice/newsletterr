@@ -53,7 +53,7 @@
                                 <span class="badge bg-secondary">{{ schedule.date_range or 7 }} days</span>
                             </td>
                             <td>
-                                <span class="text-muted">{{ schedule.start_date }}</span>
+                                <span class="text-muted" title="{{ schedule.start_date }}">{{ schedule.start_date_formatted or schedule.start_date }}</span>
                             </td>
                             <td>
                                 <span class="badge bg-dark">{{ schedule.send_time or '09:00' }}</span>

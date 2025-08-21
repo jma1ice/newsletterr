@@ -7,7 +7,7 @@ from email.mime.text import MIMEText
 from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
 from email.utils import make_msgid
-from flask import Flask, render_template, request, jsonify, Response
+from flask import Flask, render_template, request, jsonify, Response, redirect, url_for
 from pathlib import Path
 from plex_api_client import PlexAPI
 from urllib.parse import quote_plus
@@ -19,68 +19,69 @@ app.jinja_env.globals["publish_date"] = "August 20, 2025"
 def get_global_cache_status():
     """Get global cache status for display in navbar"""
     try:
-        # Check if any cache data exists without actually loading it
         cache_keys = ['stats', 'users', 'graph_data', 'recent_data']
-        has_any_data = False
-        oldest_age = 0
-        date_range_display = '7 days'  # default
-        
+        present = []
+        missing = []
+        oldest_age = 0.0
+        date_range_display = '—'
+        max_range = 0
+
         for key in cache_keys:
             info = get_cache_info(key)
-            if info['exists']:
-                has_any_data = True
-                oldest_age = max(oldest_age, info['age_hours'])
-                
-                # Try to get date range from cache params safely
+            if info.get('exists'):
+                present.append(key)
+                oldest_age = max(oldest_age, info.get('age_hours', 0))
                 if info.get('params'):
-                    # Check for both 'time_range' and 'days' parameter names
-                    days = info['params'].get('time_range') or info['params'].get('days')
-                    if days:
-                        try:
-                            days = int(days)
-                            if days == 1:
-                                date_range_display = '1 day'
-                            else:
-                                date_range_display = f'{days} days'
-                        except (ValueError, TypeError):
-                            pass  # Keep default if conversion fails
-        
-        if not has_any_data:
-            return {'has_data': False, 'status': 'No cached data', 'age_display': 'no data', 'class': 'text-muted'}
-        
-        # Determine status based on oldest data age
-        if oldest_age < 1:  # Less than 1 hour
+                    param_days = info['params'].get('time_range') or info['params'].get('days')
+                    try:
+                        param_days = int(param_days)
+                        if param_days > max_range:
+                            max_range = param_days
+                    except (TypeError, ValueError):
+                        pass
+            else:
+                missing.append(key)
+
+        if max_range > 0:
+            date_range_display = f"{max_range} day" + ("s" if max_range != 1 else "")
+
+        if not present:
             return {
-                'has_data': True, 
-                'status': f'Fresh cache for {date_range_display}', 
-                'age_display': date_range_display,
-                'class': 'text-success'
+                'has_data': False,
+                'status': 'No cached data',
+                'age_display': 'no data',
+                'class': 'cache-badge-muted',
+                'missing': missing,
+                'present': present
             }
-        elif oldest_age < 24:  # Less than 24 hours
-            hours = int(oldest_age)
-            return {
-                'has_data': True, 
-                'status': f'Cache {hours}h old ({date_range_display})', 
-                'age_display': date_range_display,
-                'class': 'text-warning'
-            }
-        elif oldest_age < 168:  # Less than 7 days
-            days = int(oldest_age / 24)
-            return {
-                'has_data': True, 
-                'status': f'Cache {days}d old ({date_range_display})', 
-                'age_display': date_range_display,
-                'class': 'text-danger'
-            }
+
+        # Determine freshness classification
+        if missing:
+            freshness_class = 'cache-badge-missing'  # force red if anything missing
+            freshness_text = f"Missing: {', '.join(missing)}"
+        elif oldest_age < 1:
+            freshness_class = 'cache-badge-fresh'
+            freshness_text = 'Fresh'
+        elif oldest_age < 24:
+            freshness_class = 'cache-badge-warn'
+            freshness_text = f"~{int(oldest_age)}h old"
+        elif oldest_age < 168:
+            freshness_class = 'cache-badge-old'
+            freshness_text = f"{int(oldest_age/24)}d old"
         else:
-            return {
-                'has_data': True, 
-                'status': f'Cache very old ({date_range_display})', 
-                'age_display': date_range_display,
-                'class': 'text-danger'
-            }
+            freshness_class = 'cache-badge-stale'
+            freshness_text = 'Very old'
+
+        return {
+            'has_data': True,
+            'status': f"{freshness_text} • Range {date_range_display}",
+            'age_display': date_range_display,
+            'class': freshness_class,
+            'missing': missing,
+            'present': present
+        }
     except:
-        return {'has_data': False, 'status': 'Cache error', 'age_display': 'error', 'class': 'text-muted'}
+        return {'has_data': False, 'status': 'Cache error', 'age_display': 'error', 'class': 'cache-badge-muted'}
 
 # Make cache status available globally in templates
 app.jinja_env.globals["get_cache_status"] = get_global_cache_status
@@ -102,11 +103,16 @@ def can_use_cached_data_for_preview(required_days):
         # Check if cached parameters cover the required date range
         stats_params = stats_info.get('params', {})
         if 'time_range' in stats_params:
-            cached_days = int(stats_params.get('time_range', 0))
-            if cached_days >= required_days:
-                return True, f"Using cached data ({cached_days} days covers {required_days} days needed)"
-        
-        return False, f"Cached range insufficient (need {required_days} days)"
+            try:
+                cached_days = int(stats_params.get('time_range', 0))
+            except (TypeError, ValueError):
+                cached_days = 0
+            # Require exact match to avoid overstating recent period with longer cached data
+            if cached_days == required_days:
+                return True, f"Using cached data ({cached_days} days exact match)"
+            else:
+                return False, f"Cached range ({cached_days} days) != requested ({required_days} days)"
+        return False, f"No cached range metadata (need {required_days} days)"
     except Exception as e:
         return False, f"Error checking cache: {str(e)}"
 
@@ -287,9 +293,19 @@ def init_db(db_path):
             email_content TEXT,
             content_size_kb REAL,
             recipient_count INTEGER,
-            sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            template_name TEXT  -- Name of template used (NULL/Manual for legacy/manual sends)
         )
     """)
+
+    # Backwards compatibility: add template_name column if missing
+    try:
+        cursor.execute("PRAGMA table_info(email_history)")
+        cols = [r[1] for r in cursor.fetchall()]
+        if 'template_name' not in cols:
+            cursor.execute("ALTER TABLE email_history ADD COLUMN template_name TEXT")
+    except Exception as _e:
+        print(f"Warning: could not ensure template_name column exists: {_e}")
     
     # Email schedules table
     cursor.execute("""
@@ -496,6 +512,8 @@ def delete_email_list(list_id):
 def get_email_schedules():
     """Get all email schedules with email list and template names"""
     from datetime import datetime
+    # Month abbreviations with trailing periods per UI spec
+    MONTH_ABBR_PERIOD = ["Jan.", "Feb.", "Mar.", "Apr.", "May.", "Jun.", "Jul.", "Aug.", "Sep.", "Oct.", "Nov.", "Dec."]
     
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
@@ -515,31 +533,45 @@ def get_email_schedules():
     
     result = []
     for schedule in schedules:
-        # Format next_send for display
+        # next_send format: "Sunday Sep. 21, 2025  09:00" (24h, two spaces before time)
         next_send_formatted = None
         if schedule[8]:  # next_send
             try:
                 next_dt = datetime.fromisoformat(schedule[8])
-                next_send_formatted = next_dt.strftime('%A, %B %d, %Y at %I:%M %p')
-            except:
-                next_send_formatted = schedule[8]  # Fallback to raw value
-        
-        # Format last_sent for display  
+                weekday = next_dt.strftime('%A')
+                month_abbr = MONTH_ABBR_PERIOD[next_dt.month - 1]
+                next_send_formatted = f"{weekday} {month_abbr} {next_dt.day}, {next_dt.year}  {next_dt.strftime('%H:%M')}"
+            except Exception:
+                next_send_formatted = schedule[8]
+
+        # last_sent format same as next_send format
         last_sent_formatted = None
         if schedule[7]:  # last_sent
             try:
                 last_dt = datetime.fromisoformat(schedule[7])
-                last_sent_formatted = last_dt.strftime('%A, %B %d, %Y at %I:%M %p')
-            except:
-                last_sent_formatted = schedule[7]  # Fallback to raw value
-        
+                weekday = last_dt.strftime('%A')
+                month_abbr = MONTH_ABBR_PERIOD[last_dt.month - 1]
+                last_sent_formatted = f"{weekday} {month_abbr} {last_dt.day}, {last_dt.year}  {last_dt.strftime('%H:%M')}"
+            except Exception:
+                last_sent_formatted = schedule[7]
+
+        # start_date display format: "Mar. 27, 2025"
+        start_date_raw = schedule[5]
+        start_date_formatted = start_date_raw
+        try:
+            start_dt = datetime.fromisoformat(start_date_raw)
+            start_date_formatted = f"{MONTH_ABBR_PERIOD[start_dt.month - 1]} {start_dt.day}, {start_dt.year}"
+        except Exception:
+            pass
+
         result.append({
             'id': schedule[0],
             'name': schedule[1],
             'email_list_id': schedule[2],
             'template_id': schedule[3],
             'frequency': schedule[4],
-            'start_date': schedule[5],
+            'start_date': start_date_raw,  # keep raw for form editing
+            'start_date_formatted': start_date_formatted,
             'send_time': schedule[6],
             'last_sent': last_sent_formatted or 'Never',
             'next_send': next_send_formatted or 'Not scheduled',
@@ -1210,13 +1242,16 @@ def send_scheduled_email(schedule_id, email_list_id, template_id):
             print(f"Email sent successfully to {len(all_recipients)} recipients")
             
             # Log to email_history
-            history_conn = sqlite3.connect(DB_PATH)
-            history_cursor = history_conn.cursor()
-            history_cursor.execute('''INSERT INTO email_history (subject, recipients, email_content, content_size_kb, recipient_count)
-                         VALUES (?, ?, ?, ?, ?)''', 
-                      (f"[SCHEDULED] {subject}", ', '.join(all_recipients), email_content[:1000], content_size_kb, len(all_recipients)))
-            history_conn.commit()
-            history_conn.close()
+            try:
+                history_conn = sqlite3.connect(DB_PATH)
+                history_cursor = history_conn.cursor()
+                history_cursor.execute('''INSERT INTO email_history (subject, recipients, email_content, content_size_kb, recipient_count, template_name)
+                                VALUES (?, ?, ?, ?, ?, ?)''',
+                                (f"[SCHEDULED] {subject}", ', '.join(all_recipients), email_content[:1000], content_size_kb, len(all_recipients), template_name))
+                history_conn.commit()
+                history_conn.close()
+            except Exception as log_err:
+                print(f"Error logging scheduled email history: {log_err}")
             
             return True
             
@@ -1848,14 +1883,15 @@ def send_email():
                 history_conn = sqlite3.connect(DB_PATH)
                 history_cursor = history_conn.cursor()
                 history_cursor.execute("""
-                    INSERT INTO email_history (subject, recipients, email_content, content_size_kb, recipient_count)
-                    VALUES (?, ?, ?, ?, ?)
+                    INSERT INTO email_history (subject, recipients, email_content, content_size_kb, recipient_count, template_name)
+                    VALUES (?, ?, ?, ?, ?, ?)
                 """, (
                     subject,
                     ', '.join(all_recipients),
                     email_content,
                     round(content_size_kb, 2),
-                    len(all_recipients)
+                    len(all_recipients),
+                    'Manual'
                 ))
                 history_conn.commit()
                 history_conn.close()
@@ -2027,7 +2063,7 @@ def email_history():
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         cursor.execute("""
-            SELECT id, subject, recipients, content_size_kb, recipient_count, sent_at 
+            SELECT id, subject, recipients, content_size_kb, recipient_count, sent_at, template_name
             FROM email_history 
             ORDER BY sent_at DESC
         """)
@@ -2054,13 +2090,28 @@ def email_history():
                 'recipients': email[2],
                 'content_size_kb': email[3],
                 'recipient_count': email[4],
-                'sent_at': formatted_time
+                'sent_at': formatted_time,
+                'template_name': email[6] if len(email) > 6 and email[6] else 'Manual'
             })
         
         return render_template('email_history.html', emails=email_list)
     except Exception as e:
         print(f"Error loading email history: {e}")
         return render_template('email_history.html', emails=[])
+
+@app.route('/email_history/clear', methods=['POST'])
+def clear_email_history():
+    """Clear all email history entries."""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM email_history")
+        conn.commit()
+        conn.close()
+        return redirect(url_for('email_history'))
+    except Exception as e:
+        print(f"Error clearing email history: {e}")
+        return redirect(url_for('email_history'))
 
 @app.route('/email_history/recipients/<int:email_id>', methods=['GET'])
 def get_email_recipients(email_id):
@@ -2472,7 +2523,7 @@ def get_calendar_data():
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         cursor.execute("""
-            SELECT id, name, frequency, start_date, send_time, next_send, is_active
+            SELECT id, name, frequency, start_date, send_time, next_send, is_active, template_id
             FROM email_schedules 
             WHERE is_active = 1
         """)
@@ -2488,7 +2539,7 @@ def get_calendar_data():
             end_date = datetime(year, month + 1, 1) - timedelta(days=1)
         
         for schedule in schedules:
-            schedule_id, name, frequency, schedule_start_date, send_time, next_send, is_active = schedule
+            schedule_id, name, frequency, schedule_start_date, send_time, next_send, is_active, template_id = schedule
             
             if not is_active:
                 continue
@@ -2534,7 +2585,8 @@ def get_calendar_data():
                         'id': schedule_id,
                         'name': name,
                         'time': send_time or '09:00',
-                        'frequency': frequency
+                        'frequency': frequency,
+                        'template_id': template_id
                     })
                 
                 # Calculate next occurrence using the same logic as calculate_next_send

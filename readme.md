@@ -8,14 +8,65 @@ Newsletterr is a lightweight Flask application that talks to **[Tautulli](https:
 
 ## Features
 
-* **One‑click stats pull** - choose a time‑range and a recently added number and let Newsletterr query Tautulli for the most‑watched items, top users, and more.  
-* **Interactive charts & tables** - Highcharts + HTML tables are rendered in the browser, then flattened into inline images with *html2canvas* so every e‑mail client sees exactly what you see.  
-* **WYSIWYG e‑mail preview** - compose the subject & body, drop in `[GRAPHS]` or `[STATS]` tokens, and pick a layout.  
-* **SMTP delivery with BCC support** - works with Gmail (app‑password), Outlook, Mailgun, or your own server.  
-* **Secure local persistence** - all settings are kept in a tiny encrypted SQLite database inside `database/data.db`.  
-* **Zero‑install frontend** - Tailwind + Bootstrap served from a CDN; no Node toolchain required.  
-* **Friendly loading spinner** - keep users informed while running scripts complete.
-* **Watch history based recommendations** - use conjurr for recommendations for your users.
+### Data & Content
+* **One‑click stats pull** – pick a time range (quick buttons: 7 / 30 / 90 / … days) and “recently added” count; Newsletterr queries Tautulli for most watched movies/shows, active users, platforms, libraries, artists and more.
+* **Recently Added injection** – drop `[RECENTLY_ADDED]` where you want the curated recently added block to appear (library selection supported).
+* **User Recommendations** – integrate with **conjurr** and insert `[RECOMMENDATIONS]` to show personalized watch suggestions (per BCC list at fetch time).
+* **Snap‑ins (drag/add workflow)** – add Stats, Graphs, Text Blocks (Title, Intro, Body, Outro) in any order to compose a tailored newsletter body.
+
+### Visualization
+* **Interactive charts** – Highcharts rendered in‑app; suitable images captured for reliable e‑mail client display.
+* **Styled data tables** – Plex / Tautulli metrics rendered as clean, responsive tables prior to embedding.
+* **Live WYSIWYG preview** – side‑by‑side iframe updates instantly as you assemble the email.
+
+### Templates & Reuse
+* **Email Templates** – save, load, clone, and delete custom templates (tracks chosen snap‑ins & layout) and re‑apply later.
+* **Template provenance tracking** – every sent email logs which template (or “Manual”) produced it; visible in Email History.
+
+### Automation & Scheduling
+* **Automated Schedules** – create Daily / Weekly / Monthly schedules with start date, fixed send time, and data range.
+* **Per‑schedule strict data window** – schedule previews fetch exactly the configured date range (no accidental reuse of broader cached data).
+* **Send Now** – manual immediate dispatch per schedule (with flashing progress state) without disturbing the schedule cadence.
+* **Color‑coded Schedule Calendar** – compact, modern calendar view showing all upcoming sends; each template assigned a stable color (legend included) with brightening hover effect.
+* **Per‑row template color dots** – schedule list includes a left‑edge colored dot consistent with calendar colors.
+
+### Delivery & Recipients
+* **SMTP (BCC) sending** – works with Gmail app passwords, generic SMTP, Mailgun, etc.; BCC chip input for recipient management & saved recipient lists.
+* **Email list management** – save, load, delete named email lists with instant population of the BCC field.
+* **Size tracking** – sent email content size (KB) logged for each history entry.
+
+### Caching & Performance
+* **Smart multi‑segment cache** – stores stats, user data, recent additions, and graph payloads separately.
+* **Global cache status badge** – real‑time indicator (fresh / warn / old / stale / missing) with tooltips and animated attention state if segments absent.
+* **Manual & automatic refresh** – daily auto refresh plus explicit “Get Stats\Users” trigger; one‑click “Clear Cache” button.
+
+### History & Auditing
+* **Email History** – full ledger of subject, send timestamp (compact formatting), template used, size, recipient count.
+* **Recipient viewer modal** – drill into any email to list all BCC recipients.
+* **Clear History** – bulk purge with confirmation.
+
+### UX & Appearance
+* **Light / Dark aware styling** – adaptive colors for dashboard, modals, calendar, and tables.
+* **Animated feedback** – loading spinner, flashing Send Now state, subtle hover depth on calendar days & dots.
+* **Compact date formatting** – standardized abbreviated month formats (e.g. “Mar. 27, 2025” / “Sunday Sep. 21, 2025  09:00”).
+* **Responsive wrapped button groups** – quick time‑range buttons auto‑wrap with padded container.
+
+### Persistence & Local Footprint
+* **SQLite storage** – schedules, templates, email history, lists & settings contained in local database files (no external service dependency).
+* **Self‑contained runtime** – pure Python + Flask + CDN assets; no Node build or container required (optional packaging roadmap below).
+
+### Extensibility
+* **Modular stat / graph command list** – extendable set of Tautulli commands for future metrics.
+* **Placeholders system** – simple token replacement for dynamic blocks keeps templating approachable.
+
+### Safety & Transparency
+* **Explicit cache clearing** – ensures forced fresh pull when data integrity matters.
+* **Exact range enforcement** – avoids quietly reusing mismatched cached spans preventing misleading analytics.
+
+### Quality of Life
+* **Pop‑out live preview** – open newsletter preview in new window while editing.
+* **Visual template color mapping** – instantly correlate schedule entries and calendar occurrences.
+* **Accessible tooltips & titles** – hover details for schedule dots and events.
 
 ---
 
@@ -76,39 +127,6 @@ By default the app listens on **http://127.0.0.1:6397**.
 7. Hit **Send Email**. Success and error messages will show after running.  
 
 ---
-
-## Project Structure
-
-```
-newsletterr/
-├── .env              # environment variables, created at first launch
-├── newsletterr.py    # Flask routes & helper functions
-├── .github/workflows/
-│   └── release-to-discord.yml
-├── templates/
-│   ├── partials/
-│   │   └── _recommendations.html
-│   ├── about.html
-│   ├── base.html
-│   ├── email_history.html
-│   ├── index.html
-│   ├── schedule_preview.html
-│   ├── scheduling.html
-│   └── settings.html
-├── static/
-│   ├── css/style.css
-│   └── img/
-│       ├── Asset_94x.png
-│       ├── favicon.ico
-│       └── load.gif
-├── database/
-│   ├── data.db       # created at first launch
-│   ├── email_history.db
-│   ├── email_lists.db
-│   └── email_templates.db
-├── README.md         # this file
-└── requirements.txt  # pip requirements
-```
 
 ---
 

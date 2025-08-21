@@ -3,8 +3,19 @@
 
 {% block content %}
 <div class="container-fluid">
-    <h1>email history</h1>
-    <p class="text-muted mb-4">View all sent emails and their recipients</p>
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+        <div>
+            <h1 class="mb-1">email history</h1>
+            <p class="text-muted mb-0">View all sent emails and their recipients</p>
+        </div>
+        {% if emails %}
+        <form method="POST" action="{{ url_for('clear_email_history') }}" onsubmit="return confirm('Are you sure you want to permanently delete all email history entries? This cannot be undone.');">
+            <button type="submit" class="btn btn-danger">
+                🗑️ Clear History
+            </button>
+        </form>
+        {% endif %}
+    </div>
 
     {% if emails %}
         <div class="table-responsive">
@@ -13,6 +24,7 @@
                     <tr>
                         <th>Subject</th>
                         <th>Date & Time Sent</th>
+                        <th>Template</th>
                         <th>Size (KB)</th>
                         <th>Recipients</th>
                         <th>View Recipients</th>
@@ -21,12 +33,9 @@
                 <tbody>
                     {% for email in emails %}
                         <tr>
-                            <td>
-                                <strong>{{ email.subject }}</strong>
-                            </td>
-                            <td>
-                                <span class="text-muted">{{ email.sent_at }}</span>
-                            </td>
+                            <td><strong>{{ email.subject }}</strong></td>
+                            <td><span class="text-muted">{{ email.sent_at }}</span></td>
+                            <td><span class="badge bg-secondary">{{ email.template_name }}</span></td>
                             <td>
                                 <span class="badge bg-info">{{ "%.2f"|format(email.content_size_kb) }} KB</span>
                             </td>
@@ -34,7 +43,7 @@
                                 <span class="badge bg-primary">{{ email.recipient_count }} recipient{{ 's' if email.recipient_count != 1 else '' }}</span>
                             </td>
                             <td>
-                                <button class="btn btn-outline-secondary btn-sm view-recipients-btn" 
+                                <button class="btn btn-secondary btn-sm view-recipients-btn" 
                                         data-email-id="{{ email.id }}" 
                                         data-subject="{{ email.subject }}">
                                     👥 Recipients

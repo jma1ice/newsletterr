@@ -36,13 +36,13 @@
             <!-- Cache Status Indicator -->
             <li style="margin-left: 20px;">
                 {% set cache_status = get_cache_status() %}
-                <span class="cache-status-badge {{ cache_status.class }}" 
-                      title="{{ cache_status.status }}" style="margin: 0; padding: 0;">
-                    <i class="fas fa-database"></i>
+                <span class="cache-badge-base {{ cache_status.class }}" 
+                      title="{{ cache_status.status }}\nPresent: {{ cache_status.present|join(', ') if cache_status.present else 'none' }}\nMissing: {{ cache_status.missing|join(', ') if cache_status.missing else 'none' }}">
+                    <strong>Cache:</strong>
                     {% if cache_status.has_data %}
                         {{ cache_status.age_display }}
                     {% else %}
-                        no data
+                        none
                     {% endif %}
                 </span>
             </li>

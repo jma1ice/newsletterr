@@ -33,20 +33,27 @@
                     {% for schedule in schedules %}
                         <tr>
                             <td>
-                                <strong>{{ schedule.name }}</strong>
+                                <div class="d-inline-flex align-items-center gap-2">
+                                    {% if schedule.template_id %}
+                                    <span class="template-color-dot schedule-row-dot" data-template-id="{{ schedule.template_id }}" title="Template color"></span>
+                                    {% else %}
+                                    <span class="template-color-dot schedule-row-dot" style="opacity:.35;" title="No template"></span>
+                                    {% endif %}
+                                    <strong>{{ schedule.name }}</strong>
+                                </div>
                             </td>
                             <td>
                                 <span class="badge bg-primary">{{ schedule.email_list_name or 'Unknown' }}</span>
                             </td>
-                            <td>
-                                <span class="badge bg-info">{{ schedule.template_name or 'Unknown' }}</span>
+                            <td class="template-col" data-template-id="{{ schedule.template_id }}">
+                                <span class="badge bg-info template-badge" data-template-id="{{ schedule.template_id }}">{{ schedule.template_name or 'Unknown' }}</span>
                             </td>
                             <td>{{ schedule.frequency.title() }}</td>
                             <td>
                                 <span class="badge bg-secondary">{{ schedule.date_range or 7 }} days</span>
                             </td>
                             <td>
-                                <span class="text-muted">{{ schedule.start_date }}</span>
+                                <span class="text-muted" title="{{ schedule.start_date }}">{{ schedule.start_date_formatted or schedule.start_date }}</span>
                             </td>
                             <td>
                                 <span class="badge bg-dark">{{ schedule.send_time or '09:00' }}</span>
@@ -64,11 +71,12 @@
                             </td>
                             <td>
                                 <div class="btn-group btn-group-sm" role="group">
-                                    <button class="btn btn-outline-primary btn-sm edit-schedule-btn" 
+                    <button class="btn btn-primary btn-sm edit-schedule-btn" 
                                             data-schedule-id="{{ schedule.id }}" 
                                             data-schedule-name="{{ schedule.name }}"
                                             data-email-list-id="{{ schedule.email_list_id }}"
                                             data-template-id="{{ schedule.template_id }}"
+                        data-template-name="{{ schedule.template_name }}"
                                             data-frequency="{{ schedule.frequency }}"
                                             data-start-date="{{ schedule.start_date }}"
                                             data-send-time="{{ schedule.send_time or '09:00' }}"
@@ -77,30 +85,30 @@
                                             data-bs-target="#scheduleModal">
                                         ✏️ Edit
                                     </button>
-                                    <button class="btn btn-outline-info btn-sm send-now-btn" 
+                                    <button class="btn btn-info btn-sm send-now-btn" 
                                             data-schedule-id="{{ schedule.id }}" 
                                             data-schedule-name="{{ schedule.name }}">
                                         📤 Send Now
                                     </button>
-                                    <button class="btn btn-outline-secondary btn-sm preview-schedule-btn" 
+                                    <button class="btn btn-secondary btn-sm preview-schedule-btn" 
                                             data-schedule-id="{{ schedule.id }}" 
                                             data-schedule-name="{{ schedule.name }}">
                                         👁️ Preview
                                     </button>
                                     {% if schedule.is_active %}
-                                        <button class="btn btn-outline-warning btn-sm toggle-schedule-btn" 
+                                        <button class="btn btn-warning btn-sm toggle-schedule-btn" 
                                                 data-schedule-id="{{ schedule.id }}" 
                                                 data-current-status="{{ schedule.is_active|lower }}">
                                             ⏸️ Pause
                                         </button>
                                     {% else %}
-                                        <button class="btn btn-outline-success btn-sm toggle-schedule-btn" 
+                                        <button class="btn btn-success btn-sm toggle-schedule-btn" 
                                                 data-schedule-id="{{ schedule.id }}" 
                                                 data-current-status="{{ schedule.is_active|lower }}">
                                             ▶️ Resume
                                         </button>
                                     {% endif %}
-                                    <button class="btn btn-outline-danger btn-sm delete-schedule-btn" 
+                                    <button class="btn btn-danger btn-sm delete-schedule-btn" 
                                             data-schedule-id="{{ schedule.id }}" 
                                             data-schedule-name="{{ schedule.name }}">
                                         🗑️ Delete
@@ -139,13 +147,9 @@
                     </div>
                 </div>
                 <div class="card-body">
-                    <div id="calendar-container">
-                        <!-- Calendar will be rendered here -->
-                    </div>
-                    <div class="mt-2 text-center">
-                        <small class="text-muted">
-                            <span class="calendar-dot me-2"></span> = Scheduled email
-                        </small>
+                    <div id="calendar-container"><!-- Calendar will be rendered here --></div>
+                    <div id="calendar-legend" class="mt-3 d-flex flex-wrap gap-2 justify-content-center" style="font-size:.6rem;">
+                        <!-- Legend populated dynamically -->
                     </div>
                 </div>
             </div>
@@ -262,89 +266,44 @@
 }
 
 /* Calendar styling */
-.calendar-card {
-    max-width: 650px;
-    width: 100%;
-}
+/* --- Refreshed Calendar Layout --- */
+/* Reduced overall footprint */
+.calendar-card { max-width: 560px; width: 100%; border-radius: 18px; overflow: hidden; box-shadow: 0 5px 14px -4px rgba(0,0,0,0.32); }
+.calendar-card .card-header { border-bottom: none; padding: .65rem .9rem; background: var(--bs-primary); color:#fff; border-radius: 18px 18px 0 0; font-size:.95rem; }
+.dark .calendar-card .card-header { background: #2c2c2c; }
+.calendar-card .card-body { padding: 1rem .85rem .75rem; background: radial-gradient(circle at 85% 12%, rgba(255,255,255,0.04), transparent 55%); }
 
-.calendar-card .card-body {
-    padding: 1.5rem;
-    overflow: hidden;
-}
+.calendar-container { display:grid; grid-template-columns:repeat(7,1fr); gap:6px; width:100%; margin:0 auto 0; max-width:530px; }
 
-.calendar-container {
-    display: grid;
-    grid-template-columns: repeat(7, 1fr);
-    gap: 1px;
-    background-color: var(--bs-border-color);
-    border: 1px solid var(--bs-border-color);
-    aspect-ratio: 1;
-    width: 100%;
-    max-width: 600px;
-    margin: 0 auto;
-    box-sizing: border-box;
-}
+.calendar-header { font-size:.7rem; font-weight:600; letter-spacing:.5px; text-transform:uppercase; padding:.35rem .25rem; text-align:center; color:var(--bs-secondary); opacity:.85; }
+.dark .calendar-header { color:#8acbd4; opacity:.75; }
 
-.calendar-header {
-    background-color: var(--bs-primary);
-    color: white;
-    padding: 8px 4px;
-    text-align: center;
-    font-weight: bold;
-    font-size: 0.75rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
+/* Tighter day cells */
+.calendar-day { position:relative; background:rgba(var(--bs-primary-rgb),0.035); border-radius:14px; padding:3px 4px 2px; display:flex; flex-direction:column; justify-content:flex-start; align-items:flex-start; min-height:0; aspect-ratio:1; box-sizing:border-box; overflow:hidden; border:1px solid rgba(255,255,255,0.1); backdrop-filter:blur(2px); -webkit-backdrop-filter:blur(2px); transition:background .18s ease, transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
+body:not(.dark) .calendar-day { background:linear-gradient(145deg,#ffffff,#f1f5ff); border:1px solid #e3e8ef; }
+.calendar-day:hover { transform:translateY(-3px); box-shadow:0 6px 18px -4px rgba(0,0,0,0.35); }
+/* Slightly stronger background when schedules present */
+.calendar-day.has-schedule { background:linear-gradient(170deg, rgba(13,110,253,.18), rgba(13,110,253,.07)); border-color:rgba(13,110,253,.42); }
+body:not(.dark) .calendar-day.has-schedule { background:linear-gradient(170deg,#e9f3ff,#f5faff); border-color:#bed7fb; }
+.calendar-day.other-month { opacity:.35; filter:saturate(.6); }
+.calendar-day.today { outline:2px solid var(--bs-primary); outline-offset:2px; box-shadow:0 0 0 3px rgba(13,110,253,0.35); }
+.dark .calendar-day.today { box-shadow:0 0 0 3px rgba(111,66,193,0.45); }
 
-.calendar-day {
-    background-color: var(--bs-body-bg);
-    padding: 2px;
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-start;
-    align-items: flex-start;
-    min-height: 0;
-    aspect-ratio: 1;
-    box-sizing: border-box;
-    overflow: hidden;
-}
+.calendar-day-number { font-size:.6rem; font-weight:700; line-height:1; letter-spacing:.4px; padding:2px 5px; background:rgba(255,255,255,0.38); border-radius:12px; backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px); box-shadow:inset 0 0 0 1px rgba(255,255,255,0.55), 0 1px 2px rgba(0,0,0,0.28); color:#000; }
+.dark .calendar-day-number { background:rgba(0,0,0,0.4); color:#fff; box-shadow:inset 0 0 0 1px rgba(255,255,255,0.07), 0 1px 2px rgba(0,0,0,0.5); }
 
-.calendar-day.other-month {
-    color: var(--bs-secondary);
-    background-color: var(--bs-light);
-}
+.calendar-dots { display:flex; flex-wrap:wrap; gap:5px; margin-top:auto; max-height:48px; overflow:hidden; width:100%; padding-top:1px; }
+.calendar-dot { width:18px; height:18px; border-radius:50%; position:relative; background:#0d6efd; box-shadow:0 0 0 2px rgba(255,255,255,0.6), 0 3px 6px -1px rgba(0,0,0,.5); cursor:pointer; transition:transform .22s ease, box-shadow .22s ease; }
+.calendar-dot:hover { transform:none; filter:brightness(1.35) saturate(1.3); box-shadow:0 0 0 2px rgba(255,255,255,0.9), 0 4px 10px -2px rgba(0,0,0,.6); }
+.dark .calendar-dot { box-shadow:0 0 0 2px rgba(0,0,0,0.55), 0 3px 6px -2px rgba(0,0,0,.9); }
 
-.calendar-day.today {
-    background-color: rgba(var(--bs-primary-rgb), 0.1);
-    border: 2px solid var(--bs-primary);
-}
+/* Compact modes for narrow widths */
+@media (max-width: 1100px) { .calendar-day-number { font-size:.55rem; } .calendar-dot { width:16px; height:16px; } }
+@media (max-width: 900px) { .calendar-container { gap:8px; } }
+@media (max-width: 760px) { .calendar-container { gap:6px; } .calendar-card{border-radius:20px;} }
+@media (max-width: 640px) { .calendar-container { gap:4px; } .calendar-card{border-radius:16px;} }
 
-.calendar-day-number {
-    font-size: 0.7rem;
-    font-weight: bold;
-    line-height: 1;
-}
-
-.calendar-dot {
-    width: 15px;
-    height: 15px;
-    background-color: #0066cc;
-    border-radius: 50%;
-    display: inline-block;
-    margin-top: 1px;
-    cursor: pointer;
-}
-
-.calendar-dots {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 1px;
-    margin-top: auto;
-    max-height: 15px;
-    overflow: hidden;
-}
+/* (Old calendar day styles replaced above) */
 
 /* Today button styling */
 #today-month {
@@ -523,12 +482,23 @@ body:not(.dark) .theme-alert {
     border-color: #dc3545;
     color: #fff;
 }
+
+/* Template color dot styling */
+.template-color-dot { width:12px; height:12px; border-radius:50%; display:inline-block; background:var(--bs-secondary); box-shadow:0 0 0 2px rgba(255,255,255,.6), 0 2px 4px -1px rgba(0,0,0,.4); position:relative; transition:filter .2s ease, box-shadow .25s ease; }
+.template-color-dot:hover { filter:brightness(1.3) saturate(1.25); box-shadow:0 0 0 2px rgba(255,255,255,.9), 0 3px 8px -2px rgba(0,0,0,.55); }
+.dark .template-color-dot { box-shadow:0 0 0 2px rgba(0,0,0,.55), 0 2px 4px -2px rgba(0,0,0,.85); }
 </style>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     let currentDate = new Date();
     let calendarData = {};
+    // Shared template color mapping so table list and calendar use identical colors per template id
+    const templateColorMap = {}; // template_id -> color
+    const templatePalette = [
+        '#0d6efd','#198754','#dc3545','#fd7e14','#6f42c1',
+        '#20c997','#ffc107','#0dcaf0','#d63384','#6610f2'
+    ];
     
     // Set default start date to today
     const startDateInput = document.getElementById('start-date');
@@ -588,6 +558,28 @@ document.addEventListener('DOMContentLoaded', function() {
         return dates;
     }
     
+    function assignTemplateColor(templateId) {
+        if (templateId == null) return null;
+        if (!(templateId in templateColorMap)) {
+            const idx = Object.keys(templateColorMap).length % templatePalette.length;
+            templateColorMap[templateId] = templatePalette[idx];
+        }
+        return templateColorMap[templateId];
+    }
+
+    function applyTemplateColorsToTable() {
+        // Color dots at far left of each schedule row
+        document.querySelectorAll('.schedule-row-dot[data-template-id]').forEach(dot => {
+            const tid = dot.getAttribute('data-template-id');
+            if (!tid) return;
+            const color = assignTemplateColor(tid);
+            if (color) {
+                dot.style.background = color;
+                dot.style.boxShadow = `0 0 0 2px rgba(255,255,255,0.7), 0 2px 4px -1px ${color}80`;
+            }
+        });
+    }
+
     async function loadCalendarData() {
         try {
             const response = await fetch(`/scheduling/calendar-data?month=${currentDate.getMonth() + 1}&year=${currentDate.getFullYear()}`);
@@ -604,6 +596,10 @@ document.addEventListener('DOMContentLoaded', function() {
     function renderCalendar() {
         const container = document.getElementById('calendar-container');
         const monthSpan = document.getElementById('current-month');
+        const legend = document.getElementById('calendar-legend');
+    const palette = templatePalette; // reuse shared palette
+    const templateColors = templateColorMap; // reuse shared mapping
+        const templateNames = {};  // template_id -> name (from schedule entries)
         
         monthSpan.textContent = formatDate(currentDate);
         
@@ -646,12 +642,25 @@ document.addEventListener('DOMContentLoaded', function() {
             // Add schedule dots
             const dateKey = dateObj.fullDate.toISOString().split('T')[0];
             if (calendarData[dateKey] && calendarData[dateKey].length > 0) {
+                dayElement.classList.add('has-schedule');
                 const dotsContainer = document.createElement('div');
                 dotsContainer.className = 'calendar-dots';
                 
                 calendarData[dateKey].forEach(schedule => {
+                    // Assign a stable color per template_id
+                    if (schedule.template_id !== undefined) {
+                        assignTemplateColor(schedule.template_id);
+                        if (!(schedule.template_id in templateNames)) {
+                            templateNames[schedule.template_id] = schedule.name;
+                        }
+                    }
                     const dot = document.createElement('div');
                     dot.className = 'calendar-dot';
+                    if (schedule.template_id !== undefined && templateColors[schedule.template_id]) {
+                        const c = templateColors[schedule.template_id];
+                        dot.style.background = c;
+                        dot.style.boxShadow = `0 0 0 2px rgba(255,255,255,0.6), 0 2px 4px -1px ${c}90`;
+                    }
                     dot.title = `${schedule.name} at ${schedule.time}`;
                     
                     // Add hover tooltip
@@ -670,6 +679,29 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             container.appendChild(dayElement);
+        });
+
+        // Build legend
+        legend.innerHTML = '';
+        Object.entries(templateColors).forEach(([tid, color]) => {
+            const item = document.createElement('div');
+            item.className = 'd-flex align-items-center gap-1 px-2 py-1 rounded';
+            item.style.background = 'rgba(0,0,0,0.05)';
+            if (document.documentElement.classList.contains('dark')) {
+                item.style.background = 'rgba(255,255,255,0.05)';
+            }
+            const swatch = document.createElement('span');
+            swatch.style.display = 'inline-block';
+            swatch.style.width = '10px';
+            swatch.style.height = '10px';
+            swatch.style.borderRadius = '50%';
+            swatch.style.background = color;
+            swatch.style.boxShadow = '0 0 0 1px rgba(0,0,0,0.2)';
+            const label = document.createElement('span');
+            label.textContent = templateNames[tid] || `Template ${tid}`;
+            item.appendChild(swatch);
+            item.appendChild(label);
+            legend.appendChild(item);
         });
     }
     
@@ -710,6 +742,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Initial calendar load
     loadCalendarData();
+    applyTemplateColorsToTable();
     
     // Modal functions
     function resetModal() {
@@ -875,6 +908,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 const originalText = this.textContent;
                 this.textContent = '📤 Sending...';
                 this.disabled = true;
+                this.classList.add('sending-flash');
                 
                 try {
                     const response = await fetch(`/scheduling/${scheduleId}/send-now`, {
@@ -896,6 +930,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Restore button state
                     this.textContent = originalText;
                     this.disabled = false;
+                    this.classList.remove('sending-flash');
                 }
             }
         });

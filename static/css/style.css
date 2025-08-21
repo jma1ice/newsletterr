@@ -134,7 +134,6 @@ body {
     color: #62a1a4;
     text-decoration: none;
     border-radius: 5px;
-    margin-top: 10px;
     transition: background-color 0.3s ease-in-out, color 0.3s ease-in-out, transform 0.3s ease-in-out;
 }
 
@@ -361,12 +360,24 @@ footer p {
     padding: 10px;
 }
 
+.site-foot{
+    display:grid;
+    grid-template-columns: 1fr auto 1fr; /* left | center | right */
+    align-items:center;
+    gap:.5rem;
+}
+
 .left-foot {
-    float: left;
+    justify-self: start;
 }
 
 .right-foot {
-    float: right;
+    justify-self: end;
+    text-align: right;
+}
+
+.middle-foot {
+    justify-self: center;
 }
 
 /* Selected Items Styling */

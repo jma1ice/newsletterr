@@ -119,9 +119,22 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 
 ## Upcoming Changes
 
-### v0.8.8
-* Donate button
-* Light mode dash fixes
+### v0.9.1
+* Light mode dashboard fixes (cache status, template chooser, graph/stat/text pane all white | view stat table header is white)
+* Muted text not showing in dark mode (under main headers)
+* Fix scheduled send images to match preview
+* On dash graph won't show in 'view' until a stat is 'viewed'
+
+### v1.0.0
+* Compile EXE file
+
+### v1.1.0
+* Dockerize and compile ELF file
+* UI for adding recently added/recommendations to email - still works with \[PLACEHOLDER\] for now
+* Graph titles need to specify the date range
+* Get fonts showing on Gmail receive side
+* Api/webhooks
+* Opt out support
 * Mobile optimizations, i.e.:
 ```
 <style>
@@ -133,56 +146,15 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 </style>
 ```
 
-### v0.9.0
-* Add in scheduled newsletter functionality
-* Mailing lists (Weekly, monthly, Movies, Shows) that you can add users to, to automate some emails. E.g. - Monthly email contains the following users, and uses the following template. 
-* Template management to go with lists - Include a few default templates that snap in the most common stats
-* Automation management (Which lists, how often?)
-* Graph titles need to specify the date range
-
-### v1.0.0
-* Dockerize
-* Compile EXE and ELF files
-
-### v1.1.0
-* Get fonts showing on Gmail receive side
-* Api/webhooks
-* Opt out support
-
 ---
 
 ## Recent Changes
 
-### v0.8.7
-* Removed graph/stat placeholders
-* Got graphs and stats on separate lines
-
-### v0.8.6
-* Got images to show in both Spark and Gmail
-* Dark mode UI cleanup
-
-### v0.8.5
-* Added email templates, history, and BCC list management
-* UI cleanup
-* Email preview pop out functionality
-
-### v0.8.4
-* Snap-ins! Graph/stat ordering pane
-* Made footer 'newsletterr' a link
-
-### v0.8.3
-* Added width to email/preview subject section
-
-### v0.8.2
-* yml fixed for github>discord bot
-
-### v0.8.1
-* Fixed some issues with update checker
-* Added release bot yaml
-
-### v0.8.0
-* Marked optional entries in settings
-* Update banner when new version detected
+### v0.9.0
+* Changed some buttons (btn-primary) to match rest of style
+* Some UI refresh
+* Donate button in about and footer
+* Link to conjurr in about
 
 ---
 

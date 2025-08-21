@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}About{% endblock %}
+{% block title %}about{% endblock %}
 {% block content %}
 <div class="container-fluid">
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <h1 style="font-weight: bold;">About</h1>
+        <h1>about</h1>
     </div>
     <p class="text-muted mb-4">Learn more about this application, version information, and licensing details.</p>
   
@@ -19,6 +19,11 @@
         <div class="sm:col-span-2">
             <dt class="font-semibold dark:border-gray-300">License</dt>
             <dd class="mt-1 text-sm">MIT</dd>
+        </div>
+        <div>
+            <dt class="font-semibold dark:border-gray-300">Check out our other project</dt>
+            <a target="_blank" href="https://github.com/yungsnuzzy/conjurr">conjurr</a><br><br>
+            <a target="_blank" href="https://ko-fi.com/newsletterr">Donate to us!</a>
         </div>
     </dl>
 
@@ -37,8 +42,10 @@
 
     <h2 class="text-2xl font-bold mb-4">Recent Changes</h2>
     <ul class="list-disc list-inside space-y-2 text-sm">
-        <li>Removed graph/stat placeholders</li>
-        <li>Got graphs and stats on separate lines</li>
+        <li>Some UI refresh</li>
+        <li>Donate button in about and footer</li>
+        <li>Link to conjurr in about</li>
+        <li>Changed some buttons (btn-primary) to match rest of style</li>
     </ul>
 </div>
 {% endblock %}

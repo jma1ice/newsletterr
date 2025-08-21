@@ -6,7 +6,7 @@
     <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
         <div>
             <h1 class="mb-1">email history</h1>
-            <p class="text-muted mb-0">View all sent emails and their recipients</p>
+            <p class="text-info mb-0">View all sent emails and their recipients</p>
         </div>
         {% if emails %}
         <form method="POST" action="{{ url_for('clear_email_history') }}" onsubmit="return confirm('Are you sure you want to permanently delete all email history entries? This cannot be undone.');">

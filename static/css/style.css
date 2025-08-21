@@ -357,11 +357,10 @@ input, textarea, select, #statSelector, #graphSelector {
 }
 
 .card-header {
-    background-color: #e9ecef !important;
-    border-bottom: 1px solid #dee2e6;
+    background-color: #8acbd4 !important;
     padding: 12px 16px;
     border-radius: 8px 8px 0 0;
-    color: #495057;
+    color: #495057 !important;
 }
 
 .card-body {
@@ -378,7 +377,7 @@ input, textarea, select, #statSelector, #graphSelector {
 .dark .card-header {
     background-color: #555 !important;
     border-bottom-color: #666;
-    color: #8acbd4;
+    color: #8acbd4 !important;
 }
 
 .dark .card-body {
@@ -387,6 +386,10 @@ input, textarea, select, #statSelector, #graphSelector {
 
 .dark .form-label {
     color: #8acbd4;
+}
+
+.form-select {
+    background-color: #8acbd4;
 }
 
 footer {
@@ -439,7 +442,7 @@ footer p {
 }
 
 .selected-item:hover {
-    background-color: #e9ecef !important;
+    background-color: #62a1a4 !important;
 }
 
 .selected-item.dragging {

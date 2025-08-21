@@ -9,7 +9,7 @@
             ➕ Add Schedule
         </button>
     </div>
-    <p class="text-muted mb-4">Manage automated email schedules. Emails will be sent automatically based on your configured schedules.</p>
+    <p class="text-info mb-4">Manage automated email schedules. Emails will be sent automatically based on your configured schedules.</p>
 
     {% if schedules %}
         <div class="table-responsive">
@@ -597,8 +597,8 @@ document.addEventListener('DOMContentLoaded', function() {
         const container = document.getElementById('calendar-container');
         const monthSpan = document.getElementById('current-month');
         const legend = document.getElementById('calendar-legend');
-    const palette = templatePalette; // reuse shared palette
-    const templateColors = templateColorMap; // reuse shared mapping
+        const palette = templatePalette; // reuse shared palette
+        const templateColors = templateColorMap; // reuse shared mapping
         const templateNames = {};  // template_id -> name (from schedule entries)
         
         monthSpan.textContent = formatDate(currentDate);

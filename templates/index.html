@@ -24,7 +24,7 @@
                             <input type="number" id="items_to_pull" name="items_to_pull" value="10" style="width: 8.5rem; margin-bottom: 8px;" /><br>
                             <label for="days_to_pull">Time Range (days):</label>
                             <input type="number" id="days_to_pull" name="days_to_pull" value="30" /><br>
-                            <div class="quick-range-buttons">
+                            <div class="quick-range-buttons d-flex flex-nowrap overflow-auto gap-2" style="padding-bottom: 5px;">
                                 <button id="time_range_week" type="button" class="button">7</button>
                                 <button id="time_range_month" type="button" class="button">30</button>
                                 <button id="time_range_quarter" type="button" class="button">90</button>
@@ -40,9 +40,9 @@
                         
                         <!-- Cache Status Display -->
                         {% if cache_info %}
-                        <div class="card mt-3" style="border: 1px solid #dee2e6;">
+                        <div class="card mt-3">
                             <div class="card-header d-flex justify-content-between align-items-center" 
-                                 style="cursor: pointer; padding: 8px 12px; background-color: #f8f9fa;" 
+                                 style="cursor: pointer; padding: 8px 12px;" 
                                  onclick="document.getElementById('cache-status-collapse').classList.toggle('d-none')">
                                 <h6 class="mb-0" style="font-size: 0.85rem;">Cache Status</h6>
                                 <span style="font-size: 0.8rem;">▼</span>
@@ -157,7 +157,7 @@
                                     </button>
                                 </div>
                             </div>
-                            <div id="selected-items-list" class="border rounded p-3 mb-4" style="min-height: 100px; background: #f8f9fa;">
+                            <div id="selected-items-list" class="border rounded p-3 mb-4" style="min-height: 100px; background: #8acbd4;">
                                 <div id="selected-items-empty" class="text-muted text-center py-3">
                                     No items selected. Use the buttons below to add items to your email.
                                 </div>
@@ -1256,7 +1256,7 @@
                             const badgeStyle = item.type === 'titleblock' ? 'badge-warning' : 'badge-secondary';
                             const placeholderText = item.type === 'titleblock' ? 'Enter your title here...' : 'Enter your text here...';
                             htmlContent += `
-                                <div class="selected-item d-flex flex-column p-2 mb-2 border rounded bg-light" 
+                                <div class="selected-item d-flex flex-column p-2 mb-2 border rounded" 
                                      data-index="${index}" draggable="true">
                                     <div class="d-flex justify-content-between align-items-center mb-2">
                                         <span class="item-name">${item.name}</span>

@@ -769,6 +769,9 @@
             
             // Set the HTML content first
             frame.srcdoc = html;
+
+            window.__emailHTML = html;
+            window.__emailReady = true;
             
             // Function to auto-resize iframe based on content
             function resizeIframe() {

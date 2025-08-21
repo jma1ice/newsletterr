@@ -71,8 +71,8 @@ By default the app listens on **http://127.0.0.1:6397**.
 2. Wait for the spinner to disappear, then the BCC, charts, and tables will populate.  
 3. Alter the BCC field to specify the recipient e‑mails (comma‑separated) if needed.  
 4. After altering, if you have connected conjurr, you can click **Get Recommendations** to pull conjurr recommendations for the users currently listed in the BCC field.  
-5. Draft the body, insert `[GRAPHS]` or `[STATS]` where appropriate.  
-6. Check the box on the stats and graphs that you wish to include.  
+5. Draft the body, use the stats/graphs pane on the right to include these in your email. 
+6. Choose a library option under Recently Added and insert `[RECENTLY_ADDED]` or `[RECOMMENDATIONS]` in the text box to include these.  
 7. Hit **Send Email**. Success and error messages will show after running.  
 
 ---

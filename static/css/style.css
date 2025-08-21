@@ -177,6 +177,11 @@ body {
     transform: scale(1.01);
 }
 
+/* Quick range buttons container ensures padding when wrapping */
+.quick-range-buttons { display:flex; flex-wrap:wrap; gap:6px; margin:10px 0 8px; padding:6px 4px 2px; background:rgba(0,0,0,0.06); border-radius:6px; }
+.dark .quick-range-buttons { background:rgba(255,255,255,0.08); }
+.quick-range-buttons .button { flex:0 0 auto; padding:6px 10px; }
+
 .add-stat-btn, .add-graph-btn {
     margin: 0;
 }

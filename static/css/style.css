@@ -154,6 +154,34 @@ body {
     color: #222;
 }
 
+.button-outline {
+    border: 1.5px solid #333;
+    color: #333;
+    background: transparent;
+    transition: background-color 0.3s ease-in-out, color 0.3s ease-in-out, transform 0.3s ease-in-out;
+}
+
+.dark .button-outline {
+    border: 1.5px solid #62a1a4;
+    color: #62a1a4;
+}
+
+.button-outline:hover {
+    background: #222;
+    color: #8acbd4;
+    transform: scale(1.01);
+}
+
+.dark .button-outline:hover {
+    background: #8acbd4;
+    color: #333;
+    transform: scale(1.01);
+}
+
+.add-stat-btn, .add-graph-btn {
+    margin: 0;
+}
+
 .blur-container {
     position: relative;
     height: 100%;

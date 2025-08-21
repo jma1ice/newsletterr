@@ -84,13 +84,14 @@ By default the app listens on **http://127.0.0.1:6397**.
 newsletterr/
 ├── .env              # environment variables, created at first launch
 ├── newsletterr.py    # Flask routes & helper functions
-├── .github/
-│   └── workflows/release-to-discord.yml
+├── .github/workflows/
+│   └── release-to-discord.yml
 ├── templates/
 │   ├── partials/
 │   │   └── _recommendations.html
 │   ├── about.html
 │   ├── base.html
+│   ├── email_history.html
 │   ├── index.html
 │   └── settings.html
 ├── static/
@@ -99,7 +100,11 @@ newsletterr/
 │       ├── Asset_94x.png
 │       ├── favicon.ico
 │       └── load.gif
-├── database/data.db  # created at first launch
+├── database/
+│   ├── data.db       # created at first launch
+│   ├── email_history.db
+│   ├── email_lists.db
+│   └── email_templates.db
 ├── README.md         # this file
 └── requirements.txt  # pip requirements
 ```
@@ -114,7 +119,9 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 
 ## Upcoming Changes
 
-### v0.8.4
+### v0.8.8
+* Donate button
+* Light mode dash fixes
 * Mobile optimizations, i.e.:
 ```
 <style>
@@ -131,23 +138,37 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 * Mailing lists (Weekly, monthly, Movies, Shows) that you can add users to, to automate some emails. E.g. - Monthly email contains the following users, and uses the following template. 
 * Template management to go with lists - Include a few default templates that snap in the most common stats
 * Automation management (Which lists, how often?)
-* Opt out support?
-* (Done) Checking "include XYZ in email" buttons should trigger them to be added to the previewed email in realtime, as snap-ins that can be removed on the fly as well. Maybe a button instead of a check box? 
-* (Done) Graph/stat ordering? Should it have a default ordering, or user editable? 
-* (Done) Email history - list of when emails were sent, and to whom
-* (Done) Email BCC list management
-* (Done) clean up UI, move stats/graphs
 * Graph titles need to specify the date range
-* (Done) made "newsletterr" footer a link
-* (Done) pop-out email preview
 
-### v1.0
+### v1.0.0
 * Dockerize
 * Compile EXE and ELF files
+
+### v1.1.0
+* Get fonts showing on Gmail receive side
+* Api/webhooks
+* Opt out support
 
 ---
 
 ## Recent Changes
+
+### v0.8.7
+* Removed graph/stat placeholders
+* Got graphs and stats on separate lines
+
+### v0.8.6
+* Got images to show in both Spark and Gmail
+* Dark mode UI cleanup
+
+### v0.8.5
+* Added email templates, history, and BCC list management
+* UI cleanup
+* Email preview pop out functionality
+
+### v0.8.4
+* Snap-ins! Graph/stat ordering pane
+* Made footer 'newsletterr' a link
 
 ### v0.8.3
 * Added width to email/preview subject section

@@ -1,4 +1,4 @@
-import os, math, uuid, base64, smtplib, sqlite3, requests, time, threading, re, json
+import os, math, uuid, base64, smtplib, sqlite3, requests, time, threading, re, json, mimetypes
 from bs4 import BeautifulSoup
 from datetime import datetime, timezone
 from cryptography.fernet import Fernet, InvalidToken
@@ -9,11 +9,12 @@ from email.mime.multipart import MIMEMultipart
 from email.utils import make_msgid
 from flask import Flask, render_template, request, jsonify, Response, redirect, url_for
 from pathlib import Path
+from playwright.sync_api import sync_playwright
 from plex_api_client import PlexAPI
-from urllib.parse import quote_plus
+from urllib.parse import quote_plus, urljoin, urlparse
 
 app = Flask(__name__)
-app.jinja_env.globals["version"] = "v0.9.5"
+app.jinja_env.globals["version"] = "v0.9.6"
 app.jinja_env.globals["publish_date"] = "August 21, 2025"
 
 def get_global_cache_status():
@@ -149,8 +150,20 @@ DATA_IMG_RE = re.compile(
     r'^data:(image/(png|jpeg|jpg|gif|webp));base64,([A-Za-z0-9+/=]+)$',
     re.IGNORECASE
 )
+_WORKERS_STARTED = False
+_WORKERS_LOCK = threading.Lock()
 
 load_dotenv(ENV_PATH)
+
+def start_background_workers():
+    global _WORKERS_STARTED
+    with _WORKERS_LOCK:
+        if _WORKERS_STARTED:
+            return
+        threading.Thread(target=background_scheduler, daemon=True, name="scheduler").start()
+        threading.Thread(target=_background_update_checker, daemon=True, name="update-checker").start()
+        _WORKERS_STARTED = True
+        print("Background workers started.")
 
 def is_cache_valid(cache_key, strict=True):
     """Check if cache data is still valid
@@ -1114,6 +1127,23 @@ def generate_email_content(template_id, settings, date_range=7):
         traceback.print_exc()
         return None, None, str(e)
 
+def render_email_html_via_headless(schedule_id: int) -> str:
+    base = "http://127.0.0.1:6397"
+    url = f"{base}/scheduling/{schedule_id}/preview-page?schedule_id={schedule_id}"
+
+    with sync_playwright() as pw:
+        browser = pw.chromium.launch(headless=True, args=["--no-sandbox"])
+        context = browser.new_context(viewport={"width": 1280, "height": 900})
+        page = context.new_page()
+        page.goto(url, wait_until="networkidle")
+
+        page.wait_for_function("window.__emailReady === true", timeout=60_000)
+
+        html = page.evaluate("window.__emailHTML")
+
+        browser.close()
+        return html or ""
+
 def send_scheduled_email(schedule_id, email_list_id, template_id):
     """Send an email based on schedule parameters"""
     print(f"Attempting to send scheduled email - Schedule ID: {schedule_id}, List ID: {email_list_id}, Template ID: {template_id}")
@@ -1188,10 +1218,8 @@ def send_scheduled_email(schedule_id, email_list_id, template_id):
             smtp_port = 587
         
         print(f"Using SMTP settings - Server: {smtp_server}, Port: {smtp_port}, From: {from_email}")
-        
-        # Generate complete email content with template processing and specified date range
-        settings = {'server_name': server_name or ''}
-        template_name, subject, email_html = generate_email_content(template_id, settings, date_range)
+
+        email_html = render_email_html_via_headless(schedule_id)
         
         if not email_html:
             print("Failed to generate email content")
@@ -1211,6 +1239,17 @@ def send_scheduled_email(schedule_id, email_list_id, template_id):
         
         msg_alternative = MIMEMultipart('alternative')
         msg_root.attach(msg_alternative)
+
+        try:
+            email_html, _cids = inline_data_images_to_cid(email_html, msg_root)
+        except Exception as e:
+            print(f"inline_data_images_to_cid failed: {e}")
+
+        public_base = 'http://127.0.0.1:6397'
+        try:
+            email_html = inline_remote_images_to_cid(email_html, msg_root, base_url=public_base)
+        except Exception as e:
+            print(f"inline_remote_images_to_cid failed: {e}")
         
         # Use the processed template content
         msg_alternative.attach(MIMEText(email_html, 'html'))
@@ -1405,6 +1444,45 @@ def inline_data_images_to_cid(html: str, msg_root, cid_prefix="img"):
 
     return str(soup), cids
 
+def inline_remote_images_to_cid(html: str, msg_root, base_url: str) -> str:
+    if not html:
+        return html
+
+    soup = BeautifulSoup(html, "html.parser")
+    session = requests.Session()
+    timeout = 10
+
+    for img in soup.find_all("img"):
+        src = (img.get("src") or "").strip()
+        if not src or src.startswith("data:") or src.startswith("cid:"):
+            continue
+
+        url = urljoin(base_url, src)
+
+        try:
+            r = session.get(url, timeout=timeout, stream=True)
+            r.raise_for_status()
+            content = r.content
+
+            ctype = r.headers.get("Content-Type") or mimetypes.guess_type(url)[0] or "image/png"
+            if not ctype.startswith("image/"):
+                continue
+            subtype = ctype.split("/", 1)[1]
+            if subtype == "jpg":
+                subtype = "jpeg"
+
+            cid = make_msgid(domain="newsletterr.local")[1:-1]
+            part = MIMEImage(content, _subtype=subtype)
+            part.add_header("Content-ID", f"<{cid}>")
+            part.add_header("Content-Disposition", "inline", filename=f"{cid}.{subtype}")
+            msg_root.attach(part)
+
+            img["src"] = f"cid:{cid}"
+        except Exception as e:
+            print(f"[inline_remote_images_to_cid] skip {url}: {e}")
+
+    return str(soup)
+
 def ensure_cids_match_html(html: str, attachments_cids: list[str]):
     missing = [cid for cid in attachments_cids if f'src="cid:{cid}"' not in html]
     return missing  # for logging / debugging only
@@ -1464,7 +1542,9 @@ def _background_update_checker():
         finally:
             time.sleep(app.config["UPDATE_CHECK_INTERVAL_SEC"])
 
-threading.Thread(target=_background_update_checker, daemon=True).start()
+@app.before_request
+def _boot_workers():
+    start_background_workers()
 
 @app.context_processor
 def inject_update_info():
@@ -2772,9 +2852,5 @@ if __name__ == '__main__':
     # Initialize unified database
     init_db(DB_PATH)
     migrate_schema("conjurr_url TEXT")
-    
-    # Start background scheduler in a separate thread
-    scheduler_thread = threading.Thread(target=background_scheduler, daemon=True)
-    scheduler_thread.start()
     
     app.run(host="127.0.0.1", port=6397, debug=True)

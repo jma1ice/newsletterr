@@ -86,6 +86,7 @@ cd newsletterr                 # root of the project
 python -m venv .venv
 source .venv/bin/activate      # Windows: .venv\\Scripts\\activate
 python -m pip install -r requirements.txt
+python -m playwright install chromium
 ```
 
 ### 3. Run
@@ -138,22 +139,26 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 
 ## Upcoming Changes
 
-### v0.9.6
-* Light mode dashboard fixes (cache status, template chooser, graph/stat/text pane all white | view stat table header is white)
-* Muted text not showing in dark mode (under main headers)
-* Fix scheduled send images to match preview
+### v0.9.7
+* Scheduled send does not grab recently added / recommendations
+* Schedule send only sends light mode
 * On dash graph won't show in 'view' until a stat is 'viewed'
+* Plex image squished
 
 ### v1.0.0
 * Compile EXE file
 
 ### v1.1.0
-* Dockerize and compile ELF file
+* Dockerize and compile ELF file | Unraid community app
 * UI for adding recently added/recommendations to email - still works with \[PLACEHOLDER\] for now
 * Graph titles need to specify the date range
 * Get fonts showing on Gmail receive side
 * Api/webhooks
 * Opt out support
+* Option for small cover art of each item in a stat table
+* Ratings in stat tables
+* Make sure custom templates can't override defaults
+* Auth page for hosted users
 * Mobile optimizations, i.e.:
 ```
 <style>
@@ -168,6 +173,12 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 ---
 
 ## Recent Changes
+
+### v0.9.6
+* Fixed scheduled send images to match preview
+* Fixed muted text not showing in dark mode
+* Light mode dashboard fixes
+* Fixed threading issue
 
 ### v0.9.5
 * Changed some buttons (btn-primary) to match rest of style

@@ -24,7 +24,7 @@
                             <input type="number" id="items_to_pull" name="items_to_pull" value="10" style="width: 8.5rem; margin-bottom: 8px;" /><br>
                             <label for="days_to_pull">Time Range (days):</label>
                             <input type="number" id="days_to_pull" name="days_to_pull" value="30" /><br>
-                            <button id="time_range_week" type="button" class="button">7</button>
+                            <button id="time_range_week" type="button" class="button" style="margin-top: 10px;">7</button>
                             <button id="time_range_month" type="button" class="button">30</button>
                             <button id="time_range_quarter" type="button" class="button">90</button>
                             <button id="time_range_two_q" type="button" class="button">180</button>
@@ -167,13 +167,13 @@
                             <div class="d-flex justify-content-between align-items-center mb-3">
                                 <h2>Text Blocks</h2>
                                 <div class="d-flex gap-2">
-                                    <button type="button" class="btn btn-outline-primary btn-sm" id="add-title-btn" title="Add a title block with large heading text">
+                                    <button type="button" class="btn button-outline btn-sm" id="add-title-btn" title="Add a title block with large heading text">
                                         + Title
                                     </button>
                                     <button type="button" class="btn btn-outline-secondary btn-sm" id="add-intro-btn" title="Add introduction text about server membership">
                                         + Intro
                                     </button>
-                                    <button type="button" class="btn btn-primary btn-sm" id="add-text-block-btn">
+                                    <button type="button" class="btn button btn-sm" id="add-text-block-btn">
                                         + Text Block
                                     </button>
                                     <button type="button" class="btn btn-outline-secondary btn-sm" id="add-outro-btn" title="Add closing thank you message">
@@ -2292,7 +2292,7 @@
                     document.querySelectorAll('.add-stat-btn, .add-graph-btn').forEach(btn => {
                         btn.textContent = 'Add';
                         btn.classList.remove('btn-success');
-                        btn.classList.add('btn-primary');
+                        btn.classList.add('button');
                         btn.disabled = false;
                     });
                     

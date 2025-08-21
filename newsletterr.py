@@ -13,8 +13,8 @@ from plex_api_client import PlexAPI
 from urllib.parse import quote_plus
 
 app = Flask(__name__)
-app.jinja_env.globals["version"] = "v0.8.7"
-app.jinja_env.globals["publish_date"] = "August 19, 2025"
+app.jinja_env.globals["version"] = "v0.9.0"
+app.jinja_env.globals["publish_date"] = "August 20, 2025"
 
 def get_global_cache_status():
     """Get global cache status for display in navbar"""

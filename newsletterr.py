@@ -19,68 +19,69 @@ app.jinja_env.globals["publish_date"] = "August 20, 2025"
 def get_global_cache_status():
     """Get global cache status for display in navbar"""
     try:
-        # Check if any cache data exists without actually loading it
         cache_keys = ['stats', 'users', 'graph_data', 'recent_data']
-        has_any_data = False
-        oldest_age = 0
-        date_range_display = '7 days'  # default
-        
+        present = []
+        missing = []
+        oldest_age = 0.0
+        date_range_display = '—'
+        max_range = 0
+
         for key in cache_keys:
             info = get_cache_info(key)
-            if info['exists']:
-                has_any_data = True
-                oldest_age = max(oldest_age, info['age_hours'])
-                
-                # Try to get date range from cache params safely
+            if info.get('exists'):
+                present.append(key)
+                oldest_age = max(oldest_age, info.get('age_hours', 0))
                 if info.get('params'):
-                    # Check for both 'time_range' and 'days' parameter names
-                    days = info['params'].get('time_range') or info['params'].get('days')
-                    if days:
-                        try:
-                            days = int(days)
-                            if days == 1:
-                                date_range_display = '1 day'
-                            else:
-                                date_range_display = f'{days} days'
-                        except (ValueError, TypeError):
-                            pass  # Keep default if conversion fails
-        
-        if not has_any_data:
-            return {'has_data': False, 'status': 'No cached data', 'age_display': 'no data', 'class': 'text-muted'}
-        
-        # Determine status based on oldest data age
-        if oldest_age < 1:  # Less than 1 hour
+                    param_days = info['params'].get('time_range') or info['params'].get('days')
+                    try:
+                        param_days = int(param_days)
+                        if param_days > max_range:
+                            max_range = param_days
+                    except (TypeError, ValueError):
+                        pass
+            else:
+                missing.append(key)
+
+        if max_range > 0:
+            date_range_display = f"{max_range} day" + ("s" if max_range != 1 else "")
+
+        if not present:
             return {
-                'has_data': True, 
-                'status': f'Fresh cache for {date_range_display}', 
-                'age_display': date_range_display,
-                'class': 'text-success'
+                'has_data': False,
+                'status': 'No cached data',
+                'age_display': 'no data',
+                'class': 'cache-badge-muted',
+                'missing': missing,
+                'present': present
             }
-        elif oldest_age < 24:  # Less than 24 hours
-            hours = int(oldest_age)
-            return {
-                'has_data': True, 
-                'status': f'Cache {hours}h old ({date_range_display})', 
-                'age_display': date_range_display,
-                'class': 'text-warning'
-            }
-        elif oldest_age < 168:  # Less than 7 days
-            days = int(oldest_age / 24)
-            return {
-                'has_data': True, 
-                'status': f'Cache {days}d old ({date_range_display})', 
-                'age_display': date_range_display,
-                'class': 'text-danger'
-            }
+
+        # Determine freshness classification
+        if missing:
+            freshness_class = 'cache-badge-missing'  # force red if anything missing
+            freshness_text = f"Missing: {', '.join(missing)}"
+        elif oldest_age < 1:
+            freshness_class = 'cache-badge-fresh'
+            freshness_text = 'Fresh'
+        elif oldest_age < 24:
+            freshness_class = 'cache-badge-warn'
+            freshness_text = f"~{int(oldest_age)}h old"
+        elif oldest_age < 168:
+            freshness_class = 'cache-badge-old'
+            freshness_text = f"{int(oldest_age/24)}d old"
         else:
-            return {
-                'has_data': True, 
-                'status': f'Cache very old ({date_range_display})', 
-                'age_display': date_range_display,
-                'class': 'text-danger'
-            }
+            freshness_class = 'cache-badge-stale'
+            freshness_text = 'Very old'
+
+        return {
+            'has_data': True,
+            'status': f"{freshness_text} • Range {date_range_display}",
+            'age_display': date_range_display,
+            'class': freshness_class,
+            'missing': missing,
+            'present': present
+        }
     except:
-        return {'has_data': False, 'status': 'Cache error', 'age_display': 'error', 'class': 'text-muted'}
+        return {'has_data': False, 'status': 'Cache error', 'age_display': 'error', 'class': 'cache-badge-muted'}
 
 # Make cache status available globally in templates
 app.jinja_env.globals["get_cache_status"] = get_global_cache_status
@@ -102,11 +103,16 @@ def can_use_cached_data_for_preview(required_days):
         # Check if cached parameters cover the required date range
         stats_params = stats_info.get('params', {})
         if 'time_range' in stats_params:
-            cached_days = int(stats_params.get('time_range', 0))
-            if cached_days >= required_days:
-                return True, f"Using cached data ({cached_days} days covers {required_days} days needed)"
-        
-        return False, f"Cached range insufficient (need {required_days} days)"
+            try:
+                cached_days = int(stats_params.get('time_range', 0))
+            except (TypeError, ValueError):
+                cached_days = 0
+            # Require exact match to avoid overstating recent period with longer cached data
+            if cached_days == required_days:
+                return True, f"Using cached data ({cached_days} days exact match)"
+            else:
+                return False, f"Cached range ({cached_days} days) != requested ({required_days} days)"
+        return False, f"No cached range metadata (need {required_days} days)"
     except Exception as e:
         return False, f"Error checking cache: {str(e)}"
 

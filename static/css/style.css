@@ -225,6 +225,26 @@ body {
     50% { box-shadow:0 0 6px 2px rgba(255,0,64,0.9); }
 }
 
+/* Flashing state for Send Now button */
+@keyframes sendFlash {
+    0%, 100% { filter: brightness(1); transform: scale(1); }
+    50% { filter: brightness(1.4); transform: scale(1.05); }
+}
+.sending-flash {
+    animation: sendFlash 0.8s ease-in-out infinite;
+    position: relative;
+}
+.sending-flash::after {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    border-radius: 6px;
+    background: radial-gradient(circle at 50% 50%, rgba(255,255,255,0.35), rgba(255,255,255,0) 70%);
+    pointer-events: none;
+    mix-blend-mode: overlay;
+    animation: pulseGlow 2s ease-in-out infinite;
+}
+
 .content-table {
     position: relative;
     z-index: 1;

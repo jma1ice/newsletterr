@@ -875,6 +875,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 const originalText = this.textContent;
                 this.textContent = '📤 Sending...';
                 this.disabled = true;
+                this.classList.add('sending-flash');
                 
                 try {
                     const response = await fetch(`/scheduling/${scheduleId}/send-now`, {
@@ -896,6 +897,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Restore button state
                     this.textContent = originalText;
                     this.disabled = false;
+                    this.classList.remove('sending-flash');
                 }
             }
         });

@@ -2507,7 +2507,7 @@ def get_calendar_data():
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         cursor.execute("""
-            SELECT id, name, frequency, start_date, send_time, next_send, is_active
+            SELECT id, name, frequency, start_date, send_time, next_send, is_active, template_id
             FROM email_schedules 
             WHERE is_active = 1
         """)
@@ -2523,7 +2523,7 @@ def get_calendar_data():
             end_date = datetime(year, month + 1, 1) - timedelta(days=1)
         
         for schedule in schedules:
-            schedule_id, name, frequency, schedule_start_date, send_time, next_send, is_active = schedule
+            schedule_id, name, frequency, schedule_start_date, send_time, next_send, is_active, template_id = schedule
             
             if not is_active:
                 continue
@@ -2569,7 +2569,8 @@ def get_calendar_data():
                         'id': schedule_id,
                         'name': name,
                         'time': send_time or '09:00',
-                        'frequency': frequency
+                        'frequency': frequency,
+                        'template_id': template_id
                     })
                 
                 # Calculate next occurrence using the same logic as calculate_next_send

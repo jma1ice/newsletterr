@@ -1,8 +1,12 @@
 {% extends "base.html" %}
-{% block title %}settings{% endblock %}
+{% block title %}Settings{% endblock %}
 {% block content %}
 <div class="container-fluid">
-    <h1>settings</h1><br>
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h1 style="font-weight: bold;">Settings</h1>
+    </div>
+    <p class="text-muted mb-4">Configure your application settings, Plex connection, and email preferences.</p>
+    
     {% if alert %}
         <p style="color: #01b301; text-shadow: 1px 0 #000, 0 1px #000, -1px 0 #000, 0 -1px #000;">{{ alert }}</p>
     {% endif %}
@@ -164,6 +168,25 @@
                     hideSpinner();
                     statusEl.textContent = 'Error starting Plex connection.';
                     button.disabled = false;
+                }
+            });
+
+            // Add Ctrl+S keyboard shortcut to save settings
+            document.addEventListener('keydown', function(event) {
+                if (event.ctrlKey && event.key === 's') {
+                    event.preventDefault(); // Prevent browser's default save dialog
+                    
+                    // Trigger the form submission
+                    const settingsForm = document.getElementById('settings_form');
+                    const applyButton = document.getElementById('apply_settings');
+                    
+                    if (settingsForm && applyButton) {
+                        // Show spinner like the normal submit does
+                        showSpinner('Applying settings...');
+                        
+                        // Submit the form
+                        settingsForm.submit();
+                    }
                 }
             });
         </script>

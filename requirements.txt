@@ -3,3 +3,5 @@ requests
 plex-api-client
 python-dotenv
 cryptography
+playwright
+beautifulsoup4

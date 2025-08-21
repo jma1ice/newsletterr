@@ -30,8 +30,22 @@
         <ul id="navLinks">
             <li><a href="{{ url_for('index') }}" class="hover:underline">newsletterr</a></li>
             <li><a href="{{ url_for('email_history') }}" class="hover:underline">email history</a></li>
+            <li><a href="{{ url_for('scheduling') }}" class="hover:underline">scheduling</a></li>
             <li><a href="{{ url_for('settings') }}" class="hover:underline">settings</a></li>
             <li><a href="{{ url_for('about') }}" class="hover:underline">about</a></li>
+            <!-- Cache Status Indicator -->
+            <li style="margin-left: 20px;">
+                {% set cache_status = get_cache_status() %}
+                <span class="cache-status-badge {{ cache_status.class }}" 
+                      title="{{ cache_status.status }}" style="margin: 0; padding: 0;">
+                    <i class="fas fa-database"></i>
+                    {% if cache_status.has_data %}
+                        {{ cache_status.age_display }}
+                    {% else %}
+                        no data
+                    {% endif %}
+                </span>
+            </li>
         </ul>
         {% if update_info.is_newer %}
             <div style="

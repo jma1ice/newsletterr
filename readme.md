@@ -1,6 +1,6 @@
 # newsletterr
 
-_Turn your Plex server analytics into a beautiful weekly* (or whenever‑you‑like) newsletter._
+_Turn your Plex server analytics into a beautiful weekly (or whenever‑you‑like) newsletter._
 
 Newsletterr is a lightweight Flask application that talks to **[Tautulli](https://tautulli.com/)**, crunches your Plex statistics, renders charts with **Highcharts**, pulls recommendations from **[conjurr](https://github.com/yungsnuzzy/conjurr)** and emails the results to your user base, all without leaving the browser.
 
@@ -35,7 +35,6 @@ cd newsletterr                 # root of the project
 python -m venv .venv
 source .venv/bin/activate      # Windows: .venv\\Scripts\\activate
 python -m pip install -r requirements.txt
-python -m playwright install chromium
 ```
 
 ### 3. Run

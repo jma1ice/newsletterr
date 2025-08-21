@@ -138,7 +138,7 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 
 ## Upcoming Changes
 
-### v0.9.1
+### v0.9.6
 * Light mode dashboard fixes (cache status, template chooser, graph/stat/text pane all white | view stat table header is white)
 * Muted text not showing in dark mode (under main headers)
 * Fix scheduled send images to match preview
@@ -169,7 +169,7 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 
 ## Recent Changes
 
-### v0.9.0
+### v0.9.5
 * Changed some buttons (btn-primary) to match rest of style
 * Some UI refresh
 * Donate button in about and footer

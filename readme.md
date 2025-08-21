@@ -92,6 +92,8 @@ newsletterr/
 │   ├── base.html
 │   ├── email_history.html
 │   ├── index.html
+│   ├── schedule_preview.html
+│   ├── scheduling.html
 │   └── settings.html
 ├── static/
 │   ├── css/style.css

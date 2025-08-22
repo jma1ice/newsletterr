@@ -858,7 +858,7 @@
                                         canvas.height = img.height;
                                         ctx.drawImage(img, 0, 0);
                                         const dataUrl = canvas.toDataURL("image/png");
-                                        allItemsHTML += `<img src="${dataUrl}" style="max-width: 100%; margin-bottom: 10px;">`;
+                                        allItemsHTML += `<img src="${dataUrl}" style="max-width: 100%; margin-bottom: 10px;"><br>`;
                                         resolve();
                                     };
                                     img.onerror = (error) => {
@@ -921,7 +921,7 @@
                                 });
 
                                 const dataUrl = canvas.toDataURL("image/png");
-                                allItemsHTML += `<img src="${dataUrl}" style="max-width: 100%; margin-bottom: 10px;">`;
+                                allItemsHTML += `<img src="${dataUrl}" style="max-width: 100%; margin-bottom: 10px;"><br>`;
 
                                 document.body.removeChild(tempWrapper);
 

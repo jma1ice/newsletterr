@@ -80,6 +80,9 @@ Newsletterr is a lightweight Flask application that talks to **[Tautulli](https:
 
 ### 2. Installation
 
+You can use newsletterr with Python or Docker:
+
+#### Python
 ```bash
 git clone https://github.com/jma1ice/newsletterr.git
 cd newsletterr                 # root of the project
@@ -87,6 +90,15 @@ python -m venv .venv
 source .venv/bin/activate      # Windows: .venv\\Scripts\\activate
 python -m pip install -r requirements.txt
 python -m playwright install chromium
+```
+
+#### Docker
+```
+docker run -d --name newsletterr \
+  -p 6397:6397 \
+  -e PUBLIC_BASE_URL=http://127.0.0.1:6397 \
+  -v newsletterr-db:/app/database \
+  jma1ice/newsletterr:latest
 ```
 
 ### 3. Run
@@ -139,7 +151,7 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 
 ## Upcoming Changes
 
-### v0.9.7
+### v0.9.8
 * Scheduled send does not grab recently added / recommendations
 * Schedule send only sends light mode
 * On dash graph won't show in 'view' until a stat is 'viewed'
@@ -149,7 +161,7 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 * Compile EXE file
 
 ### v1.1.0
-* Dockerize and compile ELF file | Unraid community app
+* Compile ELF file | Unraid community app
 * UI for adding recently added/recommendations to email - still works with \[PLACEHOLDER\] for now
 * Graph titles need to specify the date range
 * Get fonts showing on Gmail receive side
@@ -159,6 +171,8 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 * Ratings in stat tables
 * Make sure custom templates can't override defaults
 * Auth page for hosted users
+* Snap-in for images/gifs
+* Ability to add links to services, ie StatusCake, Uptime Robot
 * Mobile optimizations, i.e.:
 ```
 <style>
@@ -173,6 +187,9 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 ---
 
 ## Recent Changes
+
+### v0.9.7
+* Dockerized!
 
 ### v0.9.6
 * Fixed scheduled send images to match preview

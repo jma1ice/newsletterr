@@ -14,7 +14,7 @@ from plex_api_client import PlexAPI
 from urllib.parse import quote_plus, urljoin, urlparse
 
 app = Flask(__name__)
-app.jinja_env.globals["version"] = "v0.9.6"
+app.jinja_env.globals["version"] = "v0.9.7"
 app.jinja_env.globals["publish_date"] = "August 21, 2025"
 
 def get_global_cache_status():
@@ -2853,4 +2853,4 @@ if __name__ == '__main__':
     init_db(DB_PATH)
     migrate_schema("conjurr_url TEXT")
     
-    app.run(host="127.0.0.1", port=6397, debug=True)
+    app.run(host="0.0.0.0", port=6397, debug=True)

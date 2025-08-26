@@ -177,10 +177,24 @@ body {
     transform: scale(1.01);
 }
 
-/* Quick range buttons container ensures padding when wrapping */
-.quick-range-buttons { display:flex; flex-wrap:wrap; gap:6px; margin:10px 0 8px; padding:6px 4px 2px; background:rgba(0,0,0,0.06); border-radius:6px; }
-.dark .quick-range-buttons { background:rgba(255,255,255,0.08); }
-.quick-range-buttons .button { flex:0 0 auto; padding:6px 10px; }
+.quick-range-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 10px 0 8px;
+    padding: 6px 4px 2px;
+    background: rgba(0,0,0,0.06);
+    border-radius: 6px;
+}
+
+.dark .quick-range-buttons {
+    background: rgba(255,255,255,0.08);
+}
+
+.quick-range-buttons .button {
+    flex: 0 0 auto;
+    padding: 6px 10px;
+}
 
 .add-stat-btn, .add-graph-btn {
     margin: 0;
@@ -203,7 +217,6 @@ body {
     z-index: 0;
 }
 
-/* Cache badge styles */
 .cache-badge-base {
         display: inline-block;
         padding: 4px 10px;
@@ -217,28 +230,67 @@ body {
         -webkit-backdrop-filter: blur(6px);
         transition: transform .2s ease, background-color .3s ease;
 }
-.cache-badge-base:hover { transform: translateY(-2px); }
-.cache-badge-fresh { background: linear-gradient(90deg,#198754,#28a745); color:#fff; }
-.cache-badge-warn { background: linear-gradient(90deg,#ffc107,#ff9800); color:#222; }
-.cache-badge-old { background: linear-gradient(90deg,#dc3545,#b02a37); color:#fff; }
-.cache-badge-stale { background: repeating-linear-gradient(45deg,#6c757d,#6c757d 8px,#495057 8px,#495057 16px); color:#fff; }
-.cache-badge-missing { background: linear-gradient(135deg,#ff0033,#cc0000); color:#fff; animation: pulseGlow 2s infinite; }
-.cache-badge-muted { background: #444; color:#bbb; }
+
+.cache-badge-base:hover {
+    transform: translateY(-2px);
+}
+
+.cache-badge-fresh {
+    background: linear-gradient(90deg,#198754,#28a745);
+    color: #fff;
+}
+
+.cache-badge-warn {
+    background: linear-gradient(90deg,#ffc107,#ff9800);
+    color: #222;
+}
+
+.cache-badge-old {
+    background: linear-gradient(90deg,#dc3545,#b02a37);
+    color: #fff;
+}
+
+.cache-badge-stale {
+    background: repeating-linear-gradient(45deg,#6c757d,#6c757d 8px,#495057 8px,#495057 16px);
+    color: #fff;
+}
+
+.cache-badge-missing {
+    background: linear-gradient(135deg,#ff0033,#cc0000);
+    color: #fff;
+    animation: pulseGlow 2s infinite;
+}
+
+.cache-badge-muted {
+    background: #444;
+    color: #bbb;
+}
 
 @keyframes pulseGlow {
-    0%,100% { box-shadow:0 0 0 0 rgba(255,0,64,0.6); }
-    50% { box-shadow:0 0 6px 2px rgba(255,0,64,0.9); }
+    0%,100% {
+        box-shadow: 0 0 0 0 rgba(255,0,64,0.6);
+    }
+    50% {
+        box-shadow: 0 0 6px 2px rgba(255,0,64,0.9);
+    }
 }
 
-/* Flashing state for Send Now button */
 @keyframes sendFlash {
-    0%, 100% { filter: brightness(1); transform: scale(1); }
-    50% { filter: brightness(1.4); transform: scale(1.05); }
+    0%, 100% {
+        filter: brightness(1);
+        transform: scale(1);
+    }
+    50% {
+        filter: brightness(1.4);
+        transform: scale(1.05);
+    }
 }
+
 .sending-flash {
     animation: sendFlash 0.8s ease-in-out infinite;
     position: relative;
 }
+
 .sending-flash::after {
     content: '';
     position: absolute;
@@ -348,7 +400,6 @@ input, textarea, select, #statSelector, #graphSelector {
     color: inherit;
 }
 
-/* Card theming for Email Recipients section */
 .card {
     background-color: #f8f9fa;
     border: 1px solid #dee2e6;
@@ -416,10 +467,10 @@ footer p {
 }
 
 .site-foot{
-    display:grid;
-    grid-template-columns: 1fr auto 1fr; /* left | center | right */
-    align-items:center;
-    gap:.5rem;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: .5rem;
 }
 
 .left-foot {
@@ -435,7 +486,6 @@ footer p {
     justify-self: center;
 }
 
-/* Selected Items Styling */
 .selected-item {
     cursor: move;
     transition: background-color 0.2s;
@@ -526,7 +576,6 @@ footer p {
     color: #8acbd4;
 }
 
-/* Cache Status Badge Styles */
 .cache-status-badge {
     font-size: 11px !important;
     padding: 4px 8px !important;
@@ -566,7 +615,6 @@ footer p {
     font-size: 9px !important;
 }
 
-/* Dark mode adjustments for cache status badge */
 .dark .cache-status-badge.text-success {
     background-color: rgba(25, 135, 84, 0.15) !important;
     color: #75b798 !important;

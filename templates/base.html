@@ -33,7 +33,6 @@
             <li><a href="{{ url_for('scheduling') }}" class="hover:underline">scheduling</a></li>
             <li><a href="{{ url_for('settings') }}" class="hover:underline">settings</a></li>
             <li><a href="{{ url_for('about') }}" class="hover:underline">about</a></li>
-            <!-- Cache Status Indicator -->
             <li style="margin-left: 20px;">
                 {% set cache_status = get_cache_status() %}
                 <span class="cache-badge-base {{ cache_status.class }}" 

@@ -2,137 +2,131 @@
 {% block title %}email history{% endblock %}
 
 {% block content %}
-<div class="container-fluid">
-    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
-        <div>
-            <h1 class="mb-1">email history</h1>
-            <p class="text-info mb-0">View all sent emails and their recipients</p>
+    <div class="container-fluid">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+            <div>
+                <h1 class="mb-1">email history</h1>
+                <p class="text-info mb-0">View all sent emails and their recipients</p>
+            </div>
+            {% if emails %}
+                <form method="POST" action="{{ url_for('clear_email_history') }}" onsubmit="return confirm('Are you sure you want to permanently delete all email history entries? This cannot be undone.');">
+                    <button type="submit" class="btn btn-danger">
+                        🗑️ Clear History
+                    </button>
+                </form>
+            {% endif %}
         </div>
+
         {% if emails %}
-        <form method="POST" action="{{ url_for('clear_email_history') }}" onsubmit="return confirm('Are you sure you want to permanently delete all email history entries? This cannot be undone.');">
-            <button type="submit" class="btn btn-danger">
-                🗑️ Clear History
-            </button>
-        </form>
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Subject</th>
+                            <th>Date & Time Sent</th>
+                            <th>Template</th>
+                            <th>Size (KB)</th>
+                            <th>Recipients</th>
+                            <th>View Recipients</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for email in emails %}
+                            <tr>
+                                <td><strong>{{ email.subject }}</strong></td>
+                                <td><span class="text-muted">{{ email.sent_at }}</span></td>
+                                <td><span class="badge bg-secondary">{{ email.template_name }}</span></td>
+                                <td>
+                                    <span class="badge bg-info">{{ "%.2f"|format(email.content_size_kb) }} KB</span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-primary">{{ email.recipient_count }} recipient{{ 's' if email.recipient_count != 1 else '' }}</span>
+                                </td>
+                                <td>
+                                    <button class="btn btn-secondary btn-sm view-recipients-btn" 
+                                            data-email-id="{{ email.id }}" 
+                                            data-subject="{{ email.subject }}">
+                                        👥 Recipients
+                                    </button>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="alert alert-info" role="alert">
+                <h4 class="alert-heading">No Email History</h4>
+                <p>No emails have been sent yet. Email history will appear here after you send your first newsletter.</p>
+                <hr>
+                <p class="mb-0"><a href="{{ url_for('index') }}" class="button">Send Your First Newsletter</a></p>
+            </div>
         {% endif %}
     </div>
 
-    {% if emails %}
-        <div class="table-responsive">
-            <table class="table table-striped table-hover">
-                <thead class="table-dark">
-                    <tr>
-                        <th>Subject</th>
-                        <th>Date & Time Sent</th>
-                        <th>Template</th>
-                        <th>Size (KB)</th>
-                        <th>Recipients</th>
-                        <th>View Recipients</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for email in emails %}
-                        <tr>
-                            <td><strong>{{ email.subject }}</strong></td>
-                            <td><span class="text-muted">{{ email.sent_at }}</span></td>
-                            <td><span class="badge bg-secondary">{{ email.template_name }}</span></td>
-                            <td>
-                                <span class="badge bg-info">{{ "%.2f"|format(email.content_size_kb) }} KB</span>
-                            </td>
-                            <td>
-                                <span class="badge bg-primary">{{ email.recipient_count }} recipient{{ 's' if email.recipient_count != 1 else '' }}</span>
-                            </td>
-                            <td>
-                                <button class="btn btn-secondary btn-sm view-recipients-btn" 
-                                        data-email-id="{{ email.id }}" 
-                                        data-subject="{{ email.subject }}">
-                                    👥 Recipients
-                                </button>
-                            </td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    {% else %}
-        <div class="alert alert-info" role="alert">
-            <h4 class="alert-heading">No Email History</h4>
-            <p>No emails have been sent yet. Email history will appear here after you send your first newsletter.</p>
-            <hr>
-            <p class="mb-0"><a href="{{ url_for('index') }}" class="button">Send Your First Newsletter</a></p>
-        </div>
-    {% endif %}
-</div>
-
-<!-- Recipients Modal -->
-<div class="modal fade" id="recipientsModal" tabindex="-1" aria-labelledby="recipientsModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="recipientsModalLabel">Email Recipients</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <h6 id="modal-subject" class="mb-3"></h6>
-                <div id="recipients-list" class="row">
-                    <!-- Recipients will be loaded here -->
+    <div class="modal fade" id="recipientsModal" tabindex="-1" aria-labelledby="recipientsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="recipientsModalLabel">Email Recipients</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <div class="modal-body">
+                    <h6 id="modal-subject" class="mb-3"></h6>
+                    <div id="recipients-list" class="row"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
             </div>
         </div>
     </div>
-</div>
 
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Recipients modal functionality
-    const recipientsButtons = document.querySelectorAll('.view-recipients-btn');
-    
-    recipientsButtons.forEach(button => {
-        button.addEventListener('click', async function() {
-            const emailId = this.dataset.emailId;
-            const subject = this.dataset.subject;
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const recipientsButtons = document.querySelectorAll('.view-recipients-btn');
             
-            try {
-                const response = await fetch(`/email_history/recipients/${emailId}`);
-                const data = await response.json();
-                
-                if (data.error) {
-                    alert('Error loading recipients: ' + data.error);
-                    return;
-                }
-                
-                // Update modal content
-                document.getElementById('modal-subject').textContent = `Subject: ${data.subject}`;
-                
-                const recipientsList = document.getElementById('recipients-list');
-                recipientsList.innerHTML = '';
-                
-                data.recipients.forEach(recipient => {
-                    const col = document.createElement('div');
-                    col.className = 'col-md-6 mb-2';
-                    col.innerHTML = `
-                        <div class="card">
-                            <div class="card-body py-2">
-                                <small class="text-muted">📧</small>
-                                <span>${recipient}</span>
-                            </div>
-                        </div>
-                    `;
-                    recipientsList.appendChild(col);
+            recipientsButtons.forEach(button => {
+                button.addEventListener('click', async function() {
+                    const emailId = this.dataset.emailId;
+                    const subject = this.dataset.subject;
+                    
+                    try {
+                        const response = await fetch(`/email_history/recipients/${emailId}`);
+                        const data = await response.json();
+                        
+                        if (data.error) {
+                            alert('Error loading recipients: ' + data.error);
+                            return;
+                        }
+                        
+                        document.getElementById('modal-subject').textContent = `Subject: ${data.subject}`;
+                        
+                        const recipientsList = document.getElementById('recipients-list');
+                        recipientsList.innerHTML = '';
+                        
+                        data.recipients.forEach(recipient => {
+                            const col = document.createElement('div');
+                            col.className = 'col-md-6 mb-2';
+                            col.innerHTML = `
+                                <div class="card">
+                                    <div class="card-body py-2">
+                                        <small class="text-muted">📧</small>
+                                        <span>${recipient}</span>
+                                    </div>
+                                </div>
+                            `;
+                            recipientsList.appendChild(col);
+                        });
+                        
+                        const modal = new bootstrap.Modal(document.getElementById('recipientsModal'));
+                        modal.show();
+                        
+                    } catch (error) {
+                        alert('Error loading recipients: ' + error.message);
+                    }
                 });
-                
-                // Show modal
-                const modal = new bootstrap.Modal(document.getElementById('recipientsModal'));
-                modal.show();
-                
-            } catch (error) {
-                alert('Error loading recipients: ' + error.message);
-            }
+            });
         });
-    });
-});
-</script>
+    </script>
 {% endblock %}

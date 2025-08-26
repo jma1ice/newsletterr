@@ -93,6 +93,8 @@ python -m playwright install chromium
 ```
 
 #### Docker
+On docker hub: jma1ice/newsletterr:latest
+or build locally: 
 ```
 docker run -d --name newsletterr \
   -p 6397:6397 \
@@ -151,28 +153,51 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 
 ## Upcoming Changes
 
-### v0.9.8
-* Scheduled send does not grab recently added / recommendations
-* Schedule send only sends light mode
-* On dash graph won't show in 'view' until a stat is 'viewed'
-* Plex image squished
+### v0.9.9
+* UI for adding recommendations to email - still works with \[PLACEHOLDER\] for now
+* Recommendations headers bigger in scheduled send
+* Cache recommendations
+* Schedule send only sends dark mode
+* Graph titles need to specify the date range - or at least show what time range the data is for somewhere in the email
+* Build Docker image with python:slim
+* Error when using 587 to send email
+* Update readme to explain why one would need an App Password for email
+* Include the Plex url in the settings page so the user can change it if it pulls incorrectly
+* Dashboard preview initally stuck on light mode
+* Donate verbiage to Tips
+* SMTP should not require `@`
 
 ### v1.0.0
-* Compile EXE file
+* Compile EXE file / ELF
+* Unraid community app
 
 ### v1.1.0
-* Compile ELF file | Unraid community app
-* UI for adding recently added/recommendations to email - still works with \[PLACEHOLDER\] for now
-* Graph titles need to specify the date range
+* Redirect empty settings to the settings page with an alert
 * Get fonts showing on Gmail receive side
 * Api/webhooks
 * Opt out support
 * Option for small cover art of each item in a stat table
-* Ratings in stat tables
+* IMDb ratings in stat tables
 * Make sure custom templates can't override defaults
 * Auth page for hosted users
 * Snap-in for images/gifs
-* Ability to add links to services, ie StatusCake, Uptime Robot
+* Ability to add embedded links to services, ie StatusCake, Uptime Robot
+* Functionality for custom HTML templates
+* Ombi integration
+* Setting to choose duration or play counts for stats/graphs
+* Setting to hide play counts in stats/graphs
+* Option to sort recently added by IMDb rating
+* Option to pull recently added by # of days - when this is in should be able to show 'new items since x date' in email
+* Playlist/Collections in email content - helpful for Kometa seasonal lists
+* GitHub webhook to pull submitted issues to Discord channel
+* Split TLS/SSL from port and offer both as options in settings
+* Sonarr/Radarr calendar integration for 'coming soon'
+* Servarr PR
+* Stats for total items in library
+* Ratings (G, PG, etc) listed on recently added
+* Auto split recommendations email so its not all sent to everyone
+* Option to change Plex logo
+* M365 SMTP setup
 * Mobile optimizations, i.e.:
 ```
 <style>
@@ -187,6 +212,15 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 ---
 
 ## Recent Changes
+
+### v0.9.8
+* Plex image un-squished
+* PUBLIC_BASE_URL remade into an env var in case docker user changes port
+* Scheduled send now grabs recently added / recommendations
+* Replaced scheduled recommendation API call with selected users instead of all users
+* Set to only pull schedule recommendations if \[RECOMMENDATIONS\] is present
+* Fixed issue where on dash graph wouldn't show in 'view' until a stat was 'viewed'
+* UI added for recently added in snap-ins
 
 ### v0.9.7
 * Dockerized!

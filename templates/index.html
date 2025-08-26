@@ -38,37 +38,36 @@
                                     title="Clear cached data to force fresh fetch">Clear Cache</button>
                         </form>
                         
-                        <!-- Cache Status Display -->
                         {% if cache_info %}
-                        <div class="card mt-3">
-                            <div class="card-header d-flex justify-content-between align-items-center" 
-                                 style="cursor: pointer; padding: 8px 12px;" 
-                                 onclick="document.getElementById('cache-status-collapse').classList.toggle('d-none')">
-                                <h6 class="mb-0" style="font-size: 0.85rem;">Cache Status</h6>
-                                <span style="font-size: 0.8rem;">▼</span>
-                            </div>
-                            <div id="cache-status-collapse" class="card-body d-none" style="padding: 8px 12px; font-size: 0.8rem;">
-                                {% for key, info in cache_info.items() %}
-                                <div class="d-flex justify-content-between align-items-center mb-1">
-                                    <span style="text-transform: capitalize;">{{ key.replace('_', ' ') }}:</span>
-                                    {% if info.exists %}
-                                        {% if info.is_fresh %}
-                                            <span class="text-success">✓ Fresh ({{ "%.1f"|format(info.age_hours) }}h)</span>
-                                        {% elif info.is_usable %}
-                                            <span class="text-warning">⚠ Old ({{ "%.1f"|format(info.age_hours) }}h)</span>
-                                        {% else %}
-                                            <span class="text-danger">✗ Expired</span>
-                                        {% endif %}
-                                    {% else %}
-                                        <span class="text-muted">○ None</span>
-                                    {% endif %}
+                            <div class="card mt-3">
+                                <div class="card-header d-flex justify-content-between align-items-center" 
+                                    style="cursor: pointer; padding: 8px 12px;" 
+                                    onclick="document.getElementById('cache-status-collapse').classList.toggle('d-none')">
+                                    <h6 class="mb-0" style="font-size: 0.85rem;">Cache Status</h6>
+                                    <span style="font-size: 0.8rem;">▼</span>
                                 </div>
-                                {% endfor %}
-                                <small class="text-muted d-block mt-2">Cache refreshes daily automatically. Use "Get Stats\Users" to refresh manually.</small>
+                                <div id="cache-status-collapse" class="card-body d-none" style="padding: 8px 12px; font-size: 0.8rem;">
+                                    {% for key, info in cache_info.items() %}
+                                        <div class="d-flex justify-content-between align-items-center mb-1">
+                                            <span style="text-transform: capitalize;">{{ key.replace('_', ' ') }}:</span>
+                                            {% if info.exists %}
+                                                {% if info.is_fresh %}
+                                                    <span class="text-success">✓ Fresh ({{ "%.1f"|format(info.age_hours) }}h)</span>
+                                                {% elif info.is_usable %}
+                                                    <span class="text-warning">⚠ Old ({{ "%.1f"|format(info.age_hours) }}h)</span>
+                                                {% else %}
+                                                    <span class="text-danger">✗ Expired</span>
+                                                {% endif %}
+                                            {% else %}
+                                                <span class="text-muted">○ None</span>
+                                            {% endif %}
+                                        </div>
+                                    {% endfor %}
+                                    <small class="text-muted d-block mt-2">Cache refreshes daily automatically. Use "Get Stats\Users" to refresh manually.</small>
+                                </div>
                             </div>
-                        </div>
                         {% endif %}
-                        <!-- Expandable BCC Email Section -->
+
                         <div class="card mb-3" style="margin-top: 20px;">
                             <div class="card-header d-flex justify-content-between align-items-center" 
                                  style="cursor: pointer;" 
@@ -78,7 +77,6 @@
                             </div>
                             <div id="bcc-collapse" class="card-body">
                                 <form method="POST" action="/send_email">
-                                    <!-- Email List Management -->
                                     <div class="mb-3">
                                         <label class="form-label">Email Lists:</label>
                                         <div class="d-flex gap-2 align-items-center">
@@ -87,13 +85,12 @@
                                                 <option value="ALL">ALL</option>
                                                 <option value="Custom" selected>Custom</option>
                                                 {% for list in email_lists|sort(attribute='name') %}
-                                                <option value="{{ list.id }}" data-emails="{{ list.emails }}">{{ list.name }}</option>
+                                                    <option value="{{ list.id }}" data-emails="{{ list.emails }}">{{ list.name }}</option>
                                                 {% endfor %}
                                             </select>
                                             <button id="delete_list_btn" type="button" class="btn btn-sm btn-danger d-none">Delete</button>
                                         </div>
                                         
-                                        <!-- Save New List Input (initially hidden) -->
                                         <div id="save_list_container" class="mt-2 d-none">
                                             <div class="d-flex gap-2">
                                                 <input type="text" id="new_list_name" class="form-control" placeholder="Enter list name" />
@@ -139,7 +136,6 @@
                         <iframe class="frame" id="preview"></iframe>
                     </td>
                     <td style="width: 60%; padding: 10px; vertical-align: top;">
-                        <!-- Selected Items Pane -->
                         <div id="selected-items-pane">
                             <div class="d-flex justify-content-between align-items-center mb-3">
                                 <h2>Snap-ins</h2>
@@ -164,7 +160,6 @@
                             </div>
                         </div>
 
-                        <!-- Text Blocks Section -->
                         <div class="mb-4">
                             <div class="d-flex justify-content-between align-items-center mb-3">
                                 <h2>Text Blocks</h2>
@@ -185,9 +180,16 @@
                             </div>
                         </div>
 
-                        <!-- Stats and Graphs side by side -->
                         <div class="row">
-                            <!-- Available Stats Column -->
+                            <div class="col-md-6">
+                                {% if recent_data %}
+                                    <h2>Recently Added</h2>
+                                    <div id="ra-lib-list" class="row"></div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="row">
                             <div class="col-md-6">
                                 {% if stats %}
                                     <h2>Available Stats</h2>
@@ -215,7 +217,6 @@
                                 {% endif %}
                             </div>
                             
-                            <!-- Available Graphs Column -->
                             <div class="col-md-6">
                                 <h2>Available Graphs</h2>
                                 {% if graph_data != [{},{}] %}
@@ -249,153 +250,152 @@
                             </div>
                         </div>
 
-                        <!-- Stats Preview -->
                         {% if stats %}
                             <div id="stat-preview" class="mt-3" style="display: none;">
                                 {% for stat in stats %}
                                     <div id="stat-{{ loop.index0 }}" class="stat-table d-none">
-                                    <div class="card my-4">
-                                        <div class="card-header bg-primary text-white">
-                                            {{ stat.stat_title }}
-                                        </div>
-                                        <div class="card-body blur-container p-0">
-                                            {% if stat.rows %}
-                                                {% if stat.rows[0].art != '' %}
-                                                    <img src="/proxy-art{{ stat.rows[0].art }}" class="bg-blur" alt="" />
-                                                {% elif stat.rows[0].grandparent_thumb != '' %}
-                                                    <img src="/proxy-art{{ stat.rows[0].grandparent_thumb }}" class="bg-blur" alt="" />
-                                                {% endif %}
-                                                <table class="table table-striped content-table m-0">
-                                                    {% if stat.stat_title == "Most Watched Movies" or stat.stat_title == "Most Watched TV Shows" %}
-                                                        <thead class="table-dark">
-                                                            <tr>
-                                                                <th>Title</th>
-                                                                <th>Year</th>
-                                                                <th>Plays</th>
-                                                                <th>Hours Played</th>
-                                                                <th>Rating</th>
-                                                            </tr>
-                                                        </thead>
-                                                    {% elif stat.stat_title == "Most Popular Movies" or stat.stat_title == "Most Popular TV Shows" %}
-                                                        <thead class="table-dark">
-                                                            <tr>
-                                                                <th>Title</th>
-                                                                <th>Year</th>
-                                                                <th>Plays</th>
-                                                                <th>Users</th>
-                                                                <th>Rating</th>
-                                                            </tr>
-                                                        </thead>
-                                                    {% elif stat.stat_title == "Most Played Artists" %}
-                                                        <thead class="table-dark">
-                                                            <tr>
-                                                                <th>Author</th>
-                                                                <th>Year</th>
-                                                                <th>Plays</th>
-                                                                <th>Hours Played</th>
-                                                            </tr>
-                                                        </thead>
-                                                    {% elif stat.stat_title == "Most Popular Artists" %}
-                                                        <thead class="table-dark">
-                                                            <tr>
-                                                                <th>Author</th>
-                                                                <th>Year</th>
-                                                                <th>Plays</th>
-                                                                <th>Users</th>
-                                                            </tr>
-                                                        </thead>
-                                                    {% elif stat.stat_title == "Recently Watched" %}
-                                                        <thead class="table-dark">
-                                                            <tr>
-                                                                <th>Title</th>
-                                                                <th>Year</th>
-                                                                <th>Rating</th>
-                                                            </tr>
-                                                        </thead>
-                                                    {% elif stat.stat_title == "Most Active Libraries" %}
-                                                        <thead class="table-dark">
-                                                            <tr>
-                                                                <th>Library</th>
-                                                                <th>Plays</th>
-                                                                <th>Hours Played</th>
-                                                            </tr>
-                                                        </thead>
-                                                    {% elif stat.stat_title == "Most Active Users" %}
-                                                        <thead class="table-dark">
-                                                            <tr>
-                                                                <th>Username</th>
-                                                                <th>Plays</th>
-                                                                <th>Hours Played</th>
-                                                            </tr>
-                                                        </thead>
-                                                    {% elif stat.stat_title == "Most Active Platforms" %}
-                                                        <thead class="table-dark">
-                                                            <tr>
-                                                                <th>Platform</th>
-                                                                <th>Plays</th>
-                                                                <th>Hours Played</th>
-                                                            </tr>
-                                                        </thead>
-                                                    {% elif stat.stat_title == "Most Concurrent Streams" %}
-                                                        <thead class="table-dark">
-                                                            <tr>
-                                                                <th>Category</th>
-                                                                <th>Count</th>
-                                                            </tr>
-                                                        </thead>
+                                        <div class="card my-4">
+                                            <div class="card-header bg-primary text-white">
+                                                {{ stat.stat_title }}
+                                            </div>
+                                            <div class="card-body blur-container p-0">
+                                                {% if stat.rows %}
+                                                    {% if stat.rows[0].art != '' %}
+                                                        <img src="/proxy-art{{ stat.rows[0].art }}" class="bg-blur" alt="" />
+                                                    {% elif stat.rows[0].grandparent_thumb != '' %}
+                                                        <img src="/proxy-art{{ stat.rows[0].grandparent_thumb }}" class="bg-blur" alt="" />
                                                     {% endif %}
-                                                    <tbody>
-                                                        {% for row in stat.rows %}
-                                                            <tr>
-                                                                {% if stat.stat_title == "Most Active Libraries" %}
-                                                                    <td>{{ row.section_name }}</td>
-                                                                {% elif stat.stat_title == "Most Active Users" %}
-                                                                    <td>{{ row.user }}</td>
-                                                                {% elif stat.stat_title == "Most Active Platforms" %}
-                                                                    <td>{{ row.platform }}</td>
-                                                                {% else %}
-                                                                    <td>{{ row.title }}</td>
-                                                                {% endif %}
+                                                    <table class="table table-striped content-table m-0">
+                                                        {% if stat.stat_title == "Most Watched Movies" or stat.stat_title == "Most Watched TV Shows" %}
+                                                            <thead class="table-dark">
+                                                                <tr>
+                                                                    <th>Title</th>
+                                                                    <th>Year</th>
+                                                                    <th>Plays</th>
+                                                                    <th>Hours Played</th>
+                                                                    <th>Rating</th>
+                                                                </tr>
+                                                            </thead>
+                                                        {% elif stat.stat_title == "Most Popular Movies" or stat.stat_title == "Most Popular TV Shows" %}
+                                                            <thead class="table-dark">
+                                                                <tr>
+                                                                    <th>Title</th>
+                                                                    <th>Year</th>
+                                                                    <th>Plays</th>
+                                                                    <th>Users</th>
+                                                                    <th>Rating</th>
+                                                                </tr>
+                                                            </thead>
+                                                        {% elif stat.stat_title == "Most Played Artists" %}
+                                                            <thead class="table-dark">
+                                                                <tr>
+                                                                    <th>Author</th>
+                                                                    <th>Year</th>
+                                                                    <th>Plays</th>
+                                                                    <th>Hours Played</th>
+                                                                </tr>
+                                                            </thead>
+                                                        {% elif stat.stat_title == "Most Popular Artists" %}
+                                                            <thead class="table-dark">
+                                                                <tr>
+                                                                    <th>Author</th>
+                                                                    <th>Year</th>
+                                                                    <th>Plays</th>
+                                                                    <th>Users</th>
+                                                                </tr>
+                                                            </thead>
+                                                        {% elif stat.stat_title == "Recently Watched" %}
+                                                            <thead class="table-dark">
+                                                                <tr>
+                                                                    <th>Title</th>
+                                                                    <th>Year</th>
+                                                                    <th>Rating</th>
+                                                                </tr>
+                                                            </thead>
+                                                        {% elif stat.stat_title == "Most Active Libraries" %}
+                                                            <thead class="table-dark">
+                                                                <tr>
+                                                                    <th>Library</th>
+                                                                    <th>Plays</th>
+                                                                    <th>Hours Played</th>
+                                                                </tr>
+                                                            </thead>
+                                                        {% elif stat.stat_title == "Most Active Users" %}
+                                                            <thead class="table-dark">
+                                                                <tr>
+                                                                    <th>Username</th>
+                                                                    <th>Plays</th>
+                                                                    <th>Hours Played</th>
+                                                                </tr>
+                                                            </thead>
+                                                        {% elif stat.stat_title == "Most Active Platforms" %}
+                                                            <thead class="table-dark">
+                                                                <tr>
+                                                                    <th>Platform</th>
+                                                                    <th>Plays</th>
+                                                                    <th>Hours Played</th>
+                                                                </tr>
+                                                            </thead>
+                                                        {% elif stat.stat_title == "Most Concurrent Streams" %}
+                                                            <thead class="table-dark">
+                                                                <tr>
+                                                                    <th>Category</th>
+                                                                    <th>Count</th>
+                                                                </tr>
+                                                            </thead>
+                                                        {% endif %}
+                                                        <tbody>
+                                                            {% for row in stat.rows %}
+                                                                <tr>
+                                                                    {% if stat.stat_title == "Most Active Libraries" %}
+                                                                        <td>{{ row.section_name }}</td>
+                                                                    {% elif stat.stat_title == "Most Active Users" %}
+                                                                        <td>{{ row.user }}</td>
+                                                                    {% elif stat.stat_title == "Most Active Platforms" %}
+                                                                        <td>{{ row.platform }}</td>
+                                                                    {% else %}
+                                                                        <td>{{ row.title }}</td>
+                                                                    {% endif %}
 
-                                                                {% if stat.stat_title == "Most Active Libraries" or stat.stat_title == "Most Active Users" or stat.stat_title == "Most Active Platforms" or stat.stat_title == "Most Concurrent Streams" %}
-                                                                {% else %}
-                                                                    <td>{{ row.year }}</td>
-                                                                {% endif %}
+                                                                    {% if stat.stat_title == "Most Active Libraries" or stat.stat_title == "Most Active Users" or stat.stat_title == "Most Active Platforms" or stat.stat_title == "Most Concurrent Streams" %}
+                                                                    {% else %}
+                                                                        <td>{{ row.year }}</td>
+                                                                    {% endif %}
 
-                                                                {% if "Recently" in stat.stat_title %}
-                                                                {% elif "Concurrent" in stat.stat_title %}
-                                                                {% else %}
-                                                                    <td>{{ row.total_plays }}</td>
-                                                                {% endif %}
+                                                                    {% if "Recently" in stat.stat_title %}
+                                                                    {% elif "Concurrent" in stat.stat_title %}
+                                                                    {% else %}
+                                                                        <td>{{ row.total_plays }}</td>
+                                                                    {% endif %}
 
-                                                                {% if stat.stat_title == "Most Watched Movies" or stat.stat_title == "Most Watched TV Shows" or stat.stat_title == "Most Played Artists" or stat.stat_title == "Most Active Libraries" or stat.stat_title == "Most Active Users" or stat.stat_title == "Most Active Platforms" %}
-                                                                    <td>{{ (row.total_duration / 3600) | round(0, 'ceil')  | int }}</td>
-                                                                {% elif stat.stat_title == "Most Popular Movies" or stat.stat_title == "Most Popular TV Shows" or stat.stat_title == "Most Popular Artists" %}
-                                                                    <td>{{ row.users_watched }}</td>
-                                                                {% endif %}
+                                                                    {% if stat.stat_title == "Most Watched Movies" or stat.stat_title == "Most Watched TV Shows" or stat.stat_title == "Most Played Artists" or stat.stat_title == "Most Active Libraries" or stat.stat_title == "Most Active Users" or stat.stat_title == "Most Active Platforms" %}
+                                                                        <td>{{ (row.total_duration / 3600) | round(0, 'ceil')  | int }}</td>
+                                                                    {% elif stat.stat_title == "Most Popular Movies" or stat.stat_title == "Most Popular TV Shows" or stat.stat_title == "Most Popular Artists" %}
+                                                                        <td>{{ row.users_watched }}</td>
+                                                                    {% endif %}
 
-                                                                {% if stat.stat_title == "Most Active Libraries" or stat.stat_title == "Most Played Artists" or stat.stat_title == "Most Popular Artists" or stat.stat_title == "Most Active Users" or stat.stat_title == "Most Active Platforms" or stat.stat_title == "Most Concurrent Streams" %}
-                                                                {% else %}
-                                                                    <td>{{ row.content_rating }}</td>
-                                                                {% endif %}
+                                                                    {% if stat.stat_title == "Most Active Libraries" or stat.stat_title == "Most Played Artists" or stat.stat_title == "Most Popular Artists" or stat.stat_title == "Most Active Users" or stat.stat_title == "Most Active Platforms" or stat.stat_title == "Most Concurrent Streams" %}
+                                                                    {% else %}
+                                                                        <td>{{ row.content_rating }}</td>
+                                                                    {% endif %}
 
-                                                                {% if stat.stat_title == "Most Concurrent Streams" %}
-                                                                    <td>{{ row.count }}</td>
-                                                                {% endif %}
-                                                            </tr>
-                                                        {% endfor %}
-                                                    </tbody>
-                                                </table>
-                                            {% else %}
-                                                <p class="m-3">No data available.</p>
-                                            {% endif %}
+                                                                    {% if stat.stat_title == "Most Concurrent Streams" %}
+                                                                        <td>{{ row.count }}</td>
+                                                                    {% endif %}
+                                                                </tr>
+                                                            {% endfor %}
+                                                        </tbody>
+                                                    </table>
+                                                {% else %}
+                                                    <p class="m-3">No data available.</p>
+                                                {% endif %}
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            {% endfor %}
+                                {% endfor %}
+                            </div>
                         {% endif %}
 
-                        <!-- Graphs Preview -->
                         {% if graph_data != [{},{}] %}
                             <div id="graph-preview" class="mt-3" style="display: none;">
                                 {% for graph in graph_data %}
@@ -403,24 +403,20 @@
                                 {% endfor %}
                             </div>
                         {% endif %}
+
+                        {% if recent_data %}
+                            <div id="ra-preview" class="mt-3" style="display: none;">
+                                <div class="card my-4">
+                                    <div class="card-header bg-primary text-white">Recently Added</div>
+                                    <div class="card-body p-2">
+                                        <ul id="ra-view" class="grid grid-cols-10 gap-3" style="margin: 0; padding: 0;"></ul>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endif %}
                     </td>
                 </tr>
             </table>
-            <section>
-                <div class="flex items-end justify-between gap-3 mb-6">
-                    <h2>Recently Added</h2>
-                    <select id="ra-lib" class="border rounded px-3 py-2 dark:bg-[#333]">
-                        <option value="" selected>Select A Library...</option>
-                        <option value="__ALL__">All Libraries</option>
-                    </select>
-                </div>
-
-                <ul id="ra-grid" class="grid grid-cols-10 gap-4" style="padding-right: 2rem;"></ul>
-
-                <div id="ra-empty" class="hidden text-center text-gray-500 dark:text-gray-400 mt-10">
-                    No items match your filters.
-                </div>
-            </section><br>
             <section>
                 <div id="recommendations_pane">
                 </div>
@@ -472,6 +468,77 @@
                     thumb: thumbPath
                 };
             });
+
+            const slug = s => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'');
+
+            function renderRAGrid(list, target) {
+                target.innerHTML = '';
+                list.forEach(it => {
+                    const imgURL = it.thumb ? `/proxy-art${it.thumb.startsWith('/')?it.thumb:('/'+it.thumb)}` : '';
+                    const li = document.createElement('li');
+                    li.className = "group rounded-2xl overflow-hidden bg-[#8acbd4] dark:bg-[#333] ";
+                    li.innerHTML = `
+                        <div class="relative aspect-[2/3] bg-gray-200 dark:bg-gray-700">
+                        ${imgURL ? `<img loading="lazy" src="${imgURL}" class="h-full w-full object-cover">` : ''}
+                        ${it.library ? `<div class="ra-pill absolute top-1 right-1 text-xs px-2 py-1 rounded-full bg-black/70 text-white"><span class="pill_text">${it.library}</span></div>` : ''}
+                        ${it.added ? `<div class="ra-pill absolute bottom-1 right-1 text-[11px] text-white/90"><span class="bg-black/60 rounded px-1.5 py-0.5"><span class="pill_text">${it.added}</span></span></div>` : ''}
+                        </div>
+                        <div class="p-3">
+                        <div class="font-semibold line-clamp-2 text-[#333] dark:text-[#8acbd4]">${it.title}</div>
+                        <div class="text-xs text-gray-500 dark:text-gray-400">${it.sub ? it.sub + ' • ' : ''}${it.duration}</div>
+                        ${it.summary ? `<div class="mt-2 text-xs text-gray-600 dark:text-gray-300 line-clamp-5">${it.summary}</div>` : ''}
+                        </div>`;
+                    target.appendChild(li);
+                });
+            }
+
+            function buildRANodeForLibrary(libName) {
+                const list = items.filter(i => i.library === libName);
+                const wrap = document.createElement('div');
+                wrap.style.cssText = 'background: #282A2D; padding: 8px; width: 1080px; max-width: 100%;';
+
+                const ul = document.createElement('ul');
+                ul.className = 'grid grid-cols-10 gap-3';
+                ul.style.display = 'grid';
+                ul.style.gridTemplateColumns = 'repeat(5, 1fr)';
+                ul.style.gap = '12px';
+                ul.style.listStyle = 'none';
+                ul.style.padding = '0';
+                ul.style.margin = '0';
+
+                wrap.appendChild(ul);
+                renderRAGrid(list, ul);
+                return { node: wrap, list };
+            }
+
+            (function buildRALibraryRows() {
+                const libs = [...new Set(items.map(i => i.library).filter(Boolean))].sort();
+                const host = document.getElementById('ra-lib-list');
+                if (!host) return;
+
+                libs.forEach(lib => {
+                    const row = document.createElement('div');
+                    row.className = 'col-12 mb-2';
+                    const id = `ra-lib-${slug(lib)}`;
+
+                    row.innerHTML = `
+                        <div class="d-flex justify-content-between align-items-center p-2 border rounded">
+                        <span style="font-size: .9rem;">${lib}</span>
+                        <div>
+                            <button type="button" class="btn button-outline btn-sm me-1 ra-view-btn" 
+                                    data-lib="${lib}" data-target="${id}" style="font-size: .8rem; padding: .25rem .5rem;">
+                            View
+                            </button>
+                            <button type="button" class="btn button btn-sm ra-add-btn" 
+                                    data-type="ra" data-lib="${lib}" data-id="${id}" data-name="Recently Added: ${lib}"
+                                    style="font-size: .8rem; padding: .25rem .5rem;">
+                            Add
+                            </button>
+                        </div>
+                        </div>`;
+                    host.appendChild(row);
+                });
+            })();
 
             const libSel = document.getElementById('ra-lib');
             [...new Set(items.map(i => i.library).filter(Boolean))].sort().forEach(lib => {
@@ -774,7 +841,6 @@
             }
         </script>
         <script>
-            // Global variable for selected items
             let selectedItems = [];
 
             async function insertRecentlyAddedIntoPreview(html) {
@@ -799,13 +865,11 @@
                 try {
                     console.log('updatePreview called with selectedItems:', selectedItems);
                     
-                    // Safety check
                     if (typeof selectedItems === 'undefined') {
                         console.error('selectedItems is undefined in updatePreview');
                         return;
                     }
                     
-                    // Process all items in order to build the complete content
                     const serverName = "{{ settings.server_name }}";
                     const subject = document.getElementById('subject').value;
                     const isDark = document.documentElement.classList.contains('dark');
@@ -824,233 +888,283 @@
                     console.log('selectedGraphs:', selectedGraphs);
                     console.log('selectedStats:', selectedStats);
 
-                let allItemsHTML = "";
-                let insertedBreakBeforeStats = false;
-                
-                // Process ALL items in the exact order they appear in selectedItems array
-                for (let item of selectedItems) {
-                    if (item.type === 'textblock') {
-                        // Add text block content directly to the HTML stream
-                        const content = getTextBlockContent(item.id);
-                        if (content && content.trim().length > 0) {
-                            const formattedContent = content.trim().replace(/\n/g, "<br>");
-                            allItemsHTML += `<div style="margin-bottom: 15px;">${formattedContent}</div>`;
-                        }
-                    } else if (item.type === 'titleblock') {
-                        // Add title block with larger styling
-                        const content = getTextBlockContent(item.id);
-                        if (content && content.trim().length > 0) {
-                            const formattedContent = content.trim().replace(/\n/g, "<br>");
-                            allItemsHTML += `<div style="margin-bottom: 20px; font-size: 1.5em; font-weight: bold; text-align: center;">${formattedContent}</div>`;
-                        }
-                    } else if (item.type === 'graph') {
-                        const chart = Highcharts.charts.find(c => c && c.renderTo.id === item.id);
-                        if (chart) {
-                            try {
-                                const svg = chart.getSVG();
-                                const canvas = document.createElement("canvas");
-                                const ctx = canvas.getContext("2d");
-                                const img = new Image();
-
-                                await new Promise((resolve, reject) => {
-                                    img.onload = () => {
-                                        canvas.width = img.width;
-                                        canvas.height = img.height;
-                                        ctx.drawImage(img, 0, 0);
-                                        const dataUrl = canvas.toDataURL("image/png");
-                                        allItemsHTML += `<img src="${dataUrl}" style="max-width: 100%; margin-bottom: 10px;"><br>`;
-                                        resolve();
-                                    };
-                                    img.onerror = (error) => {
-                                        console.warn('Failed to load graph image for', item.id, error);
-                                        resolve(); // Don't reject, just skip this graph
-                                    };
-                                    img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)));
-                                });
-                            } catch (error) {
-                                console.warn('Error processing graph', item.id, error);
+                    let allItemsHTML = "";
+                    let insertedBreakBeforeStats = false;
+                    
+                    for (let item of selectedItems) {
+                        if (item.type === 'textblock') {
+                            const content = getTextBlockContent(item.id);
+                            if (content && content.trim().length > 0) {
+                                const formattedContent = content.trim().replace(/\n/g, "<br>");
+                                allItemsHTML += `<div style="margin-bottom: 15px;">${formattedContent}</div>`;
                             }
-                        }
-                    } else if (item.type === 'stat') {
-                        if (!insertedBreakBeforeStats) {
-                            allItemsHTML += `<div style="height:16px;line-height:16px;font-size:16px">&nbsp;</div>`;
-                            insertedBreakBeforeStats = true;
-                        }
-                        const tableElement = document.getElementById(item.id);
-                        if (tableElement) {
-                            try {
-                                const wasHidden = tableElement.classList.contains('d-none');
-                                if (wasHidden) {
-                                    tableElement.classList.remove('d-none');
-                                }
-                                await new Promise(resolve => setTimeout(resolve, 150));
-
-                                const original = document.getElementById(item.id);
-                                if (!original) continue;
-
-                                const clone = original.cloneNode(true);
-                                const tempWrapper = document.createElement('div');
-
-                                clone.style.display = 'inline-block';
-                                clone.style.width = 'auto';
-
-                                const table = clone.querySelector('.content-table');
-                                if (table) {
-                                    table.style.width = 'auto';
-                                }
-
-                                tempWrapper.style.position = 'fixed';
-                                tempWrapper.style.top = '-10000px';
-                                tempWrapper.style.left = '0';
-                                tempWrapper.style.zIndex = '-1';
-                                tempWrapper.style.overflow = 'hidden';
-                                tempWrapper.appendChild(clone);
-                                document.body.appendChild(tempWrapper);
-
-                                const blurImage = clone.querySelector('.bg-blur');
-                                if (blurImage) {
-                                    await blurImageElement(blurImage);
-                                }
-
-                                await new Promise(resolve => setTimeout(resolve, 50));
-                                
-                                const canvas = await html2canvas(clone, {
-                                    backgroundColor: null,
-                                    scale: 1,
-                                    useCORS: true
-                                });
-
-                                const dataUrl = canvas.toDataURL("image/png");
-                                allItemsHTML += `<img src="${dataUrl}" style="max-width: 100%; margin-bottom: 10px;"><br>`;
-
-                                document.body.removeChild(tempWrapper);
-
-                                if (wasHidden) {
-                                    tableElement.classList.add('d-none');
-                                }
-                            } catch (error) {
-                                console.warn('Error processing stat', item.id, error);
-                                // Clean up if something went wrong
+                        } else if (item.type === 'titleblock') {
+                            const content = getTextBlockContent(item.id);
+                            if (content && content.trim().length > 0) {
+                                const formattedContent = content.trim().replace(/\n/g, "<br>");
+                                allItemsHTML += `<div style="margin-bottom: 20px; font-size: 1.5em; font-weight: bold; text-align: center;">${formattedContent}</div>`;
+                            }
+                        } else if (item.type === 'graph') {
+                            const chart = Highcharts.charts.find(c => c && c.renderTo.id === item.id);
+                            if (chart) {
                                 try {
-                                    if (document.body.contains(tempWrapper)) {
-                                        document.body.removeChild(tempWrapper);
+                                    const svg = chart.getSVG();
+                                    const canvas = document.createElement("canvas");
+                                    const ctx = canvas.getContext("2d");
+                                    const img = new Image();
+
+                                    await new Promise((resolve, reject) => {
+                                        img.onload = () => {
+                                            canvas.width = img.width;
+                                            canvas.height = img.height;
+                                            ctx.drawImage(img, 0, 0);
+                                            const dataUrl = canvas.toDataURL("image/png");
+                                            allItemsHTML += `<img src="${dataUrl}" style="max-width: 100%; margin-bottom: 10px;"><br>`;
+                                            resolve();
+                                        };
+                                        img.onerror = (error) => {
+                                            console.warn('Failed to load graph image for', item.id, error);
+                                            resolve();
+                                        };
+                                        img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)));
+                                    });
+                                } catch (error) {
+                                    console.warn('Error processing graph', item.id, error);
+                                }
+                            }
+                        } else if (item.type === 'stat') {
+                            if (!insertedBreakBeforeStats) {
+                                allItemsHTML += `<div style="height:16px;line-height:16px;font-size:16px">&nbsp;</div>`;
+                                insertedBreakBeforeStats = true;
+                            }
+                            const tableElement = document.getElementById(item.id);
+                            if (tableElement) {
+                                try {
+                                    const wasHidden = tableElement.classList.contains('d-none');
+                                    if (wasHidden) {
+                                        tableElement.classList.remove('d-none');
                                     }
-                                    if (wasHidden && tableElement) {
+                                    await new Promise(resolve => setTimeout(resolve, 150));
+
+                                    const original = document.getElementById(item.id);
+                                    if (!original) continue;
+
+                                    const clone = original.cloneNode(true);
+                                    const tempWrapper = document.createElement('div');
+
+                                    clone.style.display = 'inline-block';
+                                    clone.style.width = 'auto';
+
+                                    const table = clone.querySelector('.content-table');
+                                    if (table) {
+                                        table.style.width = 'auto';
+                                    }
+
+                                    tempWrapper.style.position = 'fixed';
+                                    tempWrapper.style.top = '-10000px';
+                                    tempWrapper.style.left = '0';
+                                    tempWrapper.style.zIndex = '-1';
+                                    tempWrapper.style.overflow = 'hidden';
+                                    tempWrapper.appendChild(clone);
+                                    document.body.appendChild(tempWrapper);
+
+                                    const blurImage = clone.querySelector('.bg-blur');
+                                    if (blurImage) {
+                                        await blurImageElement(blurImage);
+                                    }
+
+                                    await new Promise(resolve => setTimeout(resolve, 50));
+                                    
+                                    const canvas = await html2canvas(clone, {
+                                        backgroundColor: null,
+                                        scale: 1,
+                                        useCORS: true
+                                    });
+
+                                    const dataUrl = canvas.toDataURL("image/png");
+                                    allItemsHTML += `<img src="${dataUrl}" style="max-width: 100%; margin-bottom: 10px;"><br>`;
+
+                                    document.body.removeChild(tempWrapper);
+
+                                    if (wasHidden) {
                                         tableElement.classList.add('d-none');
                                     }
-                                } catch (cleanupError) {
-                                    console.warn('Error during stat cleanup', cleanupError);
+                                } catch (error) {
+                                    console.warn('Error processing stat', item.id, error);
+                                    try {
+                                        if (document.body.contains(tempWrapper)) {
+                                            document.body.removeChild(tempWrapper);
+                                        }
+                                        if (wasHidden && tableElement) {
+                                            tableElement.classList.add('d-none');
+                                        }
+                                    } catch (cleanupError) {
+                                        console.warn('Error during stat cleanup', cleanupError);
+                                    }
                                 }
                             }
-                        }
-                    }
-                }
+                        } else if (item.type === 'ra') {
+                            try {
+                                const libName = item.raLibrary;
+                                const img = await captureRAPNGForLibrary(libName);
 
-                // Now allItemsHTML contains all content in the correct order
-                // Use the content directly with the standard layout
-                let content = allItemsHTML || "";
+                                let dataUrl = typeof img === 'string' ? img : img?.dataUrl;
+                                if (!dataUrl) {
+                                    console.warn('RA capture returned empty for', libName);
+                                }
 
-                html = `
-                        <link href="https://fonts.googleapis.com/css?family=IBM+Plex+Sans:400,500,600,700&display=swap" rel="stylesheet">
-                        <style>
-                            :root { color-scheme: ${isDark ? 'dark' : 'light'}; }
-                            html, body { background: ${isDark ? '#333' : '#8acbd4'}; }
-                        </style>
-                        <html><body style="font-family: IBM Plex Sans; margin: 0;">
-                            <table class="body" style="border-collapse: separate; mso-table-lspace: 0pt; mso-table-rspace: 0pt; width: 100%;" border="0" cellspacing="0" cellpadding="0">
-                                <tbody>
-                                    <tr>
-                                        <td class="preview-container" style="font-family: IBM Plex Sans; font-size: 14px; vertical-align: top; display: block;">
-                                            <div class="content" style="box-sizing: border-box; display: block;"><span class="preheader" style="color: transparent; display: none; height: 0; max-height: 0; max-width: 0; opacity: 0; overflow: hidden; mso-hide: all; visibility: hidden; width: 0;">${serverName} Newsletter</span>
-                                                <table class="main" style="border-collapse: separate; mso-table-lspace: 0pt; mso-table-rspace: 0pt; width: 100%; background: #282A2D; border-radius: 3px; color: #ffffff;" border="0" cellspacing="0" cellpadding="3">
-                                                    <tbody>
-                                                        <tr>
-                                                            <td class="wrapper" style="font-family: IBM Plex Sans; font-size: 14px; vertical-align: top; box-sizing: border-box; padding: 5px; overflow: auto;">
-                                                                <div class="header" style="width: 50%; height: 10px; text-align: center;"><img class="header-img" style="border: none; -ms-interpolation-mode: bicubic; max-width: 9%; width: 492px; height: 20px; margin-left: -35px;" src="https://d15k2d11r6t6rl.cloudfront.net/public/users/Integrators/669d5713-9b6a-46bb-bd7e-c542cff6dd6a/3bef3c50f13f4320a9e31b8be79c6ad2/Plex%20Logo%20Update%202022/plex-logo-heavy-stroke.png" width="492" height="90" /></div>
-                                                                <div class="server-name" style="font-size: 25px; text-align: center; margin-bottom: 0;">${serverName} Newsletter</div>
-                                                            </td>
-                                                        </tr>
-                                                        <tr>
-                                                            <td class="footer" style="font-family: IBM Plex Sans; font-size: 12px; vertical-align: top; clear: both; margin-top: 0; text-align: center; width: 100%;">
-
-                                                                <h1 class="footer-bar" style="margin-left: auto; margin-right: auto; width: 300px; border-top: 1px solid #E5A00D; margin-top: 5px;">${displaySubject}</h1>
-                                                                <p style="margin: 20px 0;">
-                                                                    ${content}
-                                                                </p>
-                                                                <div class="footer-bar" style="margin-left: auto; margin-right: auto; width: 250px; border-top: 1px solid #E5A00D; margin-top: 25px;">&nbsp;</div>
-                                                                <div class="content-block powered-by" style="padding-bottom: 10px; padding-top: 0;">Generated for Plex Media Server by <a href="https://github.com/jma1ice/newsletterr" style="color: #E5A00D; text-decoration: none;">newsletterr</a></div>
-                                                            </td>
-                                                        </tr>
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table></body></html>`;
-                html = await insertRecentlyAddedIntoPreview(html);
-                html = await insertRecommendationsIntoPreview(html);
-
-                const frame = document.getElementById('preview');
-                console.log('Frame element:', frame);
-                if (!frame) {
-                    console.error('Preview iframe not found!');
-                    return;
-                }
-                
-                console.log('HTML content length:', html.length);
-                console.log('HTML content preview:', html.substring(0, 200) + '...');
-                
-                // Set the HTML content first
-                frame.srcdoc = html;
-                
-                // Function to auto-resize iframe based on content
-                function resizeIframe() {
-                    try {
-                        const doc = frame.contentDocument || frame.contentWindow.document;
-                        if (doc && doc.body) {
-                            const contentHeight = Math.max(
-                                doc.body.scrollHeight,
-                                doc.body.offsetHeight,
-                                doc.documentElement.clientHeight,
-                                doc.documentElement.scrollHeight,
-                                doc.documentElement.offsetHeight
-                            );
-                            
-                            // Apply min and max height constraints
-                            const minHeight = 480; // 30rem in pixels (assuming 16px base)
-                            const maxHeight = 960; // 60rem in pixels
-                            const newHeight = Math.max(minHeight, Math.min(maxHeight, contentHeight + 20)); // +20 for padding
-                            
-                            frame.style.height = newHeight + 'px';
-                            console.log('Iframe resized to:', newHeight + 'px', 'Content height:', contentHeight);
-                        }
-                    } catch (e) {
-                        console.log('Could not resize iframe:', e);
-                    }
-                }
-                
-                // Wait for the iframe to load, then apply dark mode and resize
-                frame.onload = function() {
-                    try {
-                        const doc = frame.contentDocument || frame.contentWindow.document;
-                        if (doc && doc.documentElement) {
-                            if (isDark) {
-                                doc.documentElement.classList.add('dark');
+                                if (dataUrl) {
+                                    console.warn('RA capture returned for', libName);
+                                    allItemsHTML += `
+                                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin: 0; padding: 0;">
+                                            <tr>
+                                                <td align="center" style="padding: 12px 0 16px 0; text-align: center;">
+                                                    <div style="font-weight: 700; margin: 0 0 8px 0; color: #E5A00D; font-family: Arial, Helvetica, sans-serif;">
+                                                        Recently Added — ${libName}
+                                                    </div>
+                                                    <center>
+                                                        <img
+                                                            src="${dataUrl}"
+                                                            alt="Recently Added — ${libName}"
+                                                            style="display: block; margin: 0 auto; max-width: 100%; height: auto; border: 0; outline: none; text-decoration: none;"
+                                                            >
+                                                    </center>
+                                                </td>
+                                            </tr>
+                                        </table>`;
+                                }
+                            } catch (err) {
+                                console.warn('Error adding RA for', item, err);
                             }
-                            // Resize after a short delay to ensure content is fully rendered
-                            setTimeout(resizeIframe, 100);
                         }
-                    } catch (e) {
-                        console.log('Could not apply dark mode or resize iframe:', e);
                     }
-                };
-                
-                console.log('Preview updated successfully');
+
+                    let content = allItemsHTML || "";
+
+                    html = `
+                            <link href="https://fonts.googleapis.com/css?family=IBM+Plex+Sans:400,500,600,700&display=swap" rel="stylesheet">
+                            <style>
+                                :root { color-scheme: ${isDark ? 'dark' : 'light'}; }
+                                html, body { background: ${isDark ? '#333' : '#8acbd4'}; }
+                                @media only screen and (max-width:1900px) {
+                                    .plex-img { margin-left: 44rem !important; }
+                                }
+                                @media only screen and (max-width:1700px) {
+                                    .plex-img { margin-left: 38rem !important; }
+                                }
+                                @media only screen and (max-width:1500px) {
+                                    .plex-img { margin-left: 30rem !important; }
+                                }
+                                @media only screen and (max-width:1300px) {
+                                    .plex-img { margin-left: 24rem !important; }
+                                }
+                                @media only screen and (max-width:1100px) {
+                                    .plex-img { margin-left: 16rem !important; }
+                                }
+                                @media only screen and (max-width:900px) {
+                                    .plex-img { margin-left: 10rem !important; }
+                                }
+                                @media only screen and (max-width:700px) {
+                                    .plex-img { margin-left: 4rem !important; }
+                                }
+                                @media only screen and (max-width:500px) {
+                                    .plex-img { margin-left: 2rem !important; }
+                                }
+                            </style>
+                            <html>
+                            <body style="font-family: IBM Plex Sans; margin: 0;">
+                                <table class="body" style="border-collapse: separate; mso-table-lspace: 0pt; mso-table-rspace: 0pt; width: 100%;" border="0" cellspacing="0" cellpadding="0">
+                                    <tbody>
+                                        <tr>
+                                            <td class="preview-container" style="font-family: IBM Plex Sans; font-size: 14px; vertical-align: top; display: block;">
+                                                <div class="content" style="box-sizing: border-box; display: block;"><span class="preheader" style="color: transparent; display: none; height: 0; max-height: 0; max-width: 0; opacity: 0; overflow: hidden; mso-hide: all; visibility: hidden; width: 0;">${serverName} Newsletter</span>
+                                                    <table class="main" style="border-collapse: separate; mso-table-lspace: 0pt; mso-table-rspace: 0pt; width: 100%; background: #282A2D; border-radius: 3px; color: #ffffff;" border="0" cellspacing="0" cellpadding="3">
+                                                        <tbody>
+                                                            <tr>
+                                                                <td class="wrapper" style="font-family: IBM Plex Sans; font-size: 14px; vertical-align: top; box-sizing: border-box; padding: 5px; overflow: auto;">
+                                                                    <div class="header" style="text-align: center; line-height: 0;"><img class="header-img plex-img" style="display: block; outline: 0; text-decoration: none; height: auto; border: 0; -ms-interpolation-mode: bicubic; max-width: 100%; margin-left: 40em;" src="https://d15k2d11r6t6rl.cloudfront.net/public/users/Integrators/669d5713-9b6a-46bb-bd7e-c542cff6dd6a/3bef3c50f13f4320a9e31b8be79c6ad2/Plex%20Logo%20Update%202022/plex-logo-heavy-stroke.png" width="40" /></div>
+                                                                    <div class="server-name" style="font-size: 25px; text-align: center; margin-bottom: 0;">${serverName} Newsletter</div>
+                                                                </td>
+                                                            </tr>
+                                                            <tr>
+                                                                <td class="footer" style="font-family: IBM Plex Sans; font-size: 12px; vertical-align: top; clear: both; margin-top: 0; text-align: center; width: 100%;">
+
+                                                                    <h1 class="footer-bar" style="margin-left: auto; margin-right: auto; width: 300px; border-top: 1px solid #E5A00D; margin-top: 5px;">${displaySubject}</h1>
+                                                                    <p style="margin: 20px 0;">
+                                                                        ${content}
+                                                                    </p>
+                                                                    <div class="footer-bar" style="margin-left: auto; margin-right: auto; width: 250px; border-top: 1px solid #E5A00D; margin-top: 25px;">&nbsp;</div>
+                                                                    <div class="content-block powered-by" style="padding-bottom: 10px; padding-top: 0;">Generated for Plex Media Server by <a href="https://github.com/jma1ice/newsletterr" style="color: #E5A00D; text-decoration: none;">newsletterr</a></div>
+                                                                </td>
+                                                            </tr>
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table></body></html>`;
+                    if (html.includes('[RECENTLY_ADDED]')) {
+                        html = await insertRecentlyAddedIntoPreview(html);
+                    }
+                    if (html.includes('[RECOMMENDATIONS]')) {
+                        html = await insertRecommendationsIntoPreview(html);
+                    }
+
+                    const frame = document.getElementById('preview');
+                    console.log('Frame element:', frame);
+                    if (!frame) {
+                        console.error('Preview iframe not found!');
+                        return;
+                    }
+                    
+                    console.log('HTML content length:', html.length);
+                    console.log('HTML content preview:', html.substring(0, 200) + '...');
+                    
+                    frame.srcdoc = html;
+                    
+                    function resizeIframe() {
+                        try {
+                            const doc = frame.contentDocument || frame.contentWindow.document;
+                            if (doc && doc.body) {
+                                const contentHeight = Math.max(
+                                    doc.body.scrollHeight,
+                                    doc.body.offsetHeight,
+                                    doc.documentElement.clientHeight,
+                                    doc.documentElement.scrollHeight,
+                                    doc.documentElement.offsetHeight
+                                );
+                                
+                                const minHeight = 480;
+                                const maxHeight = 960;
+                                const newHeight = Math.max(minHeight, Math.min(maxHeight, contentHeight + 20));
+                                
+                                frame.style.height = newHeight + 'px';
+                                console.log('Iframe resized to:', newHeight + 'px', 'Content height:', contentHeight);
+                            }
+                        } catch (e) {
+                            console.log('Could not resize iframe:', e);
+                        }
+                    }
+                    
+                    frame.onload = function() {
+                        try {
+                            const doc = frame.contentDocument || frame.contentWindow.document;
+                            if (doc && doc.documentElement) {
+                                if (isDark) {
+                                    doc.documentElement.classList.add('dark');
+                                }
+                                setTimeout(resizeIframe, 100);
+                            }
+                        } catch (e) {
+                            console.log('Could not apply dark mode or resize iframe:', e);
+                        }
+                    };
+                    
+                    console.log('Preview updated successfully');
                 } catch (error) {
                     console.error('Error in updatePreview:', error);
                     console.error('Error stack:', error.stack);
-                    // Don't let the error break the preview - show something basic
                     const frame = document.getElementById('preview');
                     if (frame) {
                         frame.srcdoc = `<html><body><p>Error updating preview: ${error.message}</p><p>Check console for details</p></body></html>`;
@@ -1058,7 +1172,6 @@
                 }
             }
 
-            // Debounce function to limit how often updatePreview is called
             function debounce(func, wait) {
                 let timeout;
                 return function executedFunction(...args) {
@@ -1071,14 +1184,11 @@
                 };
             }
 
-            // Create debounced version of updatePreview (wait 300ms after user stops typing)
             const debouncedUpdatePreview = debounce(updatePreview, 300);
 
             document.addEventListener('DOMContentLoaded', () => {
-                // Use debounced version for text input to prevent excessive calls
                 document.getElementById('email_text').addEventListener('input', debouncedUpdatePreview);
                 
-                // Test preview on load
                 console.log('DOM loaded, testing preview...');
                 const frame = document.getElementById('preview');
                 if (frame) {
@@ -1088,7 +1198,6 @@
                     console.error('Preview iframe not found on DOM load!');
                 }
                 
-                // Also run initial preview update
                 setTimeout(() => {
                     console.log('Running initial updatePreview...');
                     updatePreview();
@@ -1096,35 +1205,226 @@
             });
         </script>
         <script>
-            // Handle stat view buttons
+            function showRAPreviewFor(libName) {
+                const preview = document.getElementById('ra-preview');
+                const ul = document.getElementById('ra-view');
+                const list = items.filter(i => i.library === libName);
+                ul.style.gridTemplateColumns = 'repeat(5, 1fr)';
+                renderRAGrid(list, ul);
+                preview.style.display = 'block';
+            }
+
+            async function captureRAPNGForList(list) {
+                if (!list.length) return null;
+
+                const wrap = document.createElement('div');
+                wrap.style.cssText = 'position: fixed; left: -99999px; top: 0; z-index: -1; background: #282A2D; padding: 8px; width: 1920px; max-width: 100%;';
+                const ul = document.createElement('ul');
+                ul.className = 'grid grid-cols-10 gap-3';
+                ul.style.display = 'grid';
+                ul.style.gridTemplateColumns = 'repeat(5, 1fr)';
+                ul.style.gap = '12px';
+                ul.style.listStyle = 'none';
+                ul.style.padding = '0';
+                ul.style.margin = '0';
+
+                wrap.appendChild(ul);
+                document.body.appendChild(wrap);
+                renderRAGrid(list, ul);
+
+                const imgs = ul.querySelectorAll('img');
+                await Promise.all([...imgs].map(img => img.complete ? 0 : new Promise(r => {
+                    img.addEventListener('load', r, {once:true});
+                    img.addEventListener('error', r, {once:true});
+                })));
+                try { await document.fonts?.ready; } catch(_){}
+
+                function renderPass(useFO){
+                    return html2canvas(ul, {
+                        useCORS: true,
+                        backgroundColor: '#282A2D',
+                        scale: window.devicePixelRatio > 1 ? 2 : 1,
+                        foreignObjectRendering: useFO,
+                        onclone: (doc) => {
+                            const g = doc.body.querySelector('ul');
+                            if (!g) return;
+                            const kill = doc.createElement('style');
+                            kill.textContent = `
+                                *{ box-shadow:none !important; filter:none !important; }
+                                [class*="shadow"]{ box-shadow:none !important; }
+                                [style*="box-shadow"]{ box-shadow:none !important; }
+                            `;
+                            doc.head.appendChild(kill);
+                            g.querySelectorAll('.aspect-\\[2\\/3\\]').forEach(el => {
+                                const w = el.getBoundingClientRect().width || el.clientWidth || 0;
+                                if (w>0) el.style.height = Math.round(w*3/2) + 'px';
+                            });
+                            g.querySelectorAll('.pill_text').forEach(s => { s.style.position='relative'; s.style.top='-6px'; });
+                        }
+                    });
+                }
+
+                let canvas = await renderPass(false);
+                if (!canvas || !canvas.width) canvas = await renderPass(true);
+
+                document.body.removeChild(wrap);
+                if (!canvas || !canvas.width) return null;
+
+                const blob = await new Promise(r => canvas.toBlob(r, 'image/png', 0.92));
+                const dataUrl = canvas.toDataURL('image/png', 0.92);
+                return { blob, dataUrl, cid: `recently-added-${Date.now()}.png` };
+            }
+
+            async function captureRAPNGForLibrary(libName) {
+                const { node, list } = buildRANodeForLibrary(libName);
+                if (!list.length) return null;
+
+                const tempWrapper = document.createElement('div');
+                tempWrapper.style.position = 'fixed';
+                tempWrapper.style.top = '-10000px';
+                tempWrapper.style.left = '0';
+                tempWrapper.style.zIndex = '-1';
+                tempWrapper.style.overflow = 'hidden';
+                tempWrapper.style.width = '1920px';
+                tempWrapper.style.maxWidth = '100%';
+                tempWrapper.appendChild(node);
+                document.body.appendChild(tempWrapper);
+
+                const target = node.querySelector('ul.grid') || node;
+                for (const img of target.querySelectorAll('img')) {
+                    if (img.getAttribute('loading') === 'lazy') img.removeAttribute('loading');
+                    img.setAttribute('loading', 'eager');
+                    img.decoding = 'sync';
+                }
+
+                await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+                const waitFor = (img) => img.decode
+                    ? img.decode().catch(() => {})
+                    : new Promise(res => {
+                        if (img.complete) return res();
+                        img.addEventListener('load', res, { once: true });
+                        img.addEventListener('error', res, { once: true });
+                        setTimeout(res, 2500);
+                    });
+
+                const imgs = [...target.querySelectorAll('img')];
+                await Promise.race([
+                    Promise.all(imgs.map(waitFor)),
+                    new Promise(res => setTimeout(res, 3000))
+                ]);
+
+                const canvas = await html2canvas(target, {
+                    backgroundColor: '#282A2D',
+                    scale: window.devicePixelRatio > 1 ? 2 : 1,
+                    windowWidth: 1080,
+                    windowHeight: 720,
+                    useCORS: true,
+                    onclone: (doc, cloned) => {
+                        const g = cloned && (cloned.matches?.('ul.grid') ? cloned : cloned.querySelector?.('ul.grid'));
+                        if (!g) return;
+
+                        const kill = doc.createElement('style');
+                        kill.textContent = `
+                            *{ box-shadow:none !important; filter:none !important; }
+                            [class*="shadow"]{ box-shadow:none !important; }
+                            [style*="box-shadow"]{ box-shadow:none !important; }
+                        `;
+                        doc.head.appendChild(kill);
+
+                        g.querySelectorAll('img').forEach(img => {
+                            if (img.getAttribute('loading') === 'lazy') img.removeAttribute('loading');
+                            img.setAttribute('loading', 'eager');
+                            img.decoding = 'sync';
+
+                            img.style.filter = 'none';
+                            img.style.boxShadow = 'none';
+
+                            img.style.width = '100%';
+                            img.style.height = '100%';
+                            img.style.objectFit = 'cover';
+                            img.style.display = 'block';
+                        });
+
+                        g.querySelectorAll('.aspect-\\[2\\/3\\]').forEach(el => {
+                            let w = el.getBoundingClientRect().width || el.clientWidth || 0;
+                            if (!w) {
+                                el.style.width = '200px';
+                                w = 200;
+                            }
+                            el.style.height = Math.round(w * 3 / 2) + 'px';
+                            el.style.position = 'relative';
+                            const inner = el.firstElementChild;
+                            if (inner) {
+                                inner.style.width = '100%';
+                                inner.style.height = '100%';
+                            }
+                        });
+
+                        g.querySelectorAll('.pill_text').forEach(s => {
+                            s.style.position = 'relative';
+                            s.style.top = '-6px';
+                        });
+
+                        g.querySelectorAll('.font-semibold.line-clamp-2').forEach(el => {
+                            el.style.display = 'block';
+                            el.style.webkitLineClamp = 'unset';
+                            el.style.overflow = 'hidden';
+                            el.style.lineHeight = '1.5';
+                            el.style.maxHeight = (1.75 * 2) + 'em';
+                            el.style.paddingBottom = '3px';
+                        });
+                        g.querySelectorAll('.p-3 > .text-xs:first-of-type').forEach(el => {
+                            el.style.lineHeight = '1.75';
+                            el.style.paddingBottom = '1px';
+                        });
+                        g.querySelectorAll('.line-clamp-5').forEach(el => {
+                            el.style.display = 'block';
+                            el.style.webkitLineClamp = 'unset';
+                            el.style.overflow = 'hidden';
+                            el.style.lineHeight = '1.4';
+                            el.style.maxHeight = (1.5 * 5) + 'em';
+                            el.style.paddingBottom = '4px';
+                        });
+                        g.querySelectorAll('.p-3').forEach(c => {
+                            const cs = doc.defaultView.getComputedStyle(c);
+                            const pb = parseFloat(cs.paddingBottom) || 0;
+                            if (pb < 8) c.style.paddingBottom = '8px';
+                        });
+                    }
+                });
+
+                document.body.removeChild(tempWrapper);
+                if (!canvas || !canvas.width) return null;
+
+                console.log('RA clone size', node.scrollWidth, node.scrollHeight, 'imgs=', node.querySelectorAll('img').length);
+                const dataUrl = canvas.toDataURL('image/png', 0.92);
+                return dataUrl && dataUrl.startsWith('data:image') ? { dataUrl, cid: `recently-added-${Date.now()}.png` } : null;
+            }
+
             document.addEventListener('click', (e) => {
                 if (e.target.classList.contains('view-stat-btn')) {
                     const targetId = e.target.dataset.target;
                     const previewDiv = document.getElementById('stat-preview');
                     const allStats = document.querySelectorAll('.stat-table');
                     
-                    // Hide all stats
                     allStats.forEach(el => el.classList.add('d-none'));
                     
-                    // Show selected stat
                     document.getElementById(targetId).classList.remove('d-none');
                     previewDiv.style.display = 'block';
                 }
-                
+        
                 if (e.target.classList.contains('view-graph-btn')) {
                     const targetId = e.target.dataset.target;
                     const previewDiv = document.getElementById('graph-preview');
                     const allGraphs = document.querySelectorAll('.graph-table');
                     
-                    // Hide all graphs
                     allGraphs.forEach(el => el.classList.add('d-none'));
                     
-                    // Show selected graph and render it if not already rendered
                     const container = document.getElementById(targetId);
                     container.classList.remove('d-none');
                     previewDiv.style.display = 'block';
                     
-                    // Render chart if not already rendered
                     if (!renderedCharts.has(targetId)) {
                         const index = parseInt(targetId.split('-')[1]);
                         const graphData = graphDataList[index];
@@ -1145,6 +1445,15 @@
                     
                     const nowDark = document.documentElement.classList.contains('dark');
                     applyChartTheme(nowDark);
+                }
+
+                if (e.target.classList.contains('ra-view-btn')) {
+                    const viewBtn = e.target.closest('.ra-view-btn');
+                    if (viewBtn) {
+                        const lib = viewBtn.dataset.lib;
+                        showRAPreviewFor(lib);
+                        return;
+                    }
                 }
             });
         </script>
@@ -1239,19 +1548,16 @@
             });
         </script>
         <script>
-            // Selected Items Management
             function updateSelectedItemsDisplay() {
                 const container = document.getElementById('selected-items-list');
                 
                 if (selectedItems.length === 0) {
                     container.innerHTML = '<div id="selected-items-empty" class="text-muted text-center py-3">No items selected. Use the buttons below to add items to your email.</div>';
                 } else {
-                    // Build HTML for all items in the exact order they appear in selectedItems
                     let htmlContent = '';
                     
                     selectedItems.forEach((item, index) => {
                         if (item.type === 'textblock' || item.type === 'titleblock') {
-                            // Store the current content before rebuilding
                             const currentContent = getTextBlockContent(item.id) || '';
                             const badgeStyle = item.type === 'titleblock' ? 'badge-warning' : 'badge-secondary';
                             const placeholderText = item.type === 'titleblock' ? 'Enter your title here...' : 'Enter your text here...';
@@ -1289,60 +1595,61 @@
                     
                     container.innerHTML = htmlContent;
                     
-                    // Add drag and drop functionality
                     setupDragAndDrop();
                 }
                 
-                // Update preview
                 updatePreview();
             }
 
-            function addItem(id, name, type) {
-                // Check if item already exists
-                if (selectedItems.find(item => item.id === id)) {
+            function addItem(id, name, type, extra = {}) {
+                if (!id || !type) {
+                    console.warn('addItem aborted: missing id/type', { id, type, name, extra });
                     return false;
                 }
-                
-                // If adding a graph, ensure it's rendered first
+
+                if (selectedItems.some(it => it.id === id && it.type === type)) {
+                    console.log('Item already added:', { id, type });
+                    return false;
+                }
+
                 if (type === 'graph' && !renderedCharts.has(id)) {
                     try {
-                        const index = parseInt(id.split('-')[1]);
+                        const index = parseInt(id.split('-')[1], 10);
                         const graphData = graphDataList[index];
 
                         Highcharts.chart(id, {
                             chart: { type: 'line' },
                             title: { text: graphCommands[index].name },
-                            exporting: {
-                                enabled: true
-                            },
+                            exporting: { enabled: true },
                             xAxis: { categories: graphData.categories },
                             yAxis: { title: { text: 'Plays' } },
                             series: graphData.series
                         });
 
                         renderedCharts.add(id);
-                        
-                        // Apply current theme
+
                         const nowDark = document.documentElement.classList.contains('dark');
                         applyChartTheme(nowDark);
-                        
                         console.log('Auto-rendered graph:', id);
-                    } catch (error) {
-                        console.warn('Failed to auto-render graph', id, error);
+                    } catch (err) {
+                        console.warn('Failed to auto-render graph', id, err);
                     }
                 }
-                
-                selectedItems.push({ id, name, type });
+
+                const item = { id, name: name || id, type, ...extra };
+                selectedItems.push(item);
+
                 updateSelectedItemsDisplay();
+
                 return true;
             }
+
 
             function removeItem(index) {
                 const removedItem = selectedItems[index];
                 selectedItems.splice(index, 1);
                 updateSelectedItemsDisplay();
                 
-                // Reset button state
                 const button = document.querySelector(`[data-id="${removedItem.id}"]`);
                 if (button) {
                     button.textContent = `Add`;
@@ -1362,7 +1669,6 @@
                         e.dataTransfer.setData('text/plain', index);
                         e.dataTransfer.effectAllowed = 'move';
                         
-                        // Add dragging class with a small delay for smooth transition
                         setTimeout(() => {
                             item.classList.add('dragging');
                         }, 0);
@@ -1370,7 +1676,6 @@
                     
                     item.addEventListener('dragend', () => {
                         item.classList.remove('dragging');
-                        // Remove drag-over class from all items
                         items.forEach(i => i.classList.remove('drag-over'));
                         draggedElement = null;
                     });
@@ -1383,7 +1688,6 @@
                     });
                     
                     item.addEventListener('dragleave', (e) => {
-                        // Only remove drag-over if we're actually leaving the element
                         if (!item.contains(e.relatedTarget)) {
                             item.classList.remove('drag-over');
                         }
@@ -1402,7 +1706,6 @@
                         const targetIndex = parseInt(item.dataset.index);
                         
                         if (draggedIndex !== targetIndex) {
-                            // Reorder items
                             const draggedItem = selectedItems[draggedIndex];
                             selectedItems.splice(draggedIndex, 1);
                             selectedItems.splice(targetIndex, 0, draggedItem);
@@ -1412,7 +1715,6 @@
                 });
             }
 
-            // Text Block functionality
             let textBlockCounter = 0;
             let titleBlockCounter = 0;
             
@@ -1437,11 +1739,9 @@
                 const textarea = document.querySelector(`[data-textblock-id="${textBlockId}"]`);
                 if (textarea) {
                     textarea.value = content;
-                    // Update the display name after setting content
                     const index = selectedItems.findIndex(item => item.id === textBlockId);
                     if (index !== -1) {
                         selectedItems[index].name = getTextBlockDisplayName(content);
-                        // Update the UI name display without triggering updateSelectedItemsDisplay
                         const nameSpan = document.querySelector(`[data-index="${index}"] .item-name`);
                         if (nameSpan) {
                             nameSpan.textContent = selectedItems[index].name;
@@ -1460,23 +1760,19 @@
                 const content = getTextBlockContent(textBlockId);
                 const newName = getTextBlockDisplayName(content);
                 
-                // Update the item name in selectedItems
                 if (selectedItems[index]) {
                     selectedItems[index].name = newName;
                     
-                    // Update the display name in the UI
                     const nameSpan = document.querySelector(`[data-index="${index}"] .item-name`);
                     if (nameSpan) {
                         nameSpan.textContent = newName;
                     }
                 }
                 
-                // Update preview with debounce to prevent infinite loops
                 clearTimeout(window.previewUpdateTimeout);
                 window.previewUpdateTimeout = setTimeout(updatePreview, 300);
             }
 
-            // Create specialized text blocks
             function createIntroBlock() {
                 textBlockCounter++;
                 const textBlockId = `intro-block-${textBlockCounter}`;
@@ -1485,9 +1781,9 @@
                 const displayName = 'Intro: Member message';
                 
                 if (addItem(textBlockId, displayName, 'textblock')) {
-                    // Set the content after the block is created
                     setTimeout(() => {
                         setTextBlockContent(textBlockId, introContent);
+                        debouncedUpdatePreview();
                     }, 100);
                     return textBlockId;
                 }
@@ -1501,9 +1797,9 @@
                 const displayName = 'Outro: Thank you message';
                 
                 if (addItem(textBlockId, displayName, 'textblock')) {
-                    // Set the content after the block is created
                     setTimeout(() => {
                         setTextBlockContent(textBlockId, outroContent);
+                        debouncedUpdatePreview();
                     }, 100);
                     return textBlockId;
                 }
@@ -1517,59 +1813,65 @@
                 const displayName = 'Title: Newsletter Title';
                 
                 if (addItem(textBlockId, displayName, 'titleblock')) {
-                    // Set the content after the block is created
                     setTimeout(() => {
                         setTextBlockContent(textBlockId, titleContent);
+                        debouncedUpdatePreview();
                     }, 100);
                     return textBlockId;
                 }
                 return null;
             }
 
-            // Event listeners for add buttons
-            document.addEventListener('click', (e) => {
-                if (e.target.id === 'add-text-block-btn') {
-                    createTextBlock();
+            document.addEventListener('click', async (e) => {
+                const btn = e.target.closest('button');
+                if (!btn) return;
+
+                if (btn.id === 'add-text-block-btn')  { createTextBlock(); return; }
+                if (btn.id === 'add-intro-btn') { createIntroBlock(); return; }
+                if (btn.id === 'add-outro-btn') { createOutroBlock(); return; }
+                if (btn.id === 'add-title-btn') { createTitleBlock(); return; }
+
+                if (btn.classList.contains('remove-item-btn')) {
+                    const index = parseInt(btn.dataset.index, 10);
+                    if (!Number.isNaN(index)) removeItem(index);
+                    return;
                 }
-                
-                if (e.target.id === 'add-intro-btn') {
-                    createIntroBlock();
+
+                const isAdd =
+                    btn.classList.contains('add-stat-btn') ||
+                    btn.classList.contains('add-graph-btn') ||
+                    btn.classList.contains('ra-add-btn') ||
+                    btn.classList.contains('recs-add-btn');
+
+                if (!isAdd) return;
+
+                const { id, name, type } = btn.dataset;
+                if (!id || !type) return;
+
+                console.log('Adding item:', { id, name, type });
+                console.log('Current selectedItems before:', selectedItems);
+
+                const extra = {};
+                if (type === 'ra' && btn.dataset.lib) {
+                    extra.raLibrary = btn.dataset.lib;
                 }
-                
-                if (e.target.id === 'add-outro-btn') {
-                    createOutroBlock();
+                if (type === 'recs') {
+                    if (btn.dataset.user) extra.recUser = btn.dataset.user;
+                    if (btn.dataset.filter) extra.recFilter = btn.dataset.filter;
                 }
-                
-                if (e.target.id === 'add-title-btn') {
-                    createTitleBlock();
-                }
-                
-                if (e.target.classList.contains('add-stat-btn') || e.target.classList.contains('add-graph-btn')) {
-                    const id = e.target.dataset.id;
-                    const name = e.target.dataset.name;
-                    const type = e.target.dataset.type;
-                    
-                    console.log('Adding item:', { id, name, type });
-                    console.log('Current selectedItems before:', selectedItems);
-                    
-                    if (addItem(id, name, type)) {
-                        e.target.textContent = `Added`;
-                        e.target.classList.remove('button');
-                        e.target.classList.add('btn-success');
-                        e.target.disabled = true;
-                        console.log('Item added successfully. Current selectedItems:', selectedItems);
-                    } else {
-                        console.log('Item already exists');
-                    }
-                }
-                
-                if (e.target.classList.contains('remove-item-btn')) {
-                    const index = parseInt(e.target.dataset.index);
-                    removeItem(index);
+
+                if (addItem(id, name || id, type, extra)) {
+                    btn.textContent = 'Added';
+                    btn.classList.remove('button');
+                    btn.classList.add('btn-success');
+                    btn.disabled = true;
+
+                    console.log('Item added. Current selectedItems:', selectedItems);
+                } else {
+                    console.log('Item already exists');
                 }
             });
 
-            // Initialize
             updateSelectedItemsDisplay();
         </script>
         <script>
@@ -1679,7 +1981,6 @@
             document.getElementById('sendEmailBtn').addEventListener('click', async () => {
                 const subject = document.getElementById('subject').value;
                 
-                // Collect text from all text blocks
                 const textBlocks = selectedItems
                     .filter(item => item.type === 'textblock')
                     .map(item => getTextBlockContent(item.id))
@@ -1707,7 +2008,6 @@
 
                 showSpinner('Preparing email content...');
 
-                // Extract actual HTML content from preview iframe
                 let emailHTML = '';
                 let emailImages = [];
 
@@ -1720,36 +2020,29 @@
                     console.log('Preview body found:', !!previewDoc?.body);
                     
                     if (previewDoc && previewDoc.body) {
-                        // Wait a moment for content to fully load
                         await new Promise(resolve => setTimeout(resolve, 500));
                         
-                        // Get the actual HTML content from the preview
                         const previewHTML = previewDoc.documentElement.outerHTML;
                         console.log('Preview HTML length:', previewHTML.length);
                         console.log('Preview HTML preview:', previewHTML.substring(0, 500));
                         
-                        // Process any Highcharts graphs by converting them to images
                         const charts = previewDoc.querySelectorAll('[data-highcharts-chart]');
                         console.log('Found charts:', charts.length);
                         
                         let processedHTML = previewHTML;
                         
-                        // Convert each chart to an image and replace in HTML
                         for (let i = 0; i < charts.length; i++) {
                             const chart = charts[i];
                             const chartId = chart.id || `chart-${i}`;
                             
                             try {
-                                // Get the Highcharts instance
                                 const chartInstance = Highcharts.charts.find(c => c && c.container === chart);
                                 if (chartInstance) {
-                                    // Export chart as SVG then convert to image
                                     const svgData = chartInstance.getSVG();
                                     const canvas = document.createElement('canvas');
                                     const ctx = canvas.getContext('2d');
                                     const img = new Image();
                                     
-                                    // Convert SVG to canvas
                                     const svgBlob = new Blob([svgData], {type: 'image/svg+xml'});
                                     const url = URL.createObjectURL(svgBlob);
                                     
@@ -1768,7 +2061,6 @@
                                                 data: imageData
                                             });
                                             
-                                            // Replace the chart div with an img tag
                                             processedHTML = processedHTML.replace(
                                                 chart.outerHTML,
                                                 `<img src="cid:${cid}" alt="Chart" style="max-width:100%;height:auto;">`
@@ -1786,11 +2078,9 @@
                             }
                         }
                         
-                        // Clean up the HTML for email
                         emailHTML = processedHTML
-                            .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '') // Remove scripts
+                            .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
                             .replace(/style="[^"]*"/gi, (match) => {
-                                // Keep only basic styles, remove complex CSS
                                 return match.includes('color') || match.includes('font') || match.includes('text-align') || 
                                        match.includes('background') || match.includes('padding') || match.includes('margin') ||
                                        match.includes('width') || match.includes('height') ? match : '';
@@ -1804,7 +2094,6 @@
                     }
                 } catch (error) {
                     console.error('Error preparing email content:', error);
-                    // Fallback to basic text email
                     emailHTML = `
                         <!DOCTYPE html>
                         <html>
@@ -1983,7 +2272,6 @@
             })();
         </script>
         <script>
-            // Email List Management
             document.addEventListener('DOMContentLoaded', () => {
                 const selector = document.getElementById('email_list_selector');
                 const deleteBtn = document.getElementById('delete_list_btn');
@@ -2034,17 +2322,14 @@
                     }
                 }
                 
-                // Handle list selection change
                 selector.addEventListener('change', async () => {
                     const selectedValue = selector.value;
                     
-                    // Hide delete button and save container by default
                     deleteBtn.classList.add('d-none');
                     saveContainer.classList.add('d-none');
                     
                     if (selectedValue === 'Custom') {
                         setReadOnlyMode(false);
-                        // Keep current emails
                     } else if (selectedValue === 'ALL') {
                         clearAllChips();
                         allUserEmails.forEach(email => addEmailChip(email));
@@ -2054,7 +2339,6 @@
                         newListNameInput.focus();
                         setReadOnlyMode(false);
                     } else {
-                        // Load saved list
                         const option = selector.querySelector(`option[value="${selectedValue}"]`);
                         if (option) {
                             const emails = option.dataset.emails;
@@ -2066,7 +2350,6 @@
                     }
                 });
                 
-                // Handle save new list
                 saveBtn.addEventListener('click', async () => {
                     const name = newListNameInput.value.trim();
                     if (!name) {
@@ -2092,14 +2375,12 @@
                         
                         const result = await response.json();
                         if (result.status === 'success') {
-                            // Add new option to selector
                             const newOption = document.createElement('option');
-                            newOption.value = 'temp_' + Date.now(); // Temporary ID
+                            newOption.value = 'temp_' + Date.now();
                             newOption.textContent = name;
                             newOption.dataset.emails = emails.join(', ');
                             selector.insertBefore(newOption, selector.querySelector('option[value="(Save new list)"]'));
                             
-                            // Select the new list and hide save container
                             selector.value = newOption.value;
                             saveContainer.classList.add('d-none');
                             newListNameInput.value = '';
@@ -2107,7 +2388,6 @@
                             
                             alert(result.message);
                             
-                            // Refresh the page to get proper IDs from server
                             setTimeout(() => window.location.reload(), 1000);
                         } else {
                             alert(result.message);
@@ -2117,14 +2397,12 @@
                     }
                 });
                 
-                // Handle cancel save
                 cancelBtn.addEventListener('click', () => {
                     saveContainer.classList.add('d-none');
                     newListNameInput.value = '';
                     selector.value = 'Custom';
                 });
                 
-                // Handle delete list
                 deleteBtn.addEventListener('click', async () => {
                     const selectedValue = selector.value;
                     const option = selector.querySelector(`option[value="${selectedValue}"]`);
@@ -2150,12 +2428,10 @@
                     }
                 });
                 
-                // Initialize with Custom mode
                 setReadOnlyMode(false);
             });
         </script>
         <script>
-            // Handle BCC collapse toggle
             document.addEventListener('DOMContentLoaded', () => {
                 const bccHeader = document.querySelector('[onclick*="bcc-collapse"]');
                 if (bccHeader) {
@@ -2172,12 +2448,10 @@
                     });
                 }
                 
-                // Initially collapse the BCC section
                 document.getElementById('bcc-collapse').classList.add('d-none');
                 document.getElementById('bcc-toggle-icon').style.transform = 'rotate(-90deg)';
                 document.getElementById('bcc-toggle-icon').textContent = '▶';
                 
-                // Handle cache clear button
                 const clearCacheBtn = document.getElementById('clear_cache_btn');
                 if (clearCacheBtn) {
                     clearCacheBtn.addEventListener('click', async () => {
@@ -2217,10 +2491,8 @@
                 }
             });
 
-            // Email Template Management
             let emailTemplates = [];
 
-            // Load templates on page load
             async function loadEmailTemplates() {
                 try {
                     const response = await fetch('/email_templates');
@@ -2234,12 +2506,10 @@
             function updateTemplateDropdown() {
                 const selector = document.getElementById('template-selector');
                 
-                // Clear existing options except first two
                 while (selector.children.length > 2) {
                     selector.removeChild(selector.lastChild);
                 }
                 
-                // Add templates in alphabetical order
                 emailTemplates.forEach(template => {
                     const option = document.createElement('option');
                     option.value = template.id;
@@ -2248,25 +2518,20 @@
                 });
             }
 
-            // Template selector change handler
             document.getElementById('template-selector').addEventListener('change', async function() {
                 const value = this.value;
                 const deleteBtn = document.getElementById('delete-template-btn');
                 
                 if (value === 'save-template') {
-                    // Show save template dialog
                     const templateName = prompt('Enter template name:');
                     if (templateName && templateName.trim()) {
                         await saveCurrentTemplate(templateName.trim());
                     }
-                    // Reset to Custom
                     this.value = '';
                     deleteBtn.style.display = 'none';
                 } else if (value === '') {
-                    // Custom - clear everything
                     deleteBtn.style.display = 'none';
                 } else {
-                    // Load template
                     const templateId = parseInt(value);
                     const template = emailTemplates.find(t => t.id === templateId);
                     if (template) {
@@ -2277,45 +2542,34 @@
                 }
             });
 
-            // Reset button handler
             document.getElementById('reset-template-btn').addEventListener('click', function() {
-                // Confirm the reset action
                 if (confirm('Are you sure you want to reset? This will clear all selected items and reset to Custom template.')) {
-                    // Clear all selected items
                     selectedItems.length = 0;
                     
-                    // Reset template selector to Custom
                     document.getElementById('template-selector').value = '';
                     
-                    // Hide delete button
                     document.getElementById('delete-template-btn').style.display = 'none';
                     
-                    // Reset all add buttons to original state
-                    document.querySelectorAll('.add-stat-btn, .add-graph-btn').forEach(btn => {
+                    document.querySelectorAll('.add-stat-btn, .add-graph-btn, .ra-add-btn').forEach(btn => {
                         btn.textContent = 'Add';
                         btn.classList.remove('btn-success');
                         btn.classList.add('button');
                         btn.disabled = false;
                     });
                     
-                    // Update the display
                     updateSelectedItemsDisplay();
                     
-                    // Reset text block counter
                     textBlockCounter = 0;
                 }
             });
 
-            // Save current template
             async function saveCurrentTemplate(name) {
                 try {
-                    // Collect text from all text blocks (including title blocks)
                     const textBlocks = selectedItems
                         .filter(item => item.type === 'textblock' || item.type === 'titleblock')
                         .map(item => getTextBlockContent(item.id))
                         .filter(content => content.trim().length > 0);
                     
-                    // Also store individual text block contents in selected_items for better processing
                     const itemsWithContent = selectedItems.map(item => {
                         if (item.type === 'textblock' || item.type === 'titleblock') {
                             return {
@@ -2344,7 +2598,7 @@
                     const result = await response.json();
                     if (result.status === 'success') {
                         console.log('Template saved successfully');
-                        await loadEmailTemplates(); // Reload templates
+                        await loadEmailTemplates();
                     } else {
                         alert('Error saving template: ' + result.message);
                     }
@@ -2354,28 +2608,21 @@
                 }
             }
 
-            // Load template into form
             function loadTemplate(template) {
                 try {
-                    // Parse selected items
                     const items = JSON.parse(template.selected_items);
                     
-                    // Clear current selection
                     selectedItems = [];
                     
-                    // Reset all buttons to original state
-                    document.querySelectorAll('.add-stat-btn, .add-graph-btn').forEach(btn => {
+                    document.querySelectorAll('.add-stat-btn, .add-graph-btn, .ra-add-btn').forEach(btn => {
                         btn.textContent = 'Add';
                         btn.classList.remove('btn-success');
                         btn.classList.add('button');
                         btn.disabled = false;
                     });
                     
-                    // Load template items in order, preserving types and content
                     selectedItems = items.map(item => {
-                        // For text and title blocks, restore the content
                         if ((item.type === 'textblock' || item.type === 'titleblock') && item.content) {
-                            // Ensure we have the right counter for new blocks
                             if (item.type === 'textblock' && item.id.startsWith('text-block-')) {
                                 const counter = parseInt(item.id.split('-')[2]);
                                 if (counter >= textBlockCounter) {
@@ -2401,7 +2648,6 @@
                         return { ...item };
                     });
                     
-                    // Render any graphs that need to be rendered
                     selectedItems.forEach(item => {
                         if (item.type === 'graph' && !renderedCharts.has(item.id)) {
                             try {
@@ -2422,7 +2668,6 @@
 
                                     renderedCharts.add(item.id);
                                     
-                                    // Apply current theme
                                     const nowDark = document.documentElement.classList.contains('dark');
                                     applyChartTheme(nowDark);
                                     
@@ -2434,7 +2679,6 @@
                         }
                     });
                     
-                    // Update button states for selected items
                     selectedItems.forEach(item => {
                         const button = document.querySelector(`[data-id="${item.id}"]`);
                         if (button) {
@@ -2445,20 +2689,16 @@
                         }
                     });
                     
-                    // Load form fields
                     document.getElementById('subject').value = template.subject || '';
                     
-                    // Update display and preview
                     updateSelectedItemsDisplay();
                     
-                    // After the display is updated, set the content for text/title blocks
                     setTimeout(() => {
                         selectedItems.forEach(item => {
                             if ((item.type === 'textblock' || item.type === 'titleblock') && item.content) {
                                 setTextBlockContent(item.id, item.content);
                             }
                         });
-                        // Update preview after content is set
                         updatePreview();
                     }, 100);
                     
@@ -2469,7 +2709,6 @@
                 }
             }
 
-            // Delete template
             document.getElementById('delete-template-btn').addEventListener('click', async function() {
                 const templateId = this.dataset.templateId;
                 if (!templateId) return;
@@ -2486,9 +2725,8 @@
                         const result = await response.json();
                         if (result.status === 'success') {
                             console.log('Template deleted successfully');
-                            await loadEmailTemplates(); // Reload templates
+                            await loadEmailTemplates();
                             
-                            // Reset to Custom
                             document.getElementById('template-selector').value = '';
                             this.style.display = 'none';
                         } else {
@@ -2501,7 +2739,6 @@
                 }
             });
 
-            // Pop-out preview functionality
             document.getElementById('popout-preview-btn').addEventListener('click', function() {
                 const frame = document.getElementById('preview');
                 if (!frame || !frame.srcdoc) {
@@ -2509,26 +2746,21 @@
                     return;
                 }
                 
-                // Create a new window
                 const popupWindow = window.open('', 'EmailPreview', 'width=800,height=600,scrollbars=yes,resizable=yes');
                 
                 if (popupWindow) {
-                    // Write the preview content to the new window
                     popupWindow.document.open();
                     popupWindow.document.write(frame.srcdoc);
                     popupWindow.document.close();
                     
-                    // Set window title
                     popupWindow.document.title = 'Email Preview';
                     
-                    // Focus the new window
                     popupWindow.focus();
                 } else {
                     alert('Pop-up blocked! Please allow pop-ups for this site to use the preview feature.');
                 }
             });
 
-            // Load templates on page load
             document.addEventListener('DOMContentLoaded', () => {
                 loadEmailTemplates();
             });

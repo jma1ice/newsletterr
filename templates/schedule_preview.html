@@ -20,15 +20,13 @@
                     
                     <div id="error" class="alert alert-danger" style="display: none;"></div>
                     
-                    <div id="preview-section" style="display: none;">
-                        <!-- Hidden form elements to store template data -->
+                    <div id="preview-section" aria-hidden="true" style="opacity:0; z-index:-1;">
                         <input type="hidden" id="subject" value="">
                         <input type="hidden" id="email_text" value="">
                         <input type="hidden" id="layout" value="standard">
                         <input type="hidden" id="graph_placeholder" value="">
                         <input type="hidden" id="stat_placeholder" value="">
                         
-                        <!-- Email Preview Container -->
                         <div class="row mt-3">
                             <div class="col-lg-12">
                                 <div class="card theme-card">
@@ -42,9 +40,9 @@
                             </div>
                         </div>
                         
-                        <!-- Hidden containers for stats and graphs -->
                         <div id="stats-container" style="display: none;"></div>
                         <div id="graphs-container" style="display: none;"></div>
+                        <div id="workbench" style="position:fixed; left:-10000px; top:-10000px; width:1920px;"></div>
                     </div>
                 </div>
             </div>
@@ -53,7 +51,6 @@
 </div>
 
 <script>
-    // Get schedule ID from URL parameters
     const urlParams = new URLSearchParams(window.location.search);
     const scheduleId = urlParams.get('schedule_id');
 
@@ -61,11 +58,431 @@
     let stats = [];
     let graphData = [];
     let recentData = [];
+    let recsPayload = {};
     let selectedItems = [];
     let graphCommands = [];
     let recentCommands = [];
 
-    // Blur image function for stat background processing
+    const TOKEN_PAT = {
+        RA:   '(RECENTLY_ADDED|recently_added)',
+        RECS: '(RECOMMENDATIONS|recommendations|RECS|recs)'
+    };
+    const RX = {
+        RA:    new RegExp(`\\[${TOKEN_PAT.RA}\\]`, 'i'),
+        RA_G:  new RegExp(`\\[${TOKEN_PAT.RA}\\]`, 'gi'),
+        RECS:  new RegExp(`\\[${TOKEN_PAT.RECS}\\]`, 'i'),
+        RECS_G:new RegExp(`\\[${TOKEN_PAT.RECS}\\]`, 'gi')
+    };
+
+    async function raElementToPNG(el, { scale = (window.devicePixelRatio > 1 ? 2 : 1), bg = null, minWidth = 1920, onCloneTweak = null } = {}) {
+        const prevMark = el.getAttribute('data-capture-root');
+        el.setAttribute('data-capture-root', '1');
+
+        const prevWidth = el.style.width;
+        if (!el.offsetWidth) el.style.width = `${minWidth}px`;
+
+        await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+        const imgs = Array.from(el.querySelectorAll('img'));
+        await Promise.all(imgs.map(img => new Promise(resolve => {
+            if (img.complete) return resolve();
+            const done = () => resolve();
+            img.addEventListener('load', done,  { once:true });
+            img.addEventListener('error', done, { once:true });
+            setTimeout(done, 2000);
+        })));
+
+        const canvas = await html2canvas(el, {
+            backgroundColor: bg,
+            scale,
+            useCORS: true,
+            logging: false,
+            removeContainer: true,
+            onclone: (doc) => {
+                const root = doc.querySelector('[data-capture-root="1"]');
+                if (!root) return;
+
+                const kill = doc.createElement('style');
+                kill.textContent = `
+                    *{ box-shadow:none !important; filter:none !important; }
+                    [class*="shadow"]{ box-shadow:none !important; }
+                    [style*="box-shadow"]{ box-shadow:none !important; }
+                `;
+                doc.head.appendChild(kill);
+
+                root.querySelectorAll('.aspect-\\[2\\/3\\]').forEach(el => {
+                    const w = el.getBoundingClientRect().width || el.clientWidth || 0;
+                    if (w > 0) el.style.height = Math.round(w * 3 / 2) + 'px';
+                });
+
+                root.querySelectorAll('.absolute.top-1.right-1, .absolute.bottom-1.right-1 span, .ra-pill')
+                    .forEach(p => {
+                        p.style.display = 'inline-flex';
+                        p.style.alignItems = 'center';
+                        p.style.justifyContent = 'center';
+                        p.style.lineHeight = '1';
+                        if (!p.style.padding) p.style.padding = '2px 6px';
+                        p.style.minHeight = '18px';
+                        p.style.borderRadius = '9999px';
+                    });
+
+                root.querySelectorAll('.pill_text').forEach(s => {
+                    s.style.position = 'relative';
+                    s.style.top = '-6px';
+                });
+
+                root.querySelectorAll('.font-semibold.line-clamp-2').forEach(el => {
+                    el.style.display = 'block';
+                    el.style.webkitLineClamp = 'unset';
+                    el.style.overflow = 'hidden';
+                    el.style.lineHeight = '1.5';
+                    el.style.maxHeight = (1.75 * 2) + 'em';
+                    el.style.paddingBottom = '3px';
+                });
+
+                root.querySelectorAll('.p-3 > .text-xs:first-of-type').forEach(el => {
+                    el.style.lineHeight = '1.75';
+                    el.style.paddingBottom = '1px';
+                });
+
+                root.querySelectorAll('.line-clamp-5').forEach(el => {
+                    el.style.display = 'block';
+                    el.style.webkitLineClamp = 'unset';
+                    el.style.overflow = 'hidden';
+                    el.style.lineHeight = '1.4';
+                    el.style.maxHeight = (1.5 * 5) + 'em';
+                    el.style.paddingBottom = '4px';
+                });
+
+                root.querySelectorAll('.p-3').forEach(c => {
+                    const cs = doc.defaultView.getComputedStyle(c);
+                    const pb = parseFloat(cs.paddingBottom) || 0;
+                    if (pb < 8) c.style.paddingBottom = '8px';
+                });
+
+                root.querySelectorAll('ul').forEach(u => { u.style.margin = '0'; u.style.padding = '0'; });
+
+                if (typeof onCloneTweak === 'function') {
+                    try { onCloneTweak(doc, root); } catch {}
+                }
+            }
+        });
+
+        if (prevMark === null) el.removeAttribute('data-capture-root');
+        else el.setAttribute('data-capture-root', prevMark);
+        el.style.width = prevWidth;
+
+        const url = canvas.toDataURL('image/png', 0.92);
+        if (!url || url === 'data:,') return '';
+        if (!url.startsWith('data:image')) return '';
+        return url;
+    }
+
+    async function recElementToPNG(el, { scale = (window.devicePixelRatio > 1 ? 2 : 1), bg = null, minWidth = 1920,onCloneTweak = null } = {}) {
+        const prevMark = el.getAttribute('data-capture-root');
+        el.setAttribute('data-capture-root', '1');
+
+        const prevWidth = el.style.width;
+        if (!el.offsetWidth) el.style.width = `${minWidth}px`;
+
+        await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+        const imgs = Array.from(el.querySelectorAll('img'));
+        await Promise.all(imgs.map(img => new Promise(resolve => {
+            if (img.complete) return resolve();
+            const done = () => resolve();
+            img.addEventListener('load', done,  { once:true });
+            img.addEventListener('error', done, { once:true });
+            setTimeout(done, 2000);
+        })));
+
+        const canvas = await html2canvas(el, {
+            backgroundColor: bg,
+            scale,
+            useCORS: true,
+            logging: false,
+            removeContainer: true,
+            onclone: (doc) => {
+                const root = doc.querySelector('[data-capture-root="1"]');
+                if (!root) return;
+
+                const kill = doc.createElement('style');
+                kill.textContent = `
+                    *{ box-shadow:none !important; filter:none !important; }
+                    [class*="shadow"]{ box-shadow:none !important; }
+                    [style*="box-shadow"]{ box-shadow:none !important; }
+                `;
+                doc.head.appendChild(kill);
+
+                root.querySelectorAll('.aspect-\\[2\\/3\\]').forEach(el => {
+                    const w = el.getBoundingClientRect().width || el.clientWidth || 0;
+                    if (w > 0) el.style.height = Math.round(w * 3 / 2) + 'px';
+                });
+
+                root.querySelectorAll('.absolute.top-1.right-1, .absolute.bottom-1.right-1 span, .ra-pill')
+                    .forEach(p => {
+                        p.style.display = 'inline-flex';
+                        p.style.alignItems = 'center';
+                        p.style.justifyContent = 'center';
+                        p.style.lineHeight = '1';
+                        if (!p.style.padding) p.style.padding = '2px 6px';
+                        p.style.minHeight = '18px';
+                        p.style.borderRadius = '9999px';
+                    });
+
+                root.querySelectorAll('.pill_text').forEach(s => {
+                    s.style.position = 'relative';
+                    s.style.top = '-6px';
+                });
+
+                root.querySelectorAll('.font-semibold.line-clamp-2').forEach(el => {
+                    el.style.display = 'block';
+                    el.style.webkitLineClamp = 'unset';
+                    el.style.overflow = 'hidden';
+                    el.style.lineHeight = '1.5';
+                    el.style.maxHeight = (1.75 * 2) + 'em';
+                    el.style.paddingBottom = '3px';
+                });
+
+                root.querySelectorAll('.line-clamp-5').forEach(el => {
+                    el.style.display = 'block';
+                    el.style.webkitLineClamp = 'unset';
+                    el.style.overflow = 'hidden';
+                    el.style.lineHeight = '1.4';
+                    el.style.maxHeight = (1.5 * 5) + 'em';
+                    el.style.paddingBottom = '4px';
+                });
+
+                root.querySelectorAll('ul').forEach(u => { u.style.margin = '0'; u.style.padding = '0'; });
+
+                if (typeof onCloneTweak === 'function') {
+                    try { onCloneTweak(doc, root); } catch {}
+                }
+            }
+        });
+
+        if (prevMark === null) el.removeAttribute('data-capture-root');
+        else el.setAttribute('data-capture-root', prevMark);
+        el.style.width = prevWidth;
+
+        const url = canvas.toDataURL('image/png', 0.92);
+        if (!url || url === 'data:,') return '';
+        if (!url.startsWith('data:image')) return '';
+        return url;
+    }
+
+    function buildRecentBlock(recentPayload) {
+        const flatten = (arr) => arr.flatMap(x => x?.recently_added || []);
+        const items = flatten(recentPayload || []);
+
+        const wrap = document.createElement('div');
+        wrap.style.cssText = "display:block; width:100%; padding:8px;";
+        const h = document.createElement('h3');
+        h.textContent = "Recently Added";
+        h.style.cssText = "margin:0 0 8px; font-weight:700; font-size:16px; text-align:left; color: #62a1a4;";
+        wrap.appendChild(h);
+
+        if (!items.length) {
+            wrap.innerHTML += `<div style="text-align:center; color:#666;">No recently added items.</div>`;
+            return wrap;
+        }
+
+        function pickThumb(it) {
+            const type = (it.media_type || it.type || "").toLowerCase();
+            const c = (type === "episode" || type === "season")
+                ? [it.grandparent_thumb, it.parent_thumb, it.thumb, it.art]
+                : [it.thumb, it.art, it.parent_thumb, it.grandparent_thumb];
+            return c.find(Boolean) || "";
+        }
+        const buildThumb = (p) => p ? `/proxy-art${p.startsWith('/') ? p : '/'+p}` : "";
+        const msToHMS = (ms) => {
+            ms = parseInt(ms || 0, 10);
+            const s = Math.round(ms / 1000);
+            const h = Math.floor(s/3600), m = Math.floor((s%3600)/60);
+            return h ? `${h}h ${m}m` : `${m}m`;
+        };
+        const formatDate = (d) => {
+            if (!d) return '';
+            if (/^\d+$/.test(String(d))) return new Date(parseInt(d,10)*1000).toLocaleDateString();
+            const dt = new Date(d); return isNaN(dt) ? '' : dt.toLocaleDateString();
+        };
+
+        const grid = document.createElement('ul');
+        grid.style.cssText = "display:grid; grid-template-columns:repeat(10,minmax(0,1fr)); gap:12px; list-style:none; padding:0; margin:0;";
+
+        items.forEach(it => {
+            const li = document.createElement('li');
+            li.style.cssText = "border-radius:12px; overflow:hidden; background:#8acbd4; box-shadow:0 6px 18px rgba(0,0,0,.6);";
+            const t = pickThumb(it);
+            li.innerHTML = `
+                <div style="position:relative; aspect-ratio:2/3; background:#e5e7eb;">
+                    ${t ? `<img src="${buildThumb(t)}" style="width:100%;height:100%;object-fit:cover;" crossorigin="anonymous">` : ``}
+                    ${it.library_name ? `<div class="ra-pill absolute top-1 right-1 text-xs px-2 py-1 rounded-full bg-black/70 text-white"><span class="pill_text">${it.library_name}</span></div>` : ``}
+                    ${it.added_at || it.originally_available_at ? `<div class="ra-pill absolute bottom-1 right-1 text-[11px] text-white/90 bg-black/60 rounded px-1.5 py-0.5"><span class="pill_text">${formatDate(it.added_at || it.originally_available_at)}</span></div>` : ``}
+                </div>
+                <div class="p-3">
+                    <div class="font-semibold line-clamp-2">${it.title || it.full_title || it.parent_title || it.grandparent_title || '(untitled)'}</div>
+                    <div class="text-xs text-gray-500">
+                    ${(it.year || it.grandparent_title || it.parent_title || '')} ${it.duration ? ` • ${msToHMS(it.duration)}` : ``}
+                    </div>
+                    ${it.summary || it.tagline ? `<div class="mt-2 text-xs text-gray-600 line-clamp-5">${it.tagline || it.summary}</div>` : ``}
+                </div>`;
+            grid.appendChild(li);
+        });
+
+        wrap.appendChild(grid);
+        return wrap;
+    }
+
+    function buildRecsBlock(recs) {
+        const wrap = document.createElement('div');
+        wrap.style.cssText = "display:block; width:100%; padding:8px;";
+
+        const entries = Object.entries(recs || {});
+        if (!entries.length) {
+            wrap.innerHTML = `<div style="text-align:center; color:#666;">No recommendations.</div>`;
+            return wrap;
+        }
+
+        const COLUMNS = 10;
+
+        const posterCard = (p, unavailable=false) => {
+            const href = p.href || '#';
+            const img  = p.url ? `/proxy-img?u=${encodeURIComponent(p.url)}` : '';
+            const title = p.title || '(untitled)';
+            const year  = p.year;
+            const vote  = (p.vote != null) ? String(Number(p.vote).toFixed(1)).replace('.0','') : '';
+            const runtime = p.runtime || '';
+            const overview = p.overview || '';
+
+            const li = document.createElement('li');
+            li.className = 'relative group';
+            li.style.cssText = 'border-radius:12px; overflow:hidden; background:#e5e7eb;';
+
+            li.innerHTML = `
+            <a href="${href}" style="text-decoration:none; color:inherit; display:block; position:relative;">
+                <div class="aspect-[2/3]" style="position:relative; background:#e5e7eb;">
+                ${img
+                    ? `<img src="${img}" crossorigin="anonymous"
+                            style="width:100%;height:100%;object-fit:cover;${unavailable?'filter:grayscale(65%);opacity:.7;':''}">`
+                    : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;
+                                font-size:12px;color:#374151;${unavailable?'filter:grayscale(65%);opacity:.7;':''}">
+                        No image
+                    </div>`}
+                </div>
+
+                <!-- year / ★vote pill -->
+                <div class="absolute top-1 left-1 text-[11px] text-white/90">
+                ${ (year || vote)
+                    ? `<span class="bg-black/70 rounded px-1.5 py-0.5"><span class="pill_text">
+                        ${[year, vote ? `★ ${vote}` : ''].filter(Boolean).join(' • ')}
+                    </span></span>` : '' }
+                </div>
+
+                ${ unavailable
+                    ? `<div class="absolute top-1 right-1 text-[10px] bg-rose-600/85 text-white rounded px-1.5 py-0.5">
+                        <span class="pill_text">Unavailable</span>
+                    </div>`
+                    : '' }
+
+                <!-- gradient footer -->
+                <div class="absolute inset-x-0 bottom-0 p-2 bg-gradient-to-t from-black/70 to-transparent">
+                    <div class="text-[12px] font-semibold text-white line-clamp-2">
+                        ${title} ${p.year ? `(${p.year})` : ''}
+                    </div>
+                    ${ runtime ? `<div class="text-[11px] text-white/80">${runtime}</div>` : '' }
+                </div>
+            </a>
+
+            ${ overview
+                ? `<div style="position:absolute; left:0; right:0; bottom:0; transform:translateY(100%);
+                                background:rgba(0,0,0,.8); color:#fff; font-size:10px; padding:4px 8px; line-height:1.3;">
+                    ${overview}
+                    </div>`
+                : '' }
+            `;
+            return li;
+        };
+
+        let movies_avail = [], movies_un = [], shows_avail = [], shows_un = [];
+        for (const [, v] of entries) {
+            movies_avail.push(...(v.movie_posters || []));
+            movies_un.push(...(v.movie_posters_unavailable || []));
+            shows_avail.push(...(v.show_posters || []));
+            shows_un.push(...(v.show_posters_unavailable || []));
+        }
+
+        const section = (title) => {
+            const h = document.createElement('h3');
+            h.textContent = title;
+            h.style.cssText = "margin:16px 0 8px; font-weight:700; font-size:16px; color:#62a1a4;";
+            wrap.appendChild(h);
+        };
+
+        const grid = () => {
+            const ul = document.createElement('ul');
+            ul.style.cssText = `display:grid; grid-template-columns:repeat(${COLUMNS},minmax(0,1fr));
+                                gap:12px; list-style:none; padding:0; margin:0;`;
+            return ul;
+        };
+
+        const addSection = (title, availArr, unArr) => {
+            section(title);
+            const ul = grid();
+
+            availArr.forEach(p => ul.appendChild(posterCard(p, false)));
+
+            const avail = availArr.length;
+            const remainder = (COLUMNS - (avail % COLUMNS)) % COLUMNS;
+            const span = remainder !== 0 ? remainder : COLUMNS;
+
+            if (unArr && unArr.length) {
+                const first_row = unArr.slice(0, span);
+                const rest = unArr.slice(span);
+
+                if (first_row.length) {
+                    const li = document.createElement('li');
+                    li.style.cssText = `grid-column: span ${span} / span ${span};`;
+                    li.innerHTML = `
+                        <div class="gold-frame" style="position:relative; border-radius:12px;">
+                            <div class="gold-frame-border" style="position:absolute; inset:0; pointer-events:none; border-radius:12px;
+                                                                box-shadow:0 0 0 1px #f59e0b inset;"></div>
+                            <ul style="display:grid; grid-template-columns:repeat(${span},minmax(0,1fr));
+                                    gap:${(span/(span-1.5)).toFixed(3)}rem; list-style:none; padding:8px; margin:0;"></ul>
+                        </div>`;
+                    const inner = li.querySelector('ul');
+                    first_row.forEach(p => inner.appendChild(posterCard(p, true)));
+                    ul.appendChild(li);
+                }
+
+                if (rest.length) {
+                    for (let i = 0; i < rest.length; i += COLUMNS) {
+                        const chunk = rest.slice(i, i + COLUMNS);
+                        const li = document.createElement('li');
+                        li.style.cssText = `grid-column: 1 / -1;`;
+                        li.innerHTML = `
+                            <div class="gold-frame" style="position:relative; border-radius:12px;">
+                            <div class="gold-frame-border" style="position:absolute; inset:0; pointer-events:none; border-radius:12px;
+                                                                    box-shadow:0 0 0 1px #f59e0b inset;"></div>
+                            <ul style="display:grid; grid-template-columns:repeat(${COLUMNS},minmax(0,1fr));
+                                        gap:0.75rem; list-style:none; padding:8px; margin:0;"></ul>
+                            </div>`;
+                        const inner = li.querySelector('ul');
+                        chunk.forEach(p => inner.appendChild(posterCard(p, true)));
+                        ul.appendChild(li);
+                    }
+                }
+            }
+
+            wrap.appendChild(ul);
+        };
+
+        addSection('Recommended Movies', movies_avail, movies_un);
+        addSection('Recommended Shows',  shows_avail,  shows_un);
+
+        return wrap;
+    }
+
     async function blurImageElement(imgElement) {
         const tempImg = new Image();
         tempImg.crossOrigin = 'anonymous';
@@ -94,48 +511,47 @@
         imgElement.style.zIndex = '0';
     }
 
-    // --- small utils ---
     const esc = (s='') => String(s)
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+        .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 
     function statTheadHTML(title='') {
         if (title === "Most Watched Movies" || title === "Most Watched TV Shows") {
             return `<thead class="table-dark"><tr>
-            <th>Title</th><th>Year</th><th>Plays</th><th>Hours Played</th><th>Rating</th>
-            </tr></thead>`;
+                <th>Title</th><th>Year</th><th>Plays</th><th>Hours Played</th><th>Rating</th>
+                </tr></thead>`;
         } else if (title === "Most Popular Movies" || title === "Most Popular TV Shows") {
             return `<thead class="table-dark"><tr>
-            <th>Title</th><th>Year</th><th>Plays</th><th>Users</th><th>Rating</th>
-            </tr></thead>`;
+                <th>Title</th><th>Year</th><th>Plays</th><th>Users</th><th>Rating</th>
+                </tr></thead>`;
         } else if (title === "Most Played Artists") {
             return `<thead class="table-dark"><tr>
-            <th>Author</th><th>Year</th><th>Plays</th><th>Hours Played</th>
-            </tr></thead>`;
+                <th>Author</th><th>Year</th><th>Plays</th><th>Hours Played</th>
+                </tr></thead>`;
         } else if (title === "Most Popular Artists") {
             return `<thead class="table-dark"><tr>
-            <th>Author</th><th>Year</th><th>Plays</th><th>Users</th>
-            </tr></thead>`;
+                <th>Author</th><th>Year</th><th>Plays</th><th>Users</th>
+                </tr></thead>`;
         } else if (title === "Recently Watched") {
             return `<thead class="table-dark"><tr>
-            <th>Title</th><th>Year</th><th>Rating</th>
-            </tr></thead>`;
+                <th>Title</th><th>Year</th><th>Rating</th>
+                </tr></thead>`;
         } else if (title === "Most Active Libraries") {
             return `<thead class="table-dark"><tr>
-            <th>Library</th><th>Plays</th><th>Hours Played</th>
-            </tr></thead>`;
+                <th>Library</th><th>Plays</th><th>Hours Played</th>
+                </tr></thead>`;
         } else if (title === "Most Active Users") {
             return `<thead class="table-dark"><tr>
-            <th>Username</th><th>Plays</th><th>Hours Played</th>
-            </tr></thead>`;
+                <th>Username</th><th>Plays</th><th>Hours Played</th>
+                </tr></thead>`;
         } else if (title === "Most Active Platforms") {
             return `<thead class="table-dark"><tr>
-            <th>Platform</th><th>Plays</th><th>Hours Played</th>
-            </tr></thead>`;
+                <th>Platform</th><th>Plays</th><th>Hours Played</th>
+                </tr></thead>`;
         } else if (title === "Most Concurrent Streams") {
             return `<thead class="table-dark"><tr>
-            <th>Category</th><th>Count</th>
-            </tr></thead>`;
+                <th>Category</th><th>Count</th>
+                </tr></thead>`;
         }
         return '';
     }
@@ -143,27 +559,27 @@
     function statRowHTML(title, row) {
         const firstCol =
             title === "Most Active Libraries" ? row.section_name :
-            title === "Most Active Users"     ? row.user :
+            title === "Most Active Users" ? row.user :
             title === "Most Active Platforms" ? row.platform :
             row.title;
 
-        const showYear   = !["Most Active Libraries","Most Active Users","Most Active Platforms","Most Concurrent Streams"].includes(title);
-        const showPlays  = !(title.includes("Recently") || title.includes("Concurrent"));
-        const hours      = Math.ceil((row.total_duration || 0)/3600);
-        const rating     = row.content_rating || '';
+        const showYear = !["Most Active Libraries", "Most Active Users", "Most Active Platforms", "Most Concurrent Streams"].includes(title);
+        const showPlays = !(title.includes("Recently") || title.includes("Concurrent"));
+        const hours = Math.ceil((row.total_duration || 0)/3600);
+        const rating = row.content_rating || '';
         const usersWatch = row.users_watched;
 
         let tds = `<td>${esc(firstCol||'')}</td>`;
         if (showYear) tds += `<td>${esc(row.year||'')}</td>`;
         if (showPlays) tds += `<td>${esc(row.total_plays ?? row.plays ?? row.count ?? 0)}</td>`;
 
-        if (["Most Watched Movies","Most Watched TV Shows","Most Played Artists","Most Active Libraries","Most Active Users","Most Active Platforms"].includes(title)) {
+        if (["Most Watched Movies", "Most Watched TV Shows", "Most Played Artists", "Most Active Libraries", "Most Active Users", "Most Active Platforms"].includes(title)) {
             tds += `<td>${hours}</td>`;
-        } else if (["Most Popular Movies","Most Popular TV Shows","Most Popular Artists"].includes(title)) {
+        } else if (["Most Popular Movies", "Most Popular TV Shows", "Most Popular Artists"].includes(title)) {
             tds += `<td>${esc(usersWatch ?? '')}</td>`;
         }
 
-        if (!["Most Active Libraries","Most Played Artists","Most Popular Artists","Most Active Users","Most Active Platforms","Most Concurrent Streams"].includes(title)) {
+        if (!["Most Active Libraries", "Most Played Artists", "Most Popular Artists", "Most Active Users", "Most Active Platforms", "Most Concurrent Streams"].includes(title)) {
             tds += `<td>${esc(rating)}</td>`;
         }
 
@@ -184,16 +600,16 @@
             : `<tr><td class="p-3" colspan="8">No data available.</td></tr>`;
 
         return `
-        <div class="card my-4">
-            <div class="card-header bg-primary text-white">${esc(title)}</div>
-            <div class="card-body blur-container p-0" style="position:relative;">
-            ${bg ? `<img src="/proxy-art${esc(bg)}" class="bg-blur" alt="">` : ''}
-            <table class="table table-striped content-table m-0">
-                ${statTheadHTML(title)}
-                <tbody>${body}</tbody>
-            </table>
-            </div>
-        </div>`;
+            <div class="card my-4">
+                <div class="card-header bg-primary text-white">${esc(title)}</div>
+                <div class="card-body blur-container p-0" style="position:relative;">
+                ${bg ? `<img src="/proxy-art${esc(bg)}" class="bg-blur" alt="">` : ''}
+                <table class="table table-striped content-table m-0">
+                    ${statTheadHTML(title)}
+                    <tbody>${body}</tbody>
+                </table>
+                </div>
+            </div>`;
     }
 
     function themeVars(isDark) {
@@ -201,10 +617,11 @@
             text: isDark ? '#8acbd4' : '#333',
             grid: isDark ? '#e5e7eb' : '#374151',
             axis: isDark ? '#e5e7eb' : '#374151',
-            bg:   isDark ? '#333'    : '#8acbd4',
+            bg: isDark ? '#333' : '#8acbd4',
         };
-        }
-        function applyChartTheme(isDark) {
+    }
+
+    function applyChartTheme(isDark) {
         const t = themeVars(isDark);
         Highcharts.setOptions({
             chart: { backgroundColor: t.bg, style: { fontFamily: 'IBM Plex Sans' } },
@@ -228,7 +645,6 @@
                 throw new Error('No schedule ID provided');
             }
             
-            // Fetch template data
             const response = await fetch(`/scheduling/${scheduleId}/preview`);
             const data = await response.json();
             
@@ -239,10 +655,10 @@
             templateData = data;
             selectedItems = data.selected_items || [];
             
-            // Set the data from the API response
             stats = data.stats || [];
             graphData = data.graph_data || [];
             recentData = data.recent_data || [];
+            recsPayload = data.recs || data.recommendations || {};
             graphCommands = data.graph_commands || [];
             recentCommands = data.recent_commands || [];
             
@@ -250,33 +666,30 @@
                 stats: stats.length, 
                 graphs: graphData.length, 
                 recent: recentData.length,
+                recos: Object.keys(recsPayload).length,
                 dateRange: data.date_range,
                 graphCommands: graphCommands.length
             });
             
-            // Update schedule name
             document.getElementById('schedule-name').textContent = data.template_name;
             
-            // Set form values
             document.getElementById('subject').value = data.subject || '';
             document.getElementById('email_text').value = data.email_text || '';
             document.getElementById('layout').value = data.layout || 'standard';
             
-            // Load Tautulli data (stats, graphs, etc.) for the specified date range
             await loadTautulliData(data.date_range || 7);
             console.log('After loadTautulliData - stats:', stats);
             
-            // Generate stats and graphs HTML
             await generateStatsAndGraphs();
             console.log('After generateStatsAndGraphs');
             
-            // Generate the email preview
             await updatePreview();
             
-            // Hide loading and show preview
             document.getElementById('loading').style.display = 'none';
             document.getElementById('preview-section').style.display = 'block';
-            
+            document.getElementById('preview-section').ariaHidden = 'false';
+            document.getElementById('preview-section').style.opacity = '1';
+            document.getElementById('preview-section').style.zIndex = '1';
         } catch (error) {
             console.error('Error loading preview:', error);
             document.getElementById('loading').style.display = 'none';
@@ -286,8 +699,6 @@
     }
 
     async function loadTautulliData(dateRange) {
-        // Data will be provided by the preview API endpoint
-        // This function will be called after we get the data from the API
         console.log('Data will be loaded from API response');
     }
 
@@ -295,45 +706,41 @@
         const statsContainer = document.getElementById('stats-container');
         const graphsContainer = document.getElementById('graphs-container');
         
-        // Clear containers
         statsContainer.innerHTML = '';
         graphsContainer.innerHTML = '';
         
-        // Generate stats tables
         if (Array.isArray(stats) && stats.length) {
             stats.forEach((stat, i) => {
                 const wrap = document.createElement('div');
                 wrap.id = `stat-${i}`;
                 wrap.className = 'stat-table d-none';
                 wrap.innerHTML = buildStatCardHTML(stat);
-                // ensure blur bg looks right before capture
                 const bg = wrap.querySelector('.bg-blur');
                 if (bg) { blurImageElement(bg).catch(()=>{}); }
                 statsContainer.appendChild(wrap);
             });
         }
-        // Generate graphs
         if (Array.isArray(graphData) && graphData.length) {
             graphData.forEach((g, i) => {
-            const id = `graph-${i}`;
-            const div = document.createElement('div');
-            div.id = id;
-            div.className = 'graph-table d-none';
-            div.style.width = '100%';
-            div.style.minHeight = '360px';
-            graphsContainer.appendChild(div);
+                const id = `graph-${i}`;
+                const div = document.createElement('div');
+                div.id = id;
+                div.className = 'graph-table d-none';
+                div.style.width = '100%';
+                div.style.minHeight = '360px';
+                graphsContainer.appendChild(div);
 
-            const cmd = graphCommands[i] || { name: `Chart ${i+1}`, command: '' };
-            const cfg = {
-                chart: { type: 'line', style:{ fontFamily:'IBM Plex Sans' } },
-                title: { text: cmd.name },
-                exporting: { enabled: true },
-                xAxis: { categories: g.categories || [] },
-                yAxis: { title: { text: 'Plays' } },
-                series: g.series || []
-            };
+                const cmd = graphCommands[i] || { name: `Chart ${i+1}`, command: '' };
+                const cfg = {
+                    chart: { type: 'line', style:{ fontFamily:'IBM Plex Sans' } },
+                    title: { text: cmd.name },
+                    exporting: { enabled: true },
+                    xAxis: { categories: g.categories || [] },
+                    yAxis: { title: { text: 'Plays' } },
+                    series: g.series || []
+                };
 
-            Highcharts.chart(id, cfg);
+                Highcharts.chart(id, cfg);
             });
         }
         const nowDark = document.documentElement.classList.contains('dark');
@@ -344,18 +751,15 @@
         });
     }
 
-    // Full version with Highcharts support from index.html
     async function updatePreview() {
         try {
             console.log('updatePreview called with selectedItems:', selectedItems);
             
-            // Safety check
             if (typeof selectedItems === 'undefined') {
                 console.error('selectedItems is undefined in updatePreview');
                 return;
             }
             
-            // Process all items in order to build the complete content
             const layout = document.getElementById('layout').value;
             const serverName = templateData.settings?.server_name || '';
             const subject = document.getElementById('subject').value;
@@ -378,17 +782,14 @@
 
             let allItemsHTML = "";
             
-            // Process ALL items in the exact order they appear in selectedItems array
             for (let item of selectedItems) {
                 if (item.type === 'textblock') {
-                    // Add text block content directly to the HTML stream
                     const content = item.content || '';
                     if (content && content.trim().length > 0) {
                         const formattedContent = content.trim().replace(/\n/g, "<br>");
                         allItemsHTML += `<div style="margin-bottom: 15px;">${formattedContent}</div>`;
                     }
                 } else if (item.type === 'titleblock') {
-                    // Add title block with larger styling
                     const content = item.content || '';
                     if (content && content.trim().length > 0) {
                         const formattedContent = content.trim().replace(/\n/g, "<br>");
@@ -401,7 +802,6 @@
                     if (tableElement) {
                         console.log('Element content preview:', tableElement.innerHTML.substring(0, 100));
                         try {
-                            // Convert stat table to image using html2canvas
                             const wasHidden = tableElement.classList.contains('d-none');
                             if (wasHidden) {
                                 tableElement.classList.remove('d-none');
@@ -455,7 +855,6 @@
                             allItemsHTML += `<img src="${dataUrl}" style="max-width: 100%; margin-bottom: 10px;">`;
                         } catch (error) {
                             console.warn('Error processing stat', item.id, error);
-                            // Clean up if something went wrong
                             try {
                                 if (tempWrapper && document.body.contains(tempWrapper)) {
                                     document.body.removeChild(tempWrapper);
@@ -466,20 +865,17 @@
                             } catch (cleanupError) {
                                 console.warn('Error during stat cleanup', cleanupError);
                             }
-                            // Enhanced fallback with stat data
                             const statIndex = parseInt(item.id.split('-')[1]);
                             const statData = stats[statIndex];
                             console.log('Error fallback - looking for stat index:', statIndex, 'from:', stats);
                             if (statData && statData.rows && statData.rows.length > 0) {
-                                // Use the exact same structure as the main page
                                 let fallbackHTML = `
-                                <div class="card my-4" style="margin: 20px auto; max-width: 800px;">
-                                    <div class="card-header bg-primary text-white" style="background-color: #007bff !important; color: white !important; padding: 15px; font-weight: bold;">
-                                        ${statData.stat_title || 'Statistics'}
-                                    </div>
-                                    <div class="card-body blur-container p-0" style="padding: 0 !important; position: relative;">`;
+                                    <div class="card my-4" style="margin: 20px auto; max-width: 800px;">
+                                        <div class="card-header bg-primary text-white" style="background-color: #007bff !important; color: white !important; padding: 15px; font-weight: bold;">
+                                            ${statData.stat_title || 'Statistics'}
+                                        </div>
+                                        <div class="card-body blur-container p-0" style="padding: 0 !important; position: relative;">`;
                                 
-                                // Add background image if available
                                 if (statData.rows[0] && (statData.rows[0].art || statData.rows[0].grandparent_thumb)) {
                                     const bgImage = statData.rows[0].art || statData.rows[0].grandparent_thumb;
                                     fallbackHTML += `<img src="/proxy-art${bgImage}" class="bg-blur" alt="" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; filter: blur(4px) brightness(0.75); z-index: 0;" />`;
@@ -487,7 +883,6 @@
                                 
                                 fallbackHTML += `<table class="table table-striped content-table m-0" style="position: relative; z-index: 1; margin: 0 !important; background: transparent;">`;
                                 
-                                // Add proper table header based on stat type
                                 const statTitle = statData.stat_title || '';
                                 if (statTitle.includes("Most Watched Movies") || statTitle.includes("Most Watched TV Shows")) {
                                     fallbackHTML += `
@@ -510,7 +905,6 @@
                                             </tr>
                                         </thead>`;
                                 } else {
-                                    // Generic header
                                     fallbackHTML += `
                                         <thead class="table-dark" style="background-color: #343a40 !important; color: white;">
                                             <tr>
@@ -555,24 +949,22 @@
                                 allItemsHTML += fallbackHTML;
                             } else {
                                 allItemsHTML += `
-                                <div class="card my-4" style="margin: 20px auto; max-width: 800px;">
-                                    <div class="card-header bg-primary text-white" style="background-color: #007bff !important; color: white !important; padding: 15px; font-weight: bold;">
-                                        ${item.name || 'Statistics'}
-                                    </div>
-                                    <div class="card-body" style="padding: 20px; text-align: center;">
-                                        <p style="color: #333; margin: 0;">Statistical data for the specified date range</p>
-                                    </div>
-                                </div>`;
+                                    <div class="card my-4" style="margin: 20px auto; max-width: 800px;">
+                                        <div class="card-header bg-primary text-white" style="background-color: #007bff !important; color: white !important; padding: 15px; font-weight: bold;">
+                                            ${item.name || 'Statistics'}
+                                        </div>
+                                        <div class="card-body" style="padding: 20px; text-align: center;">
+                                            <p style="color: #333; margin: 0;">Statistical data for the specified date range</p>
+                                        </div>
+                                    </div>`;
                             }
                         }
                     } else {
                         console.warn('Stat element not found:', item.id);
-                        // Enhanced fallback with stat data
                         const statIndex = parseInt(item.id.split('-')[1]);
                         const statData = stats[statIndex];
                         console.log('Missing element fallback - looking for stat index:', statIndex, 'from:', stats);
                         if (statData && statData.rows && statData.rows.length > 0) {
-                            // Use the exact same structure as the main page
                             let fallbackHTML = `
                             <div class="card my-4" style="margin: 20px auto; max-width: 800px;">
                                 <div class="card-header bg-primary text-white" style="background-color: #007bff !important; color: white !important; padding: 15px; font-weight: bold;">
@@ -580,7 +972,6 @@
                                 </div>
                                 <div class="card-body blur-container p-0" style="padding: 0 !important; position: relative;">`;
                             
-                            // Add background image if available
                             if (statData.rows[0] && (statData.rows[0].art || statData.rows[0].grandparent_thumb)) {
                                 const bgImage = statData.rows[0].art || statData.rows[0].grandparent_thumb;
                                 fallbackHTML += `<img src="/proxy-art${bgImage}" class="bg-blur" alt="" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; filter: blur(4px) brightness(0.75); z-index: 0;" />`;
@@ -588,7 +979,6 @@
                             
                             fallbackHTML += `<table class="table table-striped content-table m-0" style="position: relative; z-index: 1; margin: 0 !important; background: transparent;">`;
                             
-                            // Add proper table header based on stat type
                             const statTitle = statData.stat_title || '';
                             if (statTitle.includes("Most Watched Movies") || statTitle.includes("Most Watched TV Shows")) {
                                 fallbackHTML += `
@@ -611,7 +1001,6 @@
                                         </tr>
                                     </thead>`;
                             } else {
-                                // Generic header
                                 fallbackHTML += `
                                     <thead class="table-dark" style="background-color: #343a40 !important; color: white;">
                                         <tr>
@@ -656,14 +1045,14 @@
                             allItemsHTML += fallbackHTML;
                         } else {
                             allItemsHTML += `
-                            <div class="card my-4" style="margin: 20px auto; max-width: 800px;">
-                                <div class="card-header bg-primary text-white" style="background-color: #007bff !important; color: white !important; padding: 15px; font-weight: bold;">
-                                    ${item.name || 'Statistics'}
-                                </div>
-                                <div class="card-body" style="padding: 20px; text-align: center;">
-                                    <p style="color: #333; margin: 0;">Statistical data for the specified date range</p>
-                                </div>
-                            </div>`;
+                                <div class="card my-4" style="margin: 20px auto; max-width: 800px;">
+                                    <div class="card-header bg-primary text-white" style="background-color: #007bff !important; color: white !important; padding: 15px; font-weight: bold;">
+                                        ${item.name || 'Statistics'}
+                                    </div>
+                                    <div class="card-body" style="padding: 20px; text-align: center;">
+                                        <p style="color: #333; margin: 0;">Statistical data for the specified date range</p>
+                                    </div>
+                                </div>`;
                         }
                     }
                 } else if (item.type === 'graph') {
@@ -686,76 +1075,143 @@
                                 };
                                 img.onerror = (error) => {
                                     console.warn('Failed to load graph image for', item.id, error);
-                                    resolve(); // Don't reject, just skip this graph
+                                    resolve();
                                 };
                                 img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)));
                             });
                         } catch (error) {
                             console.warn('Error processing graph', item.id, error);
-                            // Enhanced fallback using graph command info
                             const graphIndex = parseInt(item.id.split('-')[1]);
                             const commandInfo = graphCommands[graphIndex] || { name: 'Chart' };
-                            allItemsHTML += `<div style="margin: 20px 0; padding: 20px; background: #333; border-radius: 5px; border-left: 4px solid #E5A00D;">
+                            allItemsHTML += `
+                                <div style="margin: 20px 0; padding: 20px; background: #333; border-radius: 5px; border-left: 4px solid #E5A00D;">
+                                    <h3 style="color: #E5A00D;">${commandInfo.name}</h3>
+                                    <p style="color: #fff;">Chart data for the past ${templateData.date_range || 7} days</p>
+                                    <p style="color: #ccc; font-size: 14px;">Chart will be generated when email is sent with fresh data</p>
+                                </div>`;
+                        }
+                    } else {
+                        const graphIndex = parseInt(item.id.split('-')[1]);
+                        const commandInfo = graphCommands[graphIndex] || { name: 'Chart' };
+                        allItemsHTML += `
+                            <div style="margin: 20px 0; padding: 20px; background: #333; border-radius: 5px; border-left: 4px solid #E5A00D;">
                                 <h3 style="color: #E5A00D;">${commandInfo.name}</h3>
                                 <p style="color: #fff;">Chart data for the past ${templateData.date_range || 7} days</p>
                                 <p style="color: #ccc; font-size: 14px;">Chart will be generated when email is sent with fresh data</p>
                             </div>`;
-                        }
-                    } else {
-                        // Enhanced fallback using graph command info
-                        const graphIndex = parseInt(item.id.split('-')[1]);
-                        const commandInfo = graphCommands[graphIndex] || { name: 'Chart' };
-                        allItemsHTML += `<div style="margin: 20px 0; padding: 20px; background: #333; border-radius: 5px; border-left: 4px solid #E5A00D;">
-                            <h3 style="color: #E5A00D;">${commandInfo.name}</h3>
-                            <p style="color: #fff;">Chart data for the past ${templateData.date_range || 7} days</p>
-                            <p style="color: #ccc; font-size: 14px;">Chart will be generated when email is sent with fresh data</p>
-                        </div>`;
                     }
                 }
             }
-            
-            // Now allItemsHTML contains all content in the correct order
-            // For layouts, we'll use this content directly
-            let content = allItemsHTML || "";
 
-            // Use the exact same template structure as apply_layout function and main page preview
-            html = `
+            const baseTextRaw = (document.getElementById('email_text').value || '').trim();
+            let bodyHTML = (baseTextRaw ? `<div style="margin-bottom:15px;">${baseTextRaw.replace(/\n/g,'<br>')}</div>` : '');
+            bodyHTML += (allItemsHTML || '');
+
+            let html0 = `
                 <link href="https://fonts.googleapis.com/css?family=IBM+Plex+Sans:400,500,600,700&display=swap" rel="stylesheet">
                 <style>
                     :root { color-scheme: ${isDark ? 'dark' : 'light'}; }
                     html, body { background: ${isDark ? '#333' : '#8acbd4'}; }
+                    @media only screen and (max-width:1900px) {
+                        .plex-img { margin-left: 44rem !important; }
+                    }
+                    @media only screen and (max-width:1700px) {
+                        .plex-img { margin-left: 38rem !important; }
+                    }
+                    @media only screen and (max-width:1500px) {
+                        .plex-img { margin-left: 30rem !important; }
+                    }
+                    @media only screen and (max-width:1300px) {
+                        .plex-img { margin-left: 24rem !important; }
+                    }
+                    @media only screen and (max-width:1100px) {
+                        .plex-img { margin-left: 16rem !important; }
+                    }
+                    @media only screen and (max-width:900px) {
+                        .plex-img { margin-left: 10rem !important; }
+                    }
+                    @media only screen and (max-width:700px) {
+                        .plex-img { margin-left: 4rem !important; }
+                    }
+                    @media only screen and (max-width:500px) {
+                        .plex-img { margin-left: 2rem !important; }
+                    }
                 </style>
                 <html><body style="font-family: IBM Plex Sans; margin: 0;">
-                    <table class="body" style="border-collapse: separate; mso-table-lspace: 0pt; mso-table-rspace: 0pt; width: 100%;" border="0" cellspacing="0" cellpadding="0">
-                        <tbody>
-                            <tr>
-                                <td class="container" style="font-family: IBM Plex Sans; font-size: 14px; vertical-align: top; display: block; max-width: 1042px; padding: 10px; width: 1042px; margin: 0 auto !important;">
-                                    <div class="content" style="box-sizing: border-box; display: block; margin: 0 auto; max-width: 1037px; padding: 10px;"><span class="preheader" style="color: transparent; display: none; height: 0; max-height: 0; max-width: 0; opacity: 0; overflow: hidden; mso-hide: all; visibility: hidden; width: 0;">${serverName} Newsletter</span>
-                                        <table class="main" style="border-collapse: separate; mso-table-lspace: 0pt; mso-table-rspace: 0pt; width: 100%; background: #282A2D; border-radius: 3px; color: #ffffff;" border="0" cellspacing="0" cellpadding="3">
-                                            <tbody>
-                                                <tr>
-                                                    <td class="wrapper" style="font-family: IBM Plex Sans; font-size: 14px; vertical-align: top; box-sizing: border-box; padding: 5px; overflow: auto;">
-                                                        <div class="header" style="width: 50%; height: 10px; text-align: center;"><img class="header-img" style="border: none; -ms-interpolation-mode: bicubic; max-width: 9%; width: 492px; height: 20px; margin-left: -35px;" src="https://d15k2d11r6t6rl.cloudfront.net/public/users/Integrators/669d5713-9b6a-46bb-bd7e-c542cff6dd6a/3bef3c50f13f4320a9e31b8be79c6ad2/Plex%20Logo%20Update%202022/plex-logo-heavy-stroke.png" width="492" height="90" /></div>
-                                                        <div class="server-name" style="font-size: 25px; text-align: center; margin-bottom: 0;">${serverName} Newsletter</div>
-                                                    </td>
-                                                </tr>
-                                                <tr>
-                                                    <td class="footer" style="font-family: IBM Plex Sans; font-size: 12px; vertical-align: top; clear: both; margin-top: 0; text-align: center; width: 100%;">
-                                                        <h1 class="footer-bar" style="margin-left: auto; margin-right: auto; width: 300px; border-top: 1px solid #E5A00D; margin-top: 5px;">${displaySubject}</h1>
-                                                        <p>
-                                                            ${content}
-                                                        </p>
-                                                        <div class="footer-bar" style="margin-left: auto; margin-right: auto; width: 250px; border-top: 1px solid #E5A00D; margin-top: 25px;">&nbsp;</div>
-                                                        <div class="content-block powered-by" style="padding-bottom: 10px; padding-top: 0;">Generated for Plex Media Server by <a href="https://github.com/jma1ice/newsletterr" style="color: #E5A00D; text-decoration: none;">newsletterr</a></div>
-                                                    </td>
-                                                </tr>
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table></body></html>`;
+                    <table class="body" style="width: 100%;" border="0" cellspacing="0" cellpadding="0">
+                        <tbody><tr>
+                            <td class="container" style="display:block; max-width: 1042px; padding:10px; width:1042px; margin:0 auto !important;">
+                                <div class="content" style="max-width:1037px; padding:10px; margin:0 auto;">
+                                    <span class="preheader" style="display:none; opacity:0; visibility:hidden; height:0; width:0;">${serverName} Newsletter</span>
+                                    <table class="main" style="width:100%; background:#282A2D; border-radius:3px; color:#fff;" border="0" cellspacing="0" cellpadding="3"><tbody>
+                                        <tr><td class="wrapper" style="padding:5px;">
+                                            <div class="header" style="text-align:center; line-height:0;">
+                                                <img class="header-img plex-img" style="display:block; height:auto; border:0; max-width:100%; margin-left:22em;"
+                                                    src="https://d15k2d11r6t6rl.cloudfront.net/public/users/Integrators/669d5713-9b6a-46bb-bd7e-c542cff6dd6a/3bef3c50f13f4320a9e31b8be79c6ad2/Plex%20Logo%20Update%202022/plex-logo-heavy-stroke.png" width="40" />
+                                            </div>
+                                            <div class="server-name" style="font-size:25px; text-align:center; margin-bottom:0;">${serverName} Newsletter</div>
+                                        </td></tr>
+                                        <tr><td class="footer" style="font-size:12px; text-align:center; width:100%;">
+                                            <h1 class="footer-bar" style="margin: 5px auto 0; width:300px; border-top:1px solid #E5A00D;">${displaySubject}</h1>
+                                            <div style="margin:20px 0;">
+                                                ${bodyHTML}
+                                            </div>
+                                            <div class="footer-bar" style="margin:25px auto 0; width:250px; border-top:1px solid #E5A00D;">&nbsp;</div>
+                                            <div class="content-block powered-by" style="padding-bottom:10px;">Generated for Plex Media Server by
+                                                <a href="https://github.com/jma1ice/newsletterr" style="color:#E5A00D; text-decoration:none;">newsletterr</a>
+                                            </div>
+                                        </td></tr>
+                                    </tbody></table>
+                                </div>
+                            </td>
+                        </tr></tbody>
+                    </table>
+                </body></html>`;
+
+            const needRA = RX.RA.test(html0);
+            const needRECS = RX.RECS.test(html0);
+
+            const raCount = (html0.match(RX.RA_G) || []).length;
+            const recsCount = (html0.match(RX.RECS_G) || []).length;
+
+            console.log('RA tokens:', raCount, 'RECS tokens:', recsCount);
+
+            if (needRA && raCount > 0 && Array.isArray(recentData) && recentData.length) {
+                const bench = document.getElementById('workbench');
+                const raNode = buildRecentBlock(recentData);
+                bench.appendChild(raNode);
+                await new Promise(r => setTimeout(r, 0));
+                const raPNG = await raElementToPNG(raNode, {
+                    bg: '#282A2D',
+                    minWidth: 1920
+                });
+                bench.removeChild(raNode);
+                const raHTML = raPNG ? `<div style="margin:16px 0;"><img src="${raPNG}" style="max-width:100%; display:block; margin:0 auto;"></div>` : '';
+                html0 = html0.replace(RX.RA, raHTML);
+                if (raCount > 1) html0 = html0.replace(RX.RA_G, '');
+            } else {
+                html0 = html0.replace(RX.RA_G, '');
+            }
+
+            if (needRECS && recsCount > 0 && recsPayload && Object.keys(recsPayload).length) {
+                const bench = document.getElementById('workbench');
+                const recNode = buildRecsBlock(recsPayload);
+                bench.appendChild(recNode);
+                await new Promise(r => setTimeout(r, 0));
+                const recPNG = await recElementToPNG(recNode, {
+                    bg: '#282A2D',
+                    minWidth: 1920
+                });
+                bench.removeChild(recNode);
+                const recHTML = recPNG ? `<div style="margin:16px 0;"><img src="${recPNG}" style="max-width:100%; display:block; margin:0 auto;"></div>` : '';
+                html0 = html0.replace(RX.RECS, recHTML);
+                if (recsCount > 1) html0 = html0.replace(RX.RECS_G, '');
+            } else {
+                html0 = html0.replace(RX.RECS_G, '');
+            }
+
+            window.__emailHTML = html0;
+            window.__emailReady = true;
 
             const frame = document.getElementById('preview');
             console.log('Frame element:', frame);
@@ -767,13 +1223,8 @@
             console.log('HTML content length:', html.length);
             console.log('HTML content preview:', html.substring(0, 200) + '...');
             
-            // Set the HTML content first
-            frame.srcdoc = html;
-
-            window.__emailHTML = html;
-            window.__emailReady = true;
+            frame.srcdoc = html0;
             
-            // Function to auto-resize iframe based on content
             function resizeIframe() {
                 try {
                     const doc = frame.contentDocument || frame.contentWindow.document;
@@ -786,10 +1237,9 @@
                             doc.documentElement.offsetHeight
                         );
                         
-                        // Apply min and max height constraints
-                        const minHeight = 480; // 30rem in pixels (assuming 16px base)
-                        const maxHeight = 960; // 60rem in pixels
-                        const newHeight = Math.max(minHeight, Math.min(maxHeight, contentHeight + 20)); // +20 for padding
+                        const minHeight = 480;
+                        const maxHeight = 960;
+                        const newHeight = Math.max(minHeight, Math.min(maxHeight, contentHeight + 20));
                         
                         frame.style.height = newHeight + 'px';
                         console.log('Iframe resized to:', newHeight + 'px', 'Content height:', contentHeight);
@@ -799,7 +1249,6 @@
                 }
             }
             
-            // Wait for the iframe to load, then apply dark mode and resize
             frame.onload = function() {
                 try {
                     const doc = frame.contentDocument || frame.contentWindow.document;
@@ -807,7 +1256,6 @@
                         if (isDark) {
                             doc.documentElement.classList.add('dark');
                         }
-                        // Resize after a short delay to ensure content is fully rendered
                         setTimeout(resizeIframe, 100);
                     }
                 } catch (e) {
@@ -823,7 +1271,6 @@
         }
     }
 
-    // Start loading when page loads
     document.addEventListener('DOMContentLoaded', loadPreview);
 </script>
 {% endblock %}

@@ -171,20 +171,15 @@
                 }
             });
 
-            // Add Ctrl+S keyboard shortcut to save settings
             document.addEventListener('keydown', function(event) {
                 if (event.ctrlKey && event.key === 's') {
-                    event.preventDefault(); // Prevent browser's default save dialog
+                    event.preventDefault();
                     
-                    // Trigger the form submission
                     const settingsForm = document.getElementById('settings_form');
                     const applyButton = document.getElementById('apply_settings');
                     
                     if (settingsForm && applyButton) {
-                        // Show spinner like the normal submit does
                         showSpinner('Applying settings...');
-                        
-                        // Submit the form
                         settingsForm.submit();
                     }
                 }

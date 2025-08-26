@@ -1,6 +1,6 @@
-import os, math, uuid, base64, smtplib, sqlite3, requests, time, threading, re, json, mimetypes
+import os, math, uuid, base64, smtplib, sqlite3, requests, time, threading, re, json, mimetypes, shutil, calendar, traceback
 from bs4 import BeautifulSoup
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from cryptography.fernet import Fernet, InvalidToken
 from dotenv import load_dotenv, set_key, find_dotenv
 from email.mime.text import MIMEText
@@ -14,8 +14,8 @@ from plex_api_client import PlexAPI
 from urllib.parse import quote_plus, urljoin, urlparse
 
 app = Flask(__name__)
-app.jinja_env.globals["version"] = "v0.9.7"
-app.jinja_env.globals["publish_date"] = "August 21, 2025"
+app.jinja_env.globals["version"] = "v0.9.8"
+app.jinja_env.globals["publish_date"] = "August 26, 2025"
 
 def get_global_cache_status():
     """Get global cache status for display in navbar"""
@@ -56,9 +56,8 @@ def get_global_cache_status():
                 'present': present
             }
 
-        # Determine freshness classification
         if missing:
-            freshness_class = 'cache-badge-missing'  # force red if anything missing
+            freshness_class = 'cache-badge-missing'
             freshness_text = f"Missing: {', '.join(missing)}"
         elif oldest_age < 1:
             freshness_class = 'cache-badge-fresh'
@@ -84,31 +83,26 @@ def get_global_cache_status():
     except:
         return {'has_data': False, 'status': 'Cache error', 'age_display': 'error', 'class': 'cache-badge-muted'}
 
-# Make cache status available globally in templates
 app.jinja_env.globals["get_cache_status"] = get_global_cache_status
 
 def can_use_cached_data_for_preview(required_days):
     """Check if cached data is suitable for preview with required_days date range"""
     try:
-        # Get cache info for key data types
         stats_info = get_cache_info('stats')
         graph_info = get_cache_info('graph_data')
         
-        # Check if cache exists and is reasonably fresh (within extended duration)
         if not (stats_info.get('exists') and graph_info.get('exists')):
             return False, "Cache data missing"
         
         if not (stats_info.get('is_usable') and graph_info.get('is_usable')):
             return False, "Cache data too old"
         
-        # Check if cached parameters cover the required date range
         stats_params = stats_info.get('params', {})
         if 'time_range' in stats_params:
             try:
                 cached_days = int(stats_params.get('time_range', 0))
             except (TypeError, ValueError):
                 cached_days = 0
-            # Require exact match to avoid overstating recent period with longer cached data
             if cached_days == required_days:
                 return True, f"Using cached data ({cached_days} days exact match)"
             else:
@@ -117,9 +111,8 @@ def can_use_cached_data_for_preview(required_days):
     except Exception as e:
         return False, f"Error checking cache: {str(e)}"
 
-# Cache configuration
-CACHE_DURATION = 86400  # 24 hours in seconds (daily refresh)
-CACHE_EXTENDED_DURATION = 86400 * 7  # 1 week fallback duration
+CACHE_DURATION = 86400
+CACHE_EXTENDED_DURATION = 86400 * 7
 cache_storage = {
     'stats': {'data': None, 'timestamp': 0, 'params': None},
     'users': {'data': None, 'timestamp': 0, 'params': None},
@@ -152,6 +145,7 @@ DATA_IMG_RE = re.compile(
 )
 _WORKERS_STARTED = False
 _WORKERS_LOCK = threading.Lock()
+_RENDER_LOCK = threading.Lock()
 
 load_dotenv(ENV_PATH)
 
@@ -166,11 +160,6 @@ def start_background_workers():
         print("Background workers started.")
 
 def is_cache_valid(cache_key, strict=True):
-    """Check if cache data is still valid
-    Args:
-        cache_key: The cache key to check
-        strict: If True, use normal cache duration. If False, use extended duration for fallback
-    """
     cache_entry = cache_storage.get(cache_key)
     if cache_entry and cache_entry['data'] is not None:
         age = time.time() - cache_entry['timestamp']
@@ -179,17 +168,11 @@ def is_cache_valid(cache_key, strict=True):
     return False
 
 def get_cached_data(cache_key, strict=True):
-    """Get cached data if valid
-    Args:
-        cache_key: The cache key to retrieve
-        strict: If True, use normal cache duration. If False, use extended duration for fallback
-    """
     if is_cache_valid(cache_key, strict):
         return cache_storage[cache_key]['data']
     return None
 
 def set_cached_data(cache_key, data, params=None):
-    """Store data in cache with current timestamp and parameters"""
     cache_storage[cache_key] = {
         'data': data,
         'timestamp': time.time(),
@@ -197,7 +180,6 @@ def set_cached_data(cache_key, data, params=None):
     }
 
 def get_cache_info(cache_key):
-    """Get cache information including age and parameters"""
     cache_entry = cache_storage.get(cache_key)
     if cache_entry and cache_entry['data'] is not None:
         age = time.time() - cache_entry['timestamp']
@@ -211,7 +193,6 @@ def get_cache_info(cache_key):
     return {'exists': False}
 
 def clear_cache(cache_key=None):
-    """Clear specific cache or all cache if no key specified"""
     if cache_key:
         cache_storage[cache_key] = {'data': None, 'timestamp': 0, 'params': None}
     else:
@@ -251,11 +232,9 @@ def decrypt(encrypted: str) -> str:
         return encrypted
 
 def init_db(db_path):
-    """Initialize the unified database with all tables"""
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     
-    # Settings table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS settings (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -273,7 +252,6 @@ def init_db(db_path):
         )
     """)
     
-    # Email lists table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS email_lists (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -283,7 +261,6 @@ def init_db(db_path):
         )
     """)
     
-    # Email templates table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS email_templates (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -297,7 +274,6 @@ def init_db(db_path):
         )
     """)
     
-    # Email history table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS email_history (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -311,7 +287,6 @@ def init_db(db_path):
         )
     """)
 
-    # Backwards compatibility: add template_name column if missing
     try:
         cursor.execute("PRAGMA table_info(email_history)")
         cols = [r[1] for r in cursor.fetchall()]
@@ -320,7 +295,6 @@ def init_db(db_path):
     except Exception as _e:
         print(f"Warning: could not ensure template_name column exists: {_e}")
     
-    # Email schedules table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS email_schedules (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -342,7 +316,6 @@ def init_db(db_path):
     
     conn.commit()
     
-    # Check if send_time column exists, if not add it (for existing databases)
     cursor.execute("PRAGMA table_info(email_schedules)")
     columns = [column[1] for column in cursor.fetchall()]
     if 'send_time' not in columns:
@@ -350,7 +323,6 @@ def init_db(db_path):
         cursor.execute("ALTER TABLE email_schedules ADD COLUMN send_time TEXT DEFAULT '09:00'")
         conn.commit()
     
-    # Check if date_range column exists, if not add it (for existing databases)
     if 'date_range' not in columns:
         print("Adding date_range column to email_schedules table...")
         cursor.execute("ALTER TABLE email_schedules ADD COLUMN date_range INTEGER DEFAULT 7")
@@ -359,11 +331,6 @@ def init_db(db_path):
     conn.close()
 
 def migrate_data_from_separate_dbs():
-    """Migrate data from separate database files to the unified database"""
-    import os
-    import shutil
-    
-    # Database file paths
     separate_dbs = [
         os.path.join("database", "email_lists.db"),
         os.path.join("database", "email_templates.db"), 
@@ -371,20 +338,17 @@ def migrate_data_from_separate_dbs():
         os.path.join("database", "schedules.db")
     ]
     
-    # Check if any separate database files exist
     has_separate_data = any(os.path.exists(db_path) for db_path in separate_dbs)
     
     if not has_separate_data:
-        return  # No migration needed
+        return
     
     print("Migrating data from separate database files to unified database...")
     
-    # Connect to unified database
     unified_conn = sqlite3.connect(DB_PATH)
     unified_cursor = unified_conn.cursor()
     
     try:
-        # Migrate email lists
         email_lists_path = os.path.join("database", "email_lists.db")
         if os.path.exists(email_lists_path):
             print("Migrating email lists...")
@@ -399,7 +363,6 @@ def migrate_data_from_separate_dbs():
                 """, row)
             old_conn.close()
         
-        # Migrate email templates
         email_templates_path = os.path.join("database", "email_templates.db")
         if os.path.exists(email_templates_path):
             print("Migrating email templates...")
@@ -414,7 +377,6 @@ def migrate_data_from_separate_dbs():
                 """, row)
             old_conn.close()
         
-        # Migrate email history
         email_history_path = os.path.join("database", "email_history.db")
         if os.path.exists(email_history_path):
             print("Migrating email history...")
@@ -429,7 +391,6 @@ def migrate_data_from_separate_dbs():
                 """, row)
             old_conn.close()
         
-        # Migrate email schedules
         schedules_path = os.path.join("database", "schedules.db")
         if os.path.exists(schedules_path):
             print("Migrating email schedules...")
@@ -447,7 +408,6 @@ def migrate_data_from_separate_dbs():
         unified_conn.commit()
         print("Data migration completed successfully!")
         
-        # Create backups and remove old files
         backup_dir = os.path.join("database", "backup_" + str(int(time.time())))
         os.makedirs(backup_dir, exist_ok=True)
         
@@ -463,22 +423,6 @@ def migrate_data_from_separate_dbs():
     finally:
         unified_conn.close()
 
-def init_email_lists_db(db_path):
-    """Deprecated: Use init_db() instead"""
-    pass
-
-def init_email_templates_db(db_path):
-    """Deprecated: Use init_db() instead"""
-    pass
-
-def init_email_history_db(db_path):
-    """Deprecated: Use init_db() instead"""
-    pass
-
-def init_schedules_db(db_path):
-    """Deprecated: Use init_db() instead"""
-    pass
-
 def migrate_schema(column_def):
     conn = sqlite3.connect(DB_PATH)
     try:
@@ -492,7 +436,6 @@ def migrate_schema(column_def):
         conn.close()
 
 def get_saved_email_lists():
-    """Get all saved email lists"""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("SELECT id, name, emails FROM email_lists ORDER BY name")
@@ -501,7 +444,6 @@ def get_saved_email_lists():
     return [{'id': row[0], 'name': row[1], 'emails': row[2]} for row in lists]
 
 def save_email_list(name, emails):
-    """Save a new email list"""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     try:
@@ -509,23 +451,18 @@ def save_email_list(name, emails):
         conn.commit()
         return True
     except sqlite3.IntegrityError:
-        return False  # Name already exists
+        return False
     finally:
         conn.close()
 
 def delete_email_list(list_id):
-    """Delete an email list by ID"""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("DELETE FROM email_lists WHERE id = ?", (list_id,))
     conn.commit()
     conn.close()
 
-# Scheduling functions
 def get_email_schedules():
-    """Get all email schedules with email list and template names"""
-    from datetime import datetime
-    # Month abbreviations with trailing periods per UI spec
     MONTH_ABBR_PERIOD = ["Jan.", "Feb.", "Mar.", "Apr.", "May.", "Jun.", "Jul.", "Aug.", "Sep.", "Oct.", "Nov.", "Dec."]
     
     conn = sqlite3.connect(DB_PATH)
@@ -546,9 +483,8 @@ def get_email_schedules():
     
     result = []
     for schedule in schedules:
-        # next_send format: "Sunday Sep. 21, 2025  09:00" (24h, two spaces before time)
         next_send_formatted = None
-        if schedule[8]:  # next_send
+        if schedule[8]:
             try:
                 next_dt = datetime.fromisoformat(schedule[8])
                 weekday = next_dt.strftime('%A')
@@ -557,9 +493,8 @@ def get_email_schedules():
             except Exception:
                 next_send_formatted = schedule[8]
 
-        # last_sent format same as next_send format
         last_sent_formatted = None
-        if schedule[7]:  # last_sent
+        if schedule[7]:
             try:
                 last_dt = datetime.fromisoformat(schedule[7])
                 weekday = last_dt.strftime('%A')
@@ -568,7 +503,6 @@ def get_email_schedules():
             except Exception:
                 last_sent_formatted = schedule[7]
 
-        # start_date display format: "Mar. 27, 2025"
         start_date_raw = schedule[5]
         start_date_formatted = start_date_raw
         try:
@@ -583,7 +517,7 @@ def get_email_schedules():
             'email_list_id': schedule[2],
             'template_id': schedule[3],
             'frequency': schedule[4],
-            'start_date': start_date_raw,  # keep raw for form editing
+            'start_date': start_date_raw,
             'start_date_formatted': start_date_formatted,
             'send_time': schedule[6],
             'last_sent': last_sent_formatted or 'Never',
@@ -597,66 +531,50 @@ def get_email_schedules():
     return result
 
 def calculate_next_send(frequency, start_date, send_time='09:00', last_sent=None):
-    """Calculate the next send time based on frequency and specific time"""
-    from datetime import datetime, timedelta
-    import calendar
-    
     if last_sent:
         base_date = datetime.fromisoformat(last_sent.replace('Z', '+00:00')).replace(tzinfo=None)
     else:
         base_date = datetime.fromisoformat(start_date)
     
-    # Parse send_time and set it on the base date
     hour, minute = map(int, send_time.split(':'))
     
     if frequency == 'daily':
         next_date = base_date + timedelta(days=1)
     elif frequency == 'weekly':
-        # Weekly: maintain the same day of the week
-        # Get the original day of the week from start_date
         start_dt = datetime.fromisoformat(start_date)
-        target_weekday = start_dt.weekday()  # Monday=0, Sunday=6
+        target_weekday = start_dt.weekday()
         
-        # Find the next occurrence of that weekday
         days_until_target = (target_weekday - base_date.weekday()) % 7
         if days_until_target == 0:
-            days_until_target = 7  # If it's the same day, go to next week
+            days_until_target = 7
         next_date = base_date + timedelta(days=days_until_target)
         
     elif frequency == 'monthly':
-        # Monthly: maintain the same day of the month
-        # Get the original day of the month from start_date
         start_dt = datetime.fromisoformat(start_date)
         target_day = start_dt.day
         
-        # Calculate next month
         next_month = base_date.month + 1
         next_year = base_date.year
         if next_month > 12:
             next_month = 1
             next_year += 1
         
-        # Get the last day of the target month
         last_day_of_month = calendar.monthrange(next_year, next_month)[1]
         
-        # If target day exceeds the month's days, use the last day of the month
         actual_day = min(target_day, last_day_of_month)
         
         next_date = datetime(next_year, next_month, actual_day)
         
     else:
-        next_date = base_date + timedelta(days=1)  # Default to daily
+        next_date = base_date + timedelta(days=1)
     
-    # Set the specific time
     next_date = next_date.replace(hour=hour, minute=minute, second=0, microsecond=0)
     return next_date
 
 def create_email_schedule(name, email_list_id, template_id, frequency, start_date, send_time='09:00', date_range=7):
-    """Create a new email schedule"""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
-    # Calculate next send time
     next_send = calculate_next_send(frequency, start_date, send_time)
     
     try:
@@ -673,11 +591,9 @@ def create_email_schedule(name, email_list_id, template_id, frequency, start_dat
         conn.close()
 
 def update_email_schedule(schedule_id, name, email_list_id, template_id, frequency, start_date, send_time='09:00', date_range=7):
-    """Update an existing email schedule"""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
-    # Calculate next send time based on new parameters
     next_send = calculate_next_send(frequency, start_date, send_time)
     
     try:
@@ -696,7 +612,6 @@ def update_email_schedule(schedule_id, name, email_list_id, template_id, frequen
         conn.close()
 
 def delete_email_schedule(schedule_id):
-    """Delete an email schedule"""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("DELETE FROM email_schedules WHERE id = ?", (schedule_id,))
@@ -704,7 +619,6 @@ def delete_email_schedule(schedule_id):
     conn.close()
 
 def toggle_schedule_status(schedule_id, is_active):
-    """Toggle schedule active/inactive status"""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("UPDATE email_schedules SET is_active = ? WHERE id = ?", (is_active, schedule_id))
@@ -712,11 +626,9 @@ def toggle_schedule_status(schedule_id, is_active):
     conn.close()
 
 def update_schedule_last_sent(schedule_id):
-    """Update the last sent time and calculate next send"""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
-    # Get current schedule details
     cursor.execute("SELECT frequency, start_date, send_time FROM email_schedules WHERE id = ?", (schedule_id,))
     result = cursor.fetchone()
     if not result:
@@ -735,19 +647,16 @@ def update_schedule_last_sent(schedule_id):
     conn.commit()
     conn.close()
 
-# Background scheduler
 def background_scheduler():
-    """Background thread to check and send scheduled emails and refresh cache daily"""
     print("Background scheduler started...")
-    last_cache_refresh = 0  # Track last cache refresh
+    last_cache_refresh = 0
     
     while True:
         try:
             now = datetime.now()
             current_time = time.time()
             
-            # Check if we need to refresh cache (once per day)
-            if current_time - last_cache_refresh > 86400:  # 24 hours
+            if current_time - last_cache_refresh > 86400:
                 print(f"Daily cache refresh triggered at {now.isoformat()}")
                 refresh_daily_cache()
                 last_cache_refresh = current_time
@@ -755,7 +664,6 @@ def background_scheduler():
             conn = sqlite3.connect(DB_PATH)
             cursor = conn.cursor()
             
-            # Get all active schedules for debugging
             cursor.execute("SELECT id, name, next_send, is_active FROM email_schedules")
             all_schedules = cursor.fetchall()
             print(f"Scheduler check at {now.isoformat()}")
@@ -763,7 +671,6 @@ def background_scheduler():
             for sched in all_schedules:
                 print(f"  - ID {sched[0]}: {sched[1]}, next_send: {sched[2]}, active: {sched[3]}")
             
-            # Get schedules that are due to send
             cursor.execute("""
                 SELECT id, name, email_list_id, template_id, frequency 
                 FROM email_schedules 
@@ -779,7 +686,6 @@ def background_scheduler():
                 schedule_id, name, email_list_id, template_id, frequency = schedule
                 print(f"Processing schedule: {name} (ID: {schedule_id})")
                 try:
-                    # Send the scheduled email
                     success = send_scheduled_email(schedule_id, email_list_id, template_id)
                     if success:
                         update_schedule_last_sent(schedule_id)
@@ -792,13 +698,10 @@ def background_scheduler():
         except Exception as e:
             print(f"Error in background scheduler: {e}")
         
-        # Check every 60 seconds
         time.sleep(60)
 
 def refresh_daily_cache():
-    """Refresh cache with latest data using last known parameters"""
     try:
-        # Get settings
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         cursor.execute("SELECT server_name, tautulli_url, tautulli_api FROM settings WHERE id = 1")
@@ -818,11 +721,9 @@ def refresh_daily_cache():
         tautulli_base_url = settings['tautulli_url'].rstrip('/')
         tautulli_api_key = settings['tautulli_api']
         
-        # Use default parameters for daily refresh
-        time_range = "30"  # Default to 30 days
-        count = "10"       # Default to 10 items
+        time_range = "30"
+        count = "10"
         
-        # Check if we have previous parameters
         stats_info = get_cache_info('stats')
         if stats_info['exists'] and stats_info['params']:
             time_range = stats_info['params'].get('time_range', time_range)
@@ -830,7 +731,6 @@ def refresh_daily_cache():
         
         print(f"Refreshing cache with time_range: {time_range}, count: {count}")
         
-        # Graph commands
         graph_commands = [
             {'command': 'get_concurrent_streams_by_stream_type', 'name': 'Stream Type'},
             {'command': 'get_plays_by_date', 'name': 'Plays by Date'},
@@ -851,7 +751,6 @@ def refresh_daily_cache():
             {'command': 'show'}
         ]
         
-        # Create parameter signature
         cache_params = {
             'time_range': time_range,
             'count': count,
@@ -862,19 +761,16 @@ def refresh_daily_cache():
         
         error = None
         
-        # Refresh stats
         stats, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_home_stats', 'Stats', error, time_range)
         if stats:
             set_cached_data('stats', stats, cache_params)
             print("✓ Stats cache refreshed")
         
-        # Refresh users
         users, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_users', 'Users', error)
         if users:
             set_cached_data('users', users, cache_params)
             print("✓ Users cache refreshed")
         
-        # Refresh graph data
         graph_data = []
         for command in graph_commands:
             gd, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, command["command"], command["name"], error, time_range)
@@ -885,7 +781,6 @@ def refresh_daily_cache():
             set_cached_data('graph_data', graph_data, cache_params)
             print("✓ Graph data cache refreshed")
         
-        # Refresh recent data
         recent_data = []
         for command in recent_commands:
             rd, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_recently_added', command["command"], error, count)
@@ -902,9 +797,7 @@ def refresh_daily_cache():
         print(f"Error in daily cache refresh: {e}")
 
 def generate_email_content(template_id, settings, date_range=7):
-    """Generate complete email content with graphs, stats, and template processing"""
     try:
-        # Get template
         templates_conn = sqlite3.connect(DB_PATH)
         templates_cursor = templates_conn.cursor()
         templates_cursor.execute("SELECT name, subject, email_text, selected_items FROM email_templates WHERE id = ?", (template_id,))
@@ -916,18 +809,15 @@ def generate_email_content(template_id, settings, date_range=7):
         
         template_name, subject, email_text, selected_items_json = template_result
         
-        # Parse selected items
         try:
             selected_items = json.loads(selected_items_json) if selected_items_json else []
         except:
             selected_items = []
         
-        # Get fresh data for the specified date range if Tautulli is configured
         stats = None
         graph_data = []
         recent_data = []
         
-        # Check if Tautulli is configured
         tautulli_conn = sqlite3.connect(DB_PATH)
         tautulli_cursor = tautulli_conn.cursor()
         tautulli_cursor.execute("SELECT tautulli_url, tautulli_api FROM settings WHERE id = 1")
@@ -940,7 +830,6 @@ def generate_email_content(template_id, settings, date_range=7):
             
             print(f"Fetching fresh Tautulli data for scheduled email - {date_range} days")
             
-            # Define graph commands (same as main page)
             graph_commands = [
                 {'command': 'get_concurrent_streams_by_stream_type', 'name': 'Stream Type'},
                 {'command': 'get_plays_by_date', 'name': 'Plays by Date'},
@@ -961,13 +850,11 @@ def generate_email_content(template_id, settings, date_range=7):
                 {'command': 'show'}
             ]
             
-            # Fetch fresh stats data
             try:
                 stats, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_home_stats', 'Stats', None, str(date_range))
                 if error:
                     print(f"Error fetching stats: {error}")
                     
-                # Fetch graph data
                 graph_data = []
                 for command in graph_commands:
                     gd, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, command["command"], command["name"], error, str(date_range))
@@ -976,7 +863,6 @@ def generate_email_content(template_id, settings, date_range=7):
                     if error:
                         print(f"Error fetching graph data for {command['name']}: {error}")
                 
-                # Fetch recent data
                 recent_data = []
                 for command in recent_commands:
                     rd, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_recently_added', command["command"], error, "10")
@@ -987,18 +873,15 @@ def generate_email_content(template_id, settings, date_range=7):
                         
             except Exception as e:
                 print(f"Failed to fetch fresh stats: {e}")
-                # Fallback to cached data
                 stats = get_cached_data('stats') or []
                 graph_data = get_cached_data('graph_data') or []
                 recent_data = get_cached_data('recent_data') or []
         else:
             print("Tautulli not configured, using cached data")
-            # Fallback to cached data
             stats = get_cached_data('stats') or []
             graph_data = get_cached_data('graph_data') or []
             recent_data = get_cached_data('recent_data') or []
         
-        # Process all selected items in order to build the complete email content
         all_content_html = ""
         
         for item in selected_items:
@@ -1007,23 +890,19 @@ def generate_email_content(template_id, settings, date_range=7):
             item_name = item.get('name', '')
             
             if item_type == 'textblock' or item_type == 'titleblock':
-                # Get text content from the stored content in selected_items
                 text_content = item.get('content', '')
                 
-                # Fallback to email_text if no individual content found
                 if not text_content and email_text:
                     text_content = email_text.strip()
                 
                 if text_content:
                     if item_type == 'titleblock':
-                        # Style title blocks with larger, bold, centered text
                         all_content_html += f"""
                         <div style="margin-bottom: 20px; font-size: 1.5em; font-weight: bold; text-align: center; color: #E5A00D;">
                             {text_content.replace(chr(10), '<br>')}
                         </div>
                         """
                     else:
-                        # Regular text block
                         all_content_html += f"""
                         <div style="margin-bottom: 15px; color: #fff;">
                             {text_content.replace(chr(10), '<br>')}
@@ -1041,7 +920,7 @@ def generate_email_content(template_id, settings, date_range=7):
                             <table style="width: 100%; border-collapse: collapse; margin: 10px 0;">
                         """
                         if stat.get('rows'):
-                            for row in stat['rows'][:10]:  # Limit to top 10
+                            for row in stat['rows'][:10]:
                                 title = row.get('title', 'Unknown')
                                 count = row.get('total_plays', row.get('count', 0))
                                 year = row.get('year', '')
@@ -1068,7 +947,6 @@ def generate_email_content(template_id, settings, date_range=7):
                 try:
                     graph_index = int(item_id.split('-')[1])
                     if graph_index < len(graph_data):
-                        # Generate a simple text-based representation of graph data
                         graph_info = graph_data[graph_index] if isinstance(graph_data, list) else graph_data
                         
                         graph_html = f"""
@@ -1077,7 +955,6 @@ def generate_email_content(template_id, settings, date_range=7):
                             <div style="color: #fff; font-family: monospace; font-size: 14px;">
                         """
                         
-                        # Add some basic graph data representation
                         if isinstance(graph_info, dict) and 'series' in graph_info:
                             for series in graph_info.get('series', []):
                                 series_name = series.get('name', 'Data')
@@ -1100,7 +977,6 @@ def generate_email_content(template_id, settings, date_range=7):
                         all_content_html += graph_html
                 except Exception as e:
                     print(f"Error processing graph {item_id}: {e}")
-                    # Fallback graph representation
                     graph_html = f"""
                     <div style="margin: 20px 0; padding: 20px; background: #333; border-radius: 5px; border-left: 4px solid #E5A00D;">
                         <h3 style="color: #E5A00D;">{item_name}</h3>
@@ -1109,46 +985,60 @@ def generate_email_content(template_id, settings, date_range=7):
                     """
                     all_content_html += graph_html
         
-        # If we have modular content, use it; otherwise fall back to legacy email_text
         if all_content_html.strip():
             final_content = all_content_html
         else:
-            # Fallback to legacy handling
             final_content = email_text or ""
         
-        # Apply layout with the assembled content
         processed_body = apply_layout(final_content, "", "", "", "", subject, settings['server_name'])
         
         return template_name, subject, processed_body
         
     except Exception as e:
         print(f"Error generating email content: {e}")
-        import traceback
         traceback.print_exc()
         return None, None, str(e)
 
-def render_email_html_via_headless(schedule_id: int) -> str:
-    base = "http://127.0.0.1:6397"
+def render_email_html_via_headless(schedule_id: int, base: str, theme: str) -> str:
     url = f"{base}/scheduling/{schedule_id}/preview-page?schedule_id={schedule_id}"
-
-    with sync_playwright() as pw:
-        browser = pw.chromium.launch(headless=True, args=["--no-sandbox"])
-        context = browser.new_context(viewport={"width": 1280, "height": 900})
-        page = context.new_page()
-        page.goto(url, wait_until="networkidle")
-
-        page.wait_for_function("window.__emailReady === true", timeout=60_000)
-
-        html = page.evaluate("window.__emailHTML")
-
+    try:
+        context.close()
         browser.close()
-        return html or ""
+    except Exception:
+        pass
+
+    with _RENDER_LOCK:
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch(headless=True, args=["--no-sandbox"])
+            context = browser.new_context(
+                viewport={"width": 1280, "height": 900},
+                color_scheme="dark" if theme == "dark" else "light"
+            )
+            page = context.new_page()
+            page.goto(url, wait_until="load")
+            
+            try:
+                page.wait_for_function("window.__emailReady === true || typeof window.__emailHTML === 'string'", timeout=60_000)
+            except Exception:
+                try:
+                    page.evaluate("typeof loadPreview === 'function' && loadPreview()")
+                    page.wait_for_function(
+                        "window.__emailReady === true || typeof window.__emailHTML === 'string'",
+                        timeout=30_000
+                    )
+                except Exception:
+                    pass
+
+            html = page.evaluate("window.__emailHTML || document.querySelector('#preview')?.srcdoc")
+
+            context.close()
+            browser.close()
+            pw = None
+            return html or ""
 
 def send_scheduled_email(schedule_id, email_list_id, template_id):
-    """Send an email based on schedule parameters"""
     print(f"Attempting to send scheduled email - Schedule ID: {schedule_id}, List ID: {email_list_id}, Template ID: {template_id}")
     try:
-        # Get schedule details to get date_range
         schedule_conn = sqlite3.connect(DB_PATH)
         schedule_cursor = schedule_conn.cursor()
         schedule_cursor.execute("SELECT date_range FROM email_schedules WHERE id = ?", (schedule_id,))
@@ -1158,7 +1048,6 @@ def send_scheduled_email(schedule_id, email_list_id, template_id):
         date_range = schedule_result[0] if schedule_result else 7
         print(f"Using date range: {date_range} days")
         
-        # Get email list
         email_lists_conn = sqlite3.connect(DB_PATH)
         email_lists_cursor = email_lists_conn.cursor()
         email_lists_cursor.execute("SELECT emails FROM email_lists WHERE id = ?", (email_list_id,))
@@ -1172,7 +1061,6 @@ def send_scheduled_email(schedule_id, email_list_id, template_id):
         to_emails = email_list_result[0]
         print(f"Found email list with {len(to_emails.split(','))} recipients")
         
-        # Get template
         templates_conn = sqlite3.connect(DB_PATH)
         templates_cursor = templates_conn.cursor()
         templates_cursor.execute("SELECT name, subject, email_text FROM email_templates WHERE id = ?", (template_id,))
@@ -1186,7 +1074,6 @@ def send_scheduled_email(schedule_id, email_list_id, template_id):
         template_name, subject, email_text = template_result
         print(f"Found template: {template_name}")
         
-        # Get SMTP settings from database
         settings_conn = sqlite3.connect(DB_PATH)
         settings_cursor = settings_conn.cursor()
         settings_cursor.execute("SELECT from_email, alias_email, password, smtp_server, smtp_port, server_name FROM settings WHERE id = 1")
@@ -1206,20 +1093,20 @@ def send_scheduled_email(schedule_id, email_list_id, template_id):
             print(f"SMTP_SERVER: {'Set' if smtp_server else 'Missing'}")
             return False
         
-        # Decrypt the password
         try:
             password = decrypt(encrypted_password)
         except Exception as e:
             print(f"Failed to decrypt password: {e}")
             return False
         
-        # Use default port if not set
         if not smtp_port:
             smtp_port = 587
         
         print(f"Using SMTP settings - Server: {smtp_server}, Port: {smtp_port}, From: {from_email}")
 
-        email_html = render_email_html_via_headless(schedule_id)
+        public_base = os.environ.get("PUBLIC_BASE_URL", "http://127.0.0.1:6397")
+        theme = 'dark'  # pull from elsewhere other than hardcoded
+        email_html = render_email_html_via_headless(schedule_id, public_base, theme)
         
         if not email_html:
             print("Failed to generate email content")
@@ -1227,7 +1114,6 @@ def send_scheduled_email(schedule_id, email_list_id, template_id):
         
         print(f"Generated email content for template: {template_name} with {date_range} days of data")
         
-        # Create and send email
         msg_root = MIMEMultipart('related')
         msg_root['Subject'] = f"[SCHEDULED] {subject}"
         if alias_email:
@@ -1245,19 +1131,15 @@ def send_scheduled_email(schedule_id, email_list_id, template_id):
         except Exception as e:
             print(f"inline_data_images_to_cid failed: {e}")
 
-        public_base = 'http://127.0.0.1:6397'
         try:
             email_html = inline_remote_images_to_cid(email_html, msg_root, base_url=public_base)
         except Exception as e:
             print(f"inline_remote_images_to_cid failed: {e}")
         
-        # Use the processed template content
         msg_alternative.attach(MIMEText(email_html, 'html'))
         
-        # Send email
         print("Attempting to send email...")
         try:
-            # Use SSL for port 465, STARTTLS for port 587
             if int(smtp_port) == 465:
                 server = smtplib.SMTP_SSL(smtp_server, int(smtp_port))
                 server.login(from_email, password)
@@ -1280,7 +1162,6 @@ def send_scheduled_email(schedule_id, email_list_id, template_id):
             server.quit()
             print(f"Email sent successfully to {len(all_recipients)} recipients")
             
-            # Log to email_history
             try:
                 history_conn = sqlite3.connect(DB_PATH)
                 history_cursor = history_conn.cursor()
@@ -1300,12 +1181,10 @@ def send_scheduled_email(schedule_id, email_list_id, template_id):
         
     except Exception as e:
         print(f"Error in send_scheduled_email: {e}")
-        import traceback
         traceback.print_exc()
         return False
 
 def apply_layout(body, graphs_html_block, stats_html_block, ra_html_block, recs_html_block, subject, server_name):
-    # Layout functionality deprecated - using standard layout only
     body = body.replace('\n', '<br>')
     body = body.replace('[GRAPHS]', graphs_html_block)
     body = body.replace('[STATS]', stats_html_block)
@@ -1317,10 +1196,36 @@ def apply_layout(body, graphs_html_block, stats_html_block, ra_html_block, recs_
     else:
         display_subject = subject
 
-    # Always use standard layout (layout parameter ignored)
-    return f"""
+    return f"""`
     <link href="https://fonts.googleapis.com/css?family=IBM+Plex+Sans:400,500,600,700&display=swap" rel="stylesheet">
-    <html><body style="font-family: IBM Plex Sans;">
+    <html>
+    <style>
+        @media only screen and (max-width:1900px) {{
+            .plex-img {{ margin-left: 44rem !important; }}
+        }}
+        @media only screen and (max-width:1700px) {{
+            .plex-img {{ margin-left: 38rem !important; }}
+        }}
+        @media only screen and (max-width:1500px) {{
+            .plex-img {{ margin-left: 30rem !important; }}
+        }}
+        @media only screen and (max-width:1300px) {{
+            .plex-img {{ margin-left: 24rem !important; }}
+        }}
+        @media only screen and (max-width:1100px) {{
+            .plex-img {{ margin-left: 16rem !important; }}
+        }}
+        @media only screen and (max-width:900px) {{
+            .plex-img {{ margin-left: 10rem !important; }}
+        }}
+        @media only screen and (max-width:700px) {{
+            .plex-img {{ margin-left: 4rem !important; }}
+        }}
+        @media only screen and (max-width:500px) {{
+            .plex-img {{ margin-left: 2rem !important; }}
+        }}
+    </style>
+    <body style="font-family: IBM Plex Sans;">
         <table class="body" style="border-collapse: separate; mso-table-lspace: 0pt; mso-table-rspace: 0pt; width: 100%;" border="0" cellspacing="0" cellpadding="0">
             <tbody>
                 <tr>
@@ -1330,7 +1235,7 @@ def apply_layout(body, graphs_html_block, stats_html_block, ra_html_block, recs_
                                 <tbody>
                                     <tr>
                                         <td class="wrapper" style="font-family: IBM Plex Sans; font-size: 14px; vertical-align: top; box-sizing: border-box; padding: 5px; overflow: auto;">
-                                            <div class="header" style="width: 50%; height: 10px; text-align: center;"><img class="header-img" style="border: none; -ms-interpolation-mode: bicubic; max-width: 9%; width: 492px; height: 20px; margin-left: -35px;" src="https://d15k2d11r6t6rl.cloudfront.net/public/users/Integrators/669d5713-9b6a-46bb-bd7e-c542cff6dd6a/3bef3c50f13f4320a9e31b8be79c6ad2/Plex%20Logo%20Update%202022/plex-logo-heavy-stroke.png" width="492" height="90" /></div>
+                                            <div class="header" style="text-align: center; line-height: 0;"><img class="header-img plex-img" style="display: block; outline: 0; text-decoration: none; height: auto; border: 0; -ms-interpolation-mode: bicubic; max-width: 100%; margin-left: 40em;" src="https://d15k2d11r6t6rl.cloudfront.net/public/users/Integrators/669d5713-9b6a-46bb-bd7e-c542cff6dd6a/3bef3c50f13f4320a9e31b8be79c6ad2/Plex%20Logo%20Update%202022/plex-logo-heavy-stroke.png" width="40" /></div>
                                             <div class="server-name" style="font-size: 25px; text-align: center; margin-bottom: 0;">{server_name} Newsletter</div>
                                         </td>
                                     </tr>
@@ -1350,10 +1255,10 @@ def apply_layout(body, graphs_html_block, stats_html_block, ra_html_block, recs_
                     </td>
                 </tr>
             </tbody>
-        </table></body></html>"""
+        </table></body></html>`"""
 
 def run_tautulli_command(base_url, api_key, command, data_type, error, time_range='30'):
-    out_data = None  # Initialize to prevent NameError
+    out_data = None
     
     if command == 'get_users':
         api_url = f"{base_url}/api/v2?apikey={decrypt(api_key)}&cmd={command}"
@@ -1413,12 +1318,6 @@ def run_conjurr_command(base_url, user_dict, error):
     return [recommendations_dict, error]
 
 def inline_data_images_to_cid(html: str, msg_root, cid_prefix="img"):
-    """
-    - Finds <img src="data:image/...;base64,...."> in html
-    - Replaces src with cid:<generated>
-    - Attaches each image to msg_root (multipart/related)
-    Returns (new_html, list_of_cids)
-    """
     soup = BeautifulSoup(html or "", "html.parser")
     cids = []
 
@@ -1431,9 +1330,8 @@ def inline_data_images_to_cid(html: str, msg_root, cid_prefix="img"):
         if subtype == "jpg":
             subtype = "jpeg"
 
-        # Decode and attach
         raw = base64.b64decode(b64)
-        cid = make_msgid(domain="newsletterr.local")[1:-1]  # strip <>; simple token
+        cid = make_msgid(domain="newsletterr.local")[1:-1]
         img["src"] = f"cid:{cid}"
 
         part = MIMEImage(raw, _subtype=subtype)
@@ -1485,7 +1383,7 @@ def inline_remote_images_to_cid(html: str, msg_root, base_url: str) -> str:
 
 def ensure_cids_match_html(html: str, attachments_cids: list[str]):
     missing = [cid for cid in attachments_cids if f'src="cid:{cid}"' not in html]
-    return missing  # for logging / debugging only
+    return missing
 
 def _norm(v: str):
     if not v:
@@ -1644,15 +1542,12 @@ def index():
             "server_name": ""
         }
 
-    # Load cached data if available (for both GET and POST requests)
     if settings['server_name'] != "":
-        # Try to get fresh cached data first, fall back to older data if needed
         stats = get_cached_data('stats', strict=True) or get_cached_data('stats', strict=False)
         users = get_cached_data('users', strict=True) or get_cached_data('users', strict=False)
         graph_data = get_cached_data('graph_data', strict=True) or get_cached_data('graph_data', strict=False) or []
         recent_data = get_cached_data('recent_data', strict=True) or get_cached_data('recent_data', strict=False) or []
         
-        # Build user_dict if we have users
         if users:
             for user in users:
                 if user['email'] != None and user['is_active']:
@@ -1669,7 +1564,6 @@ def index():
             tautulli_base_url = settings['tautulli_url'].rstrip('/')
             tautulli_api_key = settings['tautulli_api']
             
-            # Create parameter signature for caching
             cache_params = {
                 'time_range': time_range,
                 'count': count,
@@ -1677,22 +1571,18 @@ def index():
                 'timestamp': time.time()
             }
 
-            # Always fetch fresh data on POST request
             stats, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_home_stats', 'Stats', error, time_range)
             set_cached_data('stats', stats, cache_params)
             
             users, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_users', 'Users', error)
             set_cached_data('users', users, cache_params)
             
-            # Fetch graph data
             graph_data = []
             for command in graph_commands:
                 try:
                     gd, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, command["command"], command["name"], error, time_range)
-                    # Only append valid data, use empty dict as fallback for failed commands
                     graph_data.append(gd if gd is not None else {})
                 except Exception as e:
-                    # If command fails completely, append empty dict and continue
                     graph_data.append({})
                     if error is None:
                         error = f"Graph Error: {str(e)}"
@@ -1700,15 +1590,12 @@ def index():
                         error += f", Graph Error: {str(e)}"
             set_cached_data('graph_data', graph_data, cache_params)
             
-            # Fetch recent data
             recent_data = []
             for command in recent_commands:
                 try:
                     rd, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_recently_added', command["command"], error, count)
-                    # Only append valid data, use empty dict as fallback for failed commands
                     recent_data.append(rd if rd is not None else {})
                 except Exception as e:
-                    # If command fails completely, append empty dict and continue
                     recent_data.append({})
                     if error is None:
                         error = f"Recent Data Error: {str(e)}"
@@ -1716,7 +1603,6 @@ def index():
                         error += f", Recent Data Error: {str(e)}"
             set_cached_data('recent_data', recent_data, cache_params)
             
-            # Update user_dict with fresh users data
             user_dict = {}
             for user in users:
                 if user['email'] != None and user['is_active']:
@@ -1732,13 +1618,11 @@ def index():
         
     libs = ['movies', 'shows']
     
-    # Get saved email lists
     try:
         email_lists = get_saved_email_lists()
     except:
         email_lists = []
     
-    # Get cache status information
     cache_info = {
         'stats': get_cache_info('stats'),
         'users': get_cache_info('users'), 
@@ -1868,7 +1752,6 @@ def send_email():
 
     data = request.get_json()
     
-    # Debug logging
     print(f"DEBUG: Received email request")
     print(f"DEBUG: Subject: {data.get('subject', 'No subject')}")
     print(f"DEBUG: To emails: {data.get('to_emails', 'No recipients')}")
@@ -1879,7 +1762,6 @@ def send_email():
         for i, img in enumerate(data.get('all_images', [])):
             print(f"DEBUG: Image {i}: CID={img.get('cid')}, MIME={img.get('mime')}, Data length={len(img.get('data', ''))}")
 
-    # Get the new format data
     all_images = data.get('all_images', [])
     email_html = data.get('email_html', '')
     from_email = settings['from_email']
@@ -1903,30 +1785,24 @@ def send_email():
     msg_alternative = MIMEMultipart('alternative')
     msg_root.attach(msg_alternative)
 
-    # Use the complete HTML content from the preview
     html_content = email_html
 
     html_content, _cids_from_data = inline_data_images_to_cid(html_content, msg_root)
 
-    # Process all images and attach them with CID references
     attached_cids = []
     for image_data in all_images:
         try:
-            # Extract base64 data (remove data:image/png;base64, prefix if present)
             base64_data = image_data['data']
             if base64_data.startswith('data:'):
                 base64_data = base64_data.split(',')[1]
             
-            # Decode the image
             raw_image_data = base64.b64decode(base64_data)
             
-            # Determine the image format
             mime_type = image_data.get('mime', 'image/png')
             subtype = mime_type.split('/')[-1] if '/' in mime_type else 'png'
             if subtype == 'jpg':
                 subtype = 'jpeg'
             
-            # Create the image attachment
             image_part = MIMEImage(raw_image_data, _subtype=subtype)
             cid = image_data['cid']
             image_part.add_header('Content-ID', f'<{cid}>')
@@ -1937,8 +1813,7 @@ def send_email():
             print(f"Error processing image {image_data.get('cid', 'unknown')}: {str(e)}")
             continue
     
-    # Add a plain-text alternative first (some clients like it)
-    plain = re.sub(r'<[^>]+>', ' ', html_content)  # crude strip of tags
+    plain = re.sub(r'<[^>]+>', ' ', html_content)
     msg_alternative.attach(MIMEText(plain, 'plain', 'utf-8'))
 
     msg_alternative.attach(MIMEText(html_content, 'html', 'utf-8'))
@@ -1947,7 +1822,6 @@ def send_email():
         with smtplib.SMTP_SSL(smtp_server, smtp_port) as server:
             server.login(from_email, decrypt(password))
             
-            # Calculate email size in KB
             email_content = msg_root.as_string()
             content_size_kb = len(email_content.encode('utf-8')) / 1024
             
@@ -1958,7 +1832,6 @@ def send_email():
                 server.sendmail(alias_email, [alias_email] + to_emails, email_content)
                 all_recipients = [alias_email] + to_emails
             
-            # Save to email history
             try:
                 history_conn = sqlite3.connect(DB_PATH)
                 history_cursor = history_conn.cursor()
@@ -2138,7 +2011,6 @@ def about():
 
 @app.route('/email_history', methods=['GET'])
 def email_history():
-    """Display email history page"""
     try:
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
@@ -2152,16 +2024,11 @@ def email_history():
         
         email_list = []
         for email in emails:
-            # Convert UTC timestamp to local time
             try:
-                # Parse the SQLite timestamp
                 utc_dt = datetime.fromisoformat(email[5].replace('Z', '+00:00'))
-                # Convert to local time
                 local_dt = utc_dt.replace(tzinfo=timezone.utc).astimezone()
-                # Format as readable string
                 formatted_time = local_dt.strftime('%Y-%m-%d %I:%M:%S %p')
             except:
-                # Fallback to original timestamp if parsing fails
                 formatted_time = email[5]
             
             email_list.append({
@@ -2181,7 +2048,6 @@ def email_history():
 
 @app.route('/email_history/clear', methods=['POST'])
 def clear_email_history():
-    """Clear all email history entries."""
     try:
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
@@ -2195,7 +2061,6 @@ def clear_email_history():
 
 @app.route('/email_history/recipients/<int:email_id>', methods=['GET'])
 def get_email_recipients(email_id):
-    """Get recipients for a specific email"""
     try:
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
@@ -2217,12 +2082,10 @@ def get_email_recipients(email_id):
 
 @app.route('/scheduling', methods=['GET'])
 def scheduling():
-    """Display email scheduling page"""
     try:
         schedules = get_email_schedules()
         email_lists = get_saved_email_lists()
         
-        # Get email templates
         templates_conn = sqlite3.connect(DB_PATH)
         templates_cursor = templates_conn.cursor()
         templates_cursor.execute("SELECT id, name FROM email_templates ORDER BY name")
@@ -2239,7 +2102,6 @@ def scheduling():
 
 @app.route('/scheduling/create', methods=['POST'])
 def create_schedule():
-    """Create a new email schedule"""
     try:
         data = request.get_json()
         name = data.get('name', '').strip()
@@ -2264,7 +2126,6 @@ def create_schedule():
 
 @app.route('/scheduling/<int:schedule_id>', methods=['PUT'])
 def update_schedule(schedule_id):
-    """Update an existing email schedule"""
     try:
         data = request.get_json()
         name = data.get('name', '').strip()
@@ -2289,7 +2150,6 @@ def update_schedule(schedule_id):
 
 @app.route('/scheduling/<int:schedule_id>', methods=['DELETE'])
 def delete_schedule(schedule_id):
-    """Delete an email schedule"""
     try:
         delete_email_schedule(schedule_id)
         return jsonify({"status": "success", "message": "Schedule deleted successfully"})
@@ -2299,9 +2159,7 @@ def delete_schedule(schedule_id):
 
 @app.route('/scheduling/<int:schedule_id>/send-now', methods=['POST'])
 def send_schedule_now(schedule_id):
-    """Manually trigger sending of a scheduled email without affecting the schedule"""
     try:
-        # Get schedule details
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         cursor.execute("""
@@ -2317,13 +2175,10 @@ def send_schedule_now(schedule_id):
         
         schedule_id, name, email_list_id, template_id, frequency, is_active = schedule
         
-        # Send the email (this doesn't update the schedule's next_send time)
         print(f"Manual send triggered for schedule: {name}")
         success = send_scheduled_email(schedule_id, email_list_id, template_id)
         
         if success:
-            # Update the last_sent timestamp for manual sends
-            from datetime import datetime
             current_time = datetime.now().isoformat()
             
             update_conn = sqlite3.connect(DB_PATH)
@@ -2347,7 +2202,6 @@ def send_schedule_now(schedule_id):
 
 @app.route('/scheduling/<int:schedule_id>/toggle', methods=['POST'])
 def toggle_schedule(schedule_id):
-    """Toggle schedule active/inactive status"""
     try:
         data = request.get_json()
         is_active = data.get('is_active', True)
@@ -2360,13 +2214,11 @@ def toggle_schedule(schedule_id):
 
 @app.route('/scheduling/<int:schedule_id>/preview', methods=['GET'])
 def preview_schedule(schedule_id):
-    """Generate a preview of the email for a specific schedule"""
     try:
-        # Get schedule details
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         cursor.execute("""
-            SELECT template_id, date_range
+            SELECT template_id, date_range, email_list_id
             FROM email_schedules 
             WHERE id = ?
         """, (schedule_id,))
@@ -2376,10 +2228,9 @@ def preview_schedule(schedule_id):
         if not schedule_result:
             return jsonify({"status": "error", "message": "Schedule not found"}), 404
         
-        template_id, date_range = schedule_result
-        date_range = date_range or 7  # Default to 7 days if not set
+        template_id, date_range, email_list_id = schedule_result
+        date_range = date_range or 7
         
-        # Get template details
         templates_conn = sqlite3.connect(DB_PATH)
         templates_cursor = templates_conn.cursor()
         templates_cursor.execute("SELECT name, subject, email_text, selected_items FROM email_templates WHERE id = ?", (template_id,))
@@ -2391,13 +2242,24 @@ def preview_schedule(schedule_id):
         
         template_name, subject, email_text, selected_items_json = template_result
         
-        # Parse selected items
         try:
             selected_items = json.loads(selected_items_json) if selected_items_json else []
         except:
             selected_items = []
+
+        email_lists_conn = sqlite3.connect(DB_PATH)
+        email_lists_cursor = email_lists_conn.cursor()
+        email_lists_cursor.execute("SELECT emails FROM email_lists WHERE id = ?", (email_list_id,))
+        email_list_result = email_lists_cursor.fetchone()
+        email_lists_conn.close()
         
-        # Get settings
+        if not email_list_result:
+            print(f"Email list {email_list_id} not found")
+            return False
+        
+        to_emails = email_list_result[0]
+        to_emails_list = [email.strip() for email in to_emails.split(",")]
+        
         settings_conn = sqlite3.connect(DB_PATH)
         settings_cursor = settings_conn.cursor()
         settings_cursor.execute("SELECT server_name, tautulli_url, tautulli_api FROM settings WHERE id = 1")
@@ -2413,17 +2275,14 @@ def preview_schedule(schedule_id):
         else:
             settings = {"server_name": ""}
         
-        # Check if we can use cached data for this date range
         can_use_cache, cache_reason = can_use_cached_data_for_preview(date_range)
         
-        # Fetch data - use cache if suitable, otherwise fetch fresh
         stats = []
         graph_data = []
         recent_data = []
         
         if can_use_cache:
             print(f"Using cached data for preview: {cache_reason}")
-            # Use cached data
             stats = get_cached_data('stats', strict=False) or []
             graph_data = get_cached_data('graph_data', strict=False) or []
             recent_data = get_cached_data('recent_data', strict=False) or []
@@ -2433,7 +2292,6 @@ def preview_schedule(schedule_id):
             
             print(f"Fetching fresh Tautulli data for preview - {date_range} days ({cache_reason})")
             
-            # Define graph commands (same as main page)
             graph_commands = [
                 {'command': 'get_concurrent_streams_by_stream_type', 'name': 'Stream Type'},
                 {'command': 'get_plays_by_date', 'name': 'Plays by Date'},
@@ -2455,12 +2313,10 @@ def preview_schedule(schedule_id):
             ]
             
             try:
-                # Fetch stats
                 stats, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_home_stats', 'Stats', None, str(date_range))
                 if error:
                     print(f"Error fetching stats: {error}")
                 
-                # Fetch graph data
                 graph_data = []
                 for command in graph_commands:
                     gd, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, command["command"], command["name"], error, str(date_range))
@@ -2469,10 +2325,9 @@ def preview_schedule(schedule_id):
                     if error:
                         print(f"Error fetching graph data for {command['name']}: {error}")
                 
-                # Fetch recent data  
                 recent_data = []
                 for command in recent_commands:
-                    rd, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_recently_added', command["command"], error, "10")  # Default to 10 items
+                    rd, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_recently_added', command["command"], error, "10")
                     if rd:
                         recent_data.append(rd)
                     if error:
@@ -2480,18 +2335,15 @@ def preview_schedule(schedule_id):
                         
             except Exception as e:
                 print(f"Failed to fetch fresh data: {e}")
-                # Fallback to cached data
                 stats = get_cached_data('stats') or []
                 graph_data = get_cached_data('graph_data') or []
                 recent_data = get_cached_data('recent_data') or []
         else:
             print("Tautulli not configured, using cached data")
-            # Fallback to cached data
             stats = get_cached_data('stats') or []
             graph_data = get_cached_data('graph_data') or []
             recent_data = get_cached_data('recent_data') or []
         
-        # Define graph commands (same as main page)
         graph_commands = [
             {'command': 'get_concurrent_streams_by_stream_type', 'name': 'Stream Type'},
             {'command': 'get_plays_by_date', 'name': 'Plays by Date'},
@@ -2511,10 +2363,39 @@ def preview_schedule(schedule_id):
             {'command': 'movie'},
             {'command': 'show'}
         ]
+
+        recs = {}
+
+        if '[RECOMMENDATIONS]' in email_text:
+            try:
+                conn = sqlite3.connect(DB_PATH)
+                c = conn.cursor()
+                c.execute("SELECT conjurr_url FROM settings WHERE id = 1")
+                row = c.fetchone()
+                conn.close()
+                conjurr_url = (row[0] or "").strip() if row else ""
+
+                if conjurr_url:
+                    user_dict = {}
+                    users, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_users', 'Users', error)
+                    if users:
+                        for user in users:
+                            if user['email'] != None and user['is_active']:
+                                user_dict[user['user_id']] = user['email']
+                    
+                    filtered_users = {k: v for k, v in user_dict.items() if v in to_emails_list}
+
+                    _recs, _err = run_conjurr_command(conjurr_url, filtered_users, error=None)
+                    if isinstance(_recs, dict):
+                        recs = _recs
+
+            except Exception as e:
+                print("preview_schedule: recommendations unavailable:", e)
+                recs = {}
         
-        # Return template data so frontend can generate preview using same logic as main page
         return jsonify({
             "status": "success",
+            "message": "ok",
             "template_name": template_name,
             "subject": subject,
             "email_text": email_text,
@@ -2525,20 +2406,17 @@ def preview_schedule(schedule_id):
             "graph_data": graph_data,
             "recent_data": recent_data,
             "graph_commands": graph_commands,
-            "recent_commands": recent_commands
+            "recent_commands": recent_commands,
+            "recommendations": recs
         })
         
     except Exception as e:
         print(f"Error generating preview: {e}")
-        import traceback
         traceback.print_exc()
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/scheduling/<int:schedule_id>/preview-page', methods=['GET'])
-def preview_schedule_page(schedule_id):
-    """Serve the preview page for a specific schedule"""
-    
-    # Get schedule details to determine required date range
+def preview_schedule_page(schedule_id):    
     try:
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
@@ -2548,25 +2426,23 @@ def preview_schedule_page(schedule_id):
         
         date_range = schedule_result[0] if schedule_result else 7
     except:
-        date_range = 7  # Default fallback
+        date_range = 7
     
-    # Check if we can use cached data for this date range
     can_use_cache, cache_reason = can_use_cached_data_for_preview(date_range)
     
     if can_use_cache:
         print(f"Preview page using cached data: {cache_reason}")
-        # Use cached data (try strict first, then extended)
         stats = get_cached_data('stats', strict=True) or get_cached_data('stats', strict=False) or []
         graph_data = get_cached_data('graph_data', strict=True) or get_cached_data('graph_data', strict=False) or []
         recent_data = get_cached_data('recent_data', strict=True) or get_cached_data('recent_data', strict=False) or []
+        recommendations = (get_cached_data('recommendations', strict=True) or get_cached_data('recommendations', strict=False) or {})
     else:
         print(f"Preview page using cached data (fallback): {cache_reason}")
-        # Use whatever cached data we have as fallback
         stats = get_cached_data('stats', strict=False) or []
         graph_data = get_cached_data('graph_data', strict=False) or []
         recent_data = get_cached_data('recent_data', strict=False) or []
+        recommendations = get_cached_data('recommendations', strict=False) or {}
     
-    # Define graph commands (same as main page)
     graph_commands = [
         {'command': 'get_concurrent_streams_by_stream_type', 'name': 'Stream Type'},
         {'command': 'get_plays_by_date', 'name': 'Plays by Date'},
@@ -2582,24 +2458,21 @@ def preview_schedule_page(schedule_id):
         {'command': 'get_stream_type_by_top_10_users', 'name': 'Stream Type by Top Users'}
     ]
     
-    return render_template('schedule_preview.html', 
-                         stats=stats, 
-                         graph_data=graph_data, 
-                         recent_data=recent_data,
-                         graph_commands=graph_commands)
+    return render_template(
+        'schedule_preview.html', 
+        stats=stats, 
+        graph_data=graph_data, 
+        recent_data=recent_data,
+        graph_commands=graph_commands,
+        recommendations=recommendations
+    )
 
 @app.route('/scheduling/calendar-data', methods=['GET'])
 def get_calendar_data():
-    """Get scheduled dates for calendar display"""
     try:
-        from datetime import datetime, timedelta
-        import calendar
-        
-        # Get month and year from query params, default to current
         month = int(request.args.get('month', datetime.now().month))
         year = int(request.args.get('year', datetime.now().year))
         
-        # Get all active schedules
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         cursor.execute("""
@@ -2610,7 +2483,6 @@ def get_calendar_data():
         schedules = cursor.fetchall()
         conn.close()
         
-        # Calculate dates for the requested month
         calendar_data = {}
         start_date = datetime(year, month, 1)
         if month == 12:
@@ -2624,37 +2496,28 @@ def get_calendar_data():
             if not is_active:
                 continue
                 
-            # Parse the start date
             try:
                 schedule_start = datetime.fromisoformat(schedule_start_date)
             except:
                 continue
             
-            # For weekly/monthly schedules, we need to generate the proper sequence
-            # starting from the actual start date, not the month start
             current_date = schedule_start
             
-            # Skip forward to get close to the target month if we're way behind
             if frequency == 'weekly' and current_date < start_date:
-                # Calculate how many weeks to skip to get close to target month
                 weeks_to_skip = (start_date - current_date).days // 7
                 current_date += timedelta(weeks=weeks_to_skip)
                 
-                # Now use proper weekday logic to get to the exact weekday
                 target_weekday = schedule_start.weekday()
                 days_ahead = (target_weekday - current_date.weekday()) % 7
                 current_date += timedelta(days=days_ahead)
                 
-                # If we're still before the month, advance one more week
                 if current_date < start_date:
                     current_date += timedelta(days=7)
             
             elif frequency == 'monthly' and current_date < start_date:
-                # For monthly, jump to the target month while preserving day
                 target_day = schedule_start.day
                 current_date = datetime(year, month, min(target_day, calendar.monthrange(year, month)[1]))
             
-            # Generate dates within the target month
             while current_date <= end_date:
                 if current_date >= start_date and current_date >= schedule_start:
                     date_key = current_date.strftime('%Y-%m-%d')
@@ -2669,13 +2532,11 @@ def get_calendar_data():
                         'template_id': template_id
                     })
                 
-                # Calculate next occurrence using the same logic as calculate_next_send
                 if frequency == 'daily':
                     current_date += timedelta(days=1)
                 elif frequency == 'weekly':
-                    current_date += timedelta(days=7)  # Simple 7-day increment for weekly
+                    current_date += timedelta(days=7)
                 elif frequency == 'monthly':
-                    # Use the same day-of-month preservation logic as calculate_next_send
                     target_day = schedule_start.day
                     if current_date.month == 12:
                         next_year = current_date.year + 1
@@ -2684,7 +2545,6 @@ def get_calendar_data():
                         next_year = current_date.year
                         next_month = current_date.month + 1
                     
-                    # Handle month boundary cases
                     last_day_of_month = calendar.monthrange(next_year, next_month)[1]
                     actual_day = min(target_day, last_day_of_month)
                     current_date = current_date.replace(year=next_year, month=next_month, day=actual_day)
@@ -2703,13 +2563,11 @@ def get_calendar_data():
 
 @app.route('/clear_cache', methods=['POST'])
 def clear_cache_route():
-    """Clear the data cache and return a JSON response"""
     clear_cache()
     return jsonify({"status": "success", "message": "Cache cleared successfully"})
 
 @app.route('/cache_status', methods=['GET'])
 def cache_status():
-    """Get cache status information"""
     status = {}
     for key in cache_storage:
         status[key] = {
@@ -2721,7 +2579,6 @@ def cache_status():
 
 @app.route('/email_lists', methods=['GET'])
 def get_email_lists():
-    """Get all saved email lists"""
     try:
         lists = get_saved_email_lists()
         return jsonify({"status": "success", "lists": lists})
@@ -2730,7 +2587,6 @@ def get_email_lists():
 
 @app.route('/email_lists', methods=['POST'])
 def save_email_list_route():
-    """Save a new email list"""
     try:
         data = request.get_json()
         name = data.get('name', '').strip()
@@ -2751,17 +2607,14 @@ def save_email_list_route():
 
 @app.route('/email_lists/<int:list_id>', methods=['DELETE'])
 def delete_email_list_route(list_id):
-    """Delete an email list"""
     try:
         delete_email_list(list_id)
         return jsonify({"status": "success", "message": "List deleted successfully"})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
-# Email Template Routes
 @app.route('/email_templates', methods=['GET'])
 def get_email_templates():
-    """Get all email templates"""
     try:
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
@@ -2786,11 +2639,10 @@ def get_email_templates():
 
 @app.route('/email_templates', methods=['POST'])
 def save_email_template():
-    """Save a new email template"""
     try:
         data = request.get_json()
         name = data.get('name', '').strip()
-        selected_items = data.get('selected_items', '[]')  # JSON string
+        selected_items = data.get('selected_items', '[]')
         email_text = data.get('email_text', '')
         subject = data.get('subject', '')
         
@@ -2800,12 +2652,10 @@ def save_email_template():
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         
-        # Check if template with this name already exists
         cursor.execute("SELECT id FROM email_templates WHERE name = ?", (name,))
         existing = cursor.fetchone()
         
         if existing:
-            # Update existing template
             cursor.execute("""
                 UPDATE email_templates 
                 SET selected_items = ?, email_text = ?, subject = ?, updated_at = CURRENT_TIMESTAMP
@@ -2813,7 +2663,6 @@ def save_email_template():
             """, (selected_items, email_text, subject, name))
             message = "Template updated successfully"
         else:
-            # Create new template
             cursor.execute("""
                 INSERT INTO email_templates (name, selected_items, email_text, subject)
                 VALUES (?, ?, ?, ?)
@@ -2830,7 +2679,6 @@ def save_email_template():
 
 @app.route('/email_templates/<int:template_id>', methods=['DELETE'])
 def delete_email_template(template_id):
-    """Delete an email template"""
     try:
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
@@ -2845,12 +2693,7 @@ def delete_email_template(template_id):
 
 if __name__ == '__main__':
     os.makedirs("database", exist_ok=True)
-    
-    # Migrate data from separate database files if they exist
     migrate_data_from_separate_dbs()
-    
-    # Initialize unified database
     init_db(DB_PATH)
     migrate_schema("conjurr_url TEXT")
-    
     app.run(host="0.0.0.0", port=6397, debug=True)

@@ -35,9 +35,9 @@
                             <td>
                                 <div class="d-inline-flex align-items-center gap-2">
                                     {% if schedule.template_id %}
-                                    <span class="template-color-dot schedule-row-dot" data-template-id="{{ schedule.template_id }}" title="Template color"></span>
+                                        <span class="template-color-dot schedule-row-dot" data-template-id="{{ schedule.template_id }}" title="Template color"></span>
                                     {% else %}
-                                    <span class="template-color-dot schedule-row-dot" style="opacity:.35;" title="No template"></span>
+                                        <span class="template-color-dot schedule-row-dot" style="opacity:.35;" title="No template"></span>
                                     {% endif %}
                                     <strong>{{ schedule.name }}</strong>
                                 </div>
@@ -71,12 +71,12 @@
                             </td>
                             <td>
                                 <div class="btn-group btn-group-sm" role="group">
-                    <button class="btn btn-primary btn-sm edit-schedule-btn" 
+                                    <button class="btn btn-primary btn-sm edit-schedule-btn" 
                                             data-schedule-id="{{ schedule.id }}" 
                                             data-schedule-name="{{ schedule.name }}"
                                             data-email-list-id="{{ schedule.email_list_id }}"
                                             data-template-id="{{ schedule.template_id }}"
-                        data-template-name="{{ schedule.template_name }}"
+                                            data-template-name="{{ schedule.template_name }}"
                                             data-frequency="{{ schedule.frequency }}"
                                             data-start-date="{{ schedule.start_date }}"
                                             data-send-time="{{ schedule.send_time or '09:00' }}"
@@ -133,7 +133,6 @@
         </div>
     {% endif %}
 
-    <!-- Calendar View -->
     <div class="row mt-5">
         <div class="col-12 d-flex justify-content-center">
             <div class="card theme-card calendar-card">
@@ -147,17 +146,14 @@
                     </div>
                 </div>
                 <div class="card-body">
-                    <div id="calendar-container"><!-- Calendar will be rendered here --></div>
-                    <div id="calendar-legend" class="mt-3 d-flex flex-wrap gap-2 justify-content-center" style="font-size:.6rem;">
-                        <!-- Legend populated dynamically -->
-                    </div>
+                    <div id="calendar-container"></div>
+                    <div id="calendar-legend" class="mt-3 d-flex flex-wrap gap-2 justify-content-center" style="font-size:.6rem;"></div>
                 </div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Add/Edit Schedule Modal -->
 <div class="modal fade" id="scheduleModal" tabindex="-1" aria-labelledby="scheduleModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content theme-modal">
@@ -167,11 +163,11 @@
             </div>
             <div class="modal-body">
                 <form id="schedule-form">
-                    <input type="hidden" id="schedule-id" value="">
+                    <input type="hidden" id="schedule-id" value="" />
                     <div class="mb-3">
                         <label for="schedule-name" class="form-label">Schedule Name</label>
                         <input type="text" class="form-control theme-input" id="schedule-name" required 
-                               placeholder="e.g., Weekly Newsletter">
+                               placeholder="e.g., Weekly Newsletter" />
                     </div>
                     
                     <div class="mb-3">
@@ -244,644 +240,752 @@
 </div>
 
 <style>
-/* Theme-aware styling for scheduling page */
-.theme-modal {
-    background-color: var(--bs-body-bg);
-    color: var(--bs-body-color);
-}
+    .theme-modal {
+        background-color: var(--bs-body-bg);
+        color: var(--bs-body-color);
+    }
 
-.theme-modal-header,
-.theme-modal-footer {
-    border-color: var(--bs-border-color);
-}
+    .theme-modal-header, .theme-modal-footer {
+        border-color: var(--bs-border-color);
+    }
 
-.theme-card {
-    background-color: var(--bs-body-bg);
-    color: var(--bs-body-color);
-    border-color: var(--bs-border-color);
-}
+    .theme-card {
+        background-color: var(--bs-body-bg);
+        color: var(--bs-body-color);
+        border-color: var(--bs-border-color);
+    }
 
-.theme-card-header {
-    border-color: var(--bs-border-color);
-}
+    .theme-card-header {
+        border-color: var(--bs-border-color);
+    }
 
-/* Calendar styling */
-/* --- Refreshed Calendar Layout --- */
-/* Reduced overall footprint */
-.calendar-card { max-width: 560px; width: 100%; border-radius: 18px; overflow: hidden; box-shadow: 0 5px 14px -4px rgba(0,0,0,0.32); }
-.calendar-card .card-header { border-bottom: none; padding: .65rem .9rem; background: var(--bs-primary); color:#fff; border-radius: 18px 18px 0 0; font-size:.95rem; }
-.dark .calendar-card .card-header { background: #2c2c2c; }
-.calendar-card .card-body { padding: 1rem .85rem .75rem; background: radial-gradient(circle at 85% 12%, rgba(255,255,255,0.04), transparent 55%); }
+    .calendar-card {
+        max-width: 560px;
+        width: 100%;
+        border-radius: 18px;
+        overflow: hidden;
+        box-shadow: 0 5px 14px -4px rgba(0,0,0,0.32);
+    }
 
-.calendar-container { display:grid; grid-template-columns:repeat(7,1fr); gap:6px; width:100%; margin:0 auto 0; max-width:530px; }
+    .calendar-card .card-header {
+        border-bottom: none;
+        padding: .65rem .9rem;
+        background: var(--bs-primary);
+        color: #fff;
+        border-radius: 18px 18px 0 0;
+        font-size: .95rem;
+    }
 
-.calendar-header { font-size:.7rem; font-weight:600; letter-spacing:.5px; text-transform:uppercase; padding:.35rem .25rem; text-align:center; color:var(--bs-secondary); opacity:.85; }
-.dark .calendar-header { color:#8acbd4; opacity:.75; }
+    .dark .calendar-card .card-header {
+        background: #2c2c2c;
+    }
 
-/* Tighter day cells */
-.calendar-day { position:relative; background:rgba(var(--bs-primary-rgb),0.035); border-radius:14px; padding:3px 4px 2px; display:flex; flex-direction:column; justify-content:flex-start; align-items:flex-start; min-height:0; aspect-ratio:1; box-sizing:border-box; overflow:hidden; border:1px solid rgba(255,255,255,0.1); backdrop-filter:blur(2px); -webkit-backdrop-filter:blur(2px); transition:background .18s ease, transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
-body:not(.dark) .calendar-day { background:linear-gradient(145deg,#ffffff,#f1f5ff); border:1px solid #e3e8ef; }
-.calendar-day:hover { transform:translateY(-3px); box-shadow:0 6px 18px -4px rgba(0,0,0,0.35); }
-/* Slightly stronger background when schedules present */
-.calendar-day.has-schedule { background:linear-gradient(170deg, rgba(13,110,253,.18), rgba(13,110,253,.07)); border-color:rgba(13,110,253,.42); }
-body:not(.dark) .calendar-day.has-schedule { background:linear-gradient(170deg,#e9f3ff,#f5faff); border-color:#bed7fb; }
-.calendar-day.other-month { opacity:.35; filter:saturate(.6); }
-.calendar-day.today { outline:2px solid var(--bs-primary); outline-offset:2px; box-shadow:0 0 0 3px rgba(13,110,253,0.35); }
-.dark .calendar-day.today { box-shadow:0 0 0 3px rgba(111,66,193,0.45); }
+    .calendar-card .card-body {
+        padding: 1rem .85rem .75rem;
+        background: radial-gradient(circle at 85% 12%, rgba(255,255,255,0.04), transparent 55%);
+    }
 
-.calendar-day-number { font-size:.6rem; font-weight:700; line-height:1; letter-spacing:.4px; padding:2px 5px; background:rgba(255,255,255,0.38); border-radius:12px; backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px); box-shadow:inset 0 0 0 1px rgba(255,255,255,0.55), 0 1px 2px rgba(0,0,0,0.28); color:#000; }
-.dark .calendar-day-number { background:rgba(0,0,0,0.4); color:#fff; box-shadow:inset 0 0 0 1px rgba(255,255,255,0.07), 0 1px 2px rgba(0,0,0,0.5); }
+    .calendar-container {
+        display: grid;
+        grid-template-columns: repeat(7,1fr);
+        gap: 6px;
+        width: 100%;
+        margin: 0 auto 0;
+        max-width: 530px;
+    }
 
-.calendar-dots { display:flex; flex-wrap:wrap; gap:5px; margin-top:auto; max-height:48px; overflow:hidden; width:100%; padding-top:1px; }
-.calendar-dot { width:18px; height:18px; border-radius:50%; position:relative; background:#0d6efd; box-shadow:0 0 0 2px rgba(255,255,255,0.6), 0 3px 6px -1px rgba(0,0,0,.5); cursor:pointer; transition:transform .22s ease, box-shadow .22s ease; }
-.calendar-dot:hover { transform:none; filter:brightness(1.35) saturate(1.3); box-shadow:0 0 0 2px rgba(255,255,255,0.9), 0 4px 10px -2px rgba(0,0,0,.6); }
-.dark .calendar-dot { box-shadow:0 0 0 2px rgba(0,0,0,0.55), 0 3px 6px -2px rgba(0,0,0,.9); }
+    .calendar-header {
+        font-size: .7rem;
+        font-weight: 600;
+        letter-spacing: .5px;
+        text-transform: uppercase;
+        padding: .35rem .25rem;
+        text-align: center;
+        color: var(--bs-secondary);
+        opacity: .85;
+    }
 
-/* Compact modes for narrow widths */
-@media (max-width: 1100px) { .calendar-day-number { font-size:.55rem; } .calendar-dot { width:16px; height:16px; } }
-@media (max-width: 900px) { .calendar-container { gap:8px; } }
-@media (max-width: 760px) { .calendar-container { gap:6px; } .calendar-card{border-radius:20px;} }
-@media (max-width: 640px) { .calendar-container { gap:4px; } .calendar-card{border-radius:16px;} }
+    .dark .calendar-header {
+        color: #8acbd4;
+        opacity: .75;
+    }
 
-/* (Old calendar day styles replaced above) */
+    .calendar-day {
+        position: relative;
+        background: rgba(var(--bs-primary-rgb), 0.035);
+        border-radius: 14px;
+        padding: 3px 4px 2px;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-start;
+        align-items: flex-start;
+        min-height: 0;
+        aspect-ratio: 1;
+        box-sizing: border-box;
+        overflow: hidden;
+        border: 1px solid rgba(255,255,255,0.1);
+        backdrop-filter: blur(2px);
+        -webkit-backdrop-filter: blur(2px);
+        transition: background .18s ease, transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+    }
+    
+    body:not(.dark) .calendar-day {
+        background: linear-gradient(145deg, #ffffff, #f1f5ff);
+        border: 1px solid #e3e8ef;
+    }
+    
+    .calendar-day:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 6px 18px -4px rgba(0,0,0,0.35);
+    }
+    
+    .calendar-day.has-schedule {
+        background: linear-gradient(170deg, rgba(13,110,253,.18), rgba(13,110,253,.07));
+        border-color: rgba(13,110,253,.42);
+    }
+    
+    body:not(.dark) .calendar-day.has-schedule {
+        background: linear-gradient(170deg, #e9f3ff, #f5faff);
+        border-color: #bed7fb;
+    }
+    
+    .calendar-day.other-month {
+        opacity: .35;
+        filter: saturate(.6);
+    }
+    
+    .calendar-day.today {
+        outline: 2px solid var(--bs-primary);
+        outline-offset: 2px;
+        box-shadow: 0 0 0 3px rgba(13,110,253,0.35);
+    }
+    
+    .dark .calendar-day.today {
+        box-shadow: 0 0 0 3px rgba(111,66,193,0.45);
+    }
 
-/* Today button styling */
-#today-month {
-    font-size: 0.8rem;
-    padding: 0.25rem 0.5rem;
-    white-space: nowrap;
-}
+    .calendar-day-number {
+        font-size: .6rem;
+        font-weight: 700;
+        line-height: 1;
+        letter-spacing: .4px;
+        padding: 2px 5px;
+        background: rgba(255,255,255,0.38);
+        border-radius: 12px;
+        backdrop-filter: blur(3px);
+        -webkit-backdrop-filter: blur(3px);
+        box-shadow: inset 0 0 0 1px rgba(255,255,255,0.55), 0 1px 2px rgba(0,0,0,0.28);
+        color: #000;
+    }
+    
+    .dark .calendar-day-number {
+        background: rgba(0,0,0,0.4);
+        color: #fff;
+        box-shadow: inset 0 0 0 1px rgba(255,255,255,0.07), 0 1px 2px rgba(0,0,0,0.5);
+    }
 
-#today-month:hover {
-    background-color: var(--bs-secondary);
-    border-color: var(--bs-secondary);
-    color: white;
-}
+    .calendar-dots {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+        margin-top: auto;
+        max-height: 48px;
+        overflow: hidden;
+        width: 100%;
+        padding-top: 1px;
+    }
+    
+    .calendar-dot {
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        position: relative;
+        background: #0d6efd;
+        box-shadow: 0 0 0 2px rgba(255,255,255,0.6), 0 3px 6px -1px rgba(0,0,0,.5);
+        cursor: pointer;
+        transition: transform .22s ease, box-shadow .22s ease;
+    }
+    
+    .calendar-dot:hover {
+        transform: none;
+        filter: brightness(1.35) saturate(1.3);
+        box-shadow: 0 0 0 2px rgba(255,255,255,0.9), 0 4px 10px -2px rgba(0,0,0,.6);
+    }
+    
+    .dark .calendar-dot {
+        box-shadow: 0 0 0 2px rgba(0,0,0,0.55), 0 3px 6px -2px rgba(0,0,0,.9);
+    }
 
-/* Tooltip styling */
-.schedule-tooltip {
-    position: absolute;
-    background-color: #333;
-    color: white;
-    padding: 8px;
-    border-radius: 4px;
-    font-size: 0.75rem;
-    z-index: 1000;
-    white-space: nowrap;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-}
+    @media (max-width: 1100px) {
+        .calendar-day-number {
+            font-size: .55rem;
+        }
+        .calendar-dot {
+            width: 16px;
+            height: 16px;
+        }
+    }
+    
+    @media (max-width: 900px) {
+        .calendar-container {
+            gap: 8px;
+        }
+    }
+    
+    @media (max-width: 760px) {
+        .calendar-container {
+            gap: 6px;
+        }
+        .calendar-card{
+            border-radius: 20px;
+        }
+    }
+    
+    @media (max-width: 640px) {
+        .calendar-container {
+            gap: 4px;
+        }
+        .calendar-card{
+            border-radius: 16px;
+        }
+    }
 
-/* Light mode styling */
-body:not(.dark) .theme-modal {
-    background-color: #fff;
-    color: #333;
-    border: 1px solid #62a1a4;
-}
+    #today-month {
+        font-size: 0.8rem;
+        padding: 0.25rem 0.5rem;
+        white-space: nowrap;
+    }
 
-body:not(.dark) .theme-card {
-    background-color: #fff;
-    color: #333;
-    border: 1px solid #62a1a4;
-}
+    #today-month:hover {
+        background-color: var(--bs-secondary);
+        border-color: var(--bs-secondary);
+        color: white;
+    }
 
-body:not(.dark) .theme-card-header {
-    background-color: #8acbd4;
-    color: #333;
-    border-color: #62a1a4;
-}
+    .schedule-tooltip {
+        position: absolute;
+        background-color: #333;
+        color: white;
+        padding: 8px;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        z-index: 1000;
+        white-space: nowrap;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    }
 
-body:not(.dark) .theme-modal-header,
-body:not(.dark) .theme-modal-footer {
-    border-color: #62a1a4;
-}
+    body:not(.dark) .theme-modal {
+        background-color: #fff;
+        color: #333;
+        border: 1px solid #62a1a4;
+    }
 
-body:not(.dark) .theme-input {
-    background-color: #8acbd4;
-    color: #333;
-    border-color: #62a1a4;
-}
+    body:not(.dark) .theme-card {
+        background-color: #fff;
+        color: #333;
+        border: 1px solid #62a1a4;
+    }
 
-body:not(.dark) .theme-input:focus {
-    background-color: #8acbd4;
-    color: #333;
-    border-color: #333;
-    box-shadow: 0 0 0 0.2rem rgba(51, 51, 51, 0.25);
-}
+    body:not(.dark) .theme-card-header {
+        background-color: #8acbd4;
+        color: #333;
+        border-color: #62a1a4;
+    }
 
-body:not(.dark) .theme-input::placeholder {
-    color: rgba(51, 51, 51, 0.7);
-}
+    body:not(.dark) .theme-modal-header, body:not(.dark) .theme-modal-footer {
+        border-color: #62a1a4;
+    }
 
-body:not(.dark) .theme-alert {
-    background-color: #e3f7fa;
-    border-color: #62a1a4;
-    color: #333;
-}
+    body:not(.dark) .theme-input {
+        background-color: #8acbd4;
+        color: #333;
+        border-color: #62a1a4;
+    }
 
-body:not(.dark) .calendar-day.other-month {
-    background-color: #f8f9fa;
-    color: #6c757d;
-}
+    body:not(.dark) .theme-input:focus {
+        background-color: #8acbd4;
+        color: #333;
+        border-color: #333;
+        box-shadow: 0 0 0 0.2rem rgba(51, 51, 51, 0.25);
+    }
 
-body:not(.dark) .theme-alert {
-    background-color: #e3f7fa;
-    border-color: #62a1a4;
-    color: #333;
-}
+    body:not(.dark) .theme-input::placeholder {
+        color: rgba(51, 51, 51, 0.7);
+    }
 
-/* Dark mode styling */
-.dark .theme-modal {
-    background-color: #333 !important;
-    color: #8acbd4 !important;
-    border: 1px solid #555;
-}
+    body:not(.dark) .theme-alert {
+        background-color: #e3f7fa;
+        border-color: #62a1a4;
+        color: #333;
+    }
 
-.dark .theme-card {
-    background-color: #333 !important;
-    color: #8acbd4 !important;
-    border: 1px solid #555;
-}
+    body:not(.dark) .calendar-day.other-month {
+        background-color: #f8f9fa;
+        color: #6c757d;
+    }
 
-.dark .theme-card-header {
-    background-color: #2c2c2c !important;
-    color: #8acbd4 !important;
-    border-color: #555 !important;
-}
+    body:not(.dark) .theme-alert {
+        background-color: #e3f7fa;
+        border-color: #62a1a4;
+        color: #333;
+    }
 
-.dark .theme-modal-header,
-.dark .theme-modal-footer {
-    border-color: #555 !important;
-}
+    .dark .theme-modal {
+        background-color: #333 !important;
+        color: #8acbd4 !important;
+        border: 1px solid #555;
+    }
 
-.dark .theme-input {
-    background-color: #333;
-    color: #8acbd4;
-    border-color: #555;
-}
+    .dark .theme-card {
+        background-color: #333 !important;
+        color: #8acbd4 !important;
+        border: 1px solid #555;
+    }
 
-.dark .theme-input:focus {
-    background-color: #333;
-    color: #8acbd4;
-    border-color: #8acbd4;
-    box-shadow: 0 0 0 0.2rem rgba(138, 203, 212, 0.25);
-}
+    .dark .theme-card-header {
+        background-color: #2c2c2c !important;
+        color: #8acbd4 !important;
+        border-color: #555 !important;
+    }
 
-.dark .theme-input::placeholder {
-    color: rgba(138, 203, 212, 0.7);
-}
+    .dark .theme-modal-header, .dark .theme-modal-footer {
+        border-color: #555 !important;
+    }
 
-.dark .theme-btn-close {
-    filter: invert(1) grayscale(100%) brightness(200%);
-}
+    .dark .theme-input {
+        background-color: #333;
+        color: #8acbd4;
+        border-color: #555;
+    }
 
-.dark .theme-alert {
-    background-color: rgba(138, 203, 212, 0.1);
-    border-color: #8acbd4;
-    color: #8acbd4;
-}
+    .dark .theme-input:focus {
+        background-color: #333;
+        color: #8acbd4;
+        border-color: #8acbd4;
+        box-shadow: 0 0 0 0.2rem rgba(138, 203, 212, 0.25);
+    }
 
-.dark .calendar-day {
-    background-color: #2c2c2c;
-    color: #8acbd4;
-}
+    .dark .theme-input::placeholder {
+        color: rgba(138, 203, 212, 0.7);
+    }
 
-.dark .calendar-day.other-month {
-    background-color: #1a1a1a;
-    color: #666;
-}
+    .dark .theme-btn-close {
+        filter: invert(1) grayscale(100%) brightness(200%);
+    }
 
-/* Table styling improvements */
-.table {
-    background-color: transparent;
-}
+    .dark .theme-alert {
+        background-color: rgba(138, 203, 212, 0.1);
+        border-color: #8acbd4;
+        color: #8acbd4;
+    }
 
-.badge {
-    font-size: 0.75em;
-}
+    .dark .calendar-day {
+        background-color: #2c2c2c;
+        color: #8acbd4;
+    }
 
-.btn-group-sm > .btn {
-    font-size: 0.75rem;
-    padding: 0.25rem 0.5rem;
-}
+    .dark .calendar-day.other-month {
+        background-color: #1a1a1a;
+        color: #666;
+    }
 
-/* Custom button styling to match theme */
-.btn-outline-warning:hover {
-    background-color: #ffc107;
-    border-color: #ffc107;
-    color: #000;
-}
+    .table {
+        background-color: transparent;
+    }
 
-.btn-outline-success:hover {
-    background-color: #198754;
-    border-color: #198754;
-    color: #fff;
-}
+    .badge {
+        font-size: 0.75em;
+    }
 
-.btn-outline-danger:hover {
-    background-color: #dc3545;
-    border-color: #dc3545;
-    color: #fff;
-}
+    .btn-group-sm > .btn {
+        font-size: 0.75rem;
+        padding: 0.25rem 0.5rem;
+    }
 
-/* Template color dot styling */
-.template-color-dot { width:12px; height:12px; border-radius:50%; display:inline-block; background:var(--bs-secondary); box-shadow:0 0 0 2px rgba(255,255,255,.6), 0 2px 4px -1px rgba(0,0,0,.4); position:relative; transition:filter .2s ease, box-shadow .25s ease; }
-.template-color-dot:hover { filter:brightness(1.3) saturate(1.25); box-shadow:0 0 0 2px rgba(255,255,255,.9), 0 3px 8px -2px rgba(0,0,0,.55); }
-.dark .template-color-dot { box-shadow:0 0 0 2px rgba(0,0,0,.55), 0 2px 4px -2px rgba(0,0,0,.85); }
+    .btn-outline-warning:hover {
+        background-color: #ffc107;
+        border-color: #ffc107;
+        color: #000;
+    }
+
+    .btn-outline-success:hover {
+        background-color: #198754;
+        border-color: #198754;
+        color: #fff;
+    }
+
+    .btn-outline-danger:hover {
+        background-color: #dc3545;
+        border-color: #dc3545;
+        color: #fff;
+    }
+
+    .template-color-dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        display: inline-block;
+        background: var(--bs-secondary);
+        box-shadow: 0 0 0 2px rgba(255,255,255,.6), 0 2px 4px -1px rgba(0,0,0,.4);
+        position: relative;
+        transition: filter .2s ease, box-shadow .25s ease;
+    }
+    
+    .template-color-dot:hover {
+        filter: brightness(1.3) saturate(1.25);
+        box-shadow: 0 0 0 2px rgba(255,255,255,.9), 0 3px 8px -2px rgba(0,0,0,.55);
+    }
+    
+    .dark .template-color-dot {
+        box-shadow: 0 0 0 2px rgba(0,0,0,.55), 0 2px 4px -2px rgba(0,0,0,.85);
+    }
 </style>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    let currentDate = new Date();
-    let calendarData = {};
-    // Shared template color mapping so table list and calendar use identical colors per template id
-    const templateColorMap = {}; // template_id -> color
-    const templatePalette = [
-        '#0d6efd','#198754','#dc3545','#fd7e14','#6f42c1',
-        '#20c997','#ffc107','#0dcaf0','#d63384','#6610f2'
-    ];
-    
-    // Set default start date to today
-    const startDateInput = document.getElementById('start-date');
-    const today = new Date();
-    startDateInput.value = today.toISOString().split('T')[0];
-    
-    // Calendar functions
-    function formatDate(date) {
-        return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-    }
-    
-    function getDaysInMonth(date) {
-        return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
-    }
-    
-    function getFirstDayOfMonth(date) {
-        return new Date(date.getFullYear(), date.getMonth(), 1).getDay();
-    }
-    
-    function getCalendarDates(date) {
-        const year = date.getFullYear();
-        const month = date.getMonth();
-        const daysInMonth = getDaysInMonth(date);
-        const firstDay = getFirstDayOfMonth(date);
+    document.addEventListener('DOMContentLoaded', function() {
+        let currentDate = new Date();
+        let calendarData = {};
+        const templateColorMap = {};
+        const templatePalette = [
+            '#0d6efd','#198754','#dc3545','#fd7e14','#6f42c1',
+            '#20c997','#ffc107','#0dcaf0','#d63384','#6610f2'
+        ];
         
-        const dates = [];
-        
-        // Previous month's trailing days
-        const prevMonth = new Date(year, month - 1, 0);
-        for (let i = firstDay - 1; i >= 0; i--) {
-            dates.push({
-                date: prevMonth.getDate() - i,
-                month: 'prev',
-                fullDate: new Date(prevMonth.getFullYear(), prevMonth.getMonth(), prevMonth.getDate() - i)
-            });
-        }
-        
-        // Current month's days
-        for (let date = 1; date <= daysInMonth; date++) {
-            dates.push({
-                date: date,
-                month: 'current',
-                fullDate: new Date(year, month, date)
-            });
-        }
-        
-        // Next month's leading days
-        const remainingDays = 42 - dates.length; // 6 weeks * 7 days
-        for (let date = 1; date <= remainingDays; date++) {
-            dates.push({
-                date: date,
-                month: 'next',
-                fullDate: new Date(year, month + 1, date)
-            });
-        }
-        
-        return dates;
-    }
-    
-    function assignTemplateColor(templateId) {
-        if (templateId == null) return null;
-        if (!(templateId in templateColorMap)) {
-            const idx = Object.keys(templateColorMap).length % templatePalette.length;
-            templateColorMap[templateId] = templatePalette[idx];
-        }
-        return templateColorMap[templateId];
-    }
-
-    function applyTemplateColorsToTable() {
-        // Color dots at far left of each schedule row
-        document.querySelectorAll('.schedule-row-dot[data-template-id]').forEach(dot => {
-            const tid = dot.getAttribute('data-template-id');
-            if (!tid) return;
-            const color = assignTemplateColor(tid);
-            if (color) {
-                dot.style.background = color;
-                dot.style.boxShadow = `0 0 0 2px rgba(255,255,255,0.7), 0 2px 4px -1px ${color}80`;
-            }
-        });
-    }
-
-    async function loadCalendarData() {
-        try {
-            const response = await fetch(`/scheduling/calendar-data?month=${currentDate.getMonth() + 1}&year=${currentDate.getFullYear()}`);
-            const result = await response.json();
-            if (result.status === 'success') {
-                calendarData = result.data;
-                renderCalendar();
-            }
-        } catch (error) {
-            console.error('Error loading calendar data:', error);
-        }
-    }
-    
-    function renderCalendar() {
-        const container = document.getElementById('calendar-container');
-        const monthSpan = document.getElementById('current-month');
-        const legend = document.getElementById('calendar-legend');
-        const palette = templatePalette; // reuse shared palette
-        const templateColors = templateColorMap; // reuse shared mapping
-        const templateNames = {};  // template_id -> name (from schedule entries)
-        
-        monthSpan.textContent = formatDate(currentDate);
-        
-        // Clear previous calendar
-        container.innerHTML = '';
-        container.className = 'calendar-container';
-        
-        // Add day headers
-        const dayHeaders = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-        dayHeaders.forEach(day => {
-            const header = document.createElement('div');
-            header.className = 'calendar-header';
-            header.textContent = day;
-            container.appendChild(header);
-        });
-        
-        // Add calendar days
-        const dates = getCalendarDates(currentDate);
+        const startDateInput = document.getElementById('start-date');
         const today = new Date();
+        startDateInput.value = today.toISOString().split('T')[0];
         
-        dates.forEach(dateObj => {
-            const dayElement = document.createElement('div');
-            dayElement.className = 'calendar-day';
+        function formatDate(date) {
+            return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+        }
+        
+        function getDaysInMonth(date) {
+            return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+        }
+        
+        function getFirstDayOfMonth(date) {
+            return new Date(date.getFullYear(), date.getMonth(), 1).getDay();
+        }
+        
+        function getCalendarDates(date) {
+            const year = date.getFullYear();
+            const month = date.getMonth();
+            const daysInMonth = getDaysInMonth(date);
+            const firstDay = getFirstDayOfMonth(date);
             
-            if (dateObj.month !== 'current') {
-                dayElement.classList.add('other-month');
-            }
+            const dates = [];
             
-            // Check if it's today
-            if (dateObj.fullDate.toDateString() === today.toDateString()) {
-                dayElement.classList.add('today');
-            }
-            
-            // Add day number
-            const dayNumber = document.createElement('div');
-            dayNumber.className = 'calendar-day-number';
-            dayNumber.textContent = dateObj.date;
-            dayElement.appendChild(dayNumber);
-            
-            // Add schedule dots
-            const dateKey = dateObj.fullDate.toISOString().split('T')[0];
-            if (calendarData[dateKey] && calendarData[dateKey].length > 0) {
-                dayElement.classList.add('has-schedule');
-                const dotsContainer = document.createElement('div');
-                dotsContainer.className = 'calendar-dots';
-                
-                calendarData[dateKey].forEach(schedule => {
-                    // Assign a stable color per template_id
-                    if (schedule.template_id !== undefined) {
-                        assignTemplateColor(schedule.template_id);
-                        if (!(schedule.template_id in templateNames)) {
-                            templateNames[schedule.template_id] = schedule.name;
-                        }
-                    }
-                    const dot = document.createElement('div');
-                    dot.className = 'calendar-dot';
-                    if (schedule.template_id !== undefined && templateColors[schedule.template_id]) {
-                        const c = templateColors[schedule.template_id];
-                        dot.style.background = c;
-                        dot.style.boxShadow = `0 0 0 2px rgba(255,255,255,0.6), 0 2px 4px -1px ${c}90`;
-                    }
-                    dot.title = `${schedule.name} at ${schedule.time}`;
-                    
-                    // Add hover tooltip
-                    dot.addEventListener('mouseenter', function(e) {
-                        showTooltip(e, `${schedule.name} at ${schedule.time}`);
-                    });
-                    
-                    dot.addEventListener('mouseleave', function() {
-                        hideTooltip();
-                    });
-                    
-                    dotsContainer.appendChild(dot);
+            const prevMonth = new Date(year, month - 1, 0);
+            for (let i = firstDay - 1; i >= 0; i--) {
+                dates.push({
+                    date: prevMonth.getDate() - i,
+                    month: 'prev',
+                    fullDate: new Date(prevMonth.getFullYear(), prevMonth.getMonth(), prevMonth.getDate() - i)
                 });
-                
-                dayElement.appendChild(dotsContainer);
             }
             
-            container.appendChild(dayElement);
-        });
-
-        // Build legend
-        legend.innerHTML = '';
-        Object.entries(templateColors).forEach(([tid, color]) => {
-            const item = document.createElement('div');
-            item.className = 'd-flex align-items-center gap-1 px-2 py-1 rounded';
-            item.style.background = 'rgba(0,0,0,0.05)';
-            if (document.documentElement.classList.contains('dark')) {
-                item.style.background = 'rgba(255,255,255,0.05)';
+            for (let date = 1; date <= daysInMonth; date++) {
+                dates.push({
+                    date: date,
+                    month: 'current',
+                    fullDate: new Date(year, month, date)
+                });
             }
-            const swatch = document.createElement('span');
-            swatch.style.display = 'inline-block';
-            swatch.style.width = '10px';
-            swatch.style.height = '10px';
-            swatch.style.borderRadius = '50%';
-            swatch.style.background = color;
-            swatch.style.boxShadow = '0 0 0 1px rgba(0,0,0,0.2)';
-            const label = document.createElement('span');
-            label.textContent = templateNames[tid] || `Template ${tid}`;
-            item.appendChild(swatch);
-            item.appendChild(label);
-            legend.appendChild(item);
-        });
-    }
-    
-    function showTooltip(event, text) {
-        const tooltip = document.createElement('div');
-        tooltip.className = 'schedule-tooltip';
-        tooltip.textContent = text;
-        tooltip.style.left = event.pageX + 10 + 'px';
-        tooltip.style.top = event.pageY - 30 + 'px';
-        document.body.appendChild(tooltip);
-    }
-    
-    function hideTooltip() {
-        const tooltip = document.querySelector('.schedule-tooltip');
-        if (tooltip) {
-            tooltip.remove();
-        }
-    }
-    
-    // Calendar navigation
-    document.getElementById('prev-month').addEventListener('click', function() {
-        currentDate.setMonth(currentDate.getMonth() - 1);
-        loadCalendarData();
-    });
-    
-    document.getElementById('next-month').addEventListener('click', function() {
-        currentDate.setMonth(currentDate.getMonth() + 1);
-        loadCalendarData();
-    });
-    
-    // Today button - jump to current month
-    document.getElementById('today-month').addEventListener('click', function() {
-        const today = new Date();
-        currentDate.setFullYear(today.getFullYear());
-        currentDate.setMonth(today.getMonth());
-        loadCalendarData();
-    });
-    
-    // Initial calendar load
-    loadCalendarData();
-    applyTemplateColorsToTable();
-    
-    // Modal functions
-    function resetModal() {
-        document.getElementById('scheduleModalLabel').textContent = 'Create New Email Schedule';
-        document.getElementById('save-schedule-btn').textContent = 'Create Schedule';
-        document.getElementById('schedule-id').value = '';
-        document.getElementById('schedule-name').value = '';
-        document.getElementById('email-list-select').value = '';
-        document.getElementById('template-select').value = '';
-        document.getElementById('frequency-select').value = '';
-        document.getElementById('start-date').value = new Date().toISOString().split('T')[0];
-        document.getElementById('send-time').value = '09:00';
-        document.getElementById('date-range-select').value = '7';
-    }
-    
-    function populateEditModal(scheduleData) {
-        document.getElementById('scheduleModalLabel').textContent = 'Edit Email Schedule';
-        document.getElementById('save-schedule-btn').textContent = 'Update Schedule';
-        document.getElementById('schedule-id').value = scheduleData.scheduleId;
-        document.getElementById('schedule-name').value = scheduleData.scheduleName;
-        document.getElementById('email-list-select').value = scheduleData.emailListId;
-        document.getElementById('template-select').value = scheduleData.templateId;
-        document.getElementById('frequency-select').value = scheduleData.frequency;
-        document.getElementById('start-date').value = scheduleData.startDate;
-        document.getElementById('send-time').value = scheduleData.sendTime;
-        document.getElementById('date-range-select').value = scheduleData.dateRange || '7';
-    }
-    
-    // Add schedule button (create new)
-    document.getElementById('add-schedule-btn').addEventListener('click', function() {
-        resetModal();
-    });
-    
-    // Edit schedule buttons
-    document.querySelectorAll('.edit-schedule-btn').forEach(button => {
-        button.addEventListener('click', function() {
-            const scheduleData = {
-                scheduleId: this.dataset.scheduleId,
-                scheduleName: this.dataset.scheduleName,
-                emailListId: this.dataset.emailListId,
-                templateId: this.dataset.templateId,
-                frequency: this.dataset.frequency,
-                startDate: this.dataset.startDate,
-                sendTime: this.dataset.sendTime,
-                dateRange: this.dataset.dateRange
-            };
-            populateEditModal(scheduleData);
-        });
-    });
-    
-    // Save schedule (handles both create and edit)
-    document.getElementById('save-schedule-btn').addEventListener('click', async function() {
-        const scheduleId = document.getElementById('schedule-id').value;
-        const name = document.getElementById('schedule-name').value.trim();
-        const emailListId = document.getElementById('email-list-select').value;
-        const templateId = document.getElementById('template-select').value;
-        const frequency = document.getElementById('frequency-select').value;
-        const startDate = document.getElementById('start-date').value;
-        const sendTime = document.getElementById('send-time').value;
-        const dateRange = document.getElementById('date-range-select').value;
-        
-        if (!name || !emailListId || !templateId || !frequency || !startDate || !sendTime || !dateRange) {
-            alert('Please fill in all fields');
-            return;
+            
+            const remainingDays = 42 - dates.length;
+            for (let date = 1; date <= remainingDays; date++) {
+                dates.push({
+                    date: date,
+                    month: 'next',
+                    fullDate: new Date(year, month + 1, date)
+                });
+            }
+            
+            return dates;
         }
         
-        const isEdit = scheduleId !== '';
-        const url = isEdit ? `/scheduling/${scheduleId}` : '/scheduling/create';
-        const method = isEdit ? 'PUT' : 'POST';
+        function assignTemplateColor(templateId) {
+            if (templateId == null) return null;
+            if (!(templateId in templateColorMap)) {
+                const idx = Object.keys(templateColorMap).length % templatePalette.length;
+                templateColorMap[templateId] = templatePalette[idx];
+            }
+            return templateColorMap[templateId];
+        }
+
+        function applyTemplateColorsToTable() {
+            document.querySelectorAll('.schedule-row-dot[data-template-id]').forEach(dot => {
+                const tid = dot.getAttribute('data-template-id');
+                if (!tid) return;
+                const color = assignTemplateColor(tid);
+                if (color) {
+                    dot.style.background = color;
+                    dot.style.boxShadow = `0 0 0 2px rgba(255,255,255,0.7), 0 2px 4px -1px ${color}80`;
+                }
+            });
+        }
+
+        async function loadCalendarData() {
+            try {
+                const response = await fetch(`/scheduling/calendar-data?month=${currentDate.getMonth() + 1}&year=${currentDate.getFullYear()}`);
+                const result = await response.json();
+                if (result.status === 'success') {
+                    calendarData = result.data;
+                    renderCalendar();
+                }
+            } catch (error) {
+                console.error('Error loading calendar data:', error);
+            }
+        }
         
-        try {
-            const response = await fetch(url, {
-                method: method,
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    name: name,
-                    email_list_id: parseInt(emailListId),
-                    template_id: parseInt(templateId),
-                    frequency: frequency,
-                    start_date: startDate,
-                    send_time: sendTime,
-                    date_range: parseInt(dateRange)
-                })
+        function renderCalendar() {
+            const container = document.getElementById('calendar-container');
+            const monthSpan = document.getElementById('current-month');
+            const legend = document.getElementById('calendar-legend');
+            const palette = templatePalette;
+            const templateColors = templateColorMap;
+            const templateNames = {};
+            
+            monthSpan.textContent = formatDate(currentDate);
+            
+            container.innerHTML = '';
+            container.className = 'calendar-container';
+            
+            const dayHeaders = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            dayHeaders.forEach(day => {
+                const header = document.createElement('div');
+                header.className = 'calendar-header';
+                header.textContent = day;
+                container.appendChild(header);
             });
             
-            const result = await response.json();
-            if (result.status === 'success') {
-                alert(result.message);
-                location.reload();
-            } else {
-                alert('Error: ' + result.message);
-            }
-        } catch (error) {
-            alert(`Error ${isEdit ? 'updating' : 'creating'} schedule: ` + error.message);
+            const dates = getCalendarDates(currentDate);
+            const today = new Date();
+            
+            dates.forEach(dateObj => {
+                const dayElement = document.createElement('div');
+                dayElement.className = 'calendar-day';
+                
+                if (dateObj.month !== 'current') {
+                    dayElement.classList.add('other-month');
+                }
+                
+                if (dateObj.fullDate.toDateString() === today.toDateString()) {
+                    dayElement.classList.add('today');
+                }
+                
+                const dayNumber = document.createElement('div');
+                dayNumber.className = 'calendar-day-number';
+                dayNumber.textContent = dateObj.date;
+                dayElement.appendChild(dayNumber);
+                
+                const dateKey = dateObj.fullDate.toISOString().split('T')[0];
+                if (calendarData[dateKey] && calendarData[dateKey].length > 0) {
+                    dayElement.classList.add('has-schedule');
+                    const dotsContainer = document.createElement('div');
+                    dotsContainer.className = 'calendar-dots';
+                    
+                    calendarData[dateKey].forEach(schedule => {
+                        if (schedule.template_id !== undefined) {
+                            assignTemplateColor(schedule.template_id);
+                            if (!(schedule.template_id in templateNames)) {
+                                templateNames[schedule.template_id] = schedule.name;
+                            }
+                        }
+                        const dot = document.createElement('div');
+                        dot.className = 'calendar-dot';
+                        if (schedule.template_id !== undefined && templateColors[schedule.template_id]) {
+                            const c = templateColors[schedule.template_id];
+                            dot.style.background = c;
+                            dot.style.boxShadow = `0 0 0 2px rgba(255,255,255,0.6), 0 2px 4px -1px ${c}90`;
+                        }
+                        dot.title = `${schedule.name} at ${schedule.time}`;
+                        
+                        dot.addEventListener('mouseenter', function(e) {
+                            showTooltip(e, `${schedule.name} at ${schedule.time}`);
+                        });
+                        
+                        dot.addEventListener('mouseleave', function() {
+                            hideTooltip();
+                        });
+                        
+                        dotsContainer.appendChild(dot);
+                    });
+                    
+                    dayElement.appendChild(dotsContainer);
+                }
+                
+                container.appendChild(dayElement);
+            });
+
+            legend.innerHTML = '';
+            Object.entries(templateColors).forEach(([tid, color]) => {
+                const item = document.createElement('div');
+                item.className = 'd-flex align-items-center gap-1 px-2 py-1 rounded';
+                item.style.background = 'rgba(0,0,0,0.05)';
+                if (document.documentElement.classList.contains('dark')) {
+                    item.style.background = 'rgba(255,255,255,0.05)';
+                }
+                const swatch = document.createElement('span');
+                swatch.style.display = 'inline-block';
+                swatch.style.width = '10px';
+                swatch.style.height = '10px';
+                swatch.style.borderRadius = '50%';
+                swatch.style.background = color;
+                swatch.style.boxShadow = '0 0 0 1px rgba(0,0,0,0.2)';
+                const label = document.createElement('span');
+                label.textContent = templateNames[tid] || `Template ${tid}`;
+                item.appendChild(swatch);
+                item.appendChild(label);
+                legend.appendChild(item);
+            });
         }
-    });
-    
-    // Toggle schedule status
-    document.querySelectorAll('.toggle-schedule-btn').forEach(button => {
-        button.addEventListener('click', async function() {
-            const scheduleId = this.dataset.scheduleId;
-            const currentStatus = this.dataset.currentStatus === 'true';
-            const newStatus = !currentStatus;
+        
+        function showTooltip(event, text) {
+            const tooltip = document.createElement('div');
+            tooltip.className = 'schedule-tooltip';
+            tooltip.textContent = text;
+            tooltip.style.left = event.pageX + 10 + 'px';
+            tooltip.style.top = event.pageY - 30 + 'px';
+            document.body.appendChild(tooltip);
+        }
+        
+        function hideTooltip() {
+            const tooltip = document.querySelector('.schedule-tooltip');
+            if (tooltip) {
+                tooltip.remove();
+            }
+        }
+        
+        document.getElementById('prev-month').addEventListener('click', function() {
+            currentDate.setMonth(currentDate.getMonth() - 1);
+            loadCalendarData();
+        });
+        
+        document.getElementById('next-month').addEventListener('click', function() {
+            currentDate.setMonth(currentDate.getMonth() + 1);
+            loadCalendarData();
+        });
+        
+        document.getElementById('today-month').addEventListener('click', function() {
+            const today = new Date();
+            currentDate.setFullYear(today.getFullYear());
+            currentDate.setMonth(today.getMonth());
+            loadCalendarData();
+        });
+        
+        loadCalendarData();
+        applyTemplateColorsToTable();
+        
+        function resetModal() {
+            document.getElementById('scheduleModalLabel').textContent = 'Create New Email Schedule';
+            document.getElementById('save-schedule-btn').textContent = 'Create Schedule';
+            document.getElementById('schedule-id').value = '';
+            document.getElementById('schedule-name').value = '';
+            document.getElementById('email-list-select').value = '';
+            document.getElementById('template-select').value = '';
+            document.getElementById('frequency-select').value = '';
+            document.getElementById('start-date').value = new Date().toISOString().split('T')[0];
+            document.getElementById('send-time').value = '09:00';
+            document.getElementById('date-range-select').value = '7';
+        }
+        
+        function populateEditModal(scheduleData) {
+            document.getElementById('scheduleModalLabel').textContent = 'Edit Email Schedule';
+            document.getElementById('save-schedule-btn').textContent = 'Update Schedule';
+            document.getElementById('schedule-id').value = scheduleData.scheduleId;
+            document.getElementById('schedule-name').value = scheduleData.scheduleName;
+            document.getElementById('email-list-select').value = scheduleData.emailListId;
+            document.getElementById('template-select').value = scheduleData.templateId;
+            document.getElementById('frequency-select').value = scheduleData.frequency;
+            document.getElementById('start-date').value = scheduleData.startDate;
+            document.getElementById('send-time').value = scheduleData.sendTime;
+            document.getElementById('date-range-select').value = scheduleData.dateRange || '7';
+        }
+        
+        document.getElementById('add-schedule-btn').addEventListener('click', function() {
+            resetModal();
+        });
+        
+        document.querySelectorAll('.edit-schedule-btn').forEach(button => {
+            button.addEventListener('click', function() {
+                const scheduleData = {
+                    scheduleId: this.dataset.scheduleId,
+                    scheduleName: this.dataset.scheduleName,
+                    emailListId: this.dataset.emailListId,
+                    templateId: this.dataset.templateId,
+                    frequency: this.dataset.frequency,
+                    startDate: this.dataset.startDate,
+                    sendTime: this.dataset.sendTime,
+                    dateRange: this.dataset.dateRange
+                };
+                populateEditModal(scheduleData);
+            });
+        });
+        
+        document.getElementById('save-schedule-btn').addEventListener('click', async function() {
+            const scheduleId = document.getElementById('schedule-id').value;
+            const name = document.getElementById('schedule-name').value.trim();
+            const emailListId = document.getElementById('email-list-select').value;
+            const templateId = document.getElementById('template-select').value;
+            const frequency = document.getElementById('frequency-select').value;
+            const startDate = document.getElementById('start-date').value;
+            const sendTime = document.getElementById('send-time').value;
+            const dateRange = document.getElementById('date-range-select').value;
+            
+            if (!name || !emailListId || !templateId || !frequency || !startDate || !sendTime || !dateRange) {
+                alert('Please fill in all fields');
+                return;
+            }
+            
+            const isEdit = scheduleId !== '';
+            const url = isEdit ? `/scheduling/${scheduleId}` : '/scheduling/create';
+            const method = isEdit ? 'PUT' : 'POST';
             
             try {
-                const response = await fetch(`/scheduling/${scheduleId}/toggle`, {
-                    method: 'POST',
+                const response = await fetch(url, {
+                    method: method,
                     headers: {
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
-                        is_active: newStatus
+                        name: name,
+                        email_list_id: parseInt(emailListId),
+                        template_id: parseInt(templateId),
+                        frequency: frequency,
+                        start_date: startDate,
+                        send_time: sendTime,
+                        date_range: parseInt(dateRange)
                     })
                 });
                 
                 const result = await response.json();
                 if (result.status === 'success') {
+                    alert(result.message);
                     location.reload();
                 } else {
                     alert('Error: ' + result.message);
                 }
             } catch (error) {
-                alert('Error toggling schedule: ' + error.message);
+                alert(`Error ${isEdit ? 'updating' : 'creating'} schedule: ` + error.message);
             }
         });
-    });
-    
-    // Delete schedule
-    document.querySelectorAll('.delete-schedule-btn').forEach(button => {
-        button.addEventListener('click', async function() {
-            const scheduleId = this.dataset.scheduleId;
-            const scheduleName = this.dataset.scheduleName;
-            
-            if (confirm(`Are you sure you want to delete the schedule "${scheduleName}"? This action cannot be undone.`)) {
+        
+        document.querySelectorAll('.toggle-schedule-btn').forEach(button => {
+            button.addEventListener('click', async function() {
+                const scheduleId = this.dataset.scheduleId;
+                const currentStatus = this.dataset.currentStatus === 'true';
+                const newStatus = !currentStatus;
+                
                 try {
-                    const response = await fetch(`/scheduling/${scheduleId}`, {
-                        method: 'DELETE'
+                    const response = await fetch(`/scheduling/${scheduleId}/toggle`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            is_active: newStatus
+                        })
                     });
                     
                     const result = await response.json();
@@ -891,62 +995,80 @@ document.addEventListener('DOMContentLoaded', function() {
                         alert('Error: ' + result.message);
                     }
                 } catch (error) {
-                    alert('Error deleting schedule: ' + error.message);
+                    alert('Error toggling schedule: ' + error.message);
                 }
-            }
+            });
         });
-    });
-    
-    // Send Now button
-    document.querySelectorAll('.send-now-btn').forEach(button => {
-        button.addEventListener('click', async function() {
-            const scheduleId = this.dataset.scheduleId;
-            const scheduleName = this.dataset.scheduleName;
-            
-            if (confirm(`Send "${scheduleName}" now? This will not affect the regular schedule.`)) {
-                // Show loading state
-                const originalText = this.textContent;
-                this.textContent = '📤 Sending...';
-                this.disabled = true;
-                this.classList.add('sending-flash');
+        
+        document.querySelectorAll('.delete-schedule-btn').forEach(button => {
+            button.addEventListener('click', async function() {
+                const scheduleId = this.dataset.scheduleId;
+                const scheduleName = this.dataset.scheduleName;
                 
-                try {
-                    const response = await fetch(`/scheduling/${scheduleId}/send-now`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
+                if (confirm(`Are you sure you want to delete the schedule "${scheduleName}"? This action cannot be undone.`)) {
+                    try {
+                        const response = await fetch(`/scheduling/${scheduleId}`, {
+                            method: 'DELETE'
+                        });
+                        
+                        const result = await response.json();
+                        if (result.status === 'success') {
+                            location.reload();
+                        } else {
+                            alert('Error: ' + result.message);
                         }
-                    });
-                    
-                    const result = await response.json();
-                    if (result.status === 'success') {
-                        alert('✅ ' + result.message);
-                    } else {
-                        alert('❌ Error: ' + result.message);
+                    } catch (error) {
+                        alert('Error deleting schedule: ' + error.message);
                     }
-                } catch (error) {
-                    alert('❌ Error sending email: ' + error.message);
-                } finally {
-                    // Restore button state
-                    this.textContent = originalText;
-                    this.disabled = false;
-                    this.classList.remove('sending-flash');
                 }
-            }
+            });
+        });
+        
+        document.querySelectorAll('.send-now-btn').forEach(button => {
+            button.addEventListener('click', async function() {
+                const scheduleId = this.dataset.scheduleId;
+                const scheduleName = this.dataset.scheduleName;
+                
+                if (confirm(`Send "${scheduleName}" now? This will not affect the regular schedule.`)) {
+                    const originalText = this.textContent;
+                    this.textContent = '📤 Sending...';
+                    this.disabled = true;
+                    this.classList.add('sending-flash');
+                    
+                    try {
+                        const response = await fetch(`/scheduling/${scheduleId}/send-now`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            }
+                        });
+                        
+                        const result = await response.json();
+                        if (result.status === 'success') {
+                            alert('✅ ' + result.message);
+                        } else {
+                            alert('❌ Error: ' + result.message);
+                        }
+                    } catch (error) {
+                        alert('❌ Error sending email: ' + error.message);
+                    } finally {
+                        this.textContent = originalText;
+                        this.disabled = false;
+                        this.classList.remove('sending-flash');
+                    }
+                }
+            });
+        });
+        
+        document.querySelectorAll('.preview-schedule-btn').forEach(button => {
+            button.addEventListener('click', function() {
+                const scheduleId = this.dataset.scheduleId;
+                const scheduleName = this.dataset.scheduleName;
+                
+                const previewUrl = `/scheduling/${scheduleId}/preview-page?schedule_id=${scheduleId}`;
+                window.open(previewUrl, '_blank', 'width=1000,height=800,scrollbars=yes,resizable=yes');
+            });
         });
     });
-    
-    // Preview button
-    document.querySelectorAll('.preview-schedule-btn').forEach(button => {
-        button.addEventListener('click', function() {
-            const scheduleId = this.dataset.scheduleId;
-            const scheduleName = this.dataset.scheduleName;
-            
-            // Open preview in a new window
-            const previewUrl = `/scheduling/${scheduleId}/preview-page?schedule_id=${scheduleId}`;
-            window.open(previewUrl, '_blank', 'width=1000,height=800,scrollbars=yes,resizable=yes');
-        });
-    });
-});
 </script>
 {% endblock %}

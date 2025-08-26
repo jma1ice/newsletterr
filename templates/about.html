@@ -42,7 +42,13 @@
 
     <h2 class="text-2xl font-bold mb-4">Recent Changes</h2>
     <ul class="list-disc list-inside space-y-2 text-sm">
-        <li>Dockerized!</li>
+        <li>Plex image un-squished</li>
+        <li>PUBLIC_BASE_URL remade into an env var in case docker user changes port</li>
+        <li>Scheduled send now grabs recently added / recommendations</li>
+        <li>Replaced scheduled recommendation API call with selected users instead of all users</li>
+        <li>Set to only pull schedule recommendations if \[RECOMMENDATIONS\] is present</li>
+        <li>Fixed issue where on dash graph wouldn't show in 'view' until a stat was 'viewed'</li>
+        <li>UI added for recently added in snap-ins</li>
     </ul>
 </div>
 {% endblock %}

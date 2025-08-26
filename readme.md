@@ -155,11 +155,10 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 
 ### v0.9.9
 * UI for adding recommendations to email - still works with \[PLACEHOLDER\] for now
-* Recommendations headers bigger in scheduled send
+* Recommendations/recently added headers bigger in scheduled send
 * Cache recommendations
 * Schedule send only sends dark mode
 * Graph titles need to specify the date range - or at least show what time range the data is for somewhere in the email
-* Build Docker image with python:slim
 * Error when using 587 to send email
 * Update readme to explain why one would need an App Password for email
 * Include the Plex url in the settings page so the user can change it if it pulls incorrectly

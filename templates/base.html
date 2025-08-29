@@ -1,6 +1,14 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <script>
+        try {
+            const pref = localStorage.getItem('theme');
+            const dark = pref ? (pref === 'dark') :
+            window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+            document.documentElement.classList.toggle('dark', dark);
+        } catch (_) {}
+    </script>
     <meta charset="UTF-8" name="viewport" content="width=device-width, initial-scale=1">
     <link rel="icon" type="image/x-icon" href="/static/img/favicon.ico">
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
@@ -118,7 +126,7 @@
         Newsletterr © 2025. <a target="_blank" href="https://discord.gg/7Skcsqs4uT">Join the discussion on Discord!</a>
     </p>
     <p class="middle-foot">
-        <a target="_blank" href="https://ko-fi.com/newsletterr">Donate</a>
+        <a target="_blank" href="https://ko-fi.com/newsletterr">Tip the devs</a>
     </p>
     <p class="right-foot">
         {{ version }}

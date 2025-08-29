@@ -120,13 +120,16 @@ By default the app listens on **http://127.0.0.1:6397**.
 3. Fill in:
    * **From** – e‑mail address that will appear as the sender  
    * **Alias (optional)** – _Send As_ alias. If blank, **From** will be used, [setup instructions](https://support.google.com/a/answer/33327?hl=en)  
-   * **Password** – account or [app‑password](https://support.google.com/mail/answer/185833?hl=en) if using Gmail  
+   * **Password** – account or [app‑password](https://support.google.com/mail/answer/185833?hl=en) if using Gmail. App Password is required by Gmail for security, it will not work with your regular Gmail password  
    * **SMTP Server** – e.g. `smtp.gmail.com`  
    * **SMTP Port** – `465` for SSL or `587` for TLS  
    * **Plex Server Name** – appears in the newsletter header. This is grabbed when Plex is connected, but can be overwritten if wanted  
+   * **Plex URL** - used to pull posters for recently added items. This is grabbed when Plex is connected, but can be overwritten if wanted  
    * **Tautulli URL** – e.g. `http://localhost:8181`  
    * **Tautulli API Key** – make sure 'Enable API' is checked, and copy the API key from your [Tautulli settings.](http://localhost:8181/settings#tabs_tabs-web_interface)  
-   * **Conjurr URL** – e.g. `http://localhost:2665/`  
+   * **Conjurr URL** – e.g. `http://localhost:2665`  
+   * **Logo Filename** - This sets the logo at the top of the newsletter. To use a custom logo, place your logo file in /static/img/ and add the filename here  
+   * **Logo Width** - Use this to adjust the size of your custom logo. A small logo should be ~20, medium ~40, and banner size ~80  
 4. Click **Apply Settings**.  Settings are saved to `database/data.db`.
 
 ---
@@ -153,25 +156,23 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 
 ## Upcoming Changes
 
-### v0.9.9
-* UI for adding recommendations to email - still works with \[PLACEHOLDER\] for now
-* Recommendations/recently added headers bigger in scheduled send
-* Cache recommendations
+### v0.9.10
+* Persist ENC key through upgrades
+* Some issue sending a second scheduled email
+* Recommendations/recently added headers bigger in scheduled send | grid 5 by x instead
 * Schedule send only sends dark mode
 * Graph titles need to specify the date range - or at least show what time range the data is for somewhere in the email
 * Error when using 587 to send email
-* Update readme to explain why one would need an App Password for email
-* Include the Plex url in the settings page so the user can change it if it pulls incorrectly
-* Dashboard preview initally stuck on light mode
-* Donate verbiage to Tips
 * SMTP should not require `@`
+* Find email size regulations, warn on too big | reduce image size to better fall with regulations
+* Custom logo logic needs file select to work with docker | add in small/banner/custom dropdown
 
 ### v1.0.0
 * Compile EXE file / ELF
-* Unraid community app
+* Unraid community app - for now there are .xml files in the discord pins
 
 ### v1.1.0
-* Redirect empty settings to the settings page with an alert
+* Switch TV Show recently added info out to just show the show name, not espisode or season number
 * Get fonts showing on Gmail receive side
 * Api/webhooks
 * Opt out support
@@ -180,8 +181,7 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 * Make sure custom templates can't override defaults
 * Auth page for hosted users
 * Snap-in for images/gifs
-* Ability to add embedded links to services, ie StatusCake, Uptime Robot
-* Functionality for custom HTML templates
+* Functionality for custom HTML templates | ability to add embedded links to services, ie StatusCake, Uptime Robot
 * Ombi integration
 * Setting to choose duration or play counts for stats/graphs
 * Setting to hide play counts in stats/graphs
@@ -195,8 +195,10 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 * Stats for total items in library
 * Ratings (G, PG, etc) listed on recently added
 * Auto split recommendations email so its not all sent to everyone
-* Option to change Plex logo
 * M365 SMTP setup
+* Can the recommendations in email have clickable posters to the admins overseerr for requesting unavailable items? And for available take user to watch on Plex
+* Export email HTML button
+* Biweekly/semimonthly option for scheduled emails | possibly CRON
 * Mobile optimizations, i.e.:
 ```
 <style>
@@ -211,6 +213,18 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 ---
 
 ## Recent Changes
+
+### v0.9.9
+* Cache recommendations/filtered users
+* Snap-ins UI for adding recommendations to email
+* Replaced Plex logo with yellow newsletterr logo, also added a disclaimer at the end of the email
+* Added setting so users can use their own logo
+* Included Plex url in the settings page so it can be changed if it pulls incorrectly
+* Fixed issue where dashboard preview was initally stuck on light mode
+* Fixed cache status text color on dark mode
+* Redirect empty settings to the settings page
+* Fixed issue where sometimes BCC placeholder was missing
+* Unlinked subject from newsletter title, replaced with title snap-in and created headers snap-in for smaller section headers
 
 ### v0.9.8
 * Plex image un-squished

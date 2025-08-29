@@ -52,6 +52,11 @@
                     {% if settings.from_email !="" %}value="{{ settings.server_name }}"{% endif %}
                     placeholder="Paramount Plex" required><br><br>
 
+                <label for="plex_url">Plex URL (Optional):</label><br>
+                <input type="text" id="plex_url" name="plex_url"
+                    {% if settings.from_email !="" %}value="{{ settings.plex_url }}"{% endif %}
+                    placeholder="http://localhost:32400"><br><br>
+
                 <label for="tautulli_url">Tautulli Base URL (Optional):</label><br>
                 <input type="text" id="tautulli_url" name="tautulli_url"
                     {% if settings.from_email !="" %}value="{{ settings.tautulli_url }}"{% endif %}
@@ -66,6 +71,16 @@
                 <input type="text" id="conjurr_url" name="conjurr_url"
                     {% if settings.from_email !="" %}value="{{ settings.conjurr_url }}"{% endif %}
                     placeholder="http://localhost:2665"><br><br>
+
+                <label for="logo_filename">Logo Filename (Optional):</label><br>
+                <input type="text" id="logo_filename" name="logo_filename"
+                    {% if settings.from_email !="" %}value="{{ settings.logo_filename }}"{% endif %}
+                    placeholder="Asset_45x.png"><br><br>
+
+                <label for="logo_width">Logo Width (Optional):</label><br>
+                <input type="number" id="logo_width" name="logo_width"
+                    {% if settings.from_email !="" %}value="{{ settings.logo_width }}"{% endif %}
+                    placeholder="80"><br><br>
                 
                 <button id="apply_settings" class="button">Apply Settings</button>
             </form>

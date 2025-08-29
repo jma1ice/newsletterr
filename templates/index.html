@@ -39,17 +39,17 @@
                         </form>
                         
                         {% if cache_info %}
-                            <div class="card mt-3">
+                            <div class="card mt-3" id="cache-card">
                                 <div class="card-header d-flex justify-content-between align-items-center" 
                                     style="cursor: pointer; padding: 8px 12px;" 
-                                    onclick="document.getElementById('cache-status-collapse').classList.toggle('d-none')">
+                                    onclick="document.getElementById('cache-status-badge').classList.toggle('d-none')">
                                     <h6 class="mb-0" style="font-size: 0.85rem;">Cache Status</h6>
                                     <span style="font-size: 0.8rem;">▼</span>
                                 </div>
-                                <div id="cache-status-collapse" class="card-body d-none" style="padding: 8px 12px; font-size: 0.8rem;">
+                                <div id="cache-status-badge" class="card-body d-none" style="padding: 8px 12px; font-size: 0.8rem;">
                                     {% for key, info in cache_info.items() %}
                                         <div class="d-flex justify-content-between align-items-center mb-1">
-                                            <span style="text-transform: capitalize;">{{ key.replace('_', ' ') }}:</span>
+                                            <span class="text-muted" style="text-transform: capitalize;">{{ key.replace('_', ' ') }}:</span>
                                             {% if info.exists %}
                                                 {% if info.is_fresh %}
                                                     <span class="text-success">✓ Fresh ({{ "%.1f"|format(info.age_hours) }}h)</span>
@@ -123,7 +123,7 @@
 
                         <form method="POST" action="/send_email" style="margin-top: 0;">
                             Subject: <input type="text" name="subject" id="subject" placeholder="Subject"
-                                value="{{ settings.server_name }} News" style="width: 18rem;" required><br><br>
+                                        value="{{ settings.server_name }} News" style="width: 18rem;" required><br><br>
                         </form>
                     </td>
                     <td style="width: 40%; padding: 10px; vertical-align: top; position: sticky; top: 80px;">
@@ -133,7 +133,7 @@
                                 🗗 Pop-out
                             </button>
                         </div>
-                        <iframe class="frame" id="preview"></iframe>
+                        <iframe class="frame bg-black !important" id="preview"></iframe>
                     </td>
                     <td style="width: 60%; padding: 10px; vertical-align: top;">
                         <div id="selected-items-pane">
@@ -167,6 +167,9 @@
                                     <button type="button" class="btn button-outline btn-sm" id="add-title-btn" title="Add a title block with large heading text">
                                         + Title
                                     </button>
+                                    <button type="button" class="btn button-outline btn-sm" id="add-header-btn" title="Add a header block with medium heading text">
+                                        + Header
+                                    </button>
                                     <button type="button" class="btn btn-outline-secondary btn-sm" id="add-intro-btn" title="Add introduction text about server membership">
                                         + Intro
                                     </button>
@@ -185,6 +188,12 @@
                                 {% if recent_data %}
                                     <h2>Recently Added</h2>
                                     <div id="ra-lib-list" class="row"></div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6" id="recs-col">
+                                {% if recommendations_json %}
+                                    <h2>Recommendations</h2>
+                                    <div id="recs-user-list" class="row"></div>
                                 {% endif %}
                             </div>
                         </div>
@@ -407,20 +416,25 @@
                         {% if recent_data %}
                             <div id="ra-preview" class="mt-3" style="display: none;">
                                 <div class="card my-4">
-                                    <div class="card-header bg-primary text-white">Recently Added</div>
-                                    <div class="card-body p-2">
+                                    <div class="card-header bg-primary">Recently Added</div>
+                                    <div class="card-body">
                                         <ul id="ra-view" class="grid grid-cols-10 gap-3" style="margin: 0; padding: 0;"></ul>
                                     </div>
                                 </div>
                             </div>
                         {% endif %}
+
+                        <div id="recs-preview" class="mt-3" style="display: none;">
+                            {% if recommendations_json %}
+                                <div class="card my-4">
+                                    <div class="card-header bg-primary">Recommendations</div>
+                                    <div class="card-body"></div>
+                                </div>
+                            {% endif %}
+                        </div>
                     </td>
                 </tr>
             </table>
-            <section>
-                <div id="recommendations_pane">
-                </div>
-            </section>
         </div>
         <script>
             const recentPayload = {{ recent_data | tojson }};
@@ -523,18 +537,18 @@
 
                     row.innerHTML = `
                         <div class="d-flex justify-content-between align-items-center p-2 border rounded">
-                        <span style="font-size: .9rem;">${lib}</span>
-                        <div>
-                            <button type="button" class="btn button-outline btn-sm me-1 ra-view-btn" 
-                                    data-lib="${lib}" data-target="${id}" style="font-size: .8rem; padding: .25rem .5rem;">
-                            View
-                            </button>
-                            <button type="button" class="btn button btn-sm ra-add-btn" 
-                                    data-type="ra" data-lib="${lib}" data-id="${id}" data-name="Recently Added: ${lib}"
-                                    style="font-size: .8rem; padding: .25rem .5rem;">
-                            Add
-                            </button>
-                        </div>
+                            <span style="font-size: .9rem;">${lib}</span>
+                            <div>
+                                <button type="button" class="btn button-outline btn-sm me-1 ra-view-btn" 
+                                        data-lib="${lib}" data-target="${id}" style="font-size: .8rem; padding: .25rem .5rem;">
+                                View
+                                </button>
+                                <button type="button" class="btn button btn-sm ra-add-btn" 
+                                        data-type="ra" data-lib="${lib}" data-id="${id}" data-name="Recently Added: ${lib}"
+                                        style="font-size: .8rem; padding: .25rem .5rem;">
+                                Add
+                                </button>
+                            </div>
                         </div>`;
                     host.appendChild(row);
                 });
@@ -631,235 +645,9 @@
                 })));
                 try { await document.fonts?.ready; } catch(_){}
             }
-
-            async function captureRecentlyAddedPNG() {
-                const grid = document.getElementById('ra-grid');
-                if (!grid || !grid.children.length) return null;
-
-                const rect = grid.getBoundingClientRect();
-                if (!rect.width || !rect.height) return null;
-
-                await waitForImages(grid);
-
-                const bg = '#282A2D';
-
-                function renderPass(useFO){
-                    return html2canvas(grid, {
-                        useCORS: true,
-                        backgroundColor: bg,
-                        scale: window.devicePixelRatio > 1 ? 2 : 1,
-                        foreignObjectRendering: useFO,
-                        windowWidth: grid.scrollWidth,
-                        windowHeight: grid.scrollHeight,
-                        onclone: (doc) => {
-                            const g = doc.getElementById('ra-grid');
-                            if (!g) return;
-
-                            const kill = doc.createElement('style');
-                            kill.textContent = `
-                                *{ box-shadow: none !important; filter: none !important; }
-                                [class*="shadow"]{ box-shadow: none !important; }
-                                [style*="box-shadow"]{ box-shadow: none !important; }
-                            `;
-                            doc.head.appendChild(kill);
-
-                            g.querySelectorAll('*').forEach(el => {
-                                if (typeof el.className === 'string' && el.className.includes('shadow')) {
-                                    el.className = el.className.split(/\s+/).filter(t => !/shadow/i.test(t)).join(' ');
-                                }
-                            });
-
-                            g.querySelectorAll('.aspect-\\[2\\/3\\]').forEach(el => {
-                                const w = el.getBoundingClientRect().width || el.clientWidth || 0;
-                                if (w > 0) el.style.height = Math.round(w * 3 / 2) + 'px';
-                            });
-
-                            const pillNodes = g.querySelectorAll(
-                                '.absolute.top-1.right-1, .absolute.bottom-1.right-1 span, .ra-pill'
-                            );
-                            pillNodes.forEach(p => {
-                                p.style.display = 'inline-flex';
-                                p.style.alignItems = 'center';
-                                p.style.justifyContent = 'center';
-                                p.style.lineHeight = '1';
-                                if (!p.style.padding) p.style.padding = '2px 6px';
-                                p.style.minHeight = '18px';
-                                p.style.borderRadius = '9999px';
-                                const cs = doc.defaultView.getComputedStyle(p);
-                                
-                            });
-
-                            g.querySelectorAll('.pill_text').forEach(s => {
-                                s.style.position = 'relative'
-                                s.style.top = '-6px';
-                            });
-
-                            g.querySelectorAll('.font-semibold.line-clamp-2').forEach(el => {
-                                el.style.display = 'block';
-                                el.style.webkitLineClamp = 'unset';
-                                el.style.overflow = 'hidden';
-                                el.style.lineHeight = '1.5';
-                                el.style.maxHeight   = (1.75 * 2) + 'em';
-                                el.style.paddingBottom = '3px';
-                            });
-
-                            g.querySelectorAll('.p-3 > .text-xs:first-of-type').forEach(el => {
-                                el.style.lineHeight = '1.75';
-                                el.style.paddingBottom = '1px';
-                            });
-
-                            g.querySelectorAll('.line-clamp-5').forEach(el => {
-                                el.style.display = 'block';
-                                el.style.webkitLineClamp = 'unset';
-                                el.style.overflow = 'hidden';
-                                el.style.lineHeight = '1.4';
-                                el.style.maxHeight   = (1.5 * 5) + 'em';
-                                el.style.paddingBottom = '4px';
-                            });
-
-                            g.querySelectorAll('.p-3').forEach(c => {
-                                const cs = doc.defaultView.getComputedStyle(c);
-                                const pb = parseFloat(cs.paddingBottom) || 0;
-                                if (pb < 8) c.style.paddingBottom = '8px';
-                            });
-
-                            g.querySelectorAll('ul').forEach(u => { u.style.margin = '0'; u.style.padding = '0'; });
-                        }
-                    });
-                }
-
-                let canvas = await renderPass(false);
-                if (!canvas || !canvas.width || !canvas.height) {
-                    canvas = await renderPass(true);
-                }
-                if (!canvas || !canvas.width || !canvas.height) return null;
-
-                const blob = await new Promise(r => canvas.toBlob(r, 'image/png', 0.92));
-                const dataUrl = canvas.toDataURL('image/png', 0.92);
-                return { blob, dataUrl, cid: 'recently-added.png' };
-            }
-        </script>
-        <script>
-            async function waitImagesAndFonts(scope){
-                const imgs = Array.from(scope.querySelectorAll('img'));
-                await Promise.all(imgs.map(img => img.complete ? 0 : new Promise(res=>{
-                    img.addEventListener('load', res, {once:true});
-                    img.addEventListener('error', res, {once:true});
-                })));
-                try { await document.fonts?.ready; } catch(_) {}
-            }
-
-            async function captureRecommendationsPNG() {
-                const grid = document.getElementById('rec-grid');
-                if (!grid || !grid.children.length) return null;
-
-                const rect = grid.getBoundingClientRect();
-                if (!rect.width || !rect.height) return null;
-
-                await waitImagesAndFonts(grid);
-
-                const bg = '#282A2D';
-
-                function renderPass(useFO){
-                    return html2canvas(grid, {
-                        useCORS: true,
-                        backgroundColor: bg,
-                        scale: window.devicePixelRatio > 1 ? 2 : 1,
-                        foreignObjectRendering: useFO,
-                        windowWidth: grid.scrollWidth,
-                        windowHeight: grid.scrollHeight,
-                        onclone: (doc) => {
-                            const g = doc.getElementById('rec-grid');
-                            if (!g) return;
-
-                            g.querySelectorAll('.pill_text').forEach(s => {
-                                s.style.position = 'relative'
-                                s.style.top = '-6px';
-                            });
-
-                            g.querySelectorAll('img').forEach(img => {
-                                const src = img.getAttribute('src') || '';
-                                if (/^https?:/i.test(src)) {
-                                    img.setAttribute('crossorigin', 'anonymous');
-                                    img.setAttribute('src', `/proxy-img?u=${encodeURIComponent(src)}`);
-                                }
-                            });
-
-                            const kill = doc.createElement('style');
-                            kill.textContent = `
-                                *{ box-shadow:none !important; filter:none !important; }
-                                [class*="shadow"]{ box-shadow:none !important; }
-                                [style*="box-shadow"]{ box-shadow:none !important; }
-                            `;
-                            doc.head.appendChild(kill);
-
-                            g.querySelectorAll('.aspect-\\[2\\/3\\]').forEach(el => {
-                                const w = el.getBoundingClientRect().width || el.clientWidth || 0;
-                                if (w > 0) el.style.height = Math.round(w * 3 / 2) + 'px';
-                            });
-
-                            g.querySelectorAll('.absolute.top-1.right-1, .absolute.bottom-1.right-1 span, .ra-pill')
-                            .forEach(p => {
-                                p.style.display = 'inline-flex';
-                                p.style.alignItems = 'center';
-                                p.style.justifyContent = 'center';
-                                p.style.lineHeight = '1';
-                                if (!p.style.padding) p.style.padding = '2px 6px';
-                                p.style.minHeight = '18px';
-                                p.style.borderRadius = '9999px';
-                            });
-
-                            g.querySelectorAll('.font-semibold.line-clamp-2').forEach(el => {
-                                el.style.display = 'block';
-                                el.style.webkitLineClamp = 'unset';
-                                el.style.overflow = 'hidden';
-                                el.style.lineHeight = '1.5';
-                                el.style.maxHeight   = (1.75 * 2) + 'em';
-                                el.style.paddingBottom = '3px';
-                            });
-                            g.querySelectorAll('.line-clamp-5').forEach(el => {
-                                el.style.display = 'block';
-                                el.style.webkitLineClamp = 'unset';
-                                el.style.overflow = 'hidden';
-                                el.style.lineHeight = '1.4';
-                                el.style.maxHeight   = (1.5 * 5) + 'em';
-                                el.style.paddingBottom = '4px';
-                            });
-
-                            g.querySelectorAll('ul').forEach(u => { u.style.margin='0'; u.style.padding='0'; });
-                        }
-                    });
-                }
-
-                let canvas = await renderPass(false);
-                if (!canvas || !canvas.width || !canvas.height) canvas = await renderPass(true);
-                if (!canvas || !canvas.width || !canvas.height) return null;
-
-                const blob = await new Promise(r => canvas.toBlob(r, 'image/png', 0.92));
-                const dataUrl = canvas.toDataURL('image/png', 0.92);
-                return { blob, dataUrl, cid: 'recommendations.png' };
-            }
         </script>
         <script>
             let selectedItems = [];
-
-            async function insertRecentlyAddedIntoPreview(html) {
-                const ra = await captureRecentlyAddedPNG();
-                if (!ra) return html.replace('[RECENTLY_ADDED]', '');
-                return html.replace(
-                    '[RECENTLY_ADDED]',
-                    `<img src="${ra.dataUrl}" alt="Recently Added" style="max-width:100%;height:auto;border-radius:5px;display:block;">`
-                );
-            }
-
-            async function insertRecommendationsIntoPreview(html) {
-                const rec = await captureRecommendationsPNG();
-                if (!rec) return html.replace('[RECOMMENDATIONS]', '');
-                return html.replace(
-                    '[RECOMMENDATIONS]',
-                    `<img src="${rec.dataUrl}" alt="Recommendations" style="max-width:100%;height:auto;border-radius:5px;display:block;">`
-                );
-            }
 
             async function updatePreview() {
                 try {
@@ -878,9 +666,6 @@
                     console.log('Subject:', subject);
 
                     let html = "";
-                    let displaySubject = subject.startsWith(serverName) 
-                        ? subject.slice(serverName.length).trimStart()
-                        : subject;
 
                     const selectedGraphs = selectedItems.filter(item => item.type === 'graph').map(item => item.id);
                     const selectedStats = selectedItems.filter(item => item.type === 'stat').map(item => item.id);
@@ -898,11 +683,17 @@
                                 const formattedContent = content.trim().replace(/\n/g, "<br>");
                                 allItemsHTML += `<div style="margin-bottom: 15px;">${formattedContent}</div>`;
                             }
-                        } else if (item.type === 'titleblock') {
+                        } else if (item.type === 'headerblock') {
                             const content = getTextBlockContent(item.id);
                             if (content && content.trim().length > 0) {
                                 const formattedContent = content.trim().replace(/\n/g, "<br>");
                                 allItemsHTML += `<div style="margin-bottom: 20px; font-size: 1.5em; font-weight: bold; text-align: center;">${formattedContent}</div>`;
+                            }
+                        } else if (item.type === 'titleblock') {
+                            const content = getTextBlockContent(item.id);
+                            if (content && content.trim().length > 0) {
+                                const formattedContent = content.trim().replace(/\n/g, "<br>");
+                                allItemsHTML += `<div style="margin-bottom: 20px; font-size: 2em; font-weight: bold; text-align: center;">${formattedContent}</div>`;
                             }
                         } else if (item.type === 'graph') {
                             const chart = Highcharts.charts.find(c => c && c.renderTo.id === item.id);
@@ -1014,18 +805,18 @@
                                 }
 
                                 if (dataUrl) {
-                                    console.warn('RA capture returned for', libName);
+                                    console.log('RA capture returned for', libName);
                                     allItemsHTML += `
                                         <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin: 0; padding: 0;">
                                             <tr>
                                                 <td align="center" style="padding: 12px 0 16px 0; text-align: center;">
-                                                    <div style="font-weight: 700; margin: 0 0 8px 0; color: #E5A00D; font-family: Arial, Helvetica, sans-serif;">
-                                                        Recently Added — ${libName}
+                                                    <div style="font-weight: 700; margin: 0 0 8px 0; color: #E5A00D;">
+                                                        Recently Added - ${libName}
                                                     </div>
                                                     <center>
                                                         <img
                                                             src="${dataUrl}"
-                                                            alt="Recently Added — ${libName}"
+                                                            alt="Recently Added - ${libName}"
                                                             style="display: block; margin: 0 auto; max-width: 100%; height: auto; border: 0; outline: none; text-decoration: none;"
                                                             >
                                                     </center>
@@ -1035,6 +826,40 @@
                                 }
                             } catch (err) {
                                 console.warn('Error adding RA for', item, err);
+                            }
+                        } else if (item.type === 'recs') {
+                            try {
+                                const userKey = item.userKey;
+                                if (!userKey) continue;
+
+                                const temp = document.createElement('div');
+                                temp.style.cssText = 'position: fixed; left: -99999px; top: 0; z-index: -1; background: #282A2D; padding: 8px;';
+                                const node = buildRecsBlockForUser(userKey, { headingTag: 'h1' }, { bgColorway: 'email' });
+                                temp.appendChild(node);
+                                document.body.appendChild(temp);
+
+                                await waitForImages(temp);
+                                const canvas = await html2canvas(node, {
+                                    useCORS: true,
+                                    backgroundColor: '#282A2D',
+                                    scale: (window.devicePixelRatio > 1 ? 2 : 1),
+                                    onclone: captureRecs
+                                });
+                                document.body.removeChild(temp);
+
+                                const dataUrl = canvas.toDataURL('image/png', 0.92);
+                                allItemsHTML += `
+                                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin: 0; padding: 0;">
+                                        <tr>
+                                            <td align="center" style="padding: 12px 0 16px 0; text-align: center;">
+                                                <center>
+                                                    <img id="recs-img" src="${dataUrl}" style="max-width: 100%; height: auto; margin: 0 auto; display: block; border: 0; outline: none; text-decoration: none;"><br>
+                                                </center>
+                                            </td>
+                                        </tr>
+                                    </table>`;
+                            } catch (err) {
+                                console.warn('Error adding recommendations for', item, err);
                             }
                         }
                     }
@@ -1047,28 +872,32 @@
                                 :root { color-scheme: ${isDark ? 'dark' : 'light'}; }
                                 html, body { background: ${isDark ? '#333' : '#8acbd4'}; }
                                 @media only screen and (max-width:1900px) {
-                                    .plex-img { margin-left: 44rem !important; }
+                                    .logo-img { margin-left: 44rem !important; }
+                                    .recs-img { max-width: 60% !important; }
                                 }
                                 @media only screen and (max-width:1700px) {
-                                    .plex-img { margin-left: 38rem !important; }
+                                    .logo-img { margin-left: 38rem !important; }
+                                    .recs-img { max-width: 60% !important; }
                                 }
                                 @media only screen and (max-width:1500px) {
-                                    .plex-img { margin-left: 30rem !important; }
+                                    .logo-img { margin-left: 30rem !important; }
+                                    .recs-img { max-width: 60% !important; }
                                 }
                                 @media only screen and (max-width:1300px) {
-                                    .plex-img { margin-left: 24rem !important; }
+                                    .logo-img { margin-left: 24rem !important; }
+                                    .recs-img { max-width: 60% !important; }
                                 }
                                 @media only screen and (max-width:1100px) {
-                                    .plex-img { margin-left: 16rem !important; }
+                                    .logo-img { margin-left: 16rem !important; }
                                 }
                                 @media only screen and (max-width:900px) {
-                                    .plex-img { margin-left: 10rem !important; }
+                                    .logo-img { margin-left: 10rem !important; }
                                 }
                                 @media only screen and (max-width:700px) {
-                                    .plex-img { margin-left: 4rem !important; }
+                                    .logo-img { margin-left: 4rem !important; }
                                 }
                                 @media only screen and (max-width:500px) {
-                                    .plex-img { margin-left: 2rem !important; }
+                                    .logo-img { margin-left: 2rem !important; }
                                 }
                             </style>
                             <html>
@@ -1082,19 +911,17 @@
                                                         <tbody>
                                                             <tr>
                                                                 <td class="wrapper" style="font-family: IBM Plex Sans; font-size: 14px; vertical-align: top; box-sizing: border-box; padding: 5px; overflow: auto;">
-                                                                    <div class="header" style="text-align: center; line-height: 0;"><img class="header-img plex-img" style="display: block; outline: 0; text-decoration: none; height: auto; border: 0; -ms-interpolation-mode: bicubic; max-width: 100%; margin-left: 40em;" src="https://d15k2d11r6t6rl.cloudfront.net/public/users/Integrators/669d5713-9b6a-46bb-bd7e-c542cff6dd6a/3bef3c50f13f4320a9e31b8be79c6ad2/Plex%20Logo%20Update%202022/plex-logo-heavy-stroke.png" width="40" /></div>
+                                                                    <div class="header" style="text-align: center; line-height: 0;"><img class="header-img logo-img" style="display: block; outline: 0; text-decoration: none; height: auto; border: 0; -ms-interpolation-mode: bicubic; max-width: 100%; margin-left: 40em;" src="/static/img/{{ settings.logo_filename }}" width="{{ settings.logo_width }}" /></div>
                                                                     <div class="server-name" style="font-size: 25px; text-align: center; margin-bottom: 0;">${serverName} Newsletter</div>
                                                                 </td>
                                                             </tr>
                                                             <tr>
                                                                 <td class="footer" style="font-family: IBM Plex Sans; font-size: 12px; vertical-align: top; clear: both; margin-top: 0; text-align: center; width: 100%;">
-
-                                                                    <h1 class="footer-bar" style="margin-left: auto; margin-right: auto; width: 300px; border-top: 1px solid #E5A00D; margin-top: 5px;">${displaySubject}</h1>
-                                                                    <p style="margin: 20px 0;">
-                                                                        ${content}
-                                                                    </p>
+                                                                    <h1 class="footer-bar" style="margin-left: auto; margin-right: auto; width: 300px; border-top: 1px solid #E5A00D; margin-top: 5px; margin-bottom: 0;"></h1>
+                                                                    ${content}
                                                                     <div class="footer-bar" style="margin-left: auto; margin-right: auto; width: 250px; border-top: 1px solid #E5A00D; margin-top: 25px;">&nbsp;</div>
-                                                                    <div class="content-block powered-by" style="padding-bottom: 10px; padding-top: 0;">Generated for Plex Media Server by <a href="https://github.com/jma1ice/newsletterr" style="color: #E5A00D; text-decoration: none;">newsletterr</a></div>
+                                                                    <div class="content-block powered-by" style="padding-bottom: 5px; padding-top: 0;">Generated for Plex Media Server by <a href="https://github.com/jma1ice/newsletterr" style="color: #E5A00D; text-decoration: none;">newsletterr</a></div>
+                                                                    <div style="font-size: 8px; padding: 0;">(newsletterr is not affiliated with or a product of Plex, Inc.)</div>
                                                                 </td>
                                                             </tr>
                                                         </tbody>
@@ -1104,12 +931,6 @@
                                         </tr>
                                     </tbody>
                                 </table></body></html>`;
-                    if (html.includes('[RECENTLY_ADDED]')) {
-                        html = await insertRecentlyAddedIntoPreview(html);
-                    }
-                    if (html.includes('[RECOMMENDATIONS]')) {
-                        html = await insertRecommendationsIntoPreview(html);
-                    }
 
                     const frame = document.getElementById('preview');
                     console.log('Frame element:', frame);
@@ -1212,6 +1033,85 @@
                 ul.style.gridTemplateColumns = 'repeat(5, 1fr)';
                 renderRAGrid(list, ul);
                 preview.style.display = 'block';
+            }
+
+            function showRecsPreviewFor(userKey) {
+                const preview = document.getElementById('recs-preview');
+                if (!preview) return;
+                const header = preview.querySelector('.card-header');
+                if (header) header.textContent = `Recommendations - ${userDict[userKey] || userKey}`;
+                const body = preview.querySelector('.card-body');
+                body.innerHTML = '';
+                body.appendChild(buildRecsBlockForUser(userKey, { headingTag: 'h4' }, { bgColorway: 'view' }));
+                preview.style.display = 'block';
+            }
+
+            async function captureRecs(doc) {
+                const root = doc.getElementById('rec-grid') || doc.body;
+                const g = root.querySelector('#rec-grid') || root;
+
+                const kill = doc.createElement('style');
+                kill.textContent = `
+                    *{ box-shadow:none !important; filter:none !important; }
+                    [class*="shadow"]{ box-shadow:none !important; }
+                    [style*="box-shadow"]{ box-shadow:none !important; }
+                    .line-clamp-2, .line-clamp-3, .line-clamp-4, .line-clamp-5 {
+                        -webkit-line-clamp: unset !important; line-clamp: unset !important;
+                        display: block !important; overflow: visible !important;
+                    }
+                    .rec-user-card a, .rec-user-card a * { color: inherit !important; }
+                `;
+                doc.head.appendChild(kill);
+
+                if (!g) return;
+
+                g.querySelectorAll('.aspect-\\[2\\/3\\]').forEach(el => {
+                    const w = el.getBoundingClientRect().width || el.clientWidth || 0;
+                    if (w > 0) el.style.height = Math.round(w * 3 / 2) + 'px';
+                });
+
+                g.querySelectorAll('.absolute.left-0.right-0.bottom-0').forEach(el => {
+                    const cls = el.className || '';
+                    if (cls.includes('bg-black/80')) {
+                        el.style.transform = 'translateY(100%)';
+                        el.style.transition = 'none';
+                        el.style.maxHeight = '40%';
+                        el.style.pointerEvents = 'none';
+                    }
+                });
+
+                g.querySelectorAll('.pill_text').forEach(s => {
+                    s.style.position = 'relative';
+                    s.style.top = '-12px';
+                    s.style.fontWeight = '600';
+                    s.style.color = '#fff';
+                });
+
+                g.querySelectorAll('.text-\\[12px\\]').forEach(el => el.style.fontSize = '30px');
+                g.querySelectorAll('.text-\\[11px\\]').forEach(el => el.style.fontSize = '27px');
+                g.querySelectorAll('.text-\\[10px\\]').forEach(el => el.style.fontSize = '25px');
+
+                g.querySelectorAll('.absolute.top-1 .pill_text, .absolute.top-6 .pill_text').forEach(el => {
+                    el.style.fontSize = '24px';
+                    const parent = el.closest('div, span');
+                });
+
+                g.querySelectorAll('.absolute.top-6').forEach(el => {
+                    if (el.classList.replace) {
+                        el.classList.replace('top-6', 'top-12');
+                    } else {
+                        el.classList.remove('top-6');
+                        el.classList.add('top-12');
+                    }
+                });
+
+                g.querySelectorAll('img').forEach(img => {
+                    const u = img.getAttribute('src') || '';
+                    if (/^https?:/i.test(u)) {
+                        img.setAttribute('crossorigin', 'anonymous');
+                        img.setAttribute('src', '/proxy-img?u=' + encodeURIComponent(u));
+                    }
+                });
             }
 
             async function captureRAPNGForList(list) {
@@ -1455,6 +1355,15 @@
                         return;
                     }
                 }
+
+                if (e.target.classList.contains('recs-view-btn')) {
+                    const viewBtn = e.target.closest('.recs-view-btn');
+                    if (viewBtn) {
+                        const userKey = viewBtn.dataset.userKey;
+                        if (userKey) showRecsPreviewFor(userKey);
+                        return;
+                    }
+                }
             });
         </script>
         <script>
@@ -1557,10 +1466,32 @@
                     let htmlContent = '';
                     
                     selectedItems.forEach((item, index) => {
-                        if (item.type === 'textblock' || item.type === 'titleblock') {
+                        if (item.type === 'titleblock') {
                             const currentContent = getTextBlockContent(item.id) || '';
-                            const badgeStyle = item.type === 'titleblock' ? 'badge-warning' : 'badge-secondary';
-                            const placeholderText = item.type === 'titleblock' ? 'Enter your title here...' : 'Enter your text here...';
+                            const badgeStyle = 'badge-warning';
+                            const placeholderText = 'Enter your title here...';
+                            htmlContent += `
+                                <div class="selected-item d-flex flex-column p-2 mb-2 border rounded" 
+                                     data-index="${index}" data-fixed="top" draggable="false">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <span class="item-name">${item.name}</span>
+                                        <div>
+                                            <span class="badge ${badgeStyle} me-2">${item.type}</span>
+                                            <button type="button" class="btn btn-sm btn-outline-danger title-remove remove-item-btn" data-index="${index}">x</button>
+                                        </div>
+                                    </div>
+                                    <textarea 
+                                        data-textblock-id="${item.id}" 
+                                        class="form-control text-block-editor" 
+                                        style="height: 60px; font-size: 0.9rem; resize: vertical;"
+                                        placeholder="${placeholderText}"
+                                        oninput="updateTextBlockName('${item.id}', ${index})">${currentContent}</textarea>
+                                </div>
+                            `;
+                        } else if (item.type === 'textblock' || item.type === 'headerblock') {
+                            const currentContent = getTextBlockContent(item.id) || '';
+                            const badgeStyle = item.type === 'headerblock' ? 'badge-warning' : 'badge-secondary';
+                            const placeholderText = item.type === 'headerblock' ? 'Enter your header here...' : 'Enter your text here...';
                             htmlContent += `
                                 <div class="selected-item d-flex flex-column p-2 mb-2 border rounded" 
                                      data-index="${index}" draggable="true">
@@ -1568,7 +1499,7 @@
                                         <span class="item-name">${item.name}</span>
                                         <div>
                                             <span class="badge ${badgeStyle} me-2">${item.type}</span>
-                                            <button type="button" class="btn btn-sm btn-outline-danger remove-item-btn" data-index="${index}">×</button>
+                                            <button type="button" class="btn btn-sm btn-outline-danger remove-item-btn" data-index="${index}">x</button>
                                         </div>
                                     </div>
                                     <textarea 
@@ -1586,7 +1517,7 @@
                                     <span class="item-name">${item.name}</span>
                                     <div>
                                         <span class="badge badge-secondary me-2">${item.type}</span>
-                                        <button type="button" class="btn btn-sm btn-outline-danger remove-item-btn" data-index="${index}">×</button>
+                                        <button type="button" class="btn btn-sm btn-outline-danger remove-item-btn" data-index="${index}">x</button>
                                     </div>
                                 </div>
                             `;
@@ -1637,13 +1568,18 @@
                 }
 
                 const item = { id, name: name || id, type, ...extra };
-                selectedItems.push(item);
+
+                if (type === 'titleblock') {
+                    const existing = selectedItems.findIndex(it => it.type === 'titleblock');
+                    if (existing !== -1) selectedItems.splice(existing, 1);
+                    selectedItems.unshift(item);
+                } else {
+                    selectedItems.push(item);
+                }
 
                 updateSelectedItemsDisplay();
-
                 return true;
             }
-
 
             function removeItem(index) {
                 const removedItem = selectedItems[index];
@@ -1660,10 +1596,15 @@
             }
 
             function setupDragAndDrop() {
-                const items = document.querySelectorAll('.selected-item');
+                const items = () => Array.from(document.querySelectorAll('.selected-item'));
+                const indexOfEl = (el) => allItems().indexOf(el);
+                const isFixed = (el) => el?.dataset?.fixed === 'top';
+                const clampToMovable = (i) => Math.max(1, i);
                 let draggedElement = null;
                 
-                items.forEach((item, index) => {
+                items().forEach((item, index) => {
+                    if (isFixed(item)) return;
+
                     item.addEventListener('dragstart', (e) => {
                         draggedElement = item;
                         e.dataTransfer.setData('text/plain', index);
@@ -1676,7 +1617,7 @@
                     
                     item.addEventListener('dragend', () => {
                         item.classList.remove('dragging');
-                        items.forEach(i => i.classList.remove('drag-over'));
+                        items().forEach(i => i.classList.remove('drag-over'));
                         draggedElement = null;
                     });
                     
@@ -1717,6 +1658,7 @@
 
             let textBlockCounter = 0;
             let titleBlockCounter = 0;
+            let headerBlockCounter = 0;
             
             function createTextBlock() {
                 textBlockCounter++;
@@ -1807,14 +1749,34 @@
             }
             
             function createTitleBlock() {
-                titleBlockCounter++;
-                const textBlockId = `title-block-${titleBlockCounter}`;
-                const titleContent = 'Newsletter Title';
-                const displayName = 'Title: Newsletter Title';
+                if (titleBlockCounter > 0) {
+                    return null;
+                } else {
+                    titleBlockCounter++;
+                    const textBlockId = `title-block-${titleBlockCounter}`;
+                    const titleContent = 'Newsletter Title';
+                    const displayName = 'Title: Newsletter Title';
+                    
+                    if (addItem(textBlockId, displayName, 'titleblock')) {
+                        setTimeout(() => {
+                            setTextBlockContent(textBlockId, titleContent);
+                            debouncedUpdatePreview();
+                        }, 100);
+                        return textBlockId;
+                    }
+                    return null;
+                }
+            }
+
+            function createHeaderBlock() {
+                headerBlockCounter++;
+                const textBlockId = `header-block-${headerBlockCounter}`;
+                const headerContent = 'Newsletter Header';
+                const displayName = 'Header: Newsletter Header';
                 
-                if (addItem(textBlockId, displayName, 'titleblock')) {
+                if (addItem(textBlockId, displayName, 'headerblock')) {
                     setTimeout(() => {
-                        setTextBlockContent(textBlockId, titleContent);
+                        setTextBlockContent(textBlockId, headerContent);
                         debouncedUpdatePreview();
                     }, 100);
                     return textBlockId;
@@ -1826,16 +1788,19 @@
                 const btn = e.target.closest('button');
                 if (!btn) return;
 
-                if (btn.id === 'add-text-block-btn')  { createTextBlock(); return; }
+                if (btn.id === 'add-text-block-btn') { createTextBlock(); return; }
                 if (btn.id === 'add-intro-btn') { createIntroBlock(); return; }
                 if (btn.id === 'add-outro-btn') { createOutroBlock(); return; }
                 if (btn.id === 'add-title-btn') { createTitleBlock(); return; }
+                if (btn.id === 'add-header-btn') { createHeaderBlock(); return; }
 
                 if (btn.classList.contains('remove-item-btn')) {
                     const index = parseInt(btn.dataset.index, 10);
                     if (!Number.isNaN(index)) removeItem(index);
+                    if (btn.classList.contains('title-remove')) { titleBlockCounter = 0; }
                     return;
                 }
+
 
                 const isAdd =
                     btn.classList.contains('add-stat-btn') ||
@@ -1856,8 +1821,7 @@
                     extra.raLibrary = btn.dataset.lib;
                 }
                 if (type === 'recs') {
-                    if (btn.dataset.user) extra.recUser = btn.dataset.user;
-                    if (btn.dataset.filter) extra.recFilter = btn.dataset.filter;
+                    if (btn.dataset.userKey) extra.userKey = btn.dataset.userKey;
                 }
 
                 if (addItem(id, name || id, type, extra)) {
@@ -1873,6 +1837,227 @@
             });
 
             updateSelectedItemsDisplay();
+        </script>
+        <script id="recommendations-json" type="application/json">
+            {{ recommendations_json | tojson }}
+        </script>
+        <script>
+            function readJSONFromScript(id) {
+                const el = document.getElementById(id);
+                if (!el) return {};
+                try {
+                    const txt = (el.textContent || '').trim();
+                    if (!txt) return {};
+                    return JSON.parse(txt);
+                } catch (e) {
+                    console.error(`Invalid JSON in #${id}`, e);
+                    return {};
+                }
+            }
+
+            let recsPayload = readJSONFromScript('recommendations-json');
+            const userDict = {{ user_dict | tojson }} || {};
+        </script>
+        <script>
+            function posterCard(p, faded=false) {
+                const src = p.url ? `/proxy-img?u=${encodeURIComponent(p.url)}` : '';
+                const title = p.title || '';
+                const runtime = p.runtime || '';
+                const y = p.year ? String(p.year) : '';
+                const vote = typeof p.vote === 'number'
+                                    ? String((Math.round(p.vote * 10) / 10)).replace(/\.0$/,'')
+                                    : '';
+                const bits = [y, vote ? `★ ${vote}` : ''].filter(Boolean).join(' • ');
+                const ov = p.overview || '';
+
+                return `
+                    <li class="relative group rounded-3 overflow-hidden bg-gray-200 dark:bg-gray-700 text-white">
+                        <a href="${p.href || '#'}" target="_blank" rel="noopener" class="block text-white">
+                            <div class="aspect-[2/3]">
+                                ${src ? `<img loading="eager" src="${src}" class="h-full w-full object-cover">` : ''}
+                            </div>
+
+                            <div class="absolute top-1 left-1 text-[11px] text-white/90">
+                                ${bits ? `<span class="bg-black/70 rounded px-1.5 py-0.5 text-white"><span class="text-white pill_text">${bits}</span></span>` : ''}
+                            </div>
+
+                            ${faded ? `
+                                <div class="absolute top-6 left-1 text-[10px] bg-rose-600/85 text-white rounded px-1.5 py-0.5">
+                                    <span class="text-white pill_text">Unavailable</span>
+                                </div>` : ''}
+
+                            <div class="absolute inset-x-0 bottom-0 p-2 bg-gradient-to-t from-black/70 to-transparent">
+                                <div class="text-[12px] font-semibold text-white line-clamp-2">${title}</div>
+                                ${runtime ? `<div class="text-[11px] text-white/80">${runtime}</div>` : ''}
+                            </div>
+                        </a>
+
+                        ${ov ? `
+                            <div class="absolute left-0 right-0 bottom-0 translate-y-full group-hover:translate-y-0 transition
+                                    text-[10px] bg-black/80 text-white px-2 py-1 line-clamp-3">${ov}</div>` : ''}
+                    </li>`;
+            }
+
+            function buildRecsBlockForUser(userKey, { headingTag = 'h4' } = {}, { bgColorway = 'view' } = {}) {
+                const COLUMNS = 5;
+
+                recsPayload = readJSONFromScript('recommendations-json');
+                const data = recsPayload[userKey] || {};
+                const moviesAvail = data.movie_posters || [];
+                const moviesUn = data.movie_posters_unavailable || [];
+                const showsAvail = data.show_posters || [];
+                const showsUn = data.show_posters_unavailable || [];
+
+                const wrap = document.createElement('div');
+                if (bgColorway === 'view') {
+                    wrap.className = "rec-user-card rounded-3 bg-[#8acbd4] dark:bg-[#333] relative !shadow-none";
+                } else {
+                    wrap.className = "rec-user-card rounded-3 bg-[#282A2D] relative !shadow-none";
+                }
+
+                const section = (label) => {
+                    const h = document.createElement(headingTag);
+                    h.textContent = label;
+                    if (bgColorway === 'view') {
+                        h.classList.add('text-[#333]');
+                        h.classList.add('dark:text-[#8acbd4]');
+                    } else {
+                        h.classList.add('text-[#8acbd4]');
+                        h.classList.add('!important');
+                    }
+                    h.classList.add('pb-4')
+                    wrap.appendChild(h);
+                };
+
+                const grid = () => {
+                    const ul = document.createElement('ul');
+                    ul.className = "grid grid-cols-5 gap-3";
+                    ul.style.display = 'grid';
+                    ul.style.gridTemplateColumns = `repeat(${COLUMNS}, minmax(0, 1fr))`;
+                    ul.style.gap = '12px';
+                    ul.style.listStyle = 'none';
+                    ul.style.padding = '0';
+                    ul.style.margin = '0';
+                    return ul;
+                };
+
+                const appendPosters = (ul, arr, faded=false) => {
+                    ul.insertAdjacentHTML('beforeend', arr.map(p => posterCard(p, faded)).join(''));
+                };
+
+                const firstSpan = (availLen) => {
+                    const remainder = (COLUMNS - (availLen % COLUMNS)) % COLUMNS;
+                    return remainder !== 0 ? remainder : COLUMNS;
+                };
+
+                const clampGap = (span) => {
+                    if (span <= 1) return '0.75rem';
+                    const v = span / (span - 1.5);
+                    return (Math.max(0.5, Math.min(2.0, v))).toFixed(2) + 'rem';
+                };
+
+                const makeUnavailableRows = (unArr, span) => {
+                    const frag = document.createDocumentFragment();
+                    const firstRow = unArr.slice(0, span);
+                    const rest = unArr.slice(span);
+
+                    if (firstRow.length) {
+                        const li = document.createElement('li');
+                        li.className = "col-span-full";
+                        li.style.gridColumn = `span ${span} / span ${span}`;
+                        const box = document.createElement('div');
+                        box.className = "relative rounded";
+                        const ring = document.createElement('div');
+                        ring.className = "pointer-events-none absolute inset-0 rounded";
+                        ring.style.boxShadow = '0 0 0 1px #f59e0b inset';
+                        const ul = document.createElement('ul');
+                        ul.className = "grid p-1";
+                        ul.style.display = 'grid';
+                        ul.style.gridTemplateColumns = `repeat(${span}, minmax(0, 1fr))`;
+                        ul.style.gap = clampGap(span);
+                        firstRow.forEach(p => ul.insertAdjacentHTML('beforeend', posterCard(p, true)));
+                        box.appendChild(ring);
+                        box.appendChild(ul);
+                        li.appendChild(box);
+                        frag.appendChild(li);
+                    }
+
+                    for (let i=0; i<rest.length; i+=COLUMNS) {
+                        const chunk = rest.slice(i, i+COLUMNS);
+                        const li = document.createElement('li');
+                        li.className = "col-span-full";
+                        const box = document.createElement('div');
+                        box.className = "relative rounded";
+                        const ring = document.createElement('div');
+                        ring.className = "pointer-events-none absolute inset-0 rounded";
+                        ring.style.boxShadow = '0 0 0 1px #f59e0b inset';
+                        const ul = document.createElement('ul');
+                        ul.className = "grid p-1";
+                        ul.style.display = 'grid';
+                        ul.style.gridTemplateColumns = `repeat(${COLUMNS}, minmax(0, 1fr))`;
+                        ul.style.gap = '0.75rem';
+                        chunk.forEach(p => { if (p) ul.insertAdjacentHTML('beforeend', posterCard(p, true)); });
+                        box.appendChild(ring);
+                        box.appendChild(ul);
+                        li.appendChild(box);
+                        frag.appendChild(li);
+                    }
+
+                    return frag;
+                };
+
+                if (moviesAvail.length || moviesUn.length) {
+                    section("Recommended Movies");
+                    const ul = grid();
+                    appendPosters(ul, moviesAvail, false);
+                    if (moviesUn.length) ul.appendChild(makeUnavailableRows(moviesUn, firstSpan(moviesAvail.length)));
+                    wrap.appendChild(ul);
+                }
+
+                if (showsAvail.length || showsUn.length) {
+                    section("Recommended Shows");
+                    const ul = grid();
+                    appendPosters(ul, showsAvail, false);
+                    if (showsUn.length) ul.appendChild(makeUnavailableRows(showsUn, firstSpan(showsAvail.length)));
+                    wrap.appendChild(ul);
+                }
+
+                return wrap;
+            }
+
+            function buildRecsUserRows() {
+                recsPayload = readJSONFromScript('recommendations-json');
+                const host = document.getElementById('recs-user-list');
+                if (!host) return;
+
+                const users = Object.keys(recsPayload || {}).filter(Boolean).sort();
+
+                users.forEach(userKey => {
+                    const display = userDict[userKey] || userKey;
+                    const id = `recs-user-${slug(display)}`;
+
+                    const row = document.createElement('div');
+                    row.className = 'col-12 mb-2';
+                    row.innerHTML = `
+                        <div class="d-flex justify-content-between align-items-center p-2 border rounded">
+                            <span style="font-size: .9rem;">${display}</span>
+                            <div>
+                                <button type="button"
+                                        class="btn button-outline btn-sm me-1 recs-view-btn"
+                                        data-user-key="${userKey}" data-target="${id}"
+                                        style="font-size: .8rem; padding: .25rem .5rem;">View</button>
+                                <button type="button"
+                                        class="btn button btn-sm recs-add-btn"
+                                        data-type="recs" data-id="${id}"
+                                        data-name="Recommendations: ${display}"
+                                        data-user-key="${userKey}"
+                                        style="font-size: .8rem; padding: .25rem .5rem;">Add</button>
+                            </div>
+                        </div>`;
+                    host.appendChild(row);
+                });
+            };
+            buildRecsUserRows();
         </script>
         <script>
             document.getElementById('pullRecsBtn').addEventListener('click', async () => {
@@ -1911,20 +2096,36 @@
                 try {
                     const resp = await fetch('/pull_recommendations', {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: { 'Content-Type': 'application/json', 'Accept': 'text/html' },
                         body: JSON.stringify(payload),
                         credentials: 'same-origin'
                     });
                     
-                    const data = await resp.json();
-                    if (!resp.ok || !data.ok) throw new Error(data.error || 'Error pulling recommendations.');
+                    if (!resp.ok) throw new Error('Error pulling recommendations.');
 
-                    const alert_p = document.getElementById('alert_p');
-                    alert_p.textContent = data.alert;
+                    const html = await resp.text();
+                    const doc = new DOMParser().parseFromString(html, 'text/html');
 
-                    const pane = document.getElementById('recommendations_pane');
-                    pane.innerHTML = data.html;
-                    initRecommendationsFilter(pane);
+                    const oldCacheCard = document.getElementById('cache-card');
+                    const newCacheCard = doc.getElementById('cache-card');
+                    oldCacheCard.replaceWith(newCacheCard);
+
+                    const oldRecsRow = document.getElementById('recs-col');
+                    const newRecsRow = doc.getElementById('recs-col');
+                    oldRecsRow.replaceWith(newRecsRow);
+
+                    const oldRecsPreview = document.getElementById('recs-preview');
+                    const newRecsPreview = doc.getElementById('recs-preview');
+                    oldRecsPreview.replaceWith(newRecsPreview);
+
+                    const oldData = document.getElementById('recommendations-json');
+                    const newData = doc.getElementById('recommendations-json');
+                    if (newData) {
+                        if (oldData) oldData.replaceWith(newData); else document.body.appendChild(newData);
+                        window.recommendationsData = JSON.parse(document.getElementById('recommendations-json').textContent);
+                    }
+
+                    buildRecsUserRows();
                 } catch (err) {
                     console.error("Error pulling recommendations:", err);
                     const error_p= document.getElementById('error_p');
@@ -1934,34 +2135,6 @@
                     try { hideSpinner(); } catch(_) {}
                 }
             });
-        </script>
-        <script>
-            function initRecommendationsFilter(rootEl) {
-                const root = rootEl?.querySelector('#recommendations') || document.getElementById('recommendations') || rootEl || document;
-                const sel = root?.querySelector('#rec-user-filter');
-                const cards = Array.from(root?.querySelectorAll('.rec-user-card') || []);
-                if (!sel || !cards.length) return;
-
-                function apply() {
-                    const opt = sel.options[sel.selectedIndex];
-                    const val = sel.value;
-
-                    if (val === "") {
-                        cards.forEach(c => c.classList.add('hidden'));
-                        return;
-                    }
-
-                    if (val === '__ALL__') {
-                        cards.forEach(c => c.classList.remove('hidden'));
-                        return;
-                    }
-
-                    cards.forEach(c => c.classList.toggle('hidden', c.dataset.user !== val));
-                };
-
-                sel.addEventListener('change', apply);
-                apply();
-            }
         </script>
         <script>
             function collectEmailsFromChips() {
@@ -2202,10 +2375,10 @@
 
                 function syncHiddenFromDOM() {
                     const list = Array.from(box.querySelectorAll('.nl-chip'))
-                    .map(ch => ch.dataset.email)
-                    .filter(Boolean);
+                        .map(ch => ch.dataset.email)
+                        .filter(Boolean);
                     ta.value = list.join(', ');
-                    input.placeholder = list.length ? '' : 'Add BCC emails';
+                    input.placeholder = 'Add BCC emails';
                 }
 
                 function makeChip(email) {
@@ -2550,7 +2723,7 @@
                     
                     document.getElementById('delete-template-btn').style.display = 'none';
                     
-                    document.querySelectorAll('.add-stat-btn, .add-graph-btn, .ra-add-btn').forEach(btn => {
+                    document.querySelectorAll('.add-stat-btn, .add-graph-btn, .ra-add-btn, .recs-add-btn').forEach(btn => {
                         btn.textContent = 'Add';
                         btn.classList.remove('btn-success');
                         btn.classList.add('button');
@@ -2566,12 +2739,12 @@
             async function saveCurrentTemplate(name) {
                 try {
                     const textBlocks = selectedItems
-                        .filter(item => item.type === 'textblock' || item.type === 'titleblock')
+                        .filter(item => item.type === 'textblock' || item.type === 'titleblock' || item.type === 'headerblock')
                         .map(item => getTextBlockContent(item.id))
                         .filter(content => content.trim().length > 0);
                     
                     const itemsWithContent = selectedItems.map(item => {
-                        if (item.type === 'textblock' || item.type === 'titleblock') {
+                        if (item.type === 'textblock' || item.type === 'titleblock' || item.type === 'headerblock') {
                             return {
                                 ...item,
                                 content: getTextBlockContent(item.id) || ''
@@ -2608,13 +2781,21 @@
                 }
             }
 
+            function ensureTitleOnTop() {
+                const i = selectedItems.findIndex(it => it.type === 'titleblock');
+                if (i > 0) {
+                    const [t] = selectedItems.splice(i, 1);
+                    selectedItems.unshift(t);
+                }
+            }
+
             function loadTemplate(template) {
                 try {
                     const items = JSON.parse(template.selected_items);
                     
                     selectedItems = [];
                     
-                    document.querySelectorAll('.add-stat-btn, .add-graph-btn, .ra-add-btn').forEach(btn => {
+                    document.querySelectorAll('.add-stat-btn, .add-graph-btn, .ra-add-btn, .recs-add-btn').forEach(btn => {
                         btn.textContent = 'Add';
                         btn.classList.remove('btn-success');
                         btn.classList.add('button');
@@ -2622,7 +2803,7 @@
                     });
                     
                     selectedItems = items.map(item => {
-                        if ((item.type === 'textblock' || item.type === 'titleblock') && item.content) {
+                        if ((item.type === 'textblock' || item.type === 'titleblock' || item.type === 'headerblock') && item.content) {
                             if (item.type === 'textblock' && item.id.startsWith('text-block-')) {
                                 const counter = parseInt(item.id.split('-')[2]);
                                 if (counter >= textBlockCounter) {
@@ -2632,6 +2813,11 @@
                                 const counter = parseInt(item.id.split('-')[2]);
                                 if (counter >= titleBlockCounter) {
                                     titleBlockCounter = counter;
+                                }
+                            } else if (item.type === 'headerblock' && item.id.startsWith('header-block-')) {
+                                const counter = parseInt(item.id.split('-')[2]);
+                                if (counter >= headerBlockCounter) {
+                                    headerBlockCounter = counter;
                                 }
                             } else if (item.type === 'textblock' && item.id.startsWith('intro-block-')) {
                                 const counter = parseInt(item.id.split('-')[2]);
@@ -2691,11 +2877,12 @@
                     
                     document.getElementById('subject').value = template.subject || '';
                     
+                    ensureTitleOnTop();
                     updateSelectedItemsDisplay();
                     
                     setTimeout(() => {
                         selectedItems.forEach(item => {
-                            if ((item.type === 'textblock' || item.type === 'titleblock') && item.content) {
+                            if ((item.type === 'textblock' || item.type === 'titleblock' || item.type === 'headerblock') && item.content) {
                                 setTextBlockContent(item.id, item.content);
                             }
                         });

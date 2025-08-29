@@ -3,6 +3,8 @@ from bs4 import BeautifulSoup
 from datetime import datetime, timezone, timedelta
 from cryptography.fernet import Fernet, InvalidToken
 from dotenv import load_dotenv, set_key, find_dotenv
+from email import encoders
+from email.mime.base import MIMEBase
 from email.mime.text import MIMEText
 from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
@@ -14,8 +16,8 @@ from plex_api_client import PlexAPI
 from urllib.parse import quote_plus, urljoin, urlparse
 
 app = Flask(__name__)
-app.jinja_env.globals["version"] = "v0.9.8"
-app.jinja_env.globals["publish_date"] = "August 26, 2025"
+app.jinja_env.globals["version"] = "v0.9.9"
+app.jinja_env.globals["publish_date"] = "August 29, 2025"
 
 def get_global_cache_status():
     """Get global cache status for display in navbar"""
@@ -248,7 +250,9 @@ def init_db(db_path):
             plex_token TEXT,
             tautulli_url TEXT,
             tautulli_api TEXT,
-            conjurr_url TEXT
+            conjurr_url TEXT,
+            logo_filename TEXT DEFAULT 'NLYellow.png',
+            logo_width INTEGER DEFAULT 20
         )
     """)
     
@@ -1385,6 +1389,39 @@ def ensure_cids_match_html(html: str, attachments_cids: list[str]):
     missing = [cid for cid in attachments_cids if f'src="cid:{cid}"' not in html]
     return missing
 
+def embed_local_imgs(html: str, static_root: str) -> tuple[str, list]:
+    soup = BeautifulSoup(html or "", "html.parser")
+    parts = []
+
+    for img in soup.find_all("img"):
+        src = (img.get("src") or "").strip()
+        if not src or src.startswith(("cid:", "data:", "http://", "https://")):
+            continue
+
+        rel = src.lstrip("/")[7:]
+        print(static_root, rel)
+        fs_path = os.path.normpath(os.path.join(static_root, rel))
+
+        with open(fs_path, "rb") as f:
+            data = f.read()
+
+        mime, _ = mimetypes.guess_type(fs_path)
+        if mime and mime.startswith("image/"):
+            subtype = mime.split("/", 1)[1]
+            part = MIMEImage(data, _subtype=subtype)
+        else:
+            main, sub = (mime.split("/", 1) if mime else ("application", "octet-stream"))
+            part = MIMEBase(main, sub); part.set_payload(data); encoders.encode_base64(part)
+
+        cid = make_msgid(domain="newsletterr.local").strip("<>")
+        part.add_header("Content-ID", f"<{cid}>")
+        part.add_header("Content-Disposition", "inline", filename = os.path.basename(fs_path))
+        parts.append(part)
+
+        img["src"] = f"cid:{cid}"
+
+    return str(soup), parts
+
 def _norm(v: str):
     if not v:
         return (0,)
@@ -1522,31 +1559,46 @@ def index():
     ]
     graph_data = []
     recent_data = []
+    recommendations_json = {}
+    filtered_users = {}
     error = None
     alert = None
 
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    cursor.execute("SELECT server_name, tautulli_url, tautulli_api FROM settings WHERE id = 1")
+    cursor.execute("""
+        SELECT
+        from_email, server_name, tautulli_url, tautulli_api, logo_filename, logo_width
+        FROM settings WHERE id = 1
+    """)
     row = cursor.fetchone()
     conn.close()
 
     if row:
         settings = {
-            "server_name": row[0],
-            "tautulli_url": row[1],
-            "tautulli_api": row[2]
+            "from_email": row[0] or "",
+            "server_name": row[1] or "",
+            "tautulli_url": row[2] or "",
+            "tautulli_api": decrypt(row[3]),
+            "logo_filename": row[4] or "",
+            "logo_width": int(row[5]) if row[5] is not None else 20
         }
     else:
         settings = {
+            "from_email": "",
             "server_name": ""
         }
+
+    if settings['from_email'] == "":
+        return render_template('settings.html', settings=settings)
 
     if settings['server_name'] != "":
         stats = get_cached_data('stats', strict=True) or get_cached_data('stats', strict=False)
         users = get_cached_data('users', strict=True) or get_cached_data('users', strict=False)
         graph_data = get_cached_data('graph_data', strict=True) or get_cached_data('graph_data', strict=False) or []
         recent_data = get_cached_data('recent_data', strict=True) or get_cached_data('recent_data', strict=False) or []
+        recommendations_json = get_cached_data('recommendations_json', strict=True) or get_cached_data('recommendations_json', strict=False) or {}
+        filtered_users = get_cached_data('filtered_users', strict=True) or get_cached_data('filtered_users', strict=False) or {}
         
         if users:
             for user in users:
@@ -1612,9 +1664,6 @@ def index():
 
     if graph_data == []:
         graph_data = [{},{}]
-
-    if recent_data == []:
-        recent_data = [{},{}]
         
     libs = ['movies', 'shows']
     
@@ -1627,7 +1676,9 @@ def index():
         'stats': get_cache_info('stats'),
         'users': get_cache_info('users'), 
         'graph_data': get_cache_info('graph_data'),
-        'recent_data': get_cache_info('recent_data')
+        'recent_data': get_cache_info('recent_data'),
+        'recommendations_json': get_cache_info('recommendations_json'),
+        'filtered_users': get_cache_info('filtered_users')
     }
         
     return render_template('index.html',
@@ -1635,7 +1686,8 @@ def index():
                            graph_data=graph_data, graph_commands=graph_commands,
                            recent_data=recent_data, libs=libs,
                            error=error, alert=alert, settings=settings,
-                           email_lists=email_lists, cache_info=cache_info
+                           email_lists=email_lists, cache_info=cache_info,
+                           recommendations_json=recommendations_json, filtered_users=filtered_users
                         )
 
 @app.route('/proxy-art/<path:art_path>')
@@ -1719,12 +1771,24 @@ def pull_recommendations():
             conjurr_base_url = conjurr_settings['conjurr_url']
             recommendations_json, error = run_conjurr_command(conjurr_base_url, filtered_users, error)
             alert = "User recommendations pulled from conjurr!"
+
+            cache_params = {'timestamp': time.time()}
+
+            set_cached_data('filtered_users', filtered_users, cache_params)
+            set_cached_data('recommendations_json', recommendations_json, cache_params)
+
+    cache_info = {
+        'stats': get_cache_info('stats'),
+        'users': get_cache_info('users'), 
+        'graph_data': get_cache_info('graph_data'),
+        'recent_data': get_cache_info('recent_data'),
+        'recommendations_json': get_cache_info('recommendations_json'),
+        'filtered_users': get_cache_info('filtered_users')
+    }
     
-    frag = render_template(
-        'partials/_recommendations.html',
-        recommendations_json=recommendations_json, user_dict=user_dict
-    )
-    return jsonify({"ok": True, "html": frag, "alert": alert})
+    return render_template('index.html', stats=stats, user_dict=user_dict, graph_data=graph_data, cache_info=cache_info,
+                            graph_commands=graph_commands, recent_data=recent_data, libs=libs, settings=settings,
+                            recommendations_json=recommendations_json, filtered_users=filtered_users, alert=alert)
 
 @app.route('/send_email', methods=['POST'])
 def send_email():
@@ -1773,6 +1837,9 @@ def send_email():
     to_emails = data['to_emails'].split(", ")
     subject = data['subject']
 
+    static_root = app.static_folder
+    email_html, inline_parts = embed_local_imgs(email_html, static_root)
+
     msg_root = MIMEMultipart('related')
     msg_root['Subject'] = subject
     if alias_email == '':
@@ -1817,6 +1884,9 @@ def send_email():
     msg_alternative.attach(MIMEText(plain, 'plain', 'utf-8'))
 
     msg_alternative.attach(MIMEText(html_content, 'html', 'utf-8'))
+
+    for p in inline_parts:
+        msg_root.attach(p)
 
     try:
         with smtplib.SMTP_SSL(smtp_server, smtp_port) as server:
@@ -1867,17 +1937,20 @@ def settings():
         smtp_server = request.form.get("smtp_server")
         smtp_port = int(request.form.get("smtp_port"))
         server_name = request.form.get("server_name")
+        plex_url = request.form.get("plex_url")
         tautulli_url = request.form.get("tautulli_url")
         tautulli_api = encrypt(request.form.get("tautulli_api"))
         conjurr_url = request.form.get("conjurr_url")
+        logo_filename = request.form.get("logo_filename")
+        logo_width = request.form.get("logo_width")
 
         cursor.execute("""
             INSERT INTO settings
-            (id, from_email, alias_email, password, smtp_server, smtp_port, server_name, tautulli_url, tautulli_api, conjurr_url)
-            VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (id, from_email, alias_email, password, smtp_server, smtp_port, server_name, plex_url, tautulli_url, tautulli_api, conjurr_url, logo_filename, logo_width)
+            VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (id) DO UPDATE
-            SET from_email = excluded.from_email, alias_email = excluded.alias_email, password = excluded.password, smtp_server = excluded.smtp_server, smtp_port = excluded.smtp_port, server_name = excluded.server_name, tautulli_url = excluded.tautulli_url, tautulli_api = excluded.tautulli_api, conjurr_url = excluded.conjurr_url
-        """, (from_email, alias_email, password, smtp_server, smtp_port, server_name, tautulli_url, tautulli_api, conjurr_url))
+            SET from_email = excluded.from_email, alias_email = excluded.alias_email, password = excluded.password, smtp_server = excluded.smtp_server, smtp_port = excluded.smtp_port, server_name = excluded.server_name, plex_url = excluded.plex_url, tautulli_url = excluded.tautulli_url, tautulli_api = excluded.tautulli_api, conjurr_url = excluded.conjurr_url, logo_filename = excluded.logo_filename, logo_width = excluded.logo_width
+        """, (from_email, alias_email, password, smtp_server, smtp_port, server_name, plex_url, tautulli_url, tautulli_api, conjurr_url, logo_filename, logo_width))
         conn.commit()
         cursor.execute("SELECT plex_token FROM settings WHERE id = 1")
         plex_token = cursor.fetchone()[0]
@@ -1890,17 +1963,20 @@ def settings():
             "smtp_server": smtp_server,
             "smtp_port": smtp_port,
             "server_name": server_name,
+            "plex_url": plex_url,
             "plex_token": plex_token,
             "tautulli_url": tautulli_url,
             "tautulli_api": decrypt(tautulli_api),
-            "conjurr_url": conjurr_url
+            "conjurr_url": conjurr_url,
+            "logo_filename": logo_filename,
+            "logo_width": logo_width
         }
 
         return render_template('settings.html', alert="Settings saved successfully!", settings=settings)
 
     cursor.execute("""
         SELECT
-        from_email, alias_email, password, smtp_server, smtp_port, server_name, plex_token, tautulli_url, tautulli_api, conjurr_url
+        from_email, alias_email, password, smtp_server, smtp_port, server_name, plex_url, plex_token, tautulli_url, tautulli_api, conjurr_url, logo_filename, logo_width
         FROM settings WHERE id = 1
     """)
     row = cursor.fetchone()
@@ -1914,10 +1990,13 @@ def settings():
             "smtp_server": row[3] or "",
             "smtp_port": int(row[4]) if row[4] is not None else 587,
             "server_name": row[5] or "",
-            "plex_token": row[6] or "",
-            "tautulli_url": row[7] or "",
-            "tautulli_api": decrypt(row[8]),
-            "conjurr_url": row[9] or ""
+            "plex_url": row[6] or "",
+            "plex_token": row[7] or "",
+            "tautulli_url": row[8] or "",
+            "tautulli_api": decrypt(row[9]),
+            "conjurr_url": row[10] or "",
+            "logo_filename": row[11] or "",
+            "logo_width": int(row[12]) if row[12] is not None else 20
         }
     else:
         settings = {
@@ -2695,5 +2774,6 @@ if __name__ == '__main__':
     os.makedirs("database", exist_ok=True)
     migrate_data_from_separate_dbs()
     init_db(DB_PATH)
-    migrate_schema("conjurr_url TEXT")
+    migrate_schema("logo_filename TEXT DEFAULT 'Asset_45x.png'")
+    migrate_schema("logo_width INTEGER DEFAULT 80")
     app.run(host="0.0.0.0", port=6397, debug=True)

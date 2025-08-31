@@ -16,8 +16,8 @@ from plex_api_client import PlexAPI
 from urllib.parse import quote_plus, urljoin, urlparse
 
 app = Flask(__name__)
-app.jinja_env.globals["version"] = "v0.9.10"
-app.jinja_env.globals["publish_date"] = "August 30, 2025"
+app.jinja_env.globals["version"] = "v0.9.11"
+app.jinja_env.globals["publish_date"] = "August 31, 2025"
 
 def get_global_cache_status():
     """Get global cache status for display in navbar"""
@@ -140,7 +140,10 @@ plex_headers = {
     "X-Plex-Client-Identifier": str(uuid.uuid4())
 }
 ROOT = Path(__file__).resolve().parent
-ENV_PATH = find_dotenv(usecwd=True) or str(ROOT / ".env")
+if os.path.exists(ROOT / ".env"):
+    os.makedirs(ROOT / "env", exist_ok = True)
+    shutil.move(ROOT / ".env", ROOT / "env" / ".env")
+ENV_PATH = find_dotenv(usecwd=True) or str(ROOT / "env" / ".env")
 DATA_IMG_RE = re.compile(
     r'^data:(image/(png|jpeg|jpg|gif|webp));base64,([A-Za-z0-9+/=]+)$',
     re.IGNORECASE
@@ -1609,7 +1612,7 @@ def index():
         settings['logo_width'] = int(logo_width)
 
     if settings['from_email'] == "":
-        return render_template('settings.html', settings=settings)
+        return redirect(url_for('settings'))
     
     conn.close()
 

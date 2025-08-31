@@ -245,6 +245,7 @@ def init_db(db_path):
             password TEXT,
             smtp_server TEXT,
             smtp_port INTEGER,
+            smtp_username TEXT DEFAULT '',
             server_name TEXT,
             plex_url TEXT,
             plex_token TEXT,
@@ -330,6 +331,14 @@ def init_db(db_path):
     if 'date_range' not in columns:
         print("Adding date_range column to email_schedules table...")
         cursor.execute("ALTER TABLE email_schedules ADD COLUMN date_range INTEGER DEFAULT 7")
+        conn.commit()
+    
+    # Check if smtp_username column exists in settings table
+    cursor.execute("PRAGMA table_info(settings)")
+    settings_columns = [column[1] for column in cursor.fetchall()]
+    if 'smtp_username' not in settings_columns:
+        print("Adding smtp_username column to settings table...")
+        cursor.execute("ALTER TABLE settings ADD COLUMN smtp_username TEXT DEFAULT ''")
         conn.commit()
     
     conn.close()
@@ -1080,7 +1089,7 @@ def send_scheduled_email(schedule_id, email_list_id, template_id):
         
         settings_conn = sqlite3.connect(DB_PATH)
         settings_cursor = settings_conn.cursor()
-        settings_cursor.execute("SELECT from_email, alias_email, password, smtp_server, smtp_port, server_name FROM settings WHERE id = 1")
+        settings_cursor.execute("SELECT from_email, alias_email, password, smtp_server, smtp_port, smtp_username, server_name FROM settings WHERE id = 1")
         settings_result = settings_cursor.fetchone()
         settings_conn.close()
         
@@ -1088,7 +1097,7 @@ def send_scheduled_email(schedule_id, email_list_id, template_id):
             print("SMTP settings not found in database")
             return False
         
-        from_email, alias_email, encrypted_password, smtp_server, smtp_port, server_name = settings_result
+        from_email, alias_email, encrypted_password, smtp_server, smtp_port, smtp_username, server_name = settings_result
         
         if not all([from_email, encrypted_password, smtp_server]):
             print("Incomplete SMTP settings in database")
@@ -1146,39 +1155,43 @@ def send_scheduled_email(schedule_id, email_list_id, template_id):
         try:
             if int(smtp_port) == 465:
                 server = smtplib.SMTP_SSL(smtp_server, int(smtp_port))
-                server.login(from_email, password)
+                server.login(smtp_username or from_email, decrypt(password))
             else:
                 server = smtplib.SMTP(smtp_server, int(smtp_port))
                 server.starttls()
-                server.login(from_email, password)
+                server.login(smtp_username or from_email, decrypt(password))
             
             email_content = msg_root.as_string()
             content_size_kb = len(email_content.encode('utf-8')) / 1024
             
-            to_emails_list = [email.strip() for email in to_emails.split(",")]
-            if alias_email:
-                server.sendmail(alias_email, [alias_email] + to_emails_list, email_content)
-                all_recipients = [alias_email] + to_emails_list
+            if alias_email == '':
+                server.sendmail(from_email, [from_email] + to_emails, email_content)
+                all_recipients = [from_email] + to_emails
             else:
-                server.sendmail(from_email, [from_email] + to_emails_list, email_content)
-                all_recipients = [from_email] + to_emails_list
-            
-            server.quit()
-            print(f"Email sent successfully to {len(all_recipients)} recipients")
+                server.sendmail(alias_email, [alias_email] + to_emails, email_content)
+                all_recipients = [from_email] + to_emails
             
             try:
                 history_conn = sqlite3.connect(DB_PATH)
                 history_cursor = history_conn.cursor()
-                history_cursor.execute('''INSERT INTO email_history (subject, recipients, email_content, content_size_kb, recipient_count, template_name)
-                                VALUES (?, ?, ?, ?, ?, ?)''',
-                                (f"[SCHEDULED] {subject}", ', '.join(all_recipients), email_content[:1000], content_size_kb, len(all_recipients), template_name))
+                history_cursor.execute("""
+                    INSERT INTO email_history (subject, recipients, email_content, content_size_kb, recipient_count, template_name)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (
+                    subject,
+                    ', '.join(all_recipients),
+                    email_content,
+                    round(content_size_kb, 2),
+                    len(all_recipients),
+                    'Manual'
+                ))
                 history_conn.commit()
                 history_conn.close()
-            except Exception as log_err:
-                print(f"Error logging scheduled email history: {log_err}")
+            except Exception as history_error:
+                print(f"Error saving email history: {history_error}")
             
-            return True
-            
+            server.quit()
+            return jsonify({"success": True})
         except Exception as e:
             print(f"Failed to send email: {str(e)}")
             return False
@@ -1690,8 +1703,19 @@ def index():
                            recommendations_json=recommendations_json, filtered_users=filtered_users
                         )
 
+@app.route('/proxy-art')
+def proxy_art_no_path():
+    # Log the request to see what's happening
+    print(f"DEBUG: Received request to /proxy-art without path")
+    print(f"DEBUG: Request headers: {dict(request.headers)}")
+    print(f"DEBUG: Request args: {dict(request.args)}")
+    return Response("No art path provided", status=400)
+
 @app.route('/proxy-art/<path:art_path>')
 def proxy_art(art_path):
+    # Log the request to see what's happening
+    print(f"DEBUG: Received request to /proxy-art with path: {art_path}")
+    
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("SELECT plex_url, plex_token FROM settings WHERE id = 1")
@@ -1712,10 +1736,18 @@ def proxy_art(art_path):
     if not settings['plex_token']:
         return Response("Please connect to Plex in settings.", status=400)
 
+    if not settings['plex_url']:
+        return Response("Please configure Plex URL in settings.", status=400)
+
     plex_token = settings['plex_token']
     plex_url = settings['plex_url'].rstrip('/')
+    
+    # Ensure plex_url has a scheme
+    if not plex_url.startswith(('http://', 'https://')):
+        plex_url = f"http://{plex_url}"
 
     full_url = f"{plex_url}/{art_path}?X-Plex-Token={decrypt(plex_token)}"
+    print(f"DEBUG: Making request to: {full_url}")
     r = requests.get(full_url, stream=True)
     return Response(r.content, content_type=r.headers['Content-Type'])
 
@@ -1796,7 +1828,7 @@ def send_email():
     cursor = conn.cursor()
     cursor.execute("""
         SELECT
-        from_email, alias_email, password, smtp_server, smtp_port, server_name
+        from_email, alias_email, password, smtp_server, smtp_port, smtp_username, server_name
         FROM settings WHERE id = 1
     """)
     row = cursor.fetchone()
@@ -1809,7 +1841,8 @@ def send_email():
             "password": row[2] or "",
             "smtp_server": row[3] or "",
             "smtp_port": int(row[4]) if row[4] is not None else 587,
-            "server_name": row[5] or ""
+            "smtp_username": row[5] or "",
+            "server_name": row[6] or ""
         }
     else:
         return jsonify({"error": "Please enter email info on settings page"}), 500
@@ -1889,38 +1922,44 @@ def send_email():
         msg_root.attach(p)
 
     try:
-        with smtplib.SMTP_SSL(smtp_server, smtp_port) as server:
-            server.login(from_email, decrypt(password))
-            
-            email_content = msg_root.as_string()
-            content_size_kb = len(email_content.encode('utf-8')) / 1024
-            
-            if alias_email == '':
-                server.sendmail(from_email, [from_email] + to_emails, email_content)
-                all_recipients = [from_email] + to_emails
-            else:
-                server.sendmail(alias_email, [alias_email] + to_emails, email_content)
-                all_recipients = [alias_email] + to_emails
-            
-            try:
-                history_conn = sqlite3.connect(DB_PATH)
-                history_cursor = history_conn.cursor()
-                history_cursor.execute("""
-                    INSERT INTO email_history (subject, recipients, email_content, content_size_kb, recipient_count, template_name)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                """, (
-                    subject,
-                    ', '.join(all_recipients),
-                    email_content,
-                    round(content_size_kb, 2),
-                    len(all_recipients),
-                    'Manual'
-                ))
-                history_conn.commit()
-                history_conn.close()
-            except Exception as history_error:
-                print(f"Error saving email history: {history_error}")
-            
+        if int(smtp_port) == 465:
+            server = smtplib.SMTP_SSL(smtp_server, int(smtp_port))
+            server.login(settings['smtp_username'] or settings['from_email'], decrypt(password))
+        else:
+            server = smtplib.SMTP(smtp_server, int(smtp_port))
+            server.starttls()
+            server.login(settings['smtp_username'] or settings['from_email'], decrypt(password))
+        
+        email_content = msg_root.as_string()
+        content_size_kb = len(email_content.encode('utf-8')) / 1024
+        
+        if alias_email == '':
+            server.sendmail(from_email, [from_email] + to_emails, email_content)
+            all_recipients = [from_email] + to_emails
+        else:
+            server.sendmail(alias_email, [alias_email] + to_emails, email_content)
+            all_recipients = [from_email] + to_emails
+        
+        try:
+            history_conn = sqlite3.connect(DB_PATH)
+            history_cursor = history_conn.cursor()
+            history_cursor.execute("""
+                INSERT INTO email_history (subject, recipients, email_content, content_size_kb, recipient_count, template_name)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (
+                subject,
+                ', '.join(all_recipients),
+                email_content,
+                round(content_size_kb, 2),
+                len(all_recipients),
+                'Manual'
+            ))
+            history_conn.commit()
+            history_conn.close()
+        except Exception as history_error:
+            print(f"Error saving email history: {history_error}")
+        
+        server.quit()
         return jsonify({"success": True})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -1936,6 +1975,7 @@ def settings():
         password = encrypt(request.form.get("password"))
         smtp_server = request.form.get("smtp_server")
         smtp_port = int(request.form.get("smtp_port"))
+        smtp_username = request.form.get("smtp_username")
         server_name = request.form.get("server_name")
         plex_url = request.form.get("plex_url")
         tautulli_url = request.form.get("tautulli_url")
@@ -1946,11 +1986,11 @@ def settings():
 
         cursor.execute("""
             INSERT INTO settings
-            (id, from_email, alias_email, password, smtp_server, smtp_port, server_name, plex_url, tautulli_url, tautulli_api, conjurr_url, logo_filename, logo_width)
-            VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (id, from_email, alias_email, password, smtp_server, smtp_port, smtp_username, server_name, plex_url, tautulli_url, tautulli_api, conjurr_url, logo_filename, logo_width)
+            VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (id) DO UPDATE
-            SET from_email = excluded.from_email, alias_email = excluded.alias_email, password = excluded.password, smtp_server = excluded.smtp_server, smtp_port = excluded.smtp_port, server_name = excluded.server_name, plex_url = excluded.plex_url, tautulli_url = excluded.tautulli_url, tautulli_api = excluded.tautulli_api, conjurr_url = excluded.conjurr_url, logo_filename = excluded.logo_filename, logo_width = excluded.logo_width
-        """, (from_email, alias_email, password, smtp_server, smtp_port, server_name, plex_url, tautulli_url, tautulli_api, conjurr_url, logo_filename, logo_width))
+            SET from_email = excluded.from_email, alias_email = excluded.alias_email, password = excluded.password, smtp_server = excluded.smtp_server, smtp_port = excluded.smtp_port, smtp_username = excluded.smtp_username, server_name = excluded.server_name, plex_url = excluded.plex_url, tautulli_url = excluded.tautulli_url, tautulli_api = excluded.tautulli_api, conjurr_url = excluded.conjurr_url, logo_filename = excluded.logo_filename, logo_width = excluded.logo_width
+        """, (from_email, alias_email, password, smtp_server, smtp_port, smtp_username, server_name, plex_url, tautulli_url, tautulli_api, conjurr_url, logo_filename, logo_width))
         conn.commit()
         cursor.execute("SELECT plex_token FROM settings WHERE id = 1")
         plex_token = cursor.fetchone()[0]
@@ -1962,6 +2002,7 @@ def settings():
             "password": decrypt(password),
             "smtp_server": smtp_server,
             "smtp_port": smtp_port,
+            "smtp_username": smtp_username,
             "server_name": server_name,
             "plex_url": plex_url,
             "plex_token": plex_token,
@@ -1976,7 +2017,7 @@ def settings():
 
     cursor.execute("""
         SELECT
-        from_email, alias_email, password, smtp_server, smtp_port, server_name, plex_url, plex_token, tautulli_url, tautulli_api, conjurr_url, logo_filename, logo_width
+        from_email, alias_email, password, smtp_server, smtp_port, smtp_username, server_name, plex_url, plex_token, tautulli_url, tautulli_api, conjurr_url, logo_filename, logo_width
         FROM settings WHERE id = 1
     """)
     row = cursor.fetchone()
@@ -1989,14 +2030,15 @@ def settings():
             "password": decrypt(row[2]),
             "smtp_server": row[3] or "",
             "smtp_port": int(row[4]) if row[4] is not None else 587,
-            "server_name": row[5] or "",
-            "plex_url": row[6] or "",
-            "plex_token": row[7] or "",
-            "tautulli_url": row[8] or "",
-            "tautulli_api": decrypt(row[9]),
-            "conjurr_url": row[10] or "",
-            "logo_filename": row[11] or "",
-            "logo_width": int(row[12]) if row[12] is not None else 20
+            "smtp_username": row[5] or "",
+            "server_name": row[6] or "",
+            "plex_url": row[7] or "",
+            "plex_token": row[8] or "",
+            "tautulli_url": row[9] or "",
+            "tautulli_api": decrypt(row[10]),
+            "conjurr_url": row[11] or "",
+            "logo_filename": row[12] or "",
+            "logo_width": int(row[13]) if row[13] is not None else 20
         }
     else:
         settings = {

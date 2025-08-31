@@ -294,7 +294,7 @@
                 : [it.thumb, it.art, it.parent_thumb, it.grandparent_thumb];
             return c.find(Boolean) || "";
         }
-        const buildThumb = (p) => p ? `/proxy-art${p.startsWith('/') ? p : '/'+p}` : "";
+        const buildThumb = (p) => p && p !== '' && p !== null && p !== undefined ? `/proxy-art${p.startsWith('/') ? p : '/'+p}` : "";
         const msToHMS = (ms) => {
             ms = parseInt(ms || 0, 10);
             const s = Math.round(ms / 1000);
@@ -603,7 +603,7 @@
             <div class="card my-4">
                 <div class="card-header bg-primary text-white">${esc(title)}</div>
                 <div class="card-body blur-container p-0" style="position:relative;">
-                ${bg ? `<img src="/proxy-art${esc(bg)}" class="bg-blur" alt="">` : ''}
+                ${bg && bg !== '' ? `<img src="/proxy-art${esc(bg)}" class="bg-blur" alt="">` : ''}
                 <table class="table table-striped content-table m-0">
                     ${statTheadHTML(title)}
                     <tbody>${body}</tbody>
@@ -878,7 +878,9 @@
                                 
                                 if (statData.rows[0] && (statData.rows[0].art || statData.rows[0].grandparent_thumb)) {
                                     const bgImage = statData.rows[0].art || statData.rows[0].grandparent_thumb;
-                                    fallbackHTML += `<img src="/proxy-art${bgImage}" class="bg-blur" alt="" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; filter: blur(4px) brightness(0.75); z-index: 0;" />`;
+                                    if (bgImage && bgImage !== '') {
+                                        fallbackHTML += `<img src="/proxy-art${bgImage}" class="bg-blur" alt="" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; filter: blur(4px) brightness(0.75); z-index: 0;" />`;
+                                    }
                                 }
                                 
                                 fallbackHTML += `<table class="table table-striped content-table m-0" style="position: relative; z-index: 1; margin: 0 !important; background: transparent;">`;
@@ -974,7 +976,9 @@
                             
                             if (statData.rows[0] && (statData.rows[0].art || statData.rows[0].grandparent_thumb)) {
                                 const bgImage = statData.rows[0].art || statData.rows[0].grandparent_thumb;
-                                fallbackHTML += `<img src="/proxy-art${bgImage}" class="bg-blur" alt="" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; filter: blur(4px) brightness(0.75); z-index: 0;" />`;
+                                if (bgImage && bgImage !== '') {
+                                    fallbackHTML += `<img src="/proxy-art${bgImage}" class="bg-blur" alt="" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; filter: blur(4px) brightness(0.75); z-index: 0;" />`;
+                                }
                             }
                             
                             fallbackHTML += `<table class="table table-striped content-table m-0" style="position: relative; z-index: 1; margin: 0 !important; background: transparent;">`;

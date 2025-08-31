@@ -47,6 +47,11 @@
                     {% if settings.from_email !="" %}value="{{ settings.smtp_port }}"{% endif %}
                     placeholder="SMTP Port (465 for SSL)" required><br><br>
 
+                <label for="smtp_username">SMTP Username (Optional):</label><br>
+                <input type="text" id="smtp_username" name="smtp_username"
+                    {% if settings.from_email !="" %}value="{{ settings.smtp_username }}"{% endif %}
+                    placeholder="Leave blank to use default username"><br><br>
+
                 <label for="server_name">Plex Server Name:</label><br>
                 <input type="text" id="server_name" name="server_name"
                     {% if settings.from_email !="" %}value="{{ settings.server_name }}"{% endif %}

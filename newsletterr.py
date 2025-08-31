@@ -342,6 +342,11 @@ def init_db(db_path):
         print("Adding smtp_username column to settings table...")
         cursor.execute("ALTER TABLE settings ADD COLUMN smtp_username TEXT")
         conn.commit()
+
+    if 'smtp_protocol' not in settings_columns:
+        print("Adding smtp_protocol column to settings table...")
+        cursor.execute("ALTER TABLE settings ADD COLUMN smtp_protocol TEXT")
+        conn.commit()
     
     conn.close()
 
@@ -1091,7 +1096,7 @@ def send_scheduled_email(schedule_id, email_list_id, template_id):
         
         settings_conn = sqlite3.connect(DB_PATH)
         settings_cursor = settings_conn.cursor()
-        settings_cursor.execute("SELECT from_email, alias_email, password, smtp_server, smtp_port, server_name FROM settings WHERE id = 1")
+        settings_cursor.execute("SELECT from_email, alias_email, password, smtp_server, smtp_port, smtp_protocol, server_name FROM settings WHERE id = 1")
         settings_result = settings_cursor.fetchone()
         settings_conn.close()
         
@@ -1099,7 +1104,7 @@ def send_scheduled_email(schedule_id, email_list_id, template_id):
             print("SMTP settings not found in database")
             return False
         
-        from_email, alias_email, encrypted_password, smtp_server, smtp_port, server_name = settings_result
+        from_email, alias_email, encrypted_password, smtp_server, smtp_port, smtp_protocol, server_name = settings_result
         
         if not all([from_email, encrypted_password, smtp_server]):
             print("Incomplete SMTP settings in database")
@@ -1155,7 +1160,7 @@ def send_scheduled_email(schedule_id, email_list_id, template_id):
         
         print("Attempting to send email...")
         try:
-            if int(smtp_port) == 465:
+            if smtp_protocol == 'SSL':
                 server = smtplib.SMTP_SSL(smtp_server, int(smtp_port))
                 server.login(from_email, password)
             else:
@@ -1828,7 +1833,7 @@ def send_email():
     cursor = conn.cursor()
     cursor.execute("""
         SELECT
-        from_email, alias_email, password, smtp_username, smtp_server, smtp_port, server_name
+        from_email, alias_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name
         FROM settings WHERE id = 1
     """)
     row = cursor.fetchone()
@@ -1842,7 +1847,8 @@ def send_email():
             "smtp_username": row[3] or "",
             "smtp_server": row[4] or "",
             "smtp_port": int(row[5]) if row[5] is not None else 587,
-            "server_name": row[6] or ""
+            "smtp_protocol": row[6] or "TLS",
+            "server_name": row[7] or ""
         }
     else:
         return jsonify({"error": "Please enter email info on settings page"}), 500
@@ -1867,6 +1873,7 @@ def send_email():
     smtp_username = settings['smtp_username']
     smtp_server = settings['smtp_server']
     smtp_port = int(settings['smtp_port'])
+    smtp_protocol = settings['smtp_protocol']
     server_name = settings['server_name']
     to_emails = data['to_emails'].split(", ")
     subject = data['subject']
@@ -1923,7 +1930,7 @@ def send_email():
         msg_root.attach(p)
 
     try:
-        if int(smtp_port) == 465:
+        if smtp_protocol == 'SSL':
             server = smtplib.SMTP_SSL(smtp_server, smtp_port)
             login_username = smtp_username if smtp_username else from_email
             server.login(login_username, decrypt(password))
@@ -1979,6 +1986,7 @@ def settings():
         smtp_username = request.form.get("smtp_username")
         smtp_server = request.form.get("smtp_server")
         smtp_port = int(request.form.get("smtp_port"))
+        smtp_protocol = request.form.get("smtp_protocol")
         server_name = request.form.get("server_name")
         plex_url = request.form.get("plex_url")
         tautulli_url = request.form.get("tautulli_url")
@@ -1989,11 +1997,11 @@ def settings():
 
         cursor.execute("""
             INSERT INTO settings
-            (id, from_email, alias_email, password, smtp_username, smtp_server, smtp_port, server_name, plex_url, tautulli_url, tautulli_api, conjurr_url, logo_filename, logo_width)
-            VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (id, from_email, alias_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, plex_url, tautulli_url, tautulli_api, conjurr_url, logo_filename, logo_width)
+            VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (id) DO UPDATE
-            SET from_email = excluded.from_email, alias_email = excluded.alias_email, password = excluded.password, smtp_username = excluded.smtp_username, smtp_server = excluded.smtp_server, smtp_port = excluded.smtp_port, server_name = excluded.server_name, plex_url = excluded.plex_url, tautulli_url = excluded.tautulli_url, tautulli_api = excluded.tautulli_api, conjurr_url = excluded.conjurr_url, logo_filename = excluded.logo_filename, logo_width = excluded.logo_width
-        """, (from_email, alias_email, password, smtp_username, smtp_server, smtp_port, server_name, plex_url, tautulli_url, tautulli_api, conjurr_url, logo_filename, logo_width))
+            SET from_email = excluded.from_email, alias_email = excluded.alias_email, password = excluded.password, smtp_username = excluded.smtp_username, smtp_server = excluded.smtp_server, smtp_port = excluded.smtp_port, smtp_protocol = excluded.smtp_protocol, server_name = excluded.server_name, plex_url = excluded.plex_url, tautulli_url = excluded.tautulli_url, tautulli_api = excluded.tautulli_api, conjurr_url = excluded.conjurr_url, logo_filename = excluded.logo_filename, logo_width = excluded.logo_width
+        """, (from_email, alias_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, plex_url, tautulli_url, tautulli_api, conjurr_url, logo_filename, logo_width))
         conn.commit()
         cursor.execute("SELECT plex_token FROM settings WHERE id = 1")
         plex_token = cursor.fetchone()[0]
@@ -2006,6 +2014,7 @@ def settings():
             "smtp_username": smtp_username,
             "smtp_server": smtp_server,
             "smtp_port": smtp_port,
+            "smtp_protocol": smtp_protocol,
             "server_name": server_name,
             "plex_url": plex_url,
             "plex_token": plex_token,
@@ -2025,6 +2034,7 @@ def settings():
         smtp_username = cursor.execute("SELECT smtp_username FROM settings WHERE id = 1").fetchone()[0]
         smtp_server = cursor.execute("SELECT smtp_server FROM settings WHERE id = 1").fetchone()[0]
         smtp_port = cursor.execute("SELECT smtp_port FROM settings WHERE id = 1").fetchone()[0]
+        smtp_protocol = cursor.execute("SELECT smtp_protocol FROM settings WHERE id = 1").fetchone()[0]
         server_name = cursor.execute("SELECT server_name FROM settings WHERE id = 1").fetchone()[0]
         plex_url = cursor.execute("SELECT plex_url FROM settings WHERE id = 1").fetchone()[0]
         plex_token = cursor.execute("SELECT plex_token FROM settings WHERE id = 1").fetchone()[0]
@@ -2040,6 +2050,7 @@ def settings():
         smtp_username = cursor.execute("SELECT smtp_username FROM settings WHERE id = 1").fetchone()
         smtp_server = cursor.execute("SELECT smtp_server FROM settings WHERE id = 1").fetchone()
         smtp_port = cursor.execute("SELECT smtp_port FROM settings WHERE id = 1").fetchone()
+        smtp_protocol = cursor.execute("SELECT smtp_protocol FROM settings WHERE id = 1").fetchone()
         server_name = cursor.execute("SELECT server_name FROM settings WHERE id = 1").fetchone()
         plex_url = cursor.execute("SELECT plex_url FROM settings WHERE id = 1").fetchone()
         plex_token = cursor.execute("SELECT plex_token FROM settings WHERE id = 1").fetchone()
@@ -2054,6 +2065,7 @@ def settings():
         "alias_email": alias_email or "",
         "smtp_username": smtp_username or "",
         "smtp_server": smtp_server or "",
+        "smtp_protocol": smtp_protocol or "TLS",
         "server_name": server_name or "",
         "plex_url": plex_url or "",
         "plex_token": plex_token or "",

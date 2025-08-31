@@ -42,8 +42,9 @@
 
     <h2 class="text-2xl font-bold mb-4">Recent Changes</h2>
     <ul class="list-disc list-inside space-y-2 text-sm">
-        <li>Moved .env file to a folder to assist with docker persistence</li>
-        <li>New docker build and docker run instructions to persist .env file</li>
+        <li>Fixed error when using 587 to send email - thank you dreondre!</li>
+        <li>SMTP username does not require `@`, falls back to from email if SMTP username is not set - thank you dreondre!</li>
+        <li>Split SMTP protocol from port and offer both as options in settings</li>
     </ul>
 </div>
 {% endblock %}

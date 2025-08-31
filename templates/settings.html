@@ -42,6 +42,11 @@
                     {% if settings.password != "" %}value="{{ settings.password }}"{% endif %}
                     placeholder="Email Password or App Password" required><br><br>
 
+                <label for="smtp_username">SMTP Username (Optional - used for SMTP clients that need username login):</label><br>
+                <input type="text" id="smtp_username" name="smtp_username"
+                    {% if settings.smtp_username != "" %}value="{{ settings.smtp_username }}"{% endif %}
+                    placeholder="Leave blank to use your email address"><br><br>
+
                 <label for="smtp_server">SMTP Server:</label><br>
                 <input type="text" id="smtp_server" name="smtp_server"
                     {% if settings.smtp_server != "" %}value="{{ settings.smtp_server }}"{% endif %}
@@ -50,7 +55,13 @@
                 <label for="smtp_port">SMTP Port:</label><br>
                 <input type="number" id="smtp_port" name="smtp_port"
                     {% if settings.smtp_port != "" %}value="{{ settings.smtp_port }}"{% endif %}
-                    placeholder="SMTP Port (465 for SSL)" required><br><br>
+                    placeholder="SMTP Port (i.e. 465 or 587)" required><br><br>
+
+                <label for="smtp_protocol">SMTP Protocol (SSL typically used with port 465, TLS typically used with port 587):</label><br>
+                <select id="smtp_protocol" name="smtp_protocol">
+                    <option value="SSL" {% if settings.smtp_protocol == "SSL" %}selected{% endif %}>SSL</option>
+                    <option value="TLS" {% if settings.smtp_protocol == "TLS" %}selected{% endif %}>TLS</option>
+                </select><br><br>
 
                 <label for="server_name">Plex Server Name:</label><br>
                 <input type="text" id="server_name" name="server_name"

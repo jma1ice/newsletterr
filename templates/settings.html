@@ -42,7 +42,7 @@
                     {% if settings.password != "" %}value="{{ settings.password }}"{% endif %}
                     placeholder="Email Password or App Password" required><br><br>
 
-                <label for="smtp_username">SMTP Username (Optional):</label><br>
+                <label for="smtp_username">SMTP Username (Optional - used for SMTP clients that need username login):</label><br>
                 <input type="text" id="smtp_username" name="smtp_username"
                     {% if settings.smtp_username != "" %}value="{{ settings.smtp_username }}"{% endif %}
                     placeholder="Leave blank to use your email address"><br><br>

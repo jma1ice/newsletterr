@@ -16,7 +16,7 @@ from plex_api_client import PlexAPI
 from urllib.parse import quote_plus, urljoin, urlparse
 
 app = Flask(__name__)
-app.jinja_env.globals["version"] = "v0.9.11"
+app.jinja_env.globals["version"] = "v0.9.12"
 app.jinja_env.globals["publish_date"] = "August 31, 2025"
 
 def get_global_cache_status():
@@ -336,7 +336,6 @@ def init_db(db_path):
         cursor.execute("ALTER TABLE email_schedules ADD COLUMN date_range INTEGER DEFAULT 7")
         conn.commit()
     
-    # Check if smtp_username column exists in settings table
     cursor.execute("PRAGMA table_info(settings)")
     settings_columns = [column[1] for column in cursor.fetchall()]
     if 'smtp_username' not in settings_columns:
@@ -1934,34 +1933,34 @@ def send_email():
             login_username = smtp_username if smtp_username else from_email
             server.login(login_username, decrypt(password))
             
-            email_content = msg_root.as_string()
-            content_size_kb = len(email_content.encode('utf-8')) / 1024
-            
-            if alias_email == '':
-                server.sendmail(from_email, [from_email] + to_emails, email_content)
-                all_recipients = [from_email] + to_emails
-            else:
-                server.sendmail(alias_email, [alias_email] + to_emails, email_content)
-                all_recipients = [alias_email] + to_emails
-            
-            try:
-                history_conn = sqlite3.connect(DB_PATH)
-                history_cursor = history_conn.cursor()
-                history_cursor.execute("""
-                    INSERT INTO email_history (subject, recipients, email_content, content_size_kb, recipient_count, template_name)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                """, (
-                    subject,
-                    ', '.join(all_recipients),
-                    email_content,
-                    round(content_size_kb, 2),
-                    len(all_recipients),
-                    'Manual'
-                ))
-                history_conn.commit()
-                history_conn.close()
-            except Exception as history_error:
-                print(f"Error saving email history: {history_error}")
+        email_content = msg_root.as_string()
+        content_size_kb = len(email_content.encode('utf-8')) / 1024
+        
+        if alias_email == '':
+            server.sendmail(from_email, [from_email] + to_emails, email_content)
+            all_recipients = [from_email] + to_emails
+        else:
+            server.sendmail(alias_email, [alias_email] + to_emails, email_content)
+            all_recipients = [alias_email] + to_emails
+        
+        try:
+            history_conn = sqlite3.connect(DB_PATH)
+            history_cursor = history_conn.cursor()
+            history_cursor.execute("""
+                INSERT INTO email_history (subject, recipients, email_content, content_size_kb, recipient_count, template_name)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (
+                subject,
+                ', '.join(all_recipients),
+                email_content,
+                round(content_size_kb, 2),
+                len(all_recipients),
+                'Manual'
+            ))
+            history_conn.commit()
+            history_conn.close()
+        except Exception as history_error:
+            print(f"Error saving email history: {history_error}")
         
         server.quit()
         return jsonify({"success": True})

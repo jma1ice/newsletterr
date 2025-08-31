@@ -157,13 +157,12 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 
 ## Upcoming Changes
 
-### v0.9.12
+### v0.9.13
+* Split TLS/SSL from port and offer both as options in settings
 * Some issue sending a second scheduled email
 * Recommendations/recently added headers bigger in scheduled send | grid 5 by x instead
 * Schedule send only sends dark mode
 * Graph titles need to specify the date range - or at least show what time range the data is for somewhere in the email
-* Error when using 587 to send email
-* SMTP should not require `@`
 * Find email size regulations, warn on too big | reduce image size to better fall with regulations
 * Custom logo logic needs file select to work with docker | add in small/banner/custom dropdown - and possibly a 'no logo' option?
 * Settings for email coloring - plex yellow, newsletterr blue, custom
@@ -172,7 +171,6 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 
 ### v1.0.0
 * Compile EXE file / ELF
-* Unraid community app - for now there are .xml files in the discord pins
 
 ### v1.1.0
 * Switch TV Show recently added info out to just show the show name, not espisode or season number
@@ -192,7 +190,6 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 * Option to pull recently added by # of days - when this is in should be able to show 'new items since x date' in email
 * Playlist/Collections in email content - helpful for Kometa seasonal lists
 * GitHub webhook to pull submitted issues to Discord channel
-* Split TLS/SSL from port and offer both as options in settings
 * Sonarr/Radarr calendar integration for 'coming soon'
 * Servarr PR
 * Stats for total items in library
@@ -201,6 +198,7 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 * M365 SMTP setup
 * Can the recommendations in email have clickable posters to the admins overseerr for requesting unavailable items? And for available take user to watch on Plex
 * Export email HTML button
+* Export logs button | link to discord
 * Biweekly/semimonthly option for scheduled emails | possibly CRON
 * Option in settings for width of RA/Recs grids
 * Mobile optimizations, i.e.:
@@ -217,6 +215,10 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 ---
 
 ## Recent Changes
+
+### v0.9.12
+* Fixed error when using 587 to send email - thank you dreondre!
+* SMTP username does not require `@`, falls back to from email if SMTP username is not set - thank you dreondre!
 
 ### v0.9.11
 * Moved .env file to a folder to assist with docker persistence

@@ -16,8 +16,8 @@ from plex_api_client import PlexAPI
 from urllib.parse import quote_plus, urljoin, urlparse
 
 app = Flask(__name__)
-app.jinja_env.globals["version"] = "v0.9.9"
-app.jinja_env.globals["publish_date"] = "August 29, 2025"
+app.jinja_env.globals["version"] = "v0.9.10"
+app.jinja_env.globals["publish_date"] = "August 30, 2025"
 
 def get_global_cache_status():
     """Get global cache status for display in navbar"""
@@ -251,8 +251,8 @@ def init_db(db_path):
             tautulli_url TEXT,
             tautulli_api TEXT,
             conjurr_url TEXT,
-            logo_filename TEXT DEFAULT 'NLYellow.png',
-            logo_width INTEGER DEFAULT 20
+            logo_filename TEXT DEFAULT 'Asset_45x.png',
+            logo_width INTEGER DEFAULT 80
         )
     """)
     
@@ -1566,31 +1566,52 @@ def index():
 
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    cursor.execute("""
-        SELECT
-        from_email, server_name, tautulli_url, tautulli_api, logo_filename, logo_width
-        FROM settings WHERE id = 1
-    """)
-    row = cursor.fetchone()
-    conn.close()
+    try:
+        from_email = cursor.execute("SELECT from_email FROM settings WHERE id = 1").fetchone()[0]
+        server_name = cursor.execute("SELECT server_name FROM settings WHERE id = 1").fetchone()[0]
+        tautulli_url = cursor.execute("SELECT tautulli_url FROM settings WHERE id = 1").fetchone()[0]
+        tautulli_api = cursor.execute("SELECT tautulli_api FROM settings WHERE id = 1").fetchone()[0]
+        logo_filename = cursor.execute("SELECT logo_filename FROM settings WHERE id = 1").fetchone()[0]
+        logo_width = cursor.execute("SELECT logo_width FROM settings WHERE id = 1").fetchone()[0]
+    except:
+        from_email = cursor.execute("SELECT from_email FROM settings WHERE id = 1").fetchone()
+        server_name = cursor.execute("SELECT server_name FROM settings WHERE id = 1").fetchone()
+        tautulli_url = cursor.execute("SELECT tautulli_url FROM settings WHERE id = 1").fetchone()
+        tautulli_api = cursor.execute("SELECT tautulli_api FROM settings WHERE id = 1").fetchone()
+        logo_filename = cursor.execute("SELECT logo_filename FROM settings WHERE id = 1").fetchone()
+        logo_width = cursor.execute("SELECT logo_width FROM settings WHERE id = 1").fetchone()
 
-    if row:
-        settings = {
-            "from_email": row[0] or "",
-            "server_name": row[1] or "",
-            "tautulli_url": row[2] or "",
-            "tautulli_api": decrypt(row[3]),
-            "logo_filename": row[4] or "",
-            "logo_width": int(row[5]) if row[5] is not None else 20
-        }
+    settings = {
+        "from_email": from_email or "",
+        "server_name": server_name or "",
+        "tautulli_url": tautulli_url or "",
+        "tautulli_api": decrypt(tautulli_api),
+    }
+    if logo_filename == '' or logo_filename is None:
+        settings['logo_filename'] = 'Asset_45x.png'
+        cursor.execute("""
+            INSERT INTO settings (id, logo_filename) VALUES (1, 'Asset_45x.png')
+            ON CONFLICT (id) DO UPDATE
+            SET logo_filename = excluded.logo_filename
+        """)
+        conn.commit()
     else:
-        settings = {
-            "from_email": "",
-            "server_name": ""
-        }
+        settings['logo_filename'] = logo_filename
+    if logo_width == '' or logo_width is None:
+        settings['logo_width'] = 80
+        cursor.execute("""
+            INSERT INTO settings (id, logo_width) VALUES (1, 80)
+            ON CONFLICT (id) DO UPDATE
+            SET logo_width = excluded.logo_width
+        """)
+        conn.commit()
+    else:
+        settings['logo_width'] = int(logo_width)
 
     if settings['from_email'] == "":
         return render_template('settings.html', settings=settings)
+    
+    conn.close()
 
     if settings['server_name'] != "":
         stats = get_cached_data('stats', strict=True) or get_cached_data('stats', strict=False)
@@ -1974,35 +1995,77 @@ def settings():
 
         return render_template('settings.html', alert="Settings saved successfully!", settings=settings)
 
-    cursor.execute("""
-        SELECT
-        from_email, alias_email, password, smtp_server, smtp_port, server_name, plex_url, plex_token, tautulli_url, tautulli_api, conjurr_url, logo_filename, logo_width
-        FROM settings WHERE id = 1
-    """)
-    row = cursor.fetchone()
-    conn.close()
+    try:
+        from_email = cursor.execute("SELECT from_email FROM settings WHERE id = 1").fetchone()[0]
+        alias_email = cursor.execute("SELECT alias_email FROM settings WHERE id = 1").fetchone()[0]
+        password = cursor.execute("SELECT password FROM settings WHERE id = 1").fetchone()[0]
+        smtp_server = cursor.execute("SELECT smtp_server FROM settings WHERE id = 1").fetchone()[0]
+        smtp_port = cursor.execute("SELECT smtp_port FROM settings WHERE id = 1").fetchone()[0]
+        server_name = cursor.execute("SELECT server_name FROM settings WHERE id = 1").fetchone()[0]
+        plex_url = cursor.execute("SELECT plex_url FROM settings WHERE id = 1").fetchone()[0]
+        plex_token = cursor.execute("SELECT plex_token FROM settings WHERE id = 1").fetchone()[0]
+        tautulli_url = cursor.execute("SELECT tautulli_url FROM settings WHERE id = 1").fetchone()[0]
+        tautulli_api = cursor.execute("SELECT tautulli_api FROM settings WHERE id = 1").fetchone()[0]
+        conjurr_url = cursor.execute("SELECT conjurr_url FROM settings WHERE id = 1").fetchone()[0]
+        logo_filename = cursor.execute("SELECT logo_filename FROM settings WHERE id = 1").fetchone()[0]
+        logo_width = cursor.execute("SELECT logo_width FROM settings WHERE id = 1").fetchone()[0]
+    except:
+        from_email = cursor.execute("SELECT from_email FROM settings WHERE id = 1").fetchone()
+        alias_email = cursor.execute("SELECT alias_email FROM settings WHERE id = 1").fetchone()
+        password = cursor.execute("SELECT password FROM settings WHERE id = 1").fetchone()
+        smtp_server = cursor.execute("SELECT smtp_server FROM settings WHERE id = 1").fetchone()
+        smtp_port = cursor.execute("SELECT smtp_port FROM settings WHERE id = 1").fetchone()
+        server_name = cursor.execute("SELECT server_name FROM settings WHERE id = 1").fetchone()
+        plex_url = cursor.execute("SELECT plex_url FROM settings WHERE id = 1").fetchone()
+        plex_token = cursor.execute("SELECT plex_token FROM settings WHERE id = 1").fetchone()
+        tautulli_url = cursor.execute("SELECT tautulli_url FROM settings WHERE id = 1").fetchone()
+        tautulli_api = cursor.execute("SELECT tautulli_api FROM settings WHERE id = 1").fetchone()
+        conjurr_url = cursor.execute("SELECT conjurr_url FROM settings WHERE id = 1").fetchone()
+        logo_filename = cursor.execute("SELECT logo_filename FROM settings WHERE id = 1").fetchone()
+        logo_width = cursor.execute("SELECT logo_width FROM settings WHERE id = 1").fetchone()
 
-    if row:
-        settings = {
-            "from_email": row[0] or "",
-            "alias_email": row[1] or "",
-            "password": decrypt(row[2]),
-            "smtp_server": row[3] or "",
-            "smtp_port": int(row[4]) if row[4] is not None else 587,
-            "server_name": row[5] or "",
-            "plex_url": row[6] or "",
-            "plex_token": row[7] or "",
-            "tautulli_url": row[8] or "",
-            "tautulli_api": decrypt(row[9]),
-            "conjurr_url": row[10] or "",
-            "logo_filename": row[11] or "",
-            "logo_width": int(row[12]) if row[12] is not None else 20
-        }
+    settings = {
+        "from_email": from_email or "",
+        "alias_email": alias_email or "",
+        "smtp_server": smtp_server or "",
+        "server_name": server_name or "",
+        "plex_url": plex_url or "",
+        "plex_token": plex_token or "",
+        "tautulli_url": tautulli_url or "",
+        "conjurr_url": conjurr_url or "",
+        "logo_filename": logo_filename or ""
+    }
+    if password == '' or password is None:
+        settings["password"] = ""
     else:
-        settings = {
-            "from_email": ""
-        }
-
+        print(password)
+        settings["password"] = decrypt(password)
+    if smtp_port == '' or smtp_port is None:
+        settings["smtp_port"] = 465
+        cursor.execute("""
+            INSERT INTO settings (id, smtp_port) VALUES (1, 465)
+            ON CONFLICT (id) DO UPDATE
+            SET smtp_port = excluded.smtp_port
+        """)
+        conn.commit()
+    else:
+        settings["smtp_port"] = int(smtp_port)
+    if tautulli_api == '' or tautulli_api is None:
+        settings["tautulli_api"] = ""
+    else:
+        settings["tautulli_api"] = decrypt(tautulli_api)
+    if logo_width == '' or logo_width is None:
+        settings["logo_width"] = 80
+        cursor.execute("""
+            INSERT INTO settings (id, logo_width) VALUES (1, 80)
+            ON CONFLICT (id) DO UPDATE
+            SET logo_width = excluded.logo_width
+        """)
+        conn.commit()
+    else:
+        settings["logo_width"] = int(logo_width)
+    
+    conn.close()
     return render_template('settings.html', settings=settings)
 
 @app.post('/api/plex/pin')
@@ -2774,6 +2837,6 @@ if __name__ == '__main__':
     os.makedirs("database", exist_ok=True)
     migrate_data_from_separate_dbs()
     init_db(DB_PATH)
-    migrate_schema("logo_filename TEXT DEFAULT 'Asset_45x.png'")
-    migrate_schema("logo_width INTEGER DEFAULT 80")
+    migrate_schema("logo_filename TEXT")
+    migrate_schema("logo_width INTEGER")
     app.run(host="0.0.0.0", port=6397, debug=True)

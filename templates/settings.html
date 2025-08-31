@@ -5,8 +5,13 @@
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h1>settings</h1>
     </div>
-    <p class="text-info mb-4">Configure your application settings, Plex connection, and email preferences.</p>
-    
+    {% if settings.from_email == '' %}
+        <p style="color: #01b301; text-shadow: 1px 0 #000, 0 1px #000, -1px 0 #000, 0 -1px #000;">
+            Welcome to newsletterr! Please enter in your settings below, if you have any questions about them please see the readme.md file for an explanation.
+        </p>
+    {% else %}
+        <p class="text-info mb-4">Configure your application settings, Plex connection, and email preferences.</p>
+    {% endif %}
     {% if alert %}
         <p style="color: #01b301; text-shadow: 1px 0 #000, 0 1px #000, -1px 0 #000, 0 -1px #000;">{{ alert }}</p>
     {% endif %}
@@ -24,62 +29,62 @@
             <form method="POST" id="settings_form">
                 <label for="from_email">From:</label><br>
                 <input type="email" id="from_email" name="from_email"
-                    {% if settings.from_email !="" %}value="{{ settings.from_email }}"{% endif %}
+                    {% if settings.from_email != "" %}value="{{ settings.from_email }}"{% endif %}
                     placeholder="Your Email" required><br><br>
 
-                <label for="alias_email">Send-As Alias (Optional):</label><br>
+                <label for="alias_email">Send-As Alias (Optional - used for domain specific email addresses):</label><br>
                 <input type="email" id="alias_email" name="alias_email"
-                    {% if settings.from_email !="" %}value="{{ settings.alias_email }}"{% endif %}
+                    {% if settings.alias_email != "" %}value="{{ settings.alias_email }}"{% endif %}
                     placeholder="Blank if no alias"><br><br>
 
                 <label for="password">Password:</label><br>
                 <input type="password" id="password" name="password"
-                    {% if settings.from_email !="" %}value="{{ settings.password }}"{% endif %}
+                    {% if settings.password != "" %}value="{{ settings.password }}"{% endif %}
                     placeholder="Email Password or App Password" required><br><br>
 
                 <label for="smtp_server">SMTP Server:</label><br>
                 <input type="text" id="smtp_server" name="smtp_server"
-                    {% if settings.from_email !="" %}value="{{ settings.smtp_server }}"{% endif %}
+                    {% if settings.smtp_server != "" %}value="{{ settings.smtp_server }}"{% endif %}
                     placeholder="SMTP Server (e.g. smtp.gmail.com)" required><br><br>
 
                 <label for="smtp_port">SMTP Port:</label><br>
                 <input type="number" id="smtp_port" name="smtp_port"
-                    {% if settings.from_email !="" %}value="{{ settings.smtp_port }}"{% endif %}
+                    {% if settings.smtp_port != "" %}value="{{ settings.smtp_port }}"{% endif %}
                     placeholder="SMTP Port (465 for SSL)" required><br><br>
 
                 <label for="server_name">Plex Server Name:</label><br>
                 <input type="text" id="server_name" name="server_name"
-                    {% if settings.from_email !="" %}value="{{ settings.server_name }}"{% endif %}
+                    {% if settings.server_name != "" %}value="{{ settings.server_name }}"{% endif %}
                     placeholder="Paramount Plex" required><br><br>
 
-                <label for="plex_url">Plex URL (Optional):</label><br>
+                <label for="plex_url">Plex URL (Optional - used for posters on 'recently added' and 'stats'):</label><br>
                 <input type="text" id="plex_url" name="plex_url"
-                    {% if settings.from_email !="" %}value="{{ settings.plex_url }}"{% endif %}
+                    {% if settings.plex_url != "" %}value="{{ settings.plex_url }}"{% endif %}
                     placeholder="http://localhost:32400"><br><br>
 
-                <label for="tautulli_url">Tautulli Base URL (Optional):</label><br>
+                <label for="tautulli_url">Tautulli Base URL (Optional - used for user emails, stats, graphs, and recently added):</label><br>
                 <input type="text" id="tautulli_url" name="tautulli_url"
-                    {% if settings.from_email !="" %}value="{{ settings.tautulli_url }}"{% endif %}
+                    {% if settings.tautulli_url != "" %}value="{{ settings.tautulli_url }}"{% endif %}
                     placeholder="http://localhost:8181"><br><br>
 
-                <label for="tautulli_api">Tautulli API Key (Optional):</label><br>
+                <label for="tautulli_api">Tautulli API Key (Optional - see above):</label><br>
                 <input type="text" id="tautulli_api" name="tautulli_api"
-                    {% if settings.from_email !="" %}value="{{ settings.tautulli_api }}"{% endif %}
+                    {% if settings.tautulli_api != "" %}value="{{ settings.tautulli_api }}"{% endif %}
                     placeholder="Tautulli API Key"><br><br>
 
-                <label for="conjurr_url">Conjurr Base URL (Optional):</label><br>
+                <label for="conjurr_url">Conjurr Base URL (Optional - used for recommendations):</label><br>
                 <input type="text" id="conjurr_url" name="conjurr_url"
-                    {% if settings.from_email !="" %}value="{{ settings.conjurr_url }}"{% endif %}
+                    {% if settings.conjurr_url != "" %}value="{{ settings.conjurr_url }}"{% endif %}
                     placeholder="http://localhost:2665"><br><br>
 
-                <label for="logo_filename">Logo Filename (Optional):</label><br>
+                <label for="logo_filename">Logo Filename (Optional - used for custom logos at the top of emails):</label><br>
                 <input type="text" id="logo_filename" name="logo_filename"
-                    {% if settings.from_email !="" %}value="{{ settings.logo_filename }}"{% endif %}
+                    {% if settings.logo_filename != "" %}value="{{ settings.logo_filename }}"{% endif %}
                     placeholder="Asset_45x.png"><br><br>
 
-                <label for="logo_width">Logo Width (Optional):</label><br>
+                <label for="logo_width">Logo Width (Optional - used to size custom logos):</label><br>
                 <input type="number" id="logo_width" name="logo_width"
-                    {% if settings.from_email !="" %}value="{{ settings.logo_width }}"{% endif %}
+                    {% if settings.logo_width != "" %}value="{{ settings.logo_width }}"{% endif %}
                     placeholder="80"><br><br>
                 
                 <button id="apply_settings" class="button">Apply Settings</button>

@@ -156,7 +156,7 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 
 ## Upcoming Changes
 
-### v0.9.10
+### v0.9.11
 * Persist ENC key through upgrades
 * Some issue sending a second scheduled email
 * Recommendations/recently added headers bigger in scheduled send | grid 5 by x instead
@@ -165,7 +165,10 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 * Error when using 587 to send email
 * SMTP should not require `@`
 * Find email size regulations, warn on too big | reduce image size to better fall with regulations
-* Custom logo logic needs file select to work with docker | add in small/banner/custom dropdown
+* Custom logo logic needs file select to work with docker | add in small/banner/custom dropdown - and possibly a 'no logo' option?
+* Settings for email coloring - plex yellow, newsletterr blue, custom
+* Does Tautulli API support recently added music?
+* Logo positioning setting
 
 ### v1.0.0
 * Compile EXE file / ELF
@@ -199,6 +202,7 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 * Can the recommendations in email have clickable posters to the admins overseerr for requesting unavailable items? And for available take user to watch on Plex
 * Export email HTML button
 * Biweekly/semimonthly option for scheduled emails | possibly CRON
+* Option in settings for width of RA/Recs grids
 * Mobile optimizations, i.e.:
 ```
 <style>
@@ -214,13 +218,19 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 
 ## Recent Changes
 
+### v0.9.10
+* Added use case info for optional settings
+* Fixed issue with blank settings causing app crash
+* First use messaging in settings page
+* Extra padding on top bar
+
 ### v0.9.9
 * Cache recommendations/filtered users
 * Snap-ins UI for adding recommendations to email
 * Replaced Plex logo with yellow newsletterr logo, also added a disclaimer at the end of the email
 * Added setting so users can use their own logo
 * Included Plex url in the settings page so it can be changed if it pulls incorrectly
-* Fixed issue where dashboard preview was initally stuck on light mode
+* Fixed issue where dashboard preview was initially stuck on light mode
 * Fixed cache status text color on dark mode
 * Redirect empty settings to the settings page
 * Fixed issue where sometimes BCC placeholder was missing

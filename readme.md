@@ -100,6 +100,7 @@ docker run -d --name newsletterr \
   -p 6397:6397 \
   -e PUBLIC_BASE_URL=http://127.0.0.1:6397 \
   -v newsletterr-db:/app/database \
+  -v newsletterr-env:/app/env \
   jma1ice/newsletterr:latest
 ```
 
@@ -156,8 +157,7 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 
 ## Upcoming Changes
 
-### v0.9.11
-* Persist ENC key through upgrades
+### v0.9.12
 * Some issue sending a second scheduled email
 * Recommendations/recently added headers bigger in scheduled send | grid 5 by x instead
 * Schedule send only sends dark mode
@@ -217,6 +217,10 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 ---
 
 ## Recent Changes
+
+### v0.9.11
+* Moved .env file to a folder to assist with docker persistence
+* New docker build and docker run instructions to persist .env file
 
 ### v0.9.10
 * Added use case info for optional settings

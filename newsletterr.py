@@ -1299,15 +1299,21 @@ def run_tautulli_command(base_url, api_key, command, data_type, error, time_rang
         if data.get('response', {}).get('result') == 'success':
             out_data = data['response']['data']
         else:
+            # Don't concatenate every single error - just return a summary
             if error == None:
-                error = data.get('response', {}).get('message', 'Unknown error')
+                error = f"Tautulli API Error: {data.get('response', {}).get('message', 'Unknown error')}"
             else:
-                error += f", {data.get('response', {}).get('message', 'Unknown error')}"
+                # If we already have an error, just indicate multiple failures
+                if "Multiple Tautulli API calls failed" not in error:
+                    error = "Multiple Tautulli API calls failed"
     except requests.exceptions.RequestException as e:
+        # Don't concatenate every single error - just return a summary
         if error == None:
-            error = str(f"{data_type} Error: {e}")
+            error = f"Tautulli Connection Error: {str(e)}"
         else:
-            error += str(f", {data_type} Error: {e}")
+            # If we already have an error, just indicate multiple failures
+            if "Multiple Tautulli API calls failed" not in error:
+                error = "Multiple Tautulli API calls failed"
 
     return [out_data, error]
 
@@ -1693,9 +1699,10 @@ def index():
             set_cached_data('recent_data', recent_data, cache_params)
             
             user_dict = {}
-            for user in users:
-                if user['email'] != None and user['is_active']:
-                    user_dict[user['user_id']] = user['email']
+            if users:
+                for user in users:
+                    if user['email'] != None and user['is_active']:
+                        user_dict[user['user_id']] = user['email']
             
             alert = f"Fresh data loaded! Stats/graphs for {time_range} days, and {count} recently added items."
 

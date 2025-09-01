@@ -30,12 +30,17 @@
                 <label for="from_email">From:</label><br>
                 <input type="email" id="from_email" name="from_email"
                     {% if settings.from_email != "" %}value="{{ settings.from_email }}"{% endif %}
-                    placeholder="Your Email" required><br><br>
+                    placeholder="Your email" required><br><br>
 
                 <label for="alias_email">Send-As Alias (Optional - used for domain specific email addresses):</label><br>
                 <input type="email" id="alias_email" name="alias_email"
                     {% if settings.alias_email != "" %}value="{{ settings.alias_email }}"{% endif %}
                     placeholder="Blank if no alias"><br><br>
+
+                <label for="reply_to_email">Reply-To (Optional - used to specify a specific email address for replies):</label><br>
+                <input type="email" id="reply_to_email" name="reply_to_email"
+                    {% if settings.reply_to_email != "" %}value="{{ settings.reply_to_email }}"{% endif %}
+                    placeholder="Optional reply-to email"><br><br>
 
                 <label for="password">Password:</label><br>
                 <input type="password" id="password" name="password"

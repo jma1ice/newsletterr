@@ -157,7 +157,7 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 
 ## Upcoming Changes
 
-### v0.9.13
+### v0.9.14
 * Some issue sending a second scheduled email
 * Recommendations/recently added headers bigger in scheduled send | grid 5 by x instead
 * Schedule send only sends dark mode
@@ -213,6 +213,11 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 ---
 
 ## Recent Changes
+
+### v0.9.13
+* Adjusted tautulli API error reporting
+* Fixed app crash when Tautulli settings are missing - thank you dreondre!
+* Reply-To field in settings
 
 ### v0.9.12
 * Fixed error when using 587 to send email - thank you dreondre!

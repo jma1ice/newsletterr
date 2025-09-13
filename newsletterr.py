@@ -1,4 +1,5 @@
 import os, math, uuid, base64, smtplib, sqlite3, requests, time, threading, re, json, mimetypes, shutil, calendar, traceback
+from threading import Lock
 from bs4 import BeautifulSoup
 from datetime import datetime, timezone, timedelta
 from cryptography.fernet import Fernet, InvalidToken
@@ -9,15 +10,162 @@ from email.mime.text import MIMEText
 from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
 from email.utils import make_msgid
-from flask import Flask, render_template, request, jsonify, Response, redirect, url_for
+from flask import Flask, render_template, request, jsonify, Response, redirect, url_for, session, abort, make_response
+from functools import wraps
+import secrets
+import html
+try:
+    import bleach
+    HAS_BLEACH = True
+except ImportError:
+    HAS_BLEACH = False
+    print("Warning: bleach not available, XSS protection limited")
 from pathlib import Path
-from playwright.sync_api import sync_playwright
-from plex_api_client import PlexAPI
+try:
+    from playwright.sync_api import sync_playwright
+    HAS_PLAYWRIGHT = True
+except ImportError:
+    HAS_PLAYWRIGHT = False
+    print("Warning: playwright not available, chart generation disabled")
+
+try:
+    from plex_api_client import PlexAPI
+    HAS_PLEX_CLIENT = True
+except ImportError:
+    HAS_PLEX_CLIENT = False
+    print("Warning: plex-api-client not available")
 from urllib.parse import quote_plus, urljoin, urlparse
 
 app = Flask(__name__)
-app.jinja_env.globals["version"] = "v0.9.13"
-app.jinja_env.globals["publish_date"] = "September 01, 2025"
+if not app.secret_key:
+    # Derive a stable secret from DATA_ENC_KEY; fallback to random
+    try:
+        secret_source = os.getenv("DATA_ENC_KEY") or Fernet.generate_key().decode()
+        app.secret_key = secrets.token_hex(16) + secret_source[:16]
+    except Exception:
+        app.secret_key = secrets.token_hex(32)
+app.jinja_env.globals["version"] = "v0.9.14"
+app.jinja_env.globals["publish_date"] = "September 13, 2025"
+@app.after_request
+def set_security_headers(resp: Response):
+    try:
+        resp.headers.setdefault('X-Frame-Options', 'DENY')
+        resp.headers.setdefault('X-Content-Type-Options', 'nosniff')
+        resp.headers.setdefault('Referrer-Policy', 'no-referrer')
+        # If running behind HTTPS, HSTS can be enabled by the operator
+        # resp.headers.setdefault('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload')
+        return resp
+    except Exception:
+        return resp
+
+def require_csrf_for_json():
+    token = request.headers.get('X-CSRF-Token') or request.form.get('csrf_token')
+    if not token or token != session.get('csrf_token'):
+        abort(400)
+
+def sanitize_html_input(text):
+    """Sanitize HTML input to prevent XSS attacks"""
+    if not text:
+        return ""
+    
+    if HAS_BLEACH:
+        # Allowed tags for rich text editor
+        allowed_tags = [
+            'p', 'br', 'strong', 'b', 'em', 'i', 'u', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+            'ul', 'ol', 'li', 'blockquote', 'a', 'img', 'div', 'span'
+        ]
+        
+        # Allowed attributes
+        allowed_attributes = {
+            'a': ['href', 'title'],
+            'img': ['src', 'alt', 'title', 'width', 'height'],
+            'div': ['class'],
+            'span': ['class', 'style']
+        }
+        
+        # Allowed protocols for links
+        allowed_protocols = ['http', 'https', 'mailto']
+        
+        return bleach.clean(
+            text,
+            tags=allowed_tags,
+            attributes=allowed_attributes,
+            protocols=allowed_protocols,
+            strip=True
+        )
+    else:
+        # Fallback: basic HTML escaping (less secure but better than nothing)
+        print("Warning: Using basic HTML escaping instead of full sanitization")
+        return html.escape(text)
+
+def escape_html_output(text):
+    """Escape HTML for safe output"""
+    if not text:
+        return ""
+    return html.escape(text)
+
+# Basic Authentication System
+def requires_auth(f):
+    """Decorator for routes that require authentication"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        # Check if authentication is enabled
+        auth_enabled = os.getenv('NEWSLETTER_AUTH_ENABLED', 'false').lower() == 'true'
+        if not auth_enabled:
+            return f(*args, **kwargs)
+            
+        # Check session authentication
+        if not session.get('authenticated'):
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+def check_credentials(username, password):
+    """Check if provided credentials are valid"""
+    expected_username = os.getenv('NEWSLETTER_USERNAME', 'admin')
+    expected_password = os.getenv('NEWSLETTER_PASSWORD')
+    
+    if not expected_password:
+        # No password set - authentication disabled
+        return False
+        
+    return username == expected_username and password == expected_password
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    """Basic login endpoint"""
+    # If auth is disabled, redirect to home
+    if os.getenv('NEWSLETTER_AUTH_ENABLED', 'false').lower() != 'true':
+        return redirect(url_for('index'))
+        
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '')
+        
+        if check_credentials(username, password):
+            session['authenticated'] = True
+            session['username'] = username
+            return redirect(url_for('index'))
+        else:
+            return render_template('login.html', error='Invalid credentials')
+    
+    return render_template('login.html')
+
+@app.route('/logout')
+def logout():
+    """Logout endpoint"""
+    session.clear()
+    return redirect(url_for('login'))
+
+def safe_get(url: str, *, timeout: int = 15, retries: int = 2, **kwargs):
+    """requests.get with timeout and minimal retry/backoff."""
+    for attempt in range(retries + 1):
+        try:
+            return requests.get(url, timeout=timeout, **kwargs)
+        except requests.RequestException as e:
+            if attempt == retries:
+                raise
+            time.sleep(1.0 * (attempt + 1))
 
 def get_global_cache_status():
     """Get global cache status for display in navbar"""
@@ -136,6 +284,16 @@ _update_cache = {
 }
 
 DB_PATH = os.path.join("database", "data.db")
+
+# Thread-safe database operations
+db_lock = Lock()
+
+def get_db_connection():
+    """Get a database connection with proper timeout and configuration"""
+    conn = sqlite3.connect(DB_PATH, timeout=30.0, isolation_level=None)
+    conn.execute("PRAGMA busy_timeout = 30000")  # 30 second timeout
+    conn.execute("PRAGMA journal_mode = WAL")    # Write-Ahead Logging for better concurrency
+    return conn
 plex_headers = {
     "X-Plex-Client-Identifier": str(uuid.uuid4())
 }
@@ -451,36 +609,65 @@ def migrate_data_from_separate_dbs():
         unified_conn.close()
 
 def migrate_schema(column_def):
+    # Security: Whitelist allowed column definitions to prevent SQL injection
+    allowed_columns = {
+        'logo_filename TEXT': 'logo_filename TEXT',
+        'logo_width INTEGER': 'logo_width INTEGER',
+        'smtp_username TEXT': 'smtp_username TEXT',
+        'smtp_protocol TEXT': 'smtp_protocol TEXT',
+        'reply_to_email TEXT': 'reply_to_email TEXT'
+    }
+    
+    if column_def not in allowed_columns:
+        print(f"Security Warning: Attempted to add unauthorized column: {column_def}")
+        return
+    
     conn = sqlite3.connect(DB_PATH)
     try:
         col_name = column_def.split()[0]
         cursor = conn.execute("PRAGMA table_info('settings')")
         has_column = any(row[1] == col_name for row in cursor.fetchall())
         if not has_column:
-            conn.execute(f"ALTER TABLE settings ADD COLUMN {column_def}")
+            # Use whitelisted column definition
+            conn.execute(f"ALTER TABLE settings ADD COLUMN {allowed_columns[column_def]}")
             conn.commit()
+            print(f"Added column: {col_name}")
+    except sqlite3.Error as e:
+        print(f"Database error in migrate_schema: {e}")
     finally:
         conn.close()
 
 def get_saved_email_lists():
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("SELECT id, name, emails FROM email_lists ORDER BY name")
-    lists = cursor.fetchall()
-    conn.close()
-    return [{'id': row[0], 'name': row[1], 'emails': row[2]} for row in lists]
+    """Thread-safe email list retrieval"""
+    with db_lock:
+        conn = get_db_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, name, emails FROM email_lists ORDER BY name")
+            lists = cursor.fetchall()
+            return [{'id': row[0], 'name': row[1], 'emails': row[2]} for row in lists]
+        except sqlite3.Error as e:
+            print(f"Database error in get_saved_email_lists: {e}")
+            return []
+        finally:
+            conn.close()
 
 def save_email_list(name, emails):
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    try:
-        cursor.execute("INSERT INTO email_lists (name, emails) VALUES (?, ?)", (name, emails))
-        conn.commit()
-        return True
-    except sqlite3.IntegrityError:
-        return False
-    finally:
-        conn.close()
+    """Thread-safe email list saving"""
+    with db_lock:
+        conn = get_db_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute("INSERT INTO email_lists (name, emails) VALUES (?, ?)", (name, emails))
+            conn.commit()
+            return True
+        except sqlite3.IntegrityError:
+            return False
+        except sqlite3.Error as e:
+            print(f"Database error in save_email_list: {e}")
+            return False
+        finally:
+            conn.close()
 
 def delete_email_list(list_id):
     conn = sqlite3.connect(DB_PATH)
@@ -924,17 +1111,33 @@ def generate_email_content(template_id, settings, date_range=7):
                 
                 if text_content:
                     if item_type == 'titleblock':
-                        all_content_html += f"""
-                        <div style="margin-bottom: 20px; font-size: 1.5em; font-weight: bold; text-align: center; color: #E5A00D;">
-                            {text_content.replace(chr(10), '<br>')}
-                        </div>
-                        """
+                        # Handle HTML content from Quill editor
+                        if '<' in text_content:
+                            all_content_html += f"""
+                            <div style="margin-bottom: 20px; font-size: 1.5em; font-weight: bold; color: #E5A00D;">
+                                {text_content}
+                            </div>
+                            """
+                        else:
+                            all_content_html += f"""
+                            <div style="margin-bottom: 20px; font-size: 1.5em; font-weight: bold; text-align: center; color: #E5A00D;">
+                                {text_content.replace(chr(10), '<br>')}
+                            </div>
+                            """
                     else:
-                        all_content_html += f"""
-                        <div style="margin-bottom: 15px; color: #fff;">
-                            {text_content.replace(chr(10), '<br>')}
-                        </div>
-                        """
+                        # Handle HTML content from Quill editor
+                        if '<' in text_content:
+                            all_content_html += f"""
+                            <div style="margin-bottom: 15px; color: #fff;">
+                                {text_content}
+                            </div>
+                            """
+                        else:
+                            all_content_html += f"""
+                            <div style="margin-bottom: 15px; color: #fff;">
+                                {text_content.replace(chr(10), '<br>')}
+                            </div>
+                            """
                 
             elif item_type == 'stat' and stats:
                 try:
@@ -1214,19 +1417,63 @@ def send_scheduled_email(schedule_id, email_list_id, template_id):
         traceback.print_exc()
         return False
 
+def sanitize_html(html: str) -> str:
+    # Minimal sanitizer; allow basic formatting and links
+    try:
+        import bleach
+        allowed_tags = [
+            'p','br','strong','em','b','i','u','ul','ol','li','a','h1','h2','h3','h4','h5','h6',
+            'blockquote','code','pre','span'
+        ]
+        allowed_attrs = {
+            'a': ['href','title','target','rel'],
+            'span': ['style'],
+            '*': ['style']
+        }
+        cleaned = bleach.clean(html, tags=allowed_tags, attributes=allowed_attrs, strip=True)
+        return cleaned
+    except Exception:
+        return html
+
 def apply_layout(body, graphs_html_block, stats_html_block, ra_html_block, recs_html_block, subject, server_name):
-    body = body.replace('\n', '<br>')
-    body = body.replace('[GRAPHS]', graphs_html_block)
-    body = body.replace('[STATS]', stats_html_block)
-    body = body.replace('[RECENTLY_ADDED]', ra_html_block)
-    body = body.replace('[RECOMENDATIONS]', recs_html_block)
+    # Handle HTML content from Quill editor - only convert newlines if content doesn't contain HTML
+    if '<' not in body:
+        body = body.replace('\n', '<br>')
+    # Sanitize body (Quill HTML) and dynamic blocks
+    body = sanitize_html(body)
+    body = body.replace('[GRAPHS]', sanitize_html(graphs_html_block))
+    body = body.replace('[STATS]', sanitize_html(stats_html_block))
+    body = body.replace('[RECENTLY_ADDED]', sanitize_html(ra_html_block))
+    body = body.replace('[RECOMENDATIONS]', sanitize_html(recs_html_block))
 
     if subject.startswith(server_name):
         display_subject = subject[len(server_name):].lstrip()
     else:
         display_subject = subject
 
-    return f"""`
+    # Get logo settings from database; default to Asset_45x.png
+    logo_html = ""
+    logo_width_value = "40"
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT logo_filename, logo_width FROM settings WHERE id = 1")
+        result = cursor.fetchone()
+        conn.close()
+
+        if result:
+            logo_filename = (result[0] or "Asset_45x.png").strip()
+            logo_width_value = str(result[1]) if result[1] else "40"
+            if logo_filename:
+                if logo_filename.startswith('logo_'):
+                    logo_src = f"/static/uploads/logos/{logo_filename}"
+                else:
+                    logo_src = f"/static/img/{logo_filename}"
+                logo_html = f"<img class=\"header-img plex-img\" style=\"display: block; outline: 0; text-decoration: none; height: auto; border: 0; -ms-interpolation-mode: bicubic; max-width: 100%; margin-left: 40em;\" src=\"{logo_src}\" width=\"{logo_width_value}\" />"
+    except Exception as e:
+        print(f"Error getting logo settings: {e}")
+
+    return f"""
     <link href="https://fonts.googleapis.com/css?family=IBM+Plex+Sans:400,500,600,700&display=swap" rel="stylesheet">
     <html>
     <style>
@@ -1265,7 +1512,7 @@ def apply_layout(body, graphs_html_block, stats_html_block, ra_html_block, recs_
                                 <tbody>
                                     <tr>
                                         <td class="wrapper" style="font-family: IBM Plex Sans; font-size: 14px; vertical-align: top; box-sizing: border-box; padding: 5px; overflow: auto;">
-                                            <div class="header" style="text-align: center; line-height: 0;"><img class="header-img plex-img" style="display: block; outline: 0; text-decoration: none; height: auto; border: 0; -ms-interpolation-mode: bicubic; max-width: 100%; margin-left: 40em;" src="https://d15k2d11r6t6rl.cloudfront.net/public/users/Integrators/669d5713-9b6a-46bb-bd7e-c542cff6dd6a/3bef3c50f13f4320a9e31b8be79c6ad2/Plex%20Logo%20Update%202022/plex-logo-heavy-stroke.png" width="40" /></div>
+                                            <div class="header" style="text-align: center; line-height: 0;">{logo_html}</div>
                                             <div class="server-name" style="font-size: 25px; text-align: center; margin-bottom: 0;">{server_name} Newsletter</div>
                                         </td>
                                     </tr>
@@ -1285,7 +1532,7 @@ def apply_layout(body, graphs_html_block, stats_html_block, ra_html_block, recs_
                     </td>
                 </tr>
             </tbody>
-        </table></body></html>`"""
+        </table></body></html>"""
 
 def run_tautulli_command(base_url, api_key, command, data_type, error, time_range='30'):
     out_data = None
@@ -1302,7 +1549,7 @@ def run_tautulli_command(base_url, api_key, command, data_type, error, time_rang
             api_url = f"{base_url}/api/v2?apikey={decrypt(api_key)}&cmd={command}&time_range={time_range}"
 
     try:
-        response = requests.get(api_url)
+        response = safe_get(api_url)
         response.raise_for_status()
         data = response.json()
 
@@ -1338,7 +1585,7 @@ def run_conjurr_command(base_url, user_dict, error):
     for user in user_dict.keys():
         try:
             api_url = f"{api_base_url}{user}"
-            response = requests.get(api_url)
+            response = safe_get(api_url)
             response.raise_for_status()
             data = response.json()
 
@@ -1430,10 +1677,28 @@ def embed_local_imgs(html: str, static_root: str) -> tuple[str, list]:
 
         rel = src.lstrip("/")[7:]
         print(static_root, rel)
+        
+        # Security: Prevent path traversal attacks
         fs_path = os.path.normpath(os.path.join(static_root, rel))
+        
+        # Ensure the resolved path is within the static directory
+        if not fs_path.startswith(os.path.normpath(static_root)):
+            print(f"Security Warning: Path traversal attempt blocked: {rel}")
+            continue
+            
+        # Additional security: whitelist allowed file extensions
+        allowed_extensions = {'.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg'}
+        file_ext = os.path.splitext(fs_path)[1].lower()
+        if file_ext not in allowed_extensions:
+            print(f"Security Warning: Unauthorized file type blocked: {file_ext}")
+            continue
 
-        with open(fs_path, "rb") as f:
-            data = f.read()
+        try:
+            with open(fs_path, "rb") as f:
+                data = f.read()
+        except (IOError, OSError) as e:
+            print(f"Error reading file {fs_path}: {e}")
+            continue
 
         mime, _ = mimetypes.guess_type(fs_path)
         if mime and mime.startswith("image/"):
@@ -1472,7 +1737,7 @@ def _check_github_latest():
 
     url = f"https://api.github.com/repos/{app.config['GITHUB_OWNER']}/{app.config['GITHUB_REPO']}/releases/latest"
     try:
-        r = requests.get(url, headers=headers, timeout=10)
+        r = safe_get(url, headers=headers, timeout=10)
         if r.status_code == 304:
             _update_cache["checked_at"] = time.time()
             return
@@ -1525,6 +1790,7 @@ def inject_update_info():
     }
 
 @app.route('/', methods=['GET', 'POST'])
+@requires_auth
 def index():
     stats = None
     users = None
@@ -1618,13 +1884,7 @@ def index():
         "tautulli_api": decrypt(tautulli_api),
     }
     if logo_filename == '' or logo_filename is None:
-        settings['logo_filename'] = 'Asset_45x.png'
-        cursor.execute("""
-            INSERT INTO settings (id, logo_filename) VALUES (1, 'Asset_45x.png')
-            ON CONFLICT (id) DO UPDATE
-            SET logo_filename = excluded.logo_filename
-        """)
-        conn.commit()
+        settings['logo_filename'] = ''
     else:
         settings['logo_filename'] = logo_filename
     if logo_width == '' or logo_width is None:
@@ -1768,7 +2028,7 @@ def proxy_art(art_path):
     plex_url = settings['plex_url'].rstrip('/')
 
     full_url = f"{plex_url}/{art_path}?X-Plex-Token={decrypt(plex_token)}"
-    r = requests.get(full_url, stream=True)
+    r = safe_get(full_url, stream=True)
     return Response(r.content, content_type=r.headers['Content-Type'])
 
 @app.get("/proxy-img")
@@ -1776,12 +2036,13 @@ def proxy_img():
     url = request.args.get("u", "")
     if not url.startswith(("http://","https://")):
         return Response(status=400)
-    r = requests.get(url, timeout=15)
+    r = safe_get(url, timeout=15)
     ct = r.headers.get("Content-Type", "image/jpeg")
     return Response(r.content, headers={"Content-Type": ct, "Cache-Control": "public, max-age=86400"})
 
 @app.route('/pull_recommendations', methods=['POST'])
 def pull_recommendations():
+    require_csrf_for_json()
     recommendations_json = {}
     error = None
     alert = None
@@ -1844,6 +2105,7 @@ def pull_recommendations():
 
 @app.route('/send_email', methods=['POST'])
 def send_email():
+    require_csrf_for_json()
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("""
@@ -2000,10 +2262,14 @@ def settings():
     cursor = conn.cursor()
 
     if request.method == "POST":
+        # CSRF validation
+        token = request.form.get("csrf_token")
+        if not token or token != session.get("csrf_token"):
+            abort(400)
         from_email = request.form.get("from_email")
         alias_email = request.form.get("alias_email")
         reply_to_email = request.form.get("reply_to_email")
-        password = encrypt(request.form.get("password"))
+        submitted_password = (request.form.get("password") or "").strip()
         smtp_username = request.form.get("smtp_username")
         smtp_server = request.form.get("smtp_server")
         smtp_port = int(request.form.get("smtp_port"))
@@ -2011,10 +2277,37 @@ def settings():
         server_name = request.form.get("server_name")
         plex_url = request.form.get("plex_url")
         tautulli_url = request.form.get("tautulli_url")
-        tautulli_api = encrypt(request.form.get("tautulli_api"))
+        submitted_tautulli_api = (request.form.get("tautulli_api") or "").strip()
         conjurr_url = request.form.get("conjurr_url")
         logo_filename = request.form.get("logo_filename")
         logo_width = request.form.get("logo_width")
+
+        # Fetch current encrypted secrets to avoid accidental double-encryption
+        try:
+            cursor.execute("SELECT password, tautulli_api FROM settings WHERE id = 1")
+            current_row = cursor.fetchone() or (None, None)
+        except Exception:
+            current_row = (None, None)
+
+        current_password_enc = current_row[0]
+        current_tautulli_enc = current_row[1]
+        current_password_plain = decrypt(current_password_enc) if current_password_enc else ""
+        current_tautulli_plain = decrypt(current_tautulli_enc) if current_tautulli_enc else ""
+
+        # Determine what to store for secrets (idempotent, avoids re-encrypting unchanged values)
+        if submitted_password == "":
+            password_enc = ""
+        elif submitted_password == current_password_enc or submitted_password == current_password_plain:
+            password_enc = current_password_enc or encrypt(submitted_password)
+        else:
+            password_enc = encrypt(submitted_password)
+
+        if submitted_tautulli_api == "":
+            tautulli_api_enc = ""
+        elif submitted_tautulli_api == current_tautulli_enc or submitted_tautulli_api == current_tautulli_plain:
+            tautulli_api_enc = current_tautulli_enc or encrypt(submitted_tautulli_api)
+        else:
+            tautulli_api_enc = encrypt(submitted_tautulli_api)
 
         cursor.execute("""
             INSERT INTO settings
@@ -2022,7 +2315,7 @@ def settings():
             VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (id) DO UPDATE
             SET from_email = excluded.from_email, alias_email = excluded.alias_email, reply_to_email = excluded.reply_to_email, password = excluded.password, smtp_username = excluded.smtp_username, smtp_server = excluded.smtp_server, smtp_port = excluded.smtp_port, smtp_protocol = excluded.smtp_protocol, server_name = excluded.server_name, plex_url = excluded.plex_url, tautulli_url = excluded.tautulli_url, tautulli_api = excluded.tautulli_api, conjurr_url = excluded.conjurr_url, logo_filename = excluded.logo_filename, logo_width = excluded.logo_width
-        """, (from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, plex_url, tautulli_url, tautulli_api, conjurr_url, logo_filename, logo_width))
+        """, (from_email, alias_email, reply_to_email, password_enc, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, plex_url, tautulli_url, tautulli_api_enc, conjurr_url, logo_filename, logo_width))
         conn.commit()
         cursor.execute("SELECT plex_token FROM settings WHERE id = 1")
         plex_token = cursor.fetchone()[0]
@@ -2032,7 +2325,7 @@ def settings():
             "from_email": from_email,
             "alias_email": alias_email,
             "reply_to_email": reply_to_email,
-            "password": decrypt(password),
+            "password": decrypt(password_enc),
             "smtp_username": smtp_username,
             "smtp_server": smtp_server,
             "smtp_port": smtp_port,
@@ -2041,7 +2334,7 @@ def settings():
             "plex_url": plex_url,
             "plex_token": plex_token,
             "tautulli_url": tautulli_url,
-            "tautulli_api": decrypt(tautulli_api),
+            "tautulli_api": decrypt(tautulli_api_enc),
             "conjurr_url": conjurr_url,
             "logo_filename": logo_filename,
             "logo_width": logo_width
@@ -2128,7 +2421,10 @@ def settings():
         settings["logo_width"] = int(logo_width)
     
     conn.close()
-    return render_template('settings.html', settings=settings)
+    # Issue a CSRF token for forms
+    if not session.get("csrf_token"):
+        session["csrf_token"] = secrets.token_urlsafe(32)
+    return render_template('settings.html', settings=settings, nonce=secrets.token_urlsafe(16), csrf_token=session["csrf_token"])
 
 @app.post('/api/plex/pin')
 def plex_create_pin():
@@ -2194,7 +2490,7 @@ def plex_get_info():
         "X-Plex-Token": decrypt(token)
     }
     
-    response = requests.get(url, headers=headers)
+    response = safe_get(url, headers=headers)
     data = response.json()
 
     cursor.execute("""
@@ -2306,6 +2602,7 @@ def scheduling():
 
 @app.route('/scheduling/create', methods=['POST'])
 def create_schedule():
+    require_csrf_for_json()
     try:
         data = request.get_json()
         name = data.get('name', '').strip()
@@ -2363,6 +2660,7 @@ def delete_schedule(schedule_id):
 
 @app.route('/scheduling/<int:schedule_id>/send-now', methods=['POST'])
 def send_schedule_now(schedule_id):
+    require_csrf_for_json()
     try:
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
@@ -2406,6 +2704,7 @@ def send_schedule_now(schedule_id):
 
 @app.route('/scheduling/<int:schedule_id>/toggle', methods=['POST'])
 def toggle_schedule(schedule_id):
+    require_csrf_for_json()
     try:
         data = request.get_json()
         is_active = data.get('is_active', True)
@@ -2767,6 +3066,7 @@ def get_calendar_data():
 
 @app.route('/clear_cache', methods=['POST'])
 def clear_cache_route():
+    require_csrf_for_json()
     clear_cache()
     return jsonify({"status": "success", "message": "Cache cleared successfully"})
 
@@ -2791,6 +3091,7 @@ def get_email_lists():
 
 @app.route('/email_lists', methods=['POST'])
 def save_email_list_route():
+    require_csrf_for_json()
     try:
         data = request.get_json()
         name = data.get('name', '').strip()
@@ -2843,6 +3144,7 @@ def get_email_templates():
 
 @app.route('/email_templates', methods=['POST'])
 def save_email_template():
+    require_csrf_for_json()
     try:
         data = request.get_json()
         name = data.get('name', '').strip()
@@ -2894,6 +3196,133 @@ def delete_email_template(template_id):
     except Exception as e:
         print(f"Error deleting template: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/upload-logo', methods=['POST'])
+def upload_logo():
+    if request.content_type and request.content_type.startswith('multipart/form-data'):
+        token = request.form.get('csrf_token')
+        if not token or token != session.get('csrf_token'):
+            abort(400)
+    """Handle logo file upload with validation"""
+    try:
+        # Check if file was uploaded
+        if 'logo' not in request.files:
+            return jsonify({"status": "error", "message": "No file uploaded"}), 400
+        
+        file = request.files['logo']
+        
+        # Check if file is empty
+        if file.filename == '':
+            return jsonify({"status": "error", "message": "No file selected"}), 400
+        
+        # Validate file type
+        allowed_extensions = {'png', 'jpg', 'jpeg', 'webp'}
+        if not file.filename.lower().endswith(tuple('.' + ext for ext in allowed_extensions)):
+            return jsonify({"status": "error", "message": "Invalid file type. Only PNG, JPG, JPEG, and WebP are allowed"}), 400
+        
+        # Validate file size (max 2MB)
+        file.seek(0, 2)  # Seek to end
+        file_size = file.tell()
+        file.seek(0)  # Reset to beginning
+        
+        if file_size > 2 * 1024 * 1024:  # 2MB
+            return jsonify({"status": "error", "message": "File too large. Maximum size is 2MB"}), 400
+        
+        # Generate unique filename
+        timestamp = int(time.time())
+        file_extension = file.filename.rsplit('.', 1)[1].lower()
+        new_filename = f"logo_{timestamp}.{file_extension}"
+        
+        # Ensure upload directory exists
+        upload_dir = os.path.join(app.static_folder, 'uploads', 'logos')
+        os.makedirs(upload_dir, exist_ok=True)
+        
+        # Save file
+        file_path = os.path.join(upload_dir, new_filename)
+        file.save(file_path)
+        
+        # Get image dimensions
+        try:
+            from PIL import Image
+            with Image.open(file_path) as img:
+                width, height = img.size
+                # Validate dimensions (max 800x400)
+                if width > 800 or height > 400:
+                    # Resize image if too large
+                    img.thumbnail((800, 400), Image.Resampling.LANCZOS)
+                    img.save(file_path, quality=95, optimize=True)
+                    width, height = img.size
+        except ImportError:
+            # PIL not available, skip dimension validation
+            width, height = 0, 0
+        
+        # Update database with new logo filename
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO settings (id, logo_filename, logo_width) 
+            VALUES (1, ?, ?) 
+            ON CONFLICT (id) DO UPDATE 
+            SET logo_filename = excluded.logo_filename, logo_width = excluded.logo_width
+        """, (new_filename, width))
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            "status": "success", 
+            "message": "Logo uploaded successfully",
+            "filename": new_filename,
+            "width": width,
+            "height": height
+        })
+        
+    except Exception as e:
+        print(f"Error uploading logo: {e}")
+        return jsonify({"status": "error", "message": f"Upload failed: {str(e)}"}), 500
+
+@app.route('/delete-logo', methods=['POST'])
+def delete_logo():
+    require_csrf_for_json()
+    """Delete current logo and clear to no logo"""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        
+        # Get current logo filename
+        cursor.execute("SELECT logo_filename FROM settings WHERE id = 1")
+        result = cursor.fetchone()
+        current_logo = result[0] if result else None
+        
+        if current_logo:
+            # Delete the uploaded logo file
+            logo_path = os.path.join(app.static_folder, 'uploads', 'logos', current_logo)
+            if os.path.exists(logo_path):
+                os.remove(logo_path)
+            
+            # Clear to no logo
+            cursor.execute("""
+                UPDATE settings 
+                SET logo_filename = '', logo_width = 80 
+                WHERE id = 1
+            """)
+            conn.commit()
+            
+            return jsonify({
+                "status": "success", 
+                "message": "Logo removed"
+            })
+        else:
+            return jsonify({
+                "status": "info", 
+                "message": "No logo set"
+            })
+            
+    except Exception as e:
+        print(f"Error deleting logo: {e}")
+        return jsonify({"status": "error", "message": f"Delete failed: {str(e)}"}), 500
+    finally:
+        if 'conn' in locals():
+            conn.close()
 
 if __name__ == '__main__':
     os.makedirs("database", exist_ok=True)

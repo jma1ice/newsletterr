@@ -4,27 +4,27 @@
 <div class="container-fluid">
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h1>newsletterr dashboard</h1>
-        <button id="sendEmailBtn" class="btn btn-success btn-lg px-5 py-3" style="font-size: 1.6rem; font-weight: 700; min-width: 220px; box-shadow: 0 4px 8px rgba(0,0,0,0.2);">
+        <button id="sendEmailBtn" class="btn btn-success btn-lg px-5 py-3 send-email-btn">
             📧 Send Email
         </button>
     </div>
     {% if alert %}
-        <p id="alert_p" style="color: #01b301; text-shadow: 1px 0 #000, 0 1px #000, -1px 0 #000, 0 -1px #000;">{{ alert }}</p>
+        <p id="alert_p" class="alert-success">{{ alert }}</p>
     {% endif %}
     {% if error %}
-        <p id="error_p" style="color: #770010; text-shadow: 1px 0 #000, 0 1px #000, -1px 0 #000, 0 -1px #000;">{{ error }}</p>
+        <p id="error_p" class="alert-error">{{ error }}</p>
     {% endif %}
     <div class="foreground">
         <div>
-            <table style="height: 60%; width: 100%;">
-                <tr style="height: 100%; padding: 10px;">
-                    <td style="width: 20%; padding: 10px; vertical-align: top;">
+            <table class="main-table">
+                <tr class="main-table-row">
+                    <td class="sidebar-column">
                         <form method="POST" id="stats_form">
                             <label for="items_to_pull">Recently Added Items (#):</label>
-                            <input type="number" id="items_to_pull" name="items_to_pull" value="10" style="width: 8.5rem; margin-bottom: 8px;" /><br>
+                            <input type="number" id="items_to_pull" name="items_to_pull" value="10" class="items-input" /><br>
                             <label for="days_to_pull">Time Range (days):</label>
                             <input type="number" id="days_to_pull" name="days_to_pull" value="30" /><br>
-                            <div class="quick-range-buttons d-flex flex-nowrap overflow-auto gap-2" style="padding-bottom: 5px;">
+                            <div class="quick-range-buttons d-flex flex-nowrap overflow-auto gap-2 quick-range-container">
                                 <button id="time_range_week" type="button" class="button">7</button>
                                 <button id="time_range_month" type="button" class="button">30</button>
                                 <button id="time_range_quarter" type="button" class="button">90</button>
@@ -33,23 +33,21 @@
                                 <button id="time_range_year" type="button" class="button">365</button>
                             </div>
                             <button type="submit" class="button">Get Stats\Users</button>
-                            <button id="clear_cache_btn" type="button" class="button" 
-                                    style="background-color: #dc3545; margin-top: 5px;"
+                            <button id="clear_cache_btn" type="button" class="button clear-cache-btn"
                                     title="Clear cached data to force fresh fetch">Clear Cache</button>
                         </form>
                         
                         {% if cache_info %}
                             <div class="card mt-3" id="cache-card">
-                                <div class="card-header d-flex justify-content-between align-items-center" 
-                                    style="cursor: pointer; padding: 8px 12px;" 
-                                    onclick="document.getElementById('cache-status-badge').classList.toggle('d-none')">
-                                    <h6 class="mb-0" style="font-size: 0.85rem;">Cache Status</h6>
-                                    <span style="font-size: 0.8rem;">▼</span>
+                                <div class="card-header d-flex justify-content-between align-items-center cache-header" 
+                                    id="cache-header-toggle">
+                                    <h6 class="mb-0">Cache Status</h6>
+                                    <span>▼</span>
                                 </div>
-                                <div id="cache-status-badge" class="card-body d-none" style="padding: 8px 12px; font-size: 0.8rem;">
+                                <div id="cache-status-badge" class="card-body d-none cache-status-badge">
                                     {% for key, info in cache_info.items() %}
                                         <div class="d-flex justify-content-between align-items-center mb-1">
-                                            <span class="text-muted" style="text-transform: capitalize;">{{ key.replace('_', ' ') }}:</span>
+                                            <span class="text-muted cache-key">{{ key.replace('_', ' ') }}:</span>
                                             {% if info.exists %}
                                                 {% if info.is_fresh %}
                                                     <span class="text-success">✓ Fresh ({{ "%.1f"|format(info.age_hours) }}h)</span>
@@ -68,19 +66,18 @@
                             </div>
                         {% endif %}
 
-                        <div class="card mb-3" style="margin-top: 20px;">
-                            <div class="card-header d-flex justify-content-between align-items-center" 
-                                 style="cursor: pointer;" 
-                                 onclick="document.getElementById('bcc-collapse').classList.toggle('d-none')">
+                        <div class="card mb-3 bcc-card">
+                            <div class="card-header d-flex justify-content-between align-items-center bcc-header" 
+                                 id="bcc-header-toggle">
                                 <h5 class="mb-0">Email Recipients</h5>
-                                <span id="bcc-toggle-icon" style="transition: transform 0.3s;">▼</span>
+                                <span id="bcc-toggle-icon" class="bcc-toggle-icon">▼</span>
                             </div>
                             <div id="bcc-collapse" class="card-body">
                                 <form method="POST" action="/send_email">
                                     <div class="mb-3">
                                         <label class="form-label">Email Lists:</label>
                                         <div class="d-flex gap-2 align-items-center">
-                                            <select id="email_list_selector" class="form-select" style="flex: 1;">
+                                            <select id="email_list_selector" class="form-select email-list-selector">
                                                 <option value="(Save new list)">(Save new list)</option>
                                                 <option value="ALL">ALL</option>
                                                 <option value="Custom" selected>Custom</option>
@@ -121,12 +118,12 @@
                         {% endif %}
                         <p>Note, recommendations take 20-25 seconds per user. After getting stats/users with the top button, recommendations will be pulled for users in the BCC list.</p>
 
-                        <form method="POST" action="/send_email" style="margin-top: 0;">
+                        <form method="POST" action="/send_email" class="send-email-form">
                             Subject: <input type="text" name="subject" id="subject" placeholder="Subject"
-                                        value="{{ settings.server_name }} News" style="width: 18rem;" required><br><br>
+                                        value="{{ settings.server_name }} News" class="subject-input" required><br><br>
                         </form>
                     </td>
-                    <td style="width: 40%; padding: 10px; vertical-align: top; position: sticky; top: 80px;">
+                    <td class="content-column">
                         <div class="d-flex justify-content-between align-items-center mb-2">
                             <span>Preview:</span>
                             <button id="popout-preview-btn" class="btn button-outline btn-sm" title="Open preview in new window">
@@ -135,7 +132,7 @@
                         </div>
                         <iframe class="frame bg-black !important" id="preview"></iframe>
                     </td>
-                    <td style="width: 60%; padding: 10px; vertical-align: top;">
+                    <td class="preview-column">
                         <div id="selected-items-pane">
                             <div class="d-flex justify-content-between align-items-center mb-3">
                                 <h2>Snap-ins</h2>
@@ -144,16 +141,16 @@
                                         🔄 Reset
                                     </button>
                                     <label for="template-selector" class="form-label mb-0">Template:</label>
-                                    <select id="template-selector" class="form-select" style="width: 200px;">
+                                    <select id="template-selector" class="form-select template-selector">
                                         <option value="">Custom</option>
                                         <option value="save-template">(Save template)</option>
                                     </select>
-                                    <button id="delete-template-btn" class="btn btn-outline-danger btn-sm" style="display: none;">
+                                    <button id="delete-template-btn" class="btn btn-outline-danger btn-sm delete-template-btn">
                                         🗑️ Delete
                                     </button>
                                 </div>
                             </div>
-                            <div id="selected-items-list" class="border rounded p-3 mb-4" style="min-height: 100px; background: #8acbd4;">
+                            <div id="selected-items-list" class="border rounded p-3 mb-4 selected-items-container">
                                 <div id="selected-items-empty" class="text-muted text-center py-3">
                                     No items selected. Use the buttons below to add items to your email.
                                 </div>
@@ -206,16 +203,16 @@
                                         {% for stat in stats %}
                                             <div class="col-12 mb-2">
                                                 <div class="d-flex justify-content-between align-items-center p-2 border rounded">
-                                                    <span style="font-size: 0.9rem;">{{ stat.stat_title }}</span>
+                                                    <span class="stat-title">{{ stat.stat_title }}</span>
                                                     <div>
-                                                        <button type="button" class="btn button-outline btn-sm me-1 view-stat-btn" 
-                                                                data-target="stat-{{ loop.index0 }}" style="font-size: 0.8rem; padding: 0.25rem 0.5rem;">
+                                                        <button type="button" class="btn button-outline btn-sm me-1 view-stat-btn stat-button" 
+                                                                data-target="stat-{{ loop.index0 }}">
                                                             View
                                                         </button>
-                                                        <button type="button" class="btn button btn-sm add-stat-btn" 
+                                                        <button type="button" class="btn button btn-sm add-stat-btn stat-button" 
                                                                 data-id="stat-{{ loop.index0 }}" 
                                                                 data-name="{{ stat.stat_title }}"
-                                                                data-type="stat" style="font-size: 0.8rem; padding: 0.25rem 0.5rem;">
+                                                                data-type="stat">
                                                             Add
                                                         </button>
                                                     </div>
@@ -233,16 +230,16 @@
                                         {% for graph in graph_data %}
                                             <div class="col-12 mb-2">
                                                 <div class="d-flex justify-content-between align-items-center p-2 border rounded">
-                                                    <span style="font-size: 0.9rem;">{{ graph_commands[loop.index0].name }}</span>
+                                                    <span class="graph-title">{{ graph_commands[loop.index0].name }}</span>
                                                     <div>
-                                                        <button type="button" class="btn button-outline btn-sm me-1 view-graph-btn" 
-                                                                data-target="graph-{{ loop.index0 }}" style="font-size: 0.8rem; padding: 0.25rem 0.5rem;">
+                                                        <button type="button" class="btn button-outline btn-sm me-1 view-graph-btn graph-button" 
+                                                                data-target="graph-{{ loop.index0 }}">
                                                             View
                                                         </button>
-                                                        <button type="button" class="btn button btn-sm add-graph-btn" 
+                                                        <button type="button" class="btn button btn-sm add-graph-btn graph-button" 
                                                                 data-id="graph-{{ loop.index0 }}" 
                                                                 data-name="{{ graph_commands[loop.index0].name }}"
-                                                                data-type="graph" style="font-size: 0.8rem; padding: 0.25rem 0.5rem;">
+                                                                data-type="graph">
                                                             Add
                                                         </button>
                                                     </div>
@@ -251,7 +248,7 @@
                                         {% endfor %}
                                     </div>
                                 {% else %}
-                                    <div class="alert alert-info" style="font-size: 0.9rem; padding: 0.75rem;">
+                                    <div class="alert alert-info info-alert">
                                         <i class="fas fa-info-circle me-2"></i>
                                         No graph data available. Click <strong>"Get Stats\Users"</strong> to load data.
                                     </div>
@@ -260,7 +257,7 @@
                         </div>
 
                         {% if stats %}
-                            <div id="stat-preview" class="mt-3" style="display: none;">
+                            <div id="stat-preview" class="mt-3 preview-container">
                                 {% for stat in stats %}
                                     <div id="stat-{{ loop.index0 }}" class="stat-table d-none">
                                         <div class="card my-4">
@@ -406,7 +403,7 @@
                         {% endif %}
 
                         {% if graph_data != [{},{}] %}
-                            <div id="graph-preview" class="mt-3" style="display: none;">
+                            <div id="graph-preview" class="mt-3 preview-container">
                                 {% for graph in graph_data %}
                                     <div class="graph-table d-none" id="graph-{{ loop.index0 }}"></div>
                                 {% endfor %}
@@ -414,17 +411,17 @@
                         {% endif %}
 
                         {% if recent_data %}
-                            <div id="ra-preview" class="mt-3" style="display: none;">
+                            <div id="ra-preview" class="mt-3 preview-container">
                                 <div class="card my-4">
                                     <div class="card-header bg-primary">Recently Added</div>
                                     <div class="card-body">
-                                        <ul id="ra-view" class="grid grid-cols-10 gap-3" style="margin: 0; padding: 0;"></ul>
+                                        <ul id="ra-view" class="grid grid-cols-10 gap-3 ra-view-grid"></ul>
                                     </div>
                                 </div>
                             </div>
                         {% endif %}
 
-                        <div id="recs-preview" class="mt-3" style="display: none;">
+                        <div id="recs-preview" class="mt-3 preview-container">
                             {% if recommendations_json %}
                                 <div class="card my-4">
                                     <div class="card-header bg-primary">Recommendations</div>
@@ -436,8 +433,8 @@
                 </tr>
             </table>
         </div>
-        <script>
-            const recentPayload = {{ recent_data | tojson }};
+        <script nonce="{{ nonce }}">
+            const recentPayload = JSON.parse('{{ recent_data | tojson | safe }}');
 
             function buildThumb(path) {
                 if (!path) return '';
@@ -537,15 +534,14 @@
 
                     row.innerHTML = `
                         <div class="d-flex justify-content-between align-items-center p-2 border rounded">
-                            <span style="font-size: .9rem;">${lib}</span>
+                            <span class="library-span">${lib}</span>
                             <div>
-                                <button type="button" class="btn button-outline btn-sm me-1 ra-view-btn" 
-                                        data-lib="${lib}" data-target="${id}" style="font-size: .8rem; padding: .25rem .5rem;">
+                                <button type="button" class="btn button-outline btn-sm me-1 ra-view-btn stat-button" 
+                                        data-lib="${lib}" data-target="${id}">
                                 View
                                 </button>
-                                <button type="button" class="btn button btn-sm ra-add-btn" 
-                                        data-type="ra" data-lib="${lib}" data-id="${id}" data-name="Recently Added: ${lib}"
-                                        style="font-size: .8rem; padding: .25rem .5rem;">
+                                <button type="button" class="btn button btn-sm ra-add-btn stat-button" 
+                                        data-type="ra" data-lib="${lib}" data-id="${id}" data-name="Recently Added: ${lib}">
                                 Add
                                 </button>
                             </div>
@@ -604,7 +600,7 @@
 
             libSel.addEventListener('input', applyFilter);
         </script>
-        <script>
+        <script nonce="{{ nonce }}">
             document.getElementById('time_range_week').addEventListener('click', () => {
                 document.getElementById('days_to_pull').value = 7;
                 showSpinner('Getting stats and users...');
@@ -636,7 +632,7 @@
                 document.getElementById('stats_form').submit();
             });
         </script>
-        <script>
+        <script nonce="{{ nonce }}">
             async function waitForImages(scope){
                 const imgs = Array.from(scope.querySelectorAll('img'));
                 await Promise.all(imgs.map(img => img.complete ? 0 : new Promise(res=>{
@@ -646,7 +642,7 @@
                 try { await document.fonts?.ready; } catch(_){}
             }
         </script>
-        <script>
+        <script nonce="{{ nonce }}">
             let selectedItems = [];
 
             async function updatePreview() {
@@ -680,20 +676,23 @@
                         if (item.type === 'textblock') {
                             const content = getTextBlockContent(item.id);
                             if (content && content.trim().length > 0) {
-                                const formattedContent = content.trim().replace(/\n/g, "<br>");
+                                // For Quill HTML content, use it directly; for plain text, convert newlines
+                                const formattedContent = content.includes('<') ? content : content.trim().replace(/\n/g, "<br>");
                                 allItemsHTML += `<div style="margin-bottom: 15px;">${formattedContent}</div>`;
                             }
                         } else if (item.type === 'headerblock') {
                             const content = getTextBlockContent(item.id);
                             if (content && content.trim().length > 0) {
-                                const formattedContent = content.trim().replace(/\n/g, "<br>");
-                                allItemsHTML += `<div style="margin-bottom: 20px; font-size: 1.5em; font-weight: bold; text-align: center;">${formattedContent}</div>`;
+                                // For Quill HTML content, use it directly; for plain text, convert newlines
+                                const formattedContent = content.includes('<') ? content : content.trim().replace(/\n/g, "<br>");
+                                allItemsHTML += `<div style="margin-bottom: 20px; font-size: 1.5em; font-weight: bold;">${formattedContent}</div>`;
                             }
                         } else if (item.type === 'titleblock') {
                             const content = getTextBlockContent(item.id);
                             if (content && content.trim().length > 0) {
-                                const formattedContent = content.trim().replace(/\n/g, "<br>");
-                                allItemsHTML += `<div style="margin-bottom: 20px; font-size: 2em; font-weight: bold; text-align: center;">${formattedContent}</div>`;
+                                // For Quill HTML content, use it directly; for plain text, convert newlines
+                                const formattedContent = content.includes('<') ? content : content.trim().replace(/\n/g, "<br>");
+                                allItemsHTML += `<div style="margin-bottom: 20px; font-size: 2em; font-weight: bold;">${formattedContent}</div>`;
                             }
                         } else if (item.type === 'graph') {
                             const chart = Highcharts.charts.find(c => c && c.renderTo.id === item.id);
@@ -872,32 +871,16 @@
                                 :root { color-scheme: ${isDark ? 'dark' : 'light'}; }
                                 html, body { background: ${isDark ? '#333' : '#8acbd4'}; }
                                 @media only screen and (max-width:1900px) {
-                                    .logo-img { margin-left: 44rem !important; }
                                     .recs-img { max-width: 60% !important; }
                                 }
                                 @media only screen and (max-width:1700px) {
-                                    .logo-img { margin-left: 38rem !important; }
                                     .recs-img { max-width: 60% !important; }
                                 }
                                 @media only screen and (max-width:1500px) {
-                                    .logo-img { margin-left: 30rem !important; }
                                     .recs-img { max-width: 60% !important; }
                                 }
                                 @media only screen and (max-width:1300px) {
-                                    .logo-img { margin-left: 24rem !important; }
                                     .recs-img { max-width: 60% !important; }
-                                }
-                                @media only screen and (max-width:1100px) {
-                                    .logo-img { margin-left: 16rem !important; }
-                                }
-                                @media only screen and (max-width:900px) {
-                                    .logo-img { margin-left: 10rem !important; }
-                                }
-                                @media only screen and (max-width:700px) {
-                                    .logo-img { margin-left: 4rem !important; }
-                                }
-                                @media only screen and (max-width:500px) {
-                                    .logo-img { margin-left: 2rem !important; }
                                 }
                             </style>
                             <html>
@@ -911,7 +894,15 @@
                                                         <tbody>
                                                             <tr>
                                                                 <td class="wrapper" style="font-family: IBM Plex Sans; font-size: 14px; vertical-align: top; box-sizing: border-box; padding: 5px; overflow: auto;">
-                                                                    <div class="header" style="text-align: center; line-height: 0;"><img class="header-img logo-img" style="display: block; outline: 0; text-decoration: none; height: auto; border: 0; -ms-interpolation-mode: bicubic; max-width: 100%; margin-left: 40em;" src="/static/img/{{ settings.logo_filename }}" width="{{ settings.logo_width }}" /></div>
+                                                                    <div class="header" style="text-align: center; line-height: 0;">
+                                                                        {% if settings.logo_filename %}
+                                                                            {% if settings.logo_filename.startswith('logo_') %}
+                                                                                <img class="header-img" style="display: block; outline: 0; text-decoration: none; height: 50px; border: 0; -ms-interpolation-mode: bicubic; max-width: 100%;" src="/static/uploads/logos/{{ settings.logo_filename }}" />
+                                                                            {% else %}
+                                                                                <img class="header-img" style="display: block; outline: 0; text-decoration: none; height: 50px; border: 0; -ms-interpolation-mode: bicubic; max-width: 100%;" src="/static/img/{{ settings.logo_filename }}" />
+                                                                            {% endif %}
+                                                                        {% endif %}
+                                                                    </div>
                                                                     <div class="server-name" style="font-size: 25px; text-align: center; margin-bottom: 0;">${serverName} Newsletter</div>
                                                                 </td>
                                                             </tr>
@@ -1025,7 +1016,7 @@
                 }, 100);
             });
         </script>
-        <script>
+        <script nonce="{{ nonce }}">
             function showRAPreviewFor(libName) {
                 const preview = document.getElementById('ra-preview');
                 const ul = document.getElementById('ra-view');
@@ -1366,7 +1357,7 @@
                 }
             });
         </script>
-        <script>
+        <script nonce="{{ nonce }}">
             function themeVars(isDark) {
                 return {
                     text: isDark ? '#8acbd4' : '#333',
@@ -1421,8 +1412,8 @@
                 applyChartTheme(!nowDark);
             });
 
-            const graphDataList = {{ graph_data | tojson }};
-            const graphCommands = {{ graph_commands | tojson }};
+            const graphDataList = JSON.parse('{{ graph_data | tojson | safe }}');
+            const graphCommands = JSON.parse('{{ graph_commands | tojson | safe }}');
 
             const renderedCharts = new Set();
 
@@ -1456,7 +1447,7 @@
                 applyChartTheme(nowDark);
             });
         </script>
-        <script>
+        <script nonce="{{ nonce }}">
             function updateSelectedItemsDisplay() {
                 const container = document.getElementById('selected-items-list');
                 
@@ -1480,12 +1471,9 @@
                                             <button type="button" class="btn btn-sm btn-outline-danger title-remove remove-item-btn" data-index="${index}">x</button>
                                         </div>
                                     </div>
-                                    <textarea 
-                                        data-textblock-id="${item.id}" 
-                                        class="form-control text-block-editor" 
-                                        style="height: 60px; font-size: 0.9rem; resize: vertical;"
-                                        placeholder="${placeholderText}"
-                                        oninput="updateTextBlockName('${item.id}', ${index})">${currentContent}</textarea>
+                                    <div class="text-block-editor-container">
+                                        <div id="quill-${item.id}" class="quill-editor" data-textblock-id="${item.id}"></div>
+                                    </div>
                                 </div>
                             `;
                         } else if (item.type === 'textblock' || item.type === 'headerblock') {
@@ -1502,12 +1490,9 @@
                                             <button type="button" class="btn btn-sm btn-outline-danger remove-item-btn" data-index="${index}">x</button>
                                         </div>
                                     </div>
-                                    <textarea 
-                                        data-textblock-id="${item.id}" 
-                                        class="form-control text-block-editor" 
-                                        style="height: 60px; font-size: 0.9rem; resize: vertical;"
-                                        placeholder="${placeholderText}"
-                                        oninput="updateTextBlockName('${item.id}', ${index})">${currentContent}</textarea>
+                                    <div class="text-block-editor-container">
+                                        <div id="quill-${item.id}" class="quill-editor" data-textblock-id="${item.id}"></div>
+                                    </div>
                                 </div>
                             `;
                         } else {
@@ -1527,6 +1512,9 @@
                     container.innerHTML = htmlContent;
                     
                     setupDragAndDrop();
+                    
+                    // Initialize Quill editors for new text blocks
+                    initializeQuillEditors();
                 }
                 
                 updatePreview();
@@ -1593,6 +1581,63 @@
                     button.classList.add('button');
                     button.disabled = false;
                 }
+            }
+
+            // Initialize Quill editors for text blocks
+            function initializeQuillEditors() {
+                selectedItems.forEach((item, index) => {
+                    if (item.type === 'textblock' || item.type === 'titleblock' || item.type === 'headerblock') {
+                        const quillId = `quill-${item.id}`;
+                        const quillElement = document.getElementById(quillId);
+                        
+                        if (quillElement && !quillElement.quill) {
+                            // Configure toolbar based on block type
+                            let toolbarOptions = [
+                                ['bold', 'italic', 'underline'],
+                                ['link'],
+                                [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                                [{ 'align': [] }],
+                                ['clean']
+                            ];
+                            
+                            // Add more formatting options for regular text blocks
+                            if (item.type === 'textblock') {
+                                toolbarOptions = [
+                                    ['bold', 'italic', 'underline', 'strike'],
+                                    ['link', 'blockquote'],
+                                    [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                                    [{ 'header': [1, 2, 3, false] }],
+                                    [{ 'align': [] }],
+                                    ['clean']
+                                ];
+                            }
+                            
+                            const quill = new Quill(quillElement, {
+                                theme: 'snow',
+                                modules: {
+                                    toolbar: toolbarOptions
+                                },
+                                placeholder: item.type === 'titleblock' ? 'Enter your title here...' : 
+                                           item.type === 'headerblock' ? 'Enter your header here...' : 
+                                           'Enter your text here...'
+                            });
+                            
+                            // Store Quill instance on the element
+                            quillElement.quill = quill;
+                            
+                            // Set initial content if it exists
+                            const currentContent = getTextBlockContent(item.id);
+                            if (currentContent) {
+                                quill.root.innerHTML = currentContent;
+                            }
+                            
+                            // Add change handler
+                            quill.on('text-change', function() {
+                                updateTextBlockName(item.id, index);
+                            });
+                        }
+                    }
+                });
             }
 
             function setupDragAndDrop() {
@@ -1673,29 +1718,57 @@
             }
             
             function getTextBlockContent(textBlockId) {
+                // Try to get content from Quill editor first
+                const quillElement = document.getElementById(`quill-${textBlockId}`);
+                if (quillElement && quillElement.quill) {
+                    return quillElement.quill.root.innerHTML;
+                }
+                
+                // Fallback to old textarea method for backward compatibility
                 const textarea = document.querySelector(`[data-textblock-id="${textBlockId}"]`);
                 return textarea ? textarea.value : '';
             }
             
             function setTextBlockContent(textBlockId, content) {
+                // Try to set content in Quill editor first
+                const quillElement = document.getElementById(`quill-${textBlockId}`);
+                if (quillElement && quillElement.quill) {
+                    quillElement.quill.root.innerHTML = content;
+                }
+                
+                // Fallback to old textarea method for backward compatibility
                 const textarea = document.querySelector(`[data-textblock-id="${textBlockId}"]`);
                 if (textarea) {
                     textarea.value = content;
-                    const index = selectedItems.findIndex(item => item.id === textBlockId);
-                    if (index !== -1) {
-                        selectedItems[index].name = getTextBlockDisplayName(content);
-                        const nameSpan = document.querySelector(`[data-index="${index}"] .item-name`);
-                        if (nameSpan) {
-                            nameSpan.textContent = selectedItems[index].name;
-                        }
+                }
+                
+                // Update the item name
+                const index = selectedItems.findIndex(item => item.id === textBlockId);
+                if (index !== -1) {
+                    selectedItems[index].name = getTextBlockDisplayName(content);
+                    const nameSpan = document.querySelector(`[data-index="${index}"] .item-name`);
+                    if (nameSpan) {
+                        nameSpan.textContent = selectedItems[index].name;
                     }
                 }
             }
             
             function getTextBlockDisplayName(content) {
-                const firstLine = content.split('\n')[0].trim();
-                if (firstLine.length === 0) return 'Empty text block';
-                return firstLine.length > 30 ? firstLine.substring(0, 30) + '...' : firstLine;
+                // Handle HTML content from Quill editor
+                if (content.includes('<')) {
+                    // Strip HTML tags and get first line
+                    const tempDiv = document.createElement('div');
+                    tempDiv.innerHTML = content;
+                    const textContent = tempDiv.textContent || tempDiv.innerText || '';
+                    const firstLine = textContent.split('\n')[0].trim();
+                    if (firstLine.length === 0) return 'Empty text block';
+                    return firstLine.length > 30 ? firstLine.substring(0, 30) + '...' : firstLine;
+                } else {
+                    // Handle plain text content
+                    const firstLine = content.split('\n')[0].trim();
+                    if (firstLine.length === 0) return 'Empty text block';
+                    return firstLine.length > 30 ? firstLine.substring(0, 30) + '...' : firstLine;
+                }
             }
             
             function updateTextBlockName(textBlockId, index) {
@@ -1838,10 +1911,10 @@
 
             updateSelectedItemsDisplay();
         </script>
-        <script id="recommendations-json" type="application/json">
+        <script id="recommendations-json" type="application/json" nonce="{{ nonce }}">
             {{ recommendations_json | tojson }}
         </script>
-        <script>
+        <script nonce="{{ nonce }}">
             function readJSONFromScript(id) {
                 const el = document.getElementById(id);
                 if (!el) return {};
@@ -1856,9 +1929,9 @@
             }
 
             let recsPayload = readJSONFromScript('recommendations-json');
-            const userDict = {{ user_dict | tojson }} || {};
+            const userDict = JSON.parse('{{ user_dict | tojson | safe }}') || {};
         </script>
-        <script>
+        <script nonce="{{ nonce }}">
             function posterCard(p, faded=false) {
                 const src = p.url ? `/proxy-img?u=${encodeURIComponent(p.url)}` : '';
                 const title = p.title || '';
@@ -2059,7 +2132,7 @@
             };
             buildRecsUserRows();
         </script>
-        <script>
+        <script nonce="{{ nonce }}">
             document.getElementById('pullRecsBtn').addEventListener('click', async () => {
                 showSpinner('Pulling recommendations...');
 
@@ -2083,20 +2156,20 @@
                 const to_emails = toList.join(', ');
 
                 const payload = {
-                    stats: {{ stats | tojson }},
-                    user_dict: {{ user_dict | tojson }},
-                    graph_data: {{ graph_data | tojson }},
-                    graph_commands: {{ graph_commands | tojson }},
-                    recent_data: {{ recent_data | tojson }},
-                    libs: {{ libs | tojson }},
-                    settings: {{ settings | tojson }},
+                    stats: JSON.parse('{{ stats | tojson | safe }}'),
+                    user_dict: JSON.parse('{{ user_dict | tojson | safe }}'),
+                    graph_data: JSON.parse('{{ graph_data | tojson | safe }}'),
+                    graph_commands: JSON.parse('{{ graph_commands | tojson | safe }}'),
+                    recent_data: JSON.parse('{{ recent_data | tojson | safe }}'),
+                    libs: JSON.parse('{{ libs | tojson | safe }}'),
+                    settings: JSON.parse('{{ settings | tojson | safe }}'),
                     to_emails
                 };
 
                 try {
                     const resp = await fetch('/pull_recommendations', {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'Accept': 'text/html' },
+                        headers: { 'Content-Type': 'application/json', 'Accept': 'text/html', 'X-CSRF-Token': '{{ csrf_token }}' },
                         body: JSON.stringify(payload),
                         credentials: 'same-origin'
                     });
@@ -2136,7 +2209,7 @@
                 }
             });
         </script>
-        <script>
+        <script nonce="{{ nonce }}">
             function collectEmailsFromChips() {
                 return Array.from(document.querySelectorAll('#bcc_chips .nl-chip'))
                     .map(ch => ch.dataset.email)
@@ -2159,7 +2232,11 @@
                     .map(item => getTextBlockContent(item.id))
                     .filter(content => content.trim().length > 0);
                 
+                // For HTML content, join with double line breaks; for plain text, use newlines
                 let email_text = textBlocks.join('\n\n');
+                if (textBlocks.some(content => content.includes('<'))) {
+                    email_text = textBlocks.join('<br><br>');
+                }
 
                 const chipInput = document.getElementById('email_chip_input');
                     if (chipInput && chipInput.value.trim()) {
@@ -2322,12 +2399,12 @@
                 hideSpinner();
             });
         </script>
-        <script>
+        <script nonce="{{ nonce }}">
             document.getElementById('stats_form').addEventListener('submit', (e) => {
                 showSpinner('Getting stats and users...');
             });
         </script>
-        <script>
+        <script nonce="{{ nonce }}">
             async function blurImageElement(imgElement) {
                 const tempImg = new Image();
                 tempImg.crossOrigin = 'anonymous';
@@ -2357,7 +2434,7 @@
                 imgElement.style.filter = 'none';
             }
         </script>
-        <script>
+        <script nonce="{{ nonce }}">
             (function () {
                 const box = document.getElementById('bcc_chips');
                 const input = document.getElementById('email_chip_input');
@@ -2444,7 +2521,7 @@
                 syncHiddenFromDOM();
             })();
         </script>
-        <script>
+        <script nonce="{{ nonce }}">
             document.addEventListener('DOMContentLoaded', () => {
                 const selector = document.getElementById('email_list_selector');
                 const deleteBtn = document.getElementById('delete_list_btn');
@@ -2455,7 +2532,7 @@
                 const bccChipsContainer = document.getElementById('bcc_chips');
                 const emailInput = document.getElementById('email_chip_input');
                 
-                const allUserEmails = {{ user_dict.values() | list | tojson }};
+                const allUserEmails = JSON.parse('{{ user_dict.values() | list | tojson | safe }}');
                 
                 function collectEmailsFromChips() {
                     return Array.from(document.querySelectorAll('#bcc_chips .nl-chip'))
@@ -2604,9 +2681,9 @@
                 setReadOnlyMode(false);
             });
         </script>
-        <script>
+        <script nonce="{{ nonce }}">
             document.addEventListener('DOMContentLoaded', () => {
-                const bccHeader = document.querySelector('[onclick*="bcc-collapse"]');
+                const bccHeader = document.getElementById('bcc-header-toggle');
                 if (bccHeader) {
                     bccHeader.addEventListener('click', () => {
                         const icon = document.getElementById('bcc-toggle-icon');
@@ -2618,6 +2695,15 @@
                             icon.style.transform = 'rotate(-90deg)';
                             icon.textContent = '▶';
                         }
+                    });
+                }
+                
+                // Add cache header toggle functionality
+                const cacheHeader = document.getElementById('cache-header-toggle');
+                if (cacheHeader) {
+                    cacheHeader.addEventListener('click', () => {
+                        const badge = document.getElementById('cache-status-badge');
+                        badge.classList.toggle('d-none');
                     });
                 }
                 
@@ -2753,10 +2839,16 @@
                         return item;
                     });
                     
+                    // For HTML content, join with double line breaks; for plain text, use newlines
+                    let email_text = textBlocks.join('\n\n');
+                    if (textBlocks.some(content => content.includes('<'))) {
+                        email_text = textBlocks.join('<br><br>');
+                    }
+                    
                     const templateData = {
                         name: name,
                         selected_items: JSON.stringify(itemsWithContent),
-                        email_text: textBlocks.join('\n\n'),
+                        email_text: email_text,
                         subject: document.getElementById('subject').value
                     };
 
@@ -2887,6 +2979,11 @@
                             }
                         });
                         updatePreview();
+                        
+                        // Initialize Quill editors after content is set
+                        setTimeout(() => {
+                            initializeQuillEditors();
+                        }, 200);
                     }, 100);
                     
                     console.log('Template loaded:', template.name);

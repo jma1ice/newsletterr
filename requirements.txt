@@ -5,3 +5,5 @@ python-dotenv
 cryptography
 beautifulsoup4
 playwright
+Pillow
+bleach

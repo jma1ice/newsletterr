@@ -1,0 +1,52 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.venv
+
+# Git
+.git/
+.gitignore
+
+# Docker
+Dockerfile
+Dockerfile.*
+docker-compose.yml
+.dockerignore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project specific
+*.db
+*.sqlite
+*.sqlite3
+database/*.db
+static/uploads/
+static/img/dreflix.png
+logs/
+*.log
+
+# Documentation
+*.md
+LICENSE
+README.md
+opus_prompt.md
+
+# Temporary files
+*.tmp
+*.temp
+*.bak

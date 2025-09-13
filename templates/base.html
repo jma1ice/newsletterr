@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <script>
+    <script nonce="{{ nonce }}">
         try {
             const pref = localStorage.getItem('theme');
             const dark = pref ? (pref === 'dark') :
@@ -12,25 +12,26 @@
     <meta charset="UTF-8" name="viewport" content="width=device-width, initial-scale=1">
     <link rel="icon" type="image/x-icon" href="/static/img/favicon.ico">
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
+    <script src="https://cdn.tailwindcss.com" nonce="{{ nonce }}"></script>
+    <script nonce="{{ nonce }}">
         tailwind.config = {
             darkMode: 'class',
             corePlugins: { preflight: false }
         };
     </script>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" nonce="{{ nonce }}"></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <meta name="color-scheme" content="light dark">
-    <script src="https://code.highcharts.com/highcharts.js"></script>
-    <script src="https://code.highcharts.com/modules/exporting.js"></script>
-    <script src="https://code.highcharts.com/modules/offline-exporting.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <script src="https://code.highcharts.com/highcharts.js" nonce="{{ nonce }}"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js" nonce="{{ nonce }}"></script>
+    <!-- Quill.js WYSIWYG Editor -->
+    <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+    <script src="https://cdn.quilljs.com/1.3.6/quill.min.js" nonce="{{ nonce }}"></script>
     <title>{% block title %}newsletterr{% endblock %}</title>
 </head>
 <body>
-    <div id="spinner" class="spinner" style="display: none;">
+    <div id="spinner" class="spinner spinner-hidden">
         <img src="/static/img/load.gif" alt="Loading..." />
         <p id="loading-text"></p>
     </div>
@@ -41,7 +42,7 @@
             <li><a href="{{ url_for('scheduling') }}" class="hover:underline">scheduling</a></li>
             <li><a href="{{ url_for('settings') }}" class="hover:underline">settings</a></li>
             <li><a href="{{ url_for('about') }}" class="hover:underline">about</a></li>
-            <li style="margin-left: 20px;">
+            <li class="cache-badge-container">
                 {% set cache_status = get_cache_status() %}
                 <span class="cache-badge-base {{ cache_status.class }}" 
                       title="{{ cache_status.status }}\nPresent: {{ cache_status.present|join(', ') if cache_status.present else 'none' }}\nMissing: {{ cache_status.missing|join(', ') if cache_status.missing else 'none' }}">
@@ -55,15 +56,12 @@
             </li>
         </ul>
         {% if update_info.is_newer %}
-            <div style="
-                position: sticky; top: 0; z-index: 1000;
-                background: #fff3cd; color: #664d03; border: 1px solid #ffecb5;
-                padding: 10px 14px; font-size: 14px;">
+            <div class="update-notification">
                 A new version {{ update_info.latest }} is available.
                 <a href="{{ update_info.release_url }}" target="_blank" rel="noopener">See release notes</a>
             </div>
         {% endif %}
-        <div style="display: flex;">
+        <div class="theme-toggle-container">
             <button id="theme-toggle" type="button" role="switch" aria-checked="false" aria-label="Toggle dark mode" class="relative inline-flex h-8 w-16 items-center rounded-full bg-gray-200 dark:bg-gray-700 transition-colors focus:outline-none transform -translate-x-2 translate-y-2.5">
                 <span class="pointer-events-none absolute inset-0 z-20 flex items-center justify-between px-1">
                     <svg class="h-5 w-5 text-amber-400 transition-opacity duration-100 ease-in-out dark:!opacity-0 transform translate-x-1 translate-y-0.5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -89,7 +87,7 @@
         </div>
     </nav>
     {% block content %}{% endblock %}
-    <script>
+    <script nonce="{{ nonce }}">
         function showSpinner(passedText) {
             document.getElementById('spinner').style.display = 'flex';
             document.getElementById('loading-text').innerText = passedText;
@@ -99,7 +97,7 @@
             document.getElementById('spinner').style.display = 'none';
         }
     </script>
-    <script>
+    <script nonce="{{ nonce }}">
         (function initTheme() {
             const saved = localStorage.getItem('theme');
             const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;

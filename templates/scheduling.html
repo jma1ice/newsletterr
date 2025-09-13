@@ -947,6 +947,7 @@
                     method: method,
                     headers: {
                         'Content-Type': 'application/json',
+                        'X-CSRF-Token': '{{ csrf_token }}',
                     },
                     body: JSON.stringify({
                         name: name,
@@ -982,6 +983,7 @@
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
+                            'X-CSRF-Token': '{{ csrf_token }}',
                         },
                         body: JSON.stringify({
                             is_active: newStatus
@@ -1040,6 +1042,7 @@
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
+                                'X-CSRF-Token': '{{ csrf_token }}',
                             }
                         });
                         

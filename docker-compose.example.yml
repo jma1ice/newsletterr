@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  newsletterr:
+    image: python:3.12-slim
+    container_name: newsletterr
+    working_dir: /app
+    command: >
+      sh -c "pip install -r requirements.txt && 
+             pip install playwright &&
+             playwright install --with-deps chromium &&
+             python newsletterr.py"
+    ports:
+      - "6397:6397"
+    volumes:
+      # Mount the entire application directory
+      - .:/app
+      # Mount database directory to persist data
+      - ./database:/app/database
+      # Mount uploads directory to persist uploaded logos  
+      - ./static/uploads:/app/static/uploads
+      # Mount env directory for any environment files
+      - ./env:/app/env
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+    # Add health check
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:6397/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s

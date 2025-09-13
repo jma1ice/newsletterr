@@ -8,7 +8,7 @@
             <div class="card theme-card">
                 <div class="card-header theme-card-header d-flex justify-content-between align-items-center">
                     <h3 class="mb-0">📧 Email Preview - <span id="schedule-name"></span></h3>
-                    <button class="btn btn-primary" onclick="window.close()">Close Preview</button>
+                    <button class="btn btn-primary" id="close-preview-btn">Close Preview</button>
                 </div>
                 <div class="card-body">
                     <div id="loading" class="text-center p-4">
@@ -18,9 +18,9 @@
                         <p class="mt-2">Loading template data and generating preview...</p>
                     </div>
                     
-                    <div id="error" class="alert alert-danger" style="display: none;"></div>
+                    <div id="error" class="alert alert-danger error-hidden"></div>
                     
-                    <div id="preview-section" aria-hidden="true" style="opacity:0; z-index:-1;">
+                    <div id="preview-section" aria-hidden="true" class="preview-section-hidden">
                         <input type="hidden" id="subject" value="">
                         <input type="hidden" id="email_text" value="">
                         <input type="hidden" id="layout" value="standard">
@@ -34,15 +34,15 @@
                                         <h5 class="mb-0">📧 Email Preview</h5>
                                     </div>
                                     <div class="card-body">
-                                        <iframe id="preview" style="width: 100%; height: 600px; border: 1px solid #dee2e6; border-radius: 4px; background: white;"></iframe>
+                                        <iframe id="preview" class="preview-iframe"></iframe>
                                     </div>
                                 </div>
                             </div>
                         </div>
                         
-                        <div id="stats-container" style="display: none;"></div>
-                        <div id="graphs-container" style="display: none;"></div>
-                        <div id="workbench" style="position:fixed; left:-10000px; top:-10000px; width:1920px;"></div>
+                        <div id="stats-container" class="stats-container-hidden"></div>
+                        <div id="graphs-container" class="graphs-container-hidden"></div>
+                        <div id="workbench" class="workbench-hidden"></div>
                     </div>
                 </div>
             </div>
@@ -50,7 +50,7 @@
     </div>
 </div>
 
-<script>
+<script nonce="{{ nonce }}">
     const urlParams = new URLSearchParams(window.location.search);
     const scheduleId = urlParams.get('schedule_id');
 
@@ -1145,10 +1145,7 @@
                                     <span class="preheader" style="display:none; opacity:0; visibility:hidden; height:0; width:0;">${serverName} Newsletter</span>
                                     <table class="main" style="width:100%; background:#282A2D; border-radius:3px; color:#fff;" border="0" cellspacing="0" cellpadding="3"><tbody>
                                         <tr><td class="wrapper" style="padding:5px;">
-                                            <div class="header" style="text-align:center; line-height:0;">
-                                                <img class="header-img plex-img" style="display:block; height:auto; border:0; max-width:100%; margin-left:22em;"
-                                                    src="https://d15k2d11r6t6rl.cloudfront.net/public/users/Integrators/669d5713-9b6a-46bb-bd7e-c542cff6dd6a/3bef3c50f13f4320a9e31b8be79c6ad2/Plex%20Logo%20Update%202022/plex-logo-heavy-stroke.png" width="40" />
-                                            </div>
+                                            <div class="header" style="text-align:center; line-height:0;"></div>
                                             <div class="server-name" style="font-size:25px; text-align:center; margin-bottom:0;">${serverName} Newsletter</div>
                                         </td></tr>
                                         <tr><td class="footer" style="font-size:12px; text-align:center; width:100%;">
@@ -1271,6 +1268,15 @@
         }
     }
 
-    document.addEventListener('DOMContentLoaded', loadPreview);
+    // Add event listener for close button
+    document.addEventListener('DOMContentLoaded', () => {
+        const closeBtn = document.getElementById('close-preview-btn');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => {
+                window.close();
+            });
+        }
+        loadPreview();
+    });
 </script>
 {% endblock %}

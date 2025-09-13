@@ -1,0 +1,63 @@
+FROM python:3.12-slim
+
+# Security: Create non-root user
+RUN groupadd -r newsletterr && useradd -r -g newsletterr newsletterr
+
+# Install system dependencies and security tools
+RUN apt-get update && apt-get install -y \
+    gcc \
+    wget \
+    gnupg \
+    curl \
+    sqlite3 \
+    # Security testing tools
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# Set working directory
+WORKDIR /app
+
+# Copy requirements first for better caching
+COPY requirements.txt .
+
+# Install Python dependencies with security checks
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir -r requirements.txt \
+    && pip install --no-cache-dir safety bandit \
+    && pip install --no-cache-dir playwright
+
+# Install Playwright browsers
+RUN playwright install --with-deps chromium
+
+# Copy application code
+COPY . .
+
+# Create necessary directories with proper permissions
+RUN mkdir -p env database static/uploads/logos \
+    && chown -R newsletterr:newsletterr /app \
+    && chmod 755 /app \
+    && chmod 750 env database \
+    && chmod 755 static static/uploads static/uploads/logos
+
+# Security: Run security checks during build
+RUN python -m bandit -r newsletterr.py -f txt || true
+RUN python -m safety check || true
+
+# Switch to non-root user
+USER newsletterr
+
+# Set secure environment variables
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV FLASK_ENV=testing
+ENV FLASK_DEBUG=0
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD curl -f http://localhost:6397/ || exit 1
+
+# Expose port
+EXPOSE 6397
+
+# Run the application
+CMD ["python", "newsletterr.py"]

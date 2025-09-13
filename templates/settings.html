@@ -6,27 +6,28 @@
         <h1>settings</h1>
     </div>
     {% if settings.from_email == '' %}
-        <p style="color: #770010; text-shadow: 1px 0 #000, 0 1px #000, -1px 0 #000, 0 -1px #000;">
+        <p class="alert-error">
             Welcome to newsletterr! Please enter in your settings below, if you have any questions about them please see the readme.md file for an explanation.
         </p>
     {% else %}
         <p class="text-info mb-4">Configure your application settings, Plex connection, and email preferences.</p>
     {% endif %}
     {% if alert %}
-        <p style="color: #01b301; text-shadow: 1px 0 #000, 0 1px #000, -1px 0 #000, 0 -1px #000;">{{ alert }}</p>
+        <p class="alert-success">{{ alert }}</p>
     {% endif %}
     {% if error %}
-        <p style="color: #770010; text-shadow: 1px 0 #000, 0 1px #000, -1px 0 #000, 0 -1px #000;">{{ error }}</p>
+        <p class="alert-error">{{ error }}</p>
     {% endif %}
     <div class="foreground">
-        <div style="margin: 0px 0px 0px 15px;">
+        <div class="settings-container">
             <div>
                 <h3>Plex Account</h3>
                 <button id="connect_plex" class="button">Connect Plex</button>
-                <div id="plex_status">{% if settings.plex_token %}<p style="padding-left: 8px; color: #01b301; text-shadow: 1px 0 #000, 0 1px #000, -1px 0 #000, 0 -1px #000;">Connected</p>{% endif %}</div>
+                <div id="plex_status">{% if settings.plex_token %}<p class="plex-connected">Connected</p>{% endif %}</div>
             </div><br>
 
             <form method="POST" id="settings_form">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
                 <label for="from_email">From:</label><br>
                 <input type="email" id="from_email" name="from_email"
                     {% if settings.from_email != "" %}value="{{ settings.from_email }}"{% endif %}
@@ -44,8 +45,8 @@
 
                 <label for="password">Password:</label><br>
                 <input type="password" id="password" name="password"
-                    {% if settings.password != "" %}value="{{ settings.password }}"{% endif %}
-                    placeholder="Email Password or App Password" required><br><br>
+                    value=""
+                    placeholder="••••••••" autocomplete="new-password" required><br><br>
 
                 <label for="smtp_username">SMTP Username (Optional - used for SMTP clients that need username login):</label><br>
                 <input type="text" id="smtp_username" name="smtp_username"
@@ -84,34 +85,61 @@
                     placeholder="http://localhost:8181"><br><br>
 
                 <label for="tautulli_api">Tautulli API Key (Optional - see above):</label><br>
-                <input type="text" id="tautulli_api" name="tautulli_api"
-                    {% if settings.tautulli_api != "" %}value="{{ settings.tautulli_api }}"{% endif %}
-                    placeholder="Tautulli API Key"><br><br>
+                <input type="password" id="tautulli_api" name="tautulli_api"
+                    value=""
+                    placeholder="••••••••" autocomplete="new-password"><br><br>
 
                 <label for="conjurr_url">Conjurr Base URL (Optional - used for recommendations):</label><br>
                 <input type="text" id="conjurr_url" name="conjurr_url"
                     {% if settings.conjurr_url != "" %}value="{{ settings.conjurr_url }}"{% endif %}
                     placeholder="http://localhost:2665"><br><br>
 
-                <label for="logo_filename">Logo Filename (Optional - used for custom logos at the top of emails):</label><br>
-                <input type="text" id="logo_filename" name="logo_filename"
+                <label for="logo_filename_input">Logo Filename:</label><br>
+                <input type="text" id="logo_filename_input" name="logo_filename_input" 
                     {% if settings.logo_filename != "" %}value="{{ settings.logo_filename }}"{% endif %}
-                    placeholder="Asset_45x.png"><br><br>
-
-                <label for="logo_width">Logo Width (Optional - used to size custom logos):</label><br>
-                <input type="number" id="logo_width" name="logo_width"
-                    {% if settings.logo_width != "" %}value="{{ settings.logo_width }}"{% endif %}
-                    placeholder="80"><br><br>
+                    placeholder="Enter logo filename (e.g., Asset_45x.png) or leave blank for no logo" 
+                    class="logo-input-field" />
+                <div class="logo-input-help">
+                    <small>Available logos: Asset_45x.png, Asset_46x.png, Asset_4722x.png, Asset_47x.png, Asset_94x.png, dreflix.png</small>
+                </div><br>
+                
+                <div class="logo-preview-small">
+                    {% if settings.logo_filename and settings.logo_filename != 'Asset_45x.png' %}
+                        {% if settings.logo_filename.startswith('logo_') %}
+                            <img src="/static/uploads/logos/{{ settings.logo_filename }}" alt="Current Logo" class="logo-preview-img-small" />
+                        {% else %}
+                            <img src="/static/img/{{ settings.logo_filename }}" alt="Current Logo" class="logo-preview-img-small" />
+                        {% endif %}
+                        <span class="logo-filename-small">{{ settings.logo_filename }}</span>
+                    {% else %}
+                        <img src="/static/img/Asset_45x.png" alt="Default Logo" class="logo-preview-img-small" />
+                        <span class="logo-filename-small">Default Logo</span>
+                    {% endif %}
+                </div><br>
+                
+                <label for="logo_file">Upload Custom Logo:</label><br>
+                <input type="file" id="logo_file" name="logo_file" accept="image/png,image/jpg,image/jpeg,image/webp" />
+                <button type="button" id="upload_logo" class="button" disabled>Upload</button>
+                {% if settings.logo_filename and settings.logo_filename != 'Asset_45x.png' %}
+                    <button type="button" id="delete_logo" class="button">Delete</button>
+                {% endif %}
+                <button type="button" id="reset_logo" class="button">Reset</button><br><br>
+                    
+                    <!-- Hidden fields for form submission -->
+                    <input type="hidden" id="logo_filename" name="logo_filename" 
+                        {% if settings.logo_filename != "" %}value="{{ settings.logo_filename }}"{% endif %} />
+                    <input type="hidden" id="logo_width" name="logo_width" 
+                        {% if settings.logo_width != "" %}value="{{ settings.logo_width }}"{% endif %} />
                 
                 <button id="apply_settings" class="button">Apply Settings</button>
             </form>
         </div>
-        <script>
+        <script nonce="{{ nonce }}">
             document.getElementById('settings_form').addEventListener('submit', (e) => {
                 showSpinner('Applying settings...');
             });
         </script>
-        <script>
+        <script nonce="{{ nonce }}">
             function openCenteredPopup(url, w = 520, h = 680, name = 'plex-auth', offsetX = 0, offsetY = 0) {
                 const dualLeft = window.screenLeft ?? window.screenX;
                 const dualTop  = window.screenTop  ?? window.screenY;
@@ -218,6 +246,173 @@
                         showSpinner('Applying settings...');
                         settingsForm.submit();
                     }
+                }
+            });
+
+            // Logo Management Functionality
+            const logoFileInput = document.getElementById('logo_file');
+            const logoFilenameInput = document.getElementById('logo_filename_input');
+            const logoFilenameHidden = document.getElementById('logo_filename');
+            const uploadLogoBtn = document.getElementById('upload_logo');
+            const deleteLogoBtn = document.getElementById('delete_logo');
+            const resetLogoBtn = document.getElementById('reset_logo');
+
+            // Sync text input with hidden field and update preview
+            logoFilenameInput?.addEventListener('input', function() {
+                const filename = this.value.trim();
+                logoFilenameHidden.value = filename;
+                updateLogoPreview(filename);
+            });
+
+            // Update logo preview based on filename
+            function updateLogoPreview(filename) {
+                const previewImg = document.querySelector('.logo-preview-img-small');
+                const filenameSpan = document.querySelector('.logo-filename-small');
+
+                if (!filename) {
+                    // No logo selected
+                    if (previewImg) previewImg.remove();
+                    if (filenameSpan) filenameSpan.textContent = 'No logo';
+                    return;
+                }
+
+                // Ensure preview image exists
+                let imgEl = previewImg;
+                if (!imgEl) {
+                    const container = document.querySelector('.logo-preview-small');
+                    imgEl = document.createElement('img');
+                    imgEl.className = 'logo-preview-img-small';
+                    container.prepend(imgEl);
+                }
+
+                const isUploadedLogo = filename.startsWith('logo_');
+                const imgSrc = isUploadedLogo ? `/static/uploads/logos/${filename}` : `/static/img/${filename}`;
+                imgEl.src = imgSrc;
+                imgEl.alt = filename;
+                if (filenameSpan) filenameSpan.textContent = filename;
+            }
+
+            // Enable upload button when file is selected
+            logoFileInput?.addEventListener('change', function() {
+                const file = this.files[0];
+                if (file) {
+                    uploadLogoBtn.disabled = false;
+                    uploadLogoBtn.textContent = `Upload ${file.name}`;
+                } else {
+                    uploadLogoBtn.disabled = true;
+                    uploadLogoBtn.textContent = 'Upload Logo';
+                }
+            });
+
+            // Handle logo upload
+            uploadLogoBtn?.addEventListener('click', async function() {
+                const file = logoFileInput.files[0];
+                if (!file) return;
+
+                showSpinner('Uploading logo...');
+                uploadLogoBtn.disabled = true;
+
+                try {
+                    const formData = new FormData();
+                    formData.append('logo', file);
+
+                    const response = await fetch('/upload-logo', {
+                        method: 'POST',
+                        body: (() => { formData.append('csrf_token', '{{ csrf_token }}'); return formData; })()
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+
+                    const result = await response.json();
+
+                    if (result.status === 'success') {
+                        hideSpinner();
+                        // Update the text input with the new filename
+                        logoFilenameInput.value = result.filename;
+                        logoFilenameHidden.value = result.filename;
+                        updateLogoPreview(result.filename);
+                        uploadLogoBtn.disabled = true;
+                        uploadLogoBtn.textContent = 'Upload Logo';
+                        logoFileInput.value = ''; // Clear file input
+                    } else {
+                        hideSpinner();
+                        alert(`Upload failed: ${result.message}`);
+                        uploadLogoBtn.disabled = false;
+                    }
+                } catch (error) {
+                    hideSpinner();
+                    alert(`Upload error: ${error.message || error.toString()}`);
+                    uploadLogoBtn.disabled = false;
+                }
+            });
+
+            // Handle logo deletion
+            deleteLogoBtn?.addEventListener('click', async function() {
+                if (!confirm('Are you sure you want to delete the current logo?')) return;
+
+                showSpinner('Deleting logo...');
+                deleteLogoBtn.disabled = true;
+
+                try {
+                    const response = await fetch('/delete-logo', {
+                        method: 'POST',
+                        headers: { 'X-CSRF-Token': '{{ csrf_token }}' }
+                    });
+
+                    const result = await response.json();
+
+                    if (result.status === 'success') {
+                        hideSpinner();
+                        // Clear to no logo
+                        logoFilenameInput.value = '';
+                        logoFilenameHidden.value = '';
+                        updateLogoPreview('');
+                        deleteLogoBtn.disabled = false;
+                    } else {
+                        hideSpinner();
+                        alert(`Delete failed: ${result.message}`);
+                        deleteLogoBtn.disabled = false;
+                    }
+                } catch (error) {
+                    hideSpinner();
+                    alert(`Delete error: ${error.message || error.toString()}`);
+                    deleteLogoBtn.disabled = false;
+                }
+            });
+
+            // Handle logo reset (clear to no logo)
+            resetLogoBtn?.addEventListener('click', async function() {
+                if (!confirm('Clear header logo and use no logo?')) return;
+
+                showSpinner('Resetting logo...');
+                resetLogoBtn.disabled = true;
+
+                try {
+                    const response = await fetch('/delete-logo', {
+                        method: 'POST',
+                        headers: { 'X-CSRF-Token': '{{ csrf_token }}' }
+                    });
+
+                    const result = await response.json();
+
+                    if (result.status === 'success' || result.status === 'info') {
+                        hideSpinner();
+                        // Clear to no logo
+                        logoFilenameInput.value = '';
+                        logoFilenameHidden.value = '';
+                        updateLogoPreview('');
+                        resetLogoBtn.disabled = false;
+                    } else {
+                        hideSpinner();
+                        alert(`Reset failed: ${result.message}`);
+                        resetLogoBtn.disabled = false;
+                    }
+                } catch (error) {
+                    hideSpinner();
+                    alert(`Reset error: ${error.message || error.toString()}`);
+                    resetLogoBtn.disabled = false;
                 }
             });
         </script>

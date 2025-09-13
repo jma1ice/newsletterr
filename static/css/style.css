@@ -646,3 +646,382 @@ footer p {
     color: #62a1a4 !important;
     border-color: #333 !important;
 }
+
+.workbench-hidden {
+    position: fixed;
+    left: -10000px;
+    top: -10000px;
+    width: 1920px;
+}
+
+/* Settings page styling */
+.settings-container {
+    margin: 0px 0px 0px 15px;
+}
+
+.plex-connected {
+    padding-left: 8px; 
+    color: #01b301; 
+    text-shadow: 1px 0 #000, 0 1px #000, -1px 0 #000, 0 -1px #000;
+}
+
+/* Logo Management Styling */
+.logo-input-field {
+    width: 100%;
+    max-width: 300px;
+    padding: 6px 10px;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    font-size: 0.9em;
+    margin-bottom: 5px;
+}
+
+.logo-input-field:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 0 1px rgba(0, 123, 255, 0.25);
+}
+
+.logo-input-help {
+    margin-top: 3px;
+}
+
+.logo-input-help small {
+    color: #666;
+    font-style: normal;
+    line-height: 1.3;
+    font-size: 0.8em;
+}
+
+.logo-preview-small {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 5px 0;
+}
+
+.logo-preview-img-small {
+    max-width: 40px;
+    max-height: 30px;
+    object-fit: contain;
+    border: 1px solid #ddd;
+    border-radius: 2px;
+    padding: 2px;
+}
+
+.logo-filename-small {
+    color: #666;
+    font-size: 0.9em;
+}
+
+/* Spinner styling */
+.spinner-hidden {
+    display: none;
+}
+
+/* Quill Editor Customization */
+.ql-editor { 
+    min-height: 120px; 
+    font-family: inherit; 
+    line-height: 1.6; 
+}
+
+.ql-toolbar { 
+    border-radius: 5px 5px 0 0; 
+    background-color: #8acbd4; 
+    border-color: #62a1a4; 
+}
+
+.dark .ql-toolbar { 
+    background-color: #333; 
+    border-color: #555; 
+}
+
+.ql-container { 
+    border-radius: 0 0 5px 5px; 
+    background-color: #fff; 
+    border-color: #62a1a4; 
+}
+
+.dark .ql-container { 
+    background-color: #222; 
+    border-color: #555; 
+}
+
+.ql-editor { 
+    color: #333; 
+}
+
+.dark .ql-editor { 
+    color: #8acbd4; 
+}
+
+.ql-editor.ql-blank::before { 
+    color: #999; 
+    font-style: italic; 
+}
+
+.dark .ql-editor.ql-blank::before { 
+    color: #666; 
+}
+
+/* Text block editor container */
+.text-block-editor-container { 
+    margin-bottom: 15px; 
+}
+
+.text-block-editor-container .ql-editor { 
+    min-height: 80px; 
+}
+
+.text-block-editor-container .ql-toolbar { 
+    padding: 8px; 
+}
+
+.text-block-editor-container .ql-container { 
+    font-size: 0.9rem; 
+}
+
+/* Additional Quill editor styling */
+.ql-editor p { 
+    margin-bottom: 0.5em; 
+}
+
+.ql-editor p:last-child { 
+    margin-bottom: 0; 
+}
+
+.ql-editor h1, .ql-editor h2, .ql-editor h3 { 
+    margin-top: 1em; 
+    margin-bottom: 0.5em; 
+}
+
+.ql-editor ul, .ql-editor ol { 
+    margin-bottom: 0.5em; 
+    padding-left: 1.5em; 
+}
+
+.ql-editor blockquote { 
+    border-left: 3px solid #E5A00D; 
+    margin: 1em 0; 
+    padding-left: 1em; 
+    font-style: italic; 
+}
+
+.dark .ql-editor blockquote { 
+    border-left-color: #E5A00D; 
+}
+
+/* Ensure Quill editor fits well in the selected items */
+.selected-item .text-block-editor-container { 
+    margin-top: 10px; 
+}
+
+.selected-item .ql-toolbar { 
+    border-radius: 5px 5px 0 0; 
+}
+
+.selected-item .ql-container { 
+    border-radius: 0 0 5px 5px; 
+}
+
+/* Base template styling */
+.hidden { display: none; }
+.cache-badge-container { margin-left: 20px; }
+.update-notification {
+    position: sticky; top: 0; z-index: 1000;
+    background: #fff3cd; color: #664d03; border: 1px solid #ffecb5;
+    padding: 10px 14px; font-size: 14px;
+}
+.theme-toggle-container { display: flex; }
+
+/* Index page specific styling */
+.send-email-btn {
+    font-size: 1.6rem; 
+    font-weight: 700; 
+    min-width: 220px; 
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+.alert-success {
+    color: #01b301; 
+    text-shadow: 1px 0 #000, 0 1px #000, -1px 0 #000, 0 -1px #000;
+}
+
+.alert-error {
+    color: #770010; 
+    text-shadow: 1px 0 #000, 0 1px #000, -1px 0 #000, 0 -1px #000;
+}
+
+.main-table {
+    height: 60%; 
+    width: 100%;
+}
+
+.main-table-row {
+    height: 100%; 
+    padding: 10px;
+}
+
+.sidebar-column {
+    width: 20%; 
+    padding: 10px; 
+    vertical-align: top;
+}
+
+.items-input {
+    width: 8.5rem; 
+    margin-bottom: 8px;
+}
+
+.quick-range-container {
+    padding-bottom: 5px;
+}
+
+.clear-cache-btn {
+    background-color: #dc3545; 
+    margin-top: 5px;
+}
+
+.cache-header {
+    cursor: pointer; 
+    padding: 8px 12px;
+}
+
+.cache-header h6 {
+    font-size: 0.85rem;
+}
+
+.cache-header span {
+    font-size: 0.8rem;
+}
+
+.cache-status-badge {
+    padding: 8px 12px; 
+    font-size: 0.8rem;
+}
+
+.cache-key {
+    text-transform: capitalize;
+}
+
+.bcc-card {
+    margin-top: 20px;
+}
+
+.bcc-header {
+    cursor: pointer;
+}
+
+.bcc-toggle-icon {
+    transition: transform 0.3s;
+}
+
+.email-list-selector {
+    flex: 1;
+}
+
+/* Additional index page styles */
+.send-email-form {
+    margin-top: 0;
+}
+
+.subject-input {
+    width: 18rem;
+}
+
+.content-column {
+    width: 40%; 
+    padding: 10px; 
+    vertical-align: top; 
+    position: sticky; 
+    top: 80px;
+}
+
+.preview-column {
+    width: 60%; 
+    padding: 10px; 
+    vertical-align: top;
+}
+
+.template-selector {
+    width: 200px;
+}
+
+.delete-template-btn {
+    display: none;
+}
+
+.selected-items-container {
+    min-height: 100px; 
+    background: #8acbd4;
+}
+
+.stat-title {
+    font-size: 0.9rem;
+}
+
+.stat-button {
+    font-size: 0.8rem; 
+    padding: 0.25rem 0.5rem;
+}
+
+.graph-title {
+    font-size: 0.9rem;
+}
+
+.graph-button {
+    font-size: 0.8rem; 
+    padding: 0.25rem 0.5rem;
+}
+
+.info-alert {
+    font-size: 0.9rem; 
+    padding: 0.75rem;
+}
+
+.preview-container {
+    display: none;
+}
+
+.ra-view-grid {
+    margin: 0; 
+    padding: 0;
+}
+
+.library-span {
+    font-size: .9rem;
+}
+
+/* Schedule preview styling */
+.error-hidden {
+    display: none;
+}
+
+.preview-section-hidden {
+    opacity: 0;
+    z-index: -1;
+}
+
+.preview-iframe {
+    width: 100%;
+    height: 600px;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    background: white;
+}
+
+.stats-container-hidden {
+    display: none;
+}
+
+.graphs-container-hidden {
+    display: none;
+}
+
+.workbench-hidden {
+    position: fixed;
+    left: -10000px;
+    top: -10000px;
+    width: 1920px;
+}

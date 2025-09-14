@@ -1,26 +1,24 @@
-import os, math, uuid, base64, smtplib, sqlite3, requests, time, threading, re, json, mimetypes, shutil, calendar, traceback
-from bs4 import BeautifulSoup
+import os, math, uuid, base64, smtplib, sqlite3, requests, time, threading, re, json, mimetypes, shutil, calendar, traceback, io
+from collections import defaultdict
 from datetime import datetime, timezone, timedelta
 from cryptography.fernet import Fernet, InvalidToken
 from dotenv import load_dotenv, set_key, find_dotenv
-from email import encoders
-from email.mime.base import MIMEBase
 from email.mime.text import MIMEText
 from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
 from email.utils import make_msgid
 from flask import Flask, render_template, request, jsonify, Response, redirect, url_for
 from pathlib import Path
+from PIL import Image, ImageFilter, ImageEnhance
 from playwright.sync_api import sync_playwright
 from plex_api_client import PlexAPI
-from urllib.parse import quote_plus, urljoin, urlparse
+from urllib.parse import quote_plus, urljoin
 
 app = Flask(__name__)
-app.jinja_env.globals["version"] = "v0.9.13"
-app.jinja_env.globals["publish_date"] = "September 01, 2025"
+app.jinja_env.globals["version"] = "v0.9.14"
+app.jinja_env.globals["publish_date"] = "September 14, 2025"
 
 def get_global_cache_status():
-    """Get global cache status for display in navbar"""
     try:
         cache_keys = ['stats', 'users', 'graph_data', 'recent_data']
         present = []
@@ -88,7 +86,6 @@ def get_global_cache_status():
 app.jinja_env.globals["get_cache_status"] = get_global_cache_status
 
 def can_use_cached_data_for_preview(required_days):
-    """Check if cached data is suitable for preview with required_days date range"""
     try:
         stats_info = get_cache_info('stats')
         graph_info = get_cache_info('graph_data')
@@ -140,8 +137,8 @@ plex_headers = {
     "X-Plex-Client-Identifier": str(uuid.uuid4())
 }
 ROOT = Path(__file__).resolve().parent
+os.makedirs(ROOT / "env", exist_ok = True)
 if os.path.exists(ROOT / ".env"):
-    os.makedirs(ROOT / "env", exist_ok = True)
     shutil.move(ROOT / ".env", ROOT / "env" / ".env")
 ENV_PATH = find_dotenv(usecwd=True) or str(ROOT / "env" / ".env")
 DATA_IMG_RE = re.compile(
@@ -257,8 +254,14 @@ def init_db(db_path):
             tautulli_url TEXT,
             tautulli_api TEXT,
             conjurr_url TEXT,
-            logo_filename TEXT DEFAULT 'Asset_45x.png',
-            logo_width INTEGER DEFAULT 80
+            logo_filename TEXT DEFAULT 'Asset_94x.png',
+            logo_width INTEGER DEFAULT 80,
+            primary_color TEXT DEFAULT "#8acbd4",
+            secondary_color TEXT DEFAULT "#222222",
+            accent_color TEXT DEFAULT "#62a1a4",
+            background_color TEXT DEFAULT "#333333",
+            text_color TEXT DEFAULT "#62a1a4",
+            email_theme TEXT DEFAULT "newsletterr_blue"
         )
     """)
     
@@ -354,8 +357,155 @@ def init_db(db_path):
         print("Adding reply_to_email column to settings table...")
         cursor.execute("ALTER TABLE settings ADD COLUMN reply_to_email TEXT")
         conn.commit()
+
+    cursor.execute("PRAGMA table_info(settings)")
+    columns = [column[1] for column in cursor.fetchall()]
+    theme_columns = [
+        ('primary_color', 'TEXT DEFAULT "#8acbd4"'),
+        ('secondary_color', 'TEXT DEFAULT "#222222"'),
+        ('accent_color', 'TEXT DEFAULT "#62a1a4"'),
+        ('background_color', 'TEXT DEFAULT "#333333"'),
+        ('text_color', 'TEXT DEFAULT "#62a1a4"'),
+        ('email_theme', 'TEXT DEFAULT "newsletterr_blue"')
+    ]
+    for col_name, col_def in theme_columns:
+        if col_name not in columns:
+            print(f"Adding {col_name} column to settings table...")
+            cursor.execute(f'ALTER TABLE settings ADD COLUMN {col_name} {col_def}')
+            conn.commit()
     
     conn.close()
+
+def get_theme_settings():
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    try:
+        cursor.execute("""
+            SELECT primary_color, secondary_color, accent_color, background_color, text_color, email_theme
+            FROM settings WHERE id = 1
+        """)
+        row = cursor.fetchone()
+        
+        if row:
+            return {
+                'primary_color': row[0] or '#8acbd4',
+                'secondary_color': row[1] or '#222222',
+                'accent_color': row[2] or '#62a1a4',
+                'background_color': row[3] or '#333333',
+                'text_color': row[4] or '#62a1a4',
+                'email_theme': row[5] or 'newsletterr_blue'
+            }
+    except Exception as e:
+        print(f"Error getting theme settings: {e}")
+    finally:
+        conn.close()
+    
+    return {
+        'primary_color': '#8acbd4',
+        'secondary_color': '#222222',
+        'accent_color': '#62a1a4',
+        'background_color': '#333333',
+        'text_color': '#62a1a4',
+        'email_theme': 'newsletterr_blue'
+    }
+
+def get_email_theme_colors():
+    theme_settings = get_theme_settings()
+    
+    return {
+        'background': theme_settings['background_color'],
+        'text': theme_settings['text_color'],
+        'primary': theme_settings['primary_color'],
+        'secondary': theme_settings['secondary_color'],
+        'accent': theme_settings['accent_color'],
+        'card_bg': '#2d2d2d',
+        'border': '#404040',
+        'muted_text': '#cccccc'
+    }
+
+def build_email_css_from_theme(theme_colors, logo_width):
+    return f"""
+        <style>
+            @import url(https://fonts.googleapis.com/css?family=IBM+Plex+Sans:400,700&display=swap);
+            
+            body {{
+                margin: 0 !important;
+                padding: 0 !important;
+                font-family: 'IBM Plex Sans' !important;
+                background-color: {theme_colors['background']} !important;
+                line-height: 1.6 !important;
+                color: {theme_colors['text']} !important;
+                -webkit-text-size-adjust: 100% !important;
+                -ms-text-size-adjust: 100% !important;
+            }}
+            
+            table, td {{
+                border-collapse: collapse !important;
+                mso-table-lspace: 0pt !important;
+                mso-table-rspace: 0pt !important;
+            }}
+            
+            img {{
+                border: 0 !important;
+                height: auto !important;
+                line-height: 100% !important;
+                outline: none !important;
+                text-decoration: none !important;
+                -ms-interpolation-mode: bicubic !important;
+            }}
+            
+            .ReadMsgBody {{ width: 100% !important; }}
+            .ExternalClass {{ width: 100% !important; }}
+            .ExternalClass * {{ line-height: 100% !important; }}
+
+            @media only screen and (max-width: 8) {{
+                .email-container {{
+                    width: 100% !important;
+                    max-width: 100% !important;
+                    margin: 0 !important;
+                }}
+                
+                .email-logo {{
+                    max-width: 60px !important;
+                    width: 60px !important;
+                }}
+                
+                .grid-table {{
+                    width: 100% !important;
+                }}
+                
+                .grid-cell {{
+                    width: 50% !important;
+                    display: inline-block !important;
+                    vertical-align: top !important;
+                }}
+                
+                .card-container {{
+                    max-width: 150px !important;
+                    margin: 0 auto 10px auto !important;
+                }}
+            }}
+            
+            @media only screen and (max-device-width: 8) {{
+                .email-logo {{
+                    max-width: 60px !important;
+                    height: auto !important;
+                }}
+            }}
+            
+            .email-container {{
+                max-width: 800px !important;
+                width: 100% !important;
+            }}
+            
+            .email-logo {{
+                max-width: {logo_width}px !important;
+                width: auto !important;
+                height: auto !important;
+            }}
+        </style>
+    """
 
 def migrate_data_from_separate_dbs():
     separate_dbs = [
@@ -823,217 +973,9 @@ def refresh_daily_cache():
     except Exception as e:
         print(f"Error in daily cache refresh: {e}")
 
-def generate_email_content(template_id, settings, date_range=7):
-    try:
-        templates_conn = sqlite3.connect(DB_PATH)
-        templates_cursor = templates_conn.cursor()
-        templates_cursor.execute("SELECT name, subject, email_text, selected_items FROM email_templates WHERE id = ?", (template_id,))
-        template_result = templates_cursor.fetchone()
-        templates_conn.close()
-        
-        if not template_result:
-            return None, None, "Template not found"
-        
-        template_name, subject, email_text, selected_items_json = template_result
-        
-        try:
-            selected_items = json.loads(selected_items_json) if selected_items_json else []
-        except:
-            selected_items = []
-        
-        stats = None
-        graph_data = []
-        recent_data = []
-        
-        tautulli_conn = sqlite3.connect(DB_PATH)
-        tautulli_cursor = tautulli_conn.cursor()
-        tautulli_cursor.execute("SELECT tautulli_url, tautulli_api FROM settings WHERE id = 1")
-        tautulli_settings = tautulli_cursor.fetchone()
-        tautulli_conn.close()
-        
-        if tautulli_settings and tautulli_settings[0] and tautulli_settings[1]:
-            tautulli_base_url = tautulli_settings[0].rstrip('/')
-            tautulli_api_key = tautulli_settings[1]
-            
-            print(f"Fetching fresh Tautulli data for scheduled email - {date_range} days")
-            
-            graph_commands = [
-                {'command': 'get_concurrent_streams_by_stream_type', 'name': 'Stream Type'},
-                {'command': 'get_plays_by_date', 'name': 'Plays by Date'},
-                {'command': 'get_plays_by_dayofweek', 'name': 'Plays by Day'},
-                {'command': 'get_plays_by_hourofday', 'name': 'Plays by Hour'},
-                {'command': 'get_plays_by_source_resolution', 'name': 'Plays by Source Res'},
-                {'command': 'get_plays_by_stream_resolution', 'name': 'Plays by Stream Res'},
-                {'command': 'get_plays_by_stream_type', 'name': 'Plays by Stream Type'},
-                {'command': 'get_plays_by_top_10_platforms', 'name': 'Plays by Top Platforms'},
-                {'command': 'get_plays_by_top_10_users', 'name': 'Plays by Top Users'},
-                {'command': 'get_plays_per_month', 'name': 'Plays per Month'},
-                {'command': 'get_stream_type_by_top_10_platforms', 'name': 'Stream Type by Top Platforms'},
-                {'command': 'get_stream_type_by_top_10_users', 'name': 'Stream Type by Top Users'}
-            ]
-            
-            recent_commands = [
-                {'command': 'movie'},
-                {'command': 'show'}
-            ]
-            
-            try:
-                stats, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_home_stats', 'Stats', None, str(date_range))
-                if error:
-                    print(f"Error fetching stats: {error}")
-                    
-                graph_data = []
-                for command in graph_commands:
-                    gd, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, command["command"], command["name"], error, str(date_range))
-                    if gd:
-                        graph_data.append(gd)
-                    if error:
-                        print(f"Error fetching graph data for {command['name']}: {error}")
-                
-                recent_data = []
-                for command in recent_commands:
-                    rd, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_recently_added', command["command"], error, "10")
-                    if rd:
-                        recent_data.append(rd)
-                    if error:
-                        print(f"Error fetching recent data for {command['command']}: {error}")
-                        
-            except Exception as e:
-                print(f"Failed to fetch fresh stats: {e}")
-                stats = get_cached_data('stats') or []
-                graph_data = get_cached_data('graph_data') or []
-                recent_data = get_cached_data('recent_data') or []
-        else:
-            print("Tautulli not configured, using cached data")
-            stats = get_cached_data('stats') or []
-            graph_data = get_cached_data('graph_data') or []
-            recent_data = get_cached_data('recent_data') or []
-        
-        all_content_html = ""
-        
-        for item in selected_items:
-            item_type = item.get('type', '')
-            item_id = item.get('id', '')
-            item_name = item.get('name', '')
-            
-            if item_type == 'textblock' or item_type == 'titleblock':
-                text_content = item.get('content', '')
-                
-                if not text_content and email_text:
-                    text_content = email_text.strip()
-                
-                if text_content:
-                    if item_type == 'titleblock':
-                        all_content_html += f"""
-                        <div style="margin-bottom: 20px; font-size: 1.5em; font-weight: bold; text-align: center; color: #E5A00D;">
-                            {text_content.replace(chr(10), '<br>')}
-                        </div>
-                        """
-                    else:
-                        all_content_html += f"""
-                        <div style="margin-bottom: 15px; color: #fff;">
-                            {text_content.replace(chr(10), '<br>')}
-                        </div>
-                        """
-                
-            elif item_type == 'stat' and stats:
-                try:
-                    stat_index = int(item_id.split('-')[1])
-                    if stat_index < len(stats):
-                        stat = stats[stat_index]
-                        stat_html = f"""
-                        <div style="margin: 20px 0;">
-                            <h3 style="color: #E5A00D; border-bottom: 1px solid #E5A00D; padding-bottom: 5px; margin-bottom: 15px;">{stat.get('stat_title', 'Stats')}</h3>
-                            <table style="width: 100%; border-collapse: collapse; margin: 10px 0;">
-                        """
-                        if stat.get('rows'):
-                            for row in stat['rows'][:10]:
-                                title = row.get('title', 'Unknown')
-                                count = row.get('total_plays', row.get('count', 0))
-                                year = row.get('year', '')
-                                rating = row.get('rating', '')
-                                
-                                stat_html += f"""
-                                <tr style="border-bottom: 1px solid #444;">
-                                    <td style="padding: 8px; color: #fff; font-weight: bold;">{title}</td>
-                                    {f'<td style="padding: 8px; color: #ccc; text-align: center;">{year}</td>' if year else ''}
-                                    <td style="padding: 8px; color: #E5A00D; text-align: right; font-weight: bold;">{count}</td>
-                                    {f'<td style="padding: 8px; color: #ccc; text-align: right;">{rating}</td>' if rating else ''}
-                                </tr>
-                                """
-                        stat_html += """
-                            </table>
-                        </div>
-                        """
-                        all_content_html += stat_html
-                except Exception as e:
-                    print(f"Error processing stat {item_id}: {e}")
-                    continue
-            
-            elif item_type == 'graph' and graph_data:
-                try:
-                    graph_index = int(item_id.split('-')[1])
-                    if graph_index < len(graph_data):
-                        graph_info = graph_data[graph_index] if isinstance(graph_data, list) else graph_data
-                        
-                        graph_html = f"""
-                        <div style="margin: 20px 0; padding: 20px; background: #333; border-radius: 5px; border-left: 4px solid #E5A00D;">
-                            <h3 style="color: #E5A00D; margin-bottom: 15px;">{item_name}</h3>
-                            <div style="color: #fff; font-family: monospace; font-size: 14px;">
-                        """
-                        
-                        if isinstance(graph_info, dict) and 'series' in graph_info:
-                            for series in graph_info.get('series', []):
-                                series_name = series.get('name', 'Data')
-                                series_data = series.get('data', [])
-                                if series_data:
-                                    total = sum(series_data)
-                                    avg = total / len(series_data) if series_data else 0
-                                    graph_html += f"""
-                                    <p style="margin: 5px 0;"><strong>{series_name}:</strong> Total: {total}, Average: {avg:.1f}</p>
-                                    """
-                        else:
-                            graph_html += f"""
-                            <p style="margin: 5px 0;">Chart shows activity data for the past {date_range} days</p>
-                            """
-                        
-                        graph_html += """
-                            </div>
-                        </div>
-                        """
-                        all_content_html += graph_html
-                except Exception as e:
-                    print(f"Error processing graph {item_id}: {e}")
-                    graph_html = f"""
-                    <div style="margin: 20px 0; padding: 20px; background: #333; border-radius: 5px; border-left: 4px solid #E5A00D;">
-                        <h3 style="color: #E5A00D;">{item_name}</h3>
-                        <p style="color: #fff;">Chart data for the past {date_range} days</p>
-                    </div>
-                    """
-                    all_content_html += graph_html
-        
-        if all_content_html.strip():
-            final_content = all_content_html
-        else:
-            final_content = email_text or ""
-        
-        processed_body = apply_layout(final_content, "", "", "", "", subject, settings['server_name'])
-        
-        return template_name, subject, processed_body
-        
-    except Exception as e:
-        print(f"Error generating email content: {e}")
-        traceback.print_exc()
-        return None, None, str(e)
-
-def render_email_html_via_headless(schedule_id: int, base: str, theme: str) -> str:
+def capture_chart_images_via_headless(schedule_id: int, base: str, theme: str) -> dict:
     url = f"{base}/scheduling/{schedule_id}/preview-page?schedule_id={schedule_id}"
-    try:
-        context.close()
-        browser.close()
-    except Exception:
-        pass
-
+    
     with _RENDER_LOCK:
         with sync_playwright() as pw:
             browser = pw.chromium.launch(headless=True, args=["--no-sandbox"])
@@ -1045,247 +987,98 @@ def render_email_html_via_headless(schedule_id: int, base: str, theme: str) -> s
             page.goto(url, wait_until="load")
             
             try:
-                page.wait_for_function("window.__emailReady === true || typeof window.__emailHTML === 'string'", timeout=60_000)
-            except Exception:
-                try:
-                    page.evaluate("typeof loadPreview === 'function' && loadPreview()")
-                    page.wait_for_function(
-                        "window.__emailReady === true || typeof window.__emailHTML === 'string'",
-                        timeout=30_000
-                    )
-                except Exception:
-                    pass
+                page.wait_for_function("typeof loadPreview === 'function'", timeout=30_000)
+                page.evaluate("loadPreview()")
+                page.wait_for_function("typeof Highcharts !== 'undefined' && Highcharts.charts && Highcharts.charts.filter(Boolean).length > 0", timeout=60_000)
+                page.wait_for_timeout(2000)
+            except Exception as e:
+                print(f"Error waiting for charts to load: {e}")
 
-            html = page.evaluate("window.__emailHTML || document.querySelector('#preview')?.srcdoc")
+            selected_items = page.evaluate("selectedItems || []")
+            chart_images = {}
+            
+            for item in selected_items:
+                if item.get('type') == 'graph':
+                    chart_id = item.get('id')
+                    chart_name = item.get('name', 'Chart')
+                    
+                    print(f"Processing chart: {chart_id}")
+                    
+                    try:
+                        page.evaluate(f"""
+                            (() => {{
+                                const element = document.getElementById('{chart_id}');
+                                if (element) {{
+                                    element.classList.remove('d-none');
+                                    element.style.display = 'block';
+                                    element.style.visibility = 'visible';
+                                    element.style.opacity = '1';
+                                    element.style.position = 'static';
+                                    element.style.zIndex = '1';
+                                    
+                                    let parent = element.parentElement;
+                                    while (parent && parent !== document.body) {{
+                                        parent.style.display = 'block';
+                                        parent.style.visibility = 'visible';
+                                        parent.style.opacity = '1';
+                                        parent = parent.parentElement;
+                                    }}
+                                    
+                                    console.log('Made element visible:', '{chart_id}');
+                                    return true;
+                                }}
+                                return false;
+                            }})()
+                        """)
+                        
+                        page.wait_for_timeout(1000)
+                        
+                        is_visible = page.evaluate(f"""
+                            (() => {{
+                                const element = document.getElementById('{chart_id}');
+                                if (!element) return false;
+                                const rect = element.getBoundingClientRect();
+                                return rect.width > 0 && rect.height > 0;
+                            }})()
+                        """)
+                        
+                        print(f"Element #{chart_id} visible after adjustment: {is_visible}")
+                        
+                        if is_visible:
+                            chart_element = page.locator(f"#{chart_id}")
+                            screenshot_bytes = chart_element.screenshot(type='png', timeout=10000)
+                            
+                            screenshot_b64 = base64.b64encode(screenshot_bytes).decode('utf-8')
+                            data_url = f"data:image/png;base64,{screenshot_b64}"
+                            
+                            chart_images[chart_id] = {
+                                'name': chart_name,
+                                'dataUrl': data_url
+                            }
+                            
+                            print(f"Successfully captured screenshot for chart: {chart_id}")
+                        else:
+                            print(f"Chart element #{chart_id} still not visible after adjustments")
+                        
+                    except Exception as e:
+                        print(f"Error capturing screenshot for chart {chart_id}: {e}")
 
             context.close()
             browser.close()
-            pw = None
-            return html or ""
+            
+            print(f"Total chart images captured: {len(chart_images)}")
+            return chart_images
+
+def group_recipients_by_user(to_emails_list, user_dict):
+    email_to_user = { (v or '').strip().lower(): k for k, v in (user_dict or {}).items() if v }
+    groups = defaultdict(list)
+    for email in (to_emails_list or []):
+        key = email_to_user.get((email or '').strip().lower())
+        groups[key].append(email)
+    return groups
 
 def send_scheduled_email(schedule_id, email_list_id, template_id):
-    print(f"Attempting to send scheduled email - Schedule ID: {schedule_id}, List ID: {email_list_id}, Template ID: {template_id}")
-    try:
-        schedule_conn = sqlite3.connect(DB_PATH)
-        schedule_cursor = schedule_conn.cursor()
-        schedule_cursor.execute("SELECT date_range FROM email_schedules WHERE id = ?", (schedule_id,))
-        schedule_result = schedule_cursor.fetchone()
-        schedule_conn.close()
-        
-        date_range = schedule_result[0] if schedule_result else 7
-        print(f"Using date range: {date_range} days")
-        
-        email_lists_conn = sqlite3.connect(DB_PATH)
-        email_lists_cursor = email_lists_conn.cursor()
-        email_lists_cursor.execute("SELECT emails FROM email_lists WHERE id = ?", (email_list_id,))
-        email_list_result = email_lists_cursor.fetchone()
-        email_lists_conn.close()
-        
-        if not email_list_result:
-            print(f"Email list {email_list_id} not found")
-            return False
-        
-        to_emails = email_list_result[0]
-        print(f"Found email list with {len(to_emails.split(','))} recipients")
-        
-        templates_conn = sqlite3.connect(DB_PATH)
-        templates_cursor = templates_conn.cursor()
-        templates_cursor.execute("SELECT name, subject, email_text FROM email_templates WHERE id = ?", (template_id,))
-        template_result = templates_cursor.fetchone()
-        templates_conn.close()
-        
-        if not template_result:
-            print(f"Template {template_id} not found")
-            return False
-        
-        template_name, subject, email_text = template_result
-        print(f"Found template: {template_name}")
-        
-        settings_conn = sqlite3.connect(DB_PATH)
-        settings_cursor = settings_conn.cursor()
-        settings_cursor.execute("SELECT from_email, alias_email, reply_to_email, password, smtp_server, smtp_port, smtp_protocol, server_name FROM settings WHERE id = 1")
-        settings_result = settings_cursor.fetchone()
-        settings_conn.close()
-        
-        if not settings_result:
-            print("SMTP settings not found in database")
-            return False
-        
-        from_email, alias_email, reply_to_email, encrypted_password, smtp_server, smtp_port, smtp_protocol, server_name = settings_result
-        
-        if not all([from_email, encrypted_password, smtp_server]):
-            print("Incomplete SMTP settings in database")
-            print(f"FROM_EMAIL: {'Set' if from_email else 'Missing'}")
-            print(f"PASSWORD: {'Set' if encrypted_password else 'Missing'}")
-            print(f"SMTP_SERVER: {'Set' if smtp_server else 'Missing'}")
-            return False
-        
-        try:
-            password = decrypt(encrypted_password)
-        except Exception as e:
-            print(f"Failed to decrypt password: {e}")
-            return False
-        
-        if not smtp_port:
-            smtp_port = 587
-        
-        print(f"Using SMTP settings - Server: {smtp_server}, Port: {smtp_port}, From: {from_email}")
-
-        public_base = os.environ.get("PUBLIC_BASE_URL", "http://127.0.0.1:6397")
-        theme = 'dark'  # pull from elsewhere other than hardcoded
-        email_html = render_email_html_via_headless(schedule_id, public_base, theme)
-        
-        if not email_html:
-            print("Failed to generate email content")
-            return False
-        
-        print(f"Generated email content for template: {template_name} with {date_range} days of data")
-        
-        msg_root = MIMEMultipart('related')
-        msg_root['Subject'] = f"[SCHEDULED] {subject}"
-        if alias_email:
-            msg_root['From'] = alias_email
-            msg_root['To'] = alias_email
-        else:
-            msg_root['From'] = from_email
-            msg_root['To'] = from_email
-
-        if reply_to_email != '':
-            msg_root['Reply-To'] = reply_to_email
-        
-        msg_alternative = MIMEMultipart('alternative')
-        msg_root.attach(msg_alternative)
-
-        try:
-            email_html, _cids = inline_data_images_to_cid(email_html, msg_root)
-        except Exception as e:
-            print(f"inline_data_images_to_cid failed: {e}")
-
-        try:
-            email_html = inline_remote_images_to_cid(email_html, msg_root, base_url=public_base)
-        except Exception as e:
-            print(f"inline_remote_images_to_cid failed: {e}")
-        
-        msg_alternative.attach(MIMEText(email_html, 'html'))
-        
-        print("Attempting to send email...")
-        try:
-            if smtp_protocol == 'SSL':
-                server = smtplib.SMTP_SSL(smtp_server, int(smtp_port))
-                server.login(from_email, password)
-            else:
-                server = smtplib.SMTP(smtp_server, int(smtp_port))
-                server.starttls()
-                server.login(from_email, password)
-            
-            email_content = msg_root.as_string()
-            content_size_kb = len(email_content.encode('utf-8')) / 1024
-            
-            to_emails_list = [email.strip() for email in to_emails.split(",")]
-            if alias_email:
-                server.sendmail(alias_email, [alias_email] + to_emails_list, email_content)
-                all_recipients = [alias_email] + to_emails_list
-            else:
-                server.sendmail(from_email, [from_email] + to_emails_list, email_content)
-                all_recipients = [from_email] + to_emails_list
-            
-            server.quit()
-            print(f"Email sent successfully to {len(all_recipients)} recipients")
-            
-            try:
-                history_conn = sqlite3.connect(DB_PATH)
-                history_cursor = history_conn.cursor()
-                history_cursor.execute('''INSERT INTO email_history (subject, recipients, email_content, content_size_kb, recipient_count, template_name)
-                                VALUES (?, ?, ?, ?, ?, ?)''',
-                                (f"[SCHEDULED] {subject}", ', '.join(all_recipients), email_content[:1000], content_size_kb, len(all_recipients), template_name))
-                history_conn.commit()
-                history_conn.close()
-            except Exception as log_err:
-                print(f"Error logging scheduled email history: {log_err}")
-            
-            return True
-            
-        except Exception as e:
-            print(f"Failed to send email: {str(e)}")
-            return False
-        
-    except Exception as e:
-        print(f"Error in send_scheduled_email: {e}")
-        traceback.print_exc()
-        return False
-
-def apply_layout(body, graphs_html_block, stats_html_block, ra_html_block, recs_html_block, subject, server_name):
-    body = body.replace('\n', '<br>')
-    body = body.replace('[GRAPHS]', graphs_html_block)
-    body = body.replace('[STATS]', stats_html_block)
-    body = body.replace('[RECENTLY_ADDED]', ra_html_block)
-    body = body.replace('[RECOMENDATIONS]', recs_html_block)
-
-    if subject.startswith(server_name):
-        display_subject = subject[len(server_name):].lstrip()
-    else:
-        display_subject = subject
-
-    return f"""`
-    <link href="https://fonts.googleapis.com/css?family=IBM+Plex+Sans:400,500,600,700&display=swap" rel="stylesheet">
-    <html>
-    <style>
-        @media only screen and (max-width:1900px) {{
-            .plex-img {{ margin-left: 44rem !important; }}
-        }}
-        @media only screen and (max-width:1700px) {{
-            .plex-img {{ margin-left: 38rem !important; }}
-        }}
-        @media only screen and (max-width:1500px) {{
-            .plex-img {{ margin-left: 30rem !important; }}
-        }}
-        @media only screen and (max-width:1300px) {{
-            .plex-img {{ margin-left: 24rem !important; }}
-        }}
-        @media only screen and (max-width:1100px) {{
-            .plex-img {{ margin-left: 16rem !important; }}
-        }}
-        @media only screen and (max-width:900px) {{
-            .plex-img {{ margin-left: 10rem !important; }}
-        }}
-        @media only screen and (max-width:700px) {{
-            .plex-img {{ margin-left: 4rem !important; }}
-        }}
-        @media only screen and (max-width:500px) {{
-            .plex-img {{ margin-left: 2rem !important; }}
-        }}
-    </style>
-    <body style="font-family: IBM Plex Sans;">
-        <table class="body" style="border-collapse: separate; mso-table-lspace: 0pt; mso-table-rspace: 0pt; width: 100%;" border="0" cellspacing="0" cellpadding="0">
-            <tbody>
-                <tr>
-                    <td class="container" style="font-family: IBM Plex Sans; font-size: 14px; vertical-align: top; display: block; max-width: 1042px; padding: 10px; width: 1042px; margin: 0 auto !important;">
-                        <div class="content" style="box-sizing: border-box; display: block; margin: 0 auto; max-width: 1037px; padding: 10px;"><span class="preheader" style="color: transparent; display: none; height: 0; max-height: 0; max-width: 0; opacity: 0; overflow: hidden; mso-hide: all; visibility: hidden; width: 0;">{server_name} Newsletter</span>
-                            <table class="main" style="border-collapse: separate; mso-table-lspace: 0pt; mso-table-rspace: 0pt; width: 100%; background: #282A2D; border-radius: 3px; color: #ffffff;" border="0" cellspacing="0" cellpadding="3">
-                                <tbody>
-                                    <tr>
-                                        <td class="wrapper" style="font-family: IBM Plex Sans; font-size: 14px; vertical-align: top; box-sizing: border-box; padding: 5px; overflow: auto;">
-                                            <div class="header" style="text-align: center; line-height: 0;"><img class="header-img plex-img" style="display: block; outline: 0; text-decoration: none; height: auto; border: 0; -ms-interpolation-mode: bicubic; max-width: 100%; margin-left: 40em;" src="https://d15k2d11r6t6rl.cloudfront.net/public/users/Integrators/669d5713-9b6a-46bb-bd7e-c542cff6dd6a/3bef3c50f13f4320a9e31b8be79c6ad2/Plex%20Logo%20Update%202022/plex-logo-heavy-stroke.png" width="40" /></div>
-                                            <div class="server-name" style="font-size: 25px; text-align: center; margin-bottom: 0;">{server_name} Newsletter</div>
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td class="footer" style="font-family: IBM Plex Sans; font-size: 12px; vertical-align: top; clear: both; margin-top: 0; text-align: center; width: 100%;">
-                                            <h1 class="footer-bar" style="margin-left: auto; margin-right: auto; width: 300px; border-top: 1px solid #E5A00D; margin-top: 5px;">{display_subject}</h1>
-                                            <p>
-                                                {body}
-                                            </p>
-                                            <div class="footer-bar" style="margin-left: auto; margin-right: auto; width: 250px; border-top: 1px solid #E5A00D; margin-top: 25px;">&nbsp;</div>
-                                            <div class="content-block powered-by" style="padding-bottom: 10px; padding-top: 0;">Generated for Plex Media Server by <a href="https://github.com/jma1ice/newsletterr" style="color: #E5A00D; text-decoration: none;">newsletterr</a></div>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </td>
-                </tr>
-            </tbody>
-        </table></body></html>`"""
+    return send_scheduled_email_with_cids(schedule_id, email_list_id, template_id)
 
 def run_tautulli_command(base_url, api_key, command, data_type, error, time_range='30'):
     out_data = None
@@ -1351,107 +1144,6 @@ def run_conjurr_command(base_url, user_dict, error):
 
     return [recommendations_dict, error]
 
-def inline_data_images_to_cid(html: str, msg_root, cid_prefix="img"):
-    soup = BeautifulSoup(html or "", "html.parser")
-    cids = []
-
-    for img in soup.find_all("img"):
-        src = (img.get("src") or "").strip()
-        m = DATA_IMG_RE.match(src)
-        if not m:
-            continue
-        mime, subtype, b64 = m.group(1), m.group(2).lower(), m.group(3)
-        if subtype == "jpg":
-            subtype = "jpeg"
-
-        raw = base64.b64decode(b64)
-        cid = make_msgid(domain="newsletterr.local")[1:-1]
-        img["src"] = f"cid:{cid}"
-
-        part = MIMEImage(raw, _subtype=subtype)
-        part.add_header("Content-ID", f"<{cid}>")
-        part.add_header("Content-Disposition", "inline", filename=f"{cid}.{subtype}")
-        msg_root.attach(part)
-        cids.append(cid)
-
-    return str(soup), cids
-
-def inline_remote_images_to_cid(html: str, msg_root, base_url: str) -> str:
-    if not html:
-        return html
-
-    soup = BeautifulSoup(html, "html.parser")
-    session = requests.Session()
-    timeout = 10
-
-    for img in soup.find_all("img"):
-        src = (img.get("src") or "").strip()
-        if not src or src.startswith("data:") or src.startswith("cid:"):
-            continue
-
-        url = urljoin(base_url, src)
-
-        try:
-            r = session.get(url, timeout=timeout, stream=True)
-            r.raise_for_status()
-            content = r.content
-
-            ctype = r.headers.get("Content-Type") or mimetypes.guess_type(url)[0] or "image/png"
-            if not ctype.startswith("image/"):
-                continue
-            subtype = ctype.split("/", 1)[1]
-            if subtype == "jpg":
-                subtype = "jpeg"
-
-            cid = make_msgid(domain="newsletterr.local")[1:-1]
-            part = MIMEImage(content, _subtype=subtype)
-            part.add_header("Content-ID", f"<{cid}>")
-            part.add_header("Content-Disposition", "inline", filename=f"{cid}.{subtype}")
-            msg_root.attach(part)
-
-            img["src"] = f"cid:{cid}"
-        except Exception as e:
-            print(f"[inline_remote_images_to_cid] skip {url}: {e}")
-
-    return str(soup)
-
-def ensure_cids_match_html(html: str, attachments_cids: list[str]):
-    missing = [cid for cid in attachments_cids if f'src="cid:{cid}"' not in html]
-    return missing
-
-def embed_local_imgs(html: str, static_root: str) -> tuple[str, list]:
-    soup = BeautifulSoup(html or "", "html.parser")
-    parts = []
-
-    for img in soup.find_all("img"):
-        src = (img.get("src") or "").strip()
-        if not src or src.startswith(("cid:", "data:", "http://", "https://")):
-            continue
-
-        rel = src.lstrip("/")[7:]
-        print(static_root, rel)
-        fs_path = os.path.normpath(os.path.join(static_root, rel))
-
-        with open(fs_path, "rb") as f:
-            data = f.read()
-
-        mime, _ = mimetypes.guess_type(fs_path)
-        if mime and mime.startswith("image/"):
-            subtype = mime.split("/", 1)[1]
-            part = MIMEImage(data, _subtype=subtype)
-        else:
-            main, sub = (mime.split("/", 1) if mime else ("application", "octet-stream"))
-            part = MIMEBase(main, sub); part.set_payload(data); encoders.encode_base64(part)
-
-        cid = make_msgid(domain="newsletterr.local").strip("<>")
-        part.add_header("Content-ID", f"<{cid}>")
-        part.add_header("Content-Disposition", "inline", filename = os.path.basename(fs_path))
-        parts.append(part)
-
-        img["src"] = f"cid:{cid}"
-
-    return str(soup), parts
-
 def _norm(v: str):
     if not v:
         return (0,)
@@ -1506,6 +1198,1800 @@ def _background_update_checker():
             _check_github_latest()
         finally:
             time.sleep(app.config["UPDATE_CHECK_INTERVAL_SEC"])
+
+def get_stat_headers(title):
+    """Updated to match the exact logic from the dashboard template"""
+    if title == "Most Watched Movies" or title == "Most Watched TV Shows":
+        return ["Title", "Year", "Plays", "Hours Played", "Rating"]
+    elif title == "Most Popular Movies" or title == "Most Popular TV Shows":
+        return ["Title", "Year", "Plays", "Users", "Rating"]
+    elif title == "Most Played Artists":
+        return ["Author", "Year", "Plays", "Hours Played"]
+    elif title == "Most Popular Artists":
+        return ["Author", "Year", "Plays", "Users"]
+    elif title == "Recently Watched":
+        return ["Title", "Year", "Rating"]
+    elif title == "Most Active Libraries":
+        return ["Library", "Plays", "Hours Played"]
+    elif title == "Most Active Users":
+        return ["Username", "Plays", "Hours Played"]
+    elif title == "Most Active Platforms":
+        return ["Platform", "Plays", "Hours Played"]
+    elif title == "Most Concurrent Streams":
+        return ["Category", "Count"]
+    else:
+        return ["Title", "Value"]
+
+def get_stat_cells(title, row):
+    cells = []
+    
+    if title == "Most Active Libraries":
+        cells.append(row.get('section_name', ''))
+    elif title == "Most Active Users":
+        cells.append(row.get('user', ''))
+    elif title == "Most Active Platforms":
+        cells.append(row.get('platform', ''))
+    else:
+        cells.append(row.get('title', ''))
+    
+    skip_year_stats = ["Most Active Libraries", "Most Active Users", "Most Active Platforms", "Most Concurrent Streams"]
+    if title not in skip_year_stats:
+        cells.append(row.get('year', ''))
+    
+    if "Recently" not in title and "Concurrent" not in title:
+        cells.append(row.get('total_plays', 0))
+    
+    hours_stats = ["Most Watched Movies", "Most Watched TV Shows", "Most Played Artists", "Most Active Libraries", "Most Active Users", "Most Active Platforms"]
+    users_stats = ["Most Popular Movies", "Most Popular TV Shows", "Most Popular Artists"]
+    
+    if title in hours_stats:
+        hours = round(row.get('total_duration', 0) / 3600) if row.get('total_duration') else 0
+        cells.append(int(hours))
+    elif title in users_stats:
+        cells.append(row.get('users_watched', ''))
+    
+    skip_rating_stats = ["Most Active Libraries", "Most Played Artists", "Most Popular Artists", "Most Active Users", "Most Active Platforms", "Most Concurrent Streams"]
+    if title not in skip_rating_stats:
+        cells.append(row.get('content_rating', ''))
+    
+    if title == "Most Concurrent Streams":
+        cells.append(row.get('count', 0))
+    
+    return cells
+
+def fetch_tautulli_data_for_email(tautulli_base_url, tautulli_api_key, date_range, server_name):
+    data = {
+        'settings': {'server_name': server_name},
+        'stats': [],
+        'graph_data': [],
+        'recent_data': [],
+        'graph_commands': []
+    }
+    
+    graph_commands = [
+        {'command': 'get_concurrent_streams_by_stream_type', 'name': 'Stream Type'},
+        {'command': 'get_plays_by_date', 'name': 'Plays by Date'},
+        {'command': 'get_plays_by_dayofweek', 'name': 'Plays by Day'},
+        {'command': 'get_plays_by_hourofday', 'name': 'Plays by Hour'},
+        {'command': 'get_plays_by_source_resolution', 'name': 'Plays by Source Res'},
+        {'command': 'get_plays_by_stream_resolution', 'name': 'Plays by Stream Res'},
+        {'command': 'get_plays_by_stream_type', 'name': 'Plays by Stream Type'},
+        {'command': 'get_plays_by_top_10_platforms', 'name': 'Plays by Top Platforms'},
+        {'command': 'get_plays_by_top_10_users', 'name': 'Plays by Top Users'},
+        {'command': 'get_plays_per_month', 'name': 'Plays per Month'},
+        {'command': 'get_stream_type_by_top_10_platforms', 'name': 'Stream Type by Top Platforms'},
+        {'command': 'get_stream_type_by_top_10_users', 'name': 'Stream Type by Top Users'}
+    ]
+    
+    try:
+        stats, _ = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_home_stats', 'Stats', None, str(date_range))
+        if stats:
+            data['stats'] = stats
+        
+        graph_data = []
+        for command in graph_commands:
+            try:
+                gd, _ = run_tautulli_command(tautulli_base_url, tautulli_api_key, command["command"], command["name"], None, str(date_range))
+                graph_data.append(gd if gd is not None else {})
+            except Exception as e:
+                graph_data.append({})
+                print(f"Error fetching graph data for {command['name']}: {e}")
+        
+        data['graph_data'] = graph_data
+        data['graph_commands'] = graph_commands
+        
+        recent_commands = [{'command': 'movie'}, {'command': 'show'}]
+        for command in recent_commands:
+            recent, _ = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_recently_added', command["command"], None, "10")
+            if recent:
+                data['recent_data'].append(recent)
+                
+        print(f"Fetched Tautulli data: {len(data['stats'])} stats, {len(data['graph_data'])} graphs, {len(data['recent_data'])} recent sections")
+        
+    except Exception as e:
+        print(f"Error fetching Tautulli data: {e}")
+    
+    return data
+
+def convert_html_to_plain_text(html_content):
+    html_content = re.sub(r'<script.*?</script>', '', html_content, flags=re.DOTALL)
+    html_content = re.sub(r'<style.*?</style>', '', html_content, flags=re.DOTALL)
+    
+    html_content = re.sub(r'<br\s*/?>', '\n', html_content)
+    html_content = re.sub(r'</p>', '\n\n', html_content)
+    html_content = re.sub(r'</div>', '\n', html_content)
+    html_content = re.sub(r'<h[1-6][^>]*>', '\n\n', html_content)
+    html_content = re.sub(r'</h[1-6]>', '\n', html_content)
+    
+    html_content = re.sub(r'<[^>]+>', '', html_content)
+    
+    html_content = re.sub(r'\n\s*\n', '\n\n', html_content)
+    html_content = html_content.strip()
+    
+    return html_content
+
+def fetch_and_attach_image(image_url, msg_root, cid_name, base_url=""):
+    try:
+        if image_url.startswith('/'):
+            full_url = urljoin(base_url or "http://127.0.0.1:6397", image_url)
+        else:
+            full_url = image_url
+        
+        response = requests.get(full_url, timeout=10)
+        response.raise_for_status()
+        
+        content_type = response.headers.get('Content-Type')
+        if not content_type or not content_type.startswith('image/'):
+            content_type = mimetypes.guess_type(full_url)[0] or 'image/png'
+        
+        subtype = content_type.split('/')[-1]
+        if subtype == 'jpg':
+            subtype = 'jpeg'
+        
+        cid = make_msgid(domain="newsletterr.local")[1:-1]
+        
+        img_part = MIMEImage(response.content, _subtype=subtype)
+        img_part.add_header('Content-ID', f'<{cid}>')
+        img_part.add_header('Content-Disposition', 'inline', filename=f'{cid_name}.{subtype}')
+        msg_root.attach(img_part)
+        
+        return cid
+        
+    except Exception as e:
+        print(f"Error processing image {image_url}: {e}")
+        return None
+
+def fetch_and_attach_blurred_image(image_url, msg_root, cid_name, base_url=""):
+    try:
+        if image_url.startswith('/'):
+            full_url = urljoin(base_url or "http://127.0.0.1:6397", image_url)
+        else:
+            full_url = image_url
+        
+        response = requests.get(full_url, timeout=10)
+        response.raise_for_status()
+        
+        image = Image.open(io.BytesIO(response.content))
+        
+        if image.mode in ('RGBA', 'LA', 'P'):
+            image = image.convert('RGB')
+        
+        blurred = image.filter(ImageFilter.GaussianBlur(radius=30))
+        
+        enhancer = ImageEnhance.Brightness(blurred)
+        darkened = enhancer.enhance(0.7)
+        
+        img_bytes = io.BytesIO()
+        darkened.save(img_bytes, format='JPEG', quality=85)
+        img_bytes.seek(0)
+        
+        cid = make_msgid(domain="newsletterr.local")[1:-1]
+        
+        img_part = MIMEImage(img_bytes.getvalue(), _subtype='jpeg')
+        img_part.add_header('Content-ID', f'<{cid}>')
+        img_part.add_header('Content-Disposition', 'inline', filename=f'{cid_name}-blurred.jpg')
+        msg_root.attach(img_part)
+        
+        return cid
+        
+    except Exception as e:
+        print(f"Error processing blurred image {image_url}: {e}")
+        return fetch_and_attach_image(image_url, msg_root, cid_name, base_url)
+
+def build_stats_html_with_cid_background(stat_data, msg_root, theme_colors, base_url=""):
+    if not stat_data or not stat_data.get('rows'):
+        return ""
+    
+    title = stat_data.get('stat_title', 'Statistics')
+    rows = stat_data['rows']
+    
+    background_cid = None
+    if rows and (rows[0].get('art') or rows[0].get('grandparent_thumb')):
+        artwork_path = rows[0].get('art') or rows[0].get('grandparent_thumb')
+        if artwork_path:
+            image_url = f"/proxy-art{artwork_path}" if not artwork_path.startswith('/proxy-art') else artwork_path
+            background_cid = fetch_and_attach_blurred_image(
+                image_url, 
+                msg_root, 
+                f"stat-bg-{len(msg_root.get_payload())}", 
+                base_url
+            )
+    
+    headers = get_stat_headers(title)
+    header_cells = "".join([
+        f'<th style="padding: 12px; background-color: rgba(52, 58, 64, 0.9); color: white; font-weight: bold; border: none; font-family: \'IBM Plex Sans\'; font-size: 14px; text-align: left;">{h}</th>' 
+        for h in headers
+    ])
+    
+    rows_html = ""
+    for row in rows:
+        cells = get_stat_cells(title, row)
+        cells_html = "".join([
+            f'<td style="padding: 12px; background-color: rgba(255, 255, 255, 0.5); color: #333; border-bottom: 1px solid rgba(222, 226, 230, 0.8); font-family: \'IBM Plex Sans\'; font-size: 14px;">{cell}</td>' 
+            for cell in cells
+        ])
+        rows_html += f'<tr>{cells_html}</tr>'
+    
+    container_style = f"""
+        margin: 20px 0;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        border: 1px solid {theme_colors['border']};
+        position: relative;
+        font-family: 'IBM Plex Sans';
+    """
+    
+    if background_cid:
+        container_style += f"""
+            background-image: url('cid:{background_cid}');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+        """
+    else:
+        container_style += f"background-color: {theme_colors['card_bg']};"
+    
+    overlay = ""
+    if background_cid:
+        overlay = f"""
+            <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; 
+                        background-color: rgba(0, 0, 0, 0.3); z-index: 0;"></div>
+        """
+    
+    header_style = f"""
+        background-color: {theme_colors['primary']};
+        color: white;
+        padding: 15px;
+        text-align: center;
+        font-weight: bold;
+        font-size: 18px;
+        font-family: 'IBM Plex Sans';
+        margin: 0;
+        position: relative;
+        z-index: 2;
+    """
+    
+    table_style = """
+        width: 100%;
+        border-collapse: collapse;
+        position: relative;
+        z-index: 2;
+        font-family: 'IBM Plex Sans';
+    """
+    
+    return f"""
+        <div style="{container_style}">
+            {overlay}
+            <div style="position: relative; z-index: 1;">
+                <div style="{header_style}">{title}</div>
+                <table style="{table_style}">
+                    <thead>
+                        <tr>{header_cells}</tr>
+                    </thead>
+                    <tbody>
+                        {rows_html}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    """
+
+def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, library_filter=None, base_url=""):
+    if not recent_data:
+        return f"""
+        <div style="background-color: {theme_colors['card_bg']}; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid {theme_colors['border']}; font-family: 'IBM Plex Sans';">
+            <p style="text-align: center; color: {theme_colors['muted_text']}; padding: 20px; margin: 0; font-family: 'IBM Plex Sans';">No recently added items available.</p>
+        </div>
+        """
+    
+    items = []
+    if isinstance(recent_data, list):
+        for item in recent_data:
+            if isinstance(item, dict) and 'recently_added' in item:
+                items.extend(item['recently_added'])
+            elif isinstance(item, dict) and 'title' in item:
+                items.append(item)
+    
+    if library_filter:
+        items = [item for item in items if library_filter.lower() in item.get('library_name', '').lower()]
+    
+    if not items:
+        return f"""
+        <div style="background-color: {theme_colors['card_bg']}; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid {theme_colors['border']}; font-family: 'IBM Plex Sans';">
+            <p style="text-align: center; color: {theme_colors['muted_text']}; padding: 20px; margin: 0; font-family: 'IBM Plex Sans';">No recently added items found{f' for {library_filter}' if library_filter else ''}.</p>
+        </div>
+        """
+    
+    items_html = ""
+    items_per_row = 5
+    
+    for i in range(0, len(items), items_per_row):
+        row_items = items[i:i + items_per_row]
+        row_html = "<tr>"
+        
+        for j, item in enumerate(row_items):
+            title = item.get('title', 'Unknown')
+            year = item.get('year', '')
+            library = item.get('library_name', '')
+            summary = item.get('tagline') or item.get('summary', '')
+            added_date = ""
+            duration = ""
+            
+            poster_cid = None
+            poster_candidates = [item.get('thumb'), item.get('art'), item.get('parent_thumb'), item.get('grandparent_thumb')]
+            for candidate in poster_candidates:
+                if candidate:
+                    poster_url = f"/proxy-art{candidate}" if not candidate.startswith('/proxy-art') else candidate
+                    poster_cid = fetch_and_attach_image(
+                        poster_url, 
+                        msg_root, 
+                        f"recent-{i}-{j}", 
+                        base_url
+                    )
+                    break
+                        
+            if item.get('added_at'):
+                try:
+                    timestamp = item['added_at']
+                    if isinstance(timestamp, str) and timestamp.isdigit():
+                        timestamp = int(timestamp)
+                    
+                    if isinstance(timestamp, (int, float)):
+                        dt = datetime.fromtimestamp(timestamp)
+                        added_date = dt.strftime('%m/%d/%Y')
+                    else:
+                        dt = datetime.fromisoformat(str(timestamp))
+                        added_date = dt.strftime('%m/%d/%Y')
+                except Exception as e:
+                    if item.get('originally_available_at'):
+                        try:
+                            timestamp = item['originally_available_at']
+                            if isinstance(timestamp, str) and timestamp.isdigit():
+                                timestamp = int(timestamp)
+                            
+                            if isinstance(timestamp, (int, float)):
+                                dt = datetime.fromtimestamp(timestamp)
+                                added_date = dt.strftime('%m/%d/%Y')
+                            else:
+                                dt = datetime.fromisoformat(str(timestamp))
+                                added_date = dt.strftime('%m/%d/%Y')
+                        except Exception as e2:
+                            added_date = ""
+            
+            if item.get('duration'):
+                try:
+                    ms = int(item['duration'])
+                    s = ms // 1000
+                    h = s // 3600
+                    m = (s % 3600) // 60
+                    duration = f"{h}h {m}m" if h else f"{m}m"
+                except:
+                    pass
+            
+            cell_style = f"""
+                width: 20%;
+                padding: 8px;
+                vertical-align: top;
+                font-family: 'IBM Plex Sans';
+            """
+
+            if poster_cid:
+                poster_bg_url = f"cid:{poster_cid}"
+                
+                card_html = f"""
+                    <div style="
+                        background-color: {theme_colors['card_bg']};
+                        border-radius: 12px;
+                        overflow: hidden;
+                        border: 1px solid {theme_colors['border']};
+                        width: 124px;
+                        margin: 0 auto;
+                        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.6);
+                    ">
+                        <div style="
+                            background-image: url('{poster_bg_url}');
+                            background-size: cover;
+                            background-position: center;
+                            background-repeat: no-repeat;
+                            height: 185px;
+                            position: relative;
+                            background-color: #f8f9fa;
+                        ">
+                            {f'''
+                            <div style="
+                                float: right;
+                                background-color: rgba(0, 0, 0, 0.7);
+                                color: white;
+                                padding: 2px 8px;
+                                border-radius: 12px;
+                                font-size: 10px;
+                                margin: 2px;
+                                font-family: 'IBM Plex Sans';
+                                line-height: 1;
+                            ">{library}</div>
+                            ''' if library else ''}
+                            
+                            {f'''
+                            <div style="
+                                float: right;
+                                clear: right;
+                                background-color: rgba(0, 0, 0, 0.6);
+                                color: rgba(255, 255, 255, 0.9);
+                                padding: 2px 6px;
+                                border-radius: 4px;
+                                font-size: 9px;
+                                margin: 153px 2px 2px 2px;
+                                font-family: 'IBM Plex Sans';
+                                line-height: 1;
+                            ">{added_date}</div>
+                            ''' if added_date else ''}
+                        </div>
+                        
+                        <div style="
+                            padding: 12px;
+                            background-color: {theme_colors['card_bg']};
+                            color: {theme_colors['text']};
+                        ">
+                            <div style="
+                                font-weight: bold;
+                                font-size: 14px;
+                                color: {theme_colors['text']};
+                                margin-bottom: 4px;
+                                line-height: 1.2;
+                                font-family: 'IBM Plex Sans';
+                            ">{title}</div>
+                            
+                            <div style="
+                                font-size: 11px;
+                                color: {theme_colors['muted_text']};
+                                margin-bottom: 8px;
+                                font-family: 'IBM Plex Sans';
+                            ">{' • '.join(filter(None, [str(year) if year else '', duration]))}</div>
+                            
+                            {f'''
+                            <div style="
+                                font-size: 11px;
+                                color: {theme_colors['text']};
+                                opacity: 0.8;
+                                line-height: 1.3;
+                                font-family: 'IBM Plex Sans';
+                            ">{summary[:100]}{'...' if len(summary) > 100 else ''}</div>
+                            ''' if summary else ''}
+                        </div>
+                    </div>
+                """
+            else:
+                card_html = f"""
+                    <div style="
+                        background-color: {theme_colors['card_bg']};
+                        border-radius: 12px;
+                        border: 1px solid {theme_colors['border']};
+                        padding: 12px;
+                        text-align: center;
+                        max-width: 200px;
+                        margin: 0 auto;
+                        height: 300px;
+                        display: table;
+                    ">
+                        <div style="display: table-cell; vertical-align: middle;">
+                            <div style="
+                                font-weight: bold;
+                                font-size: 14px;
+                                color: {theme_colors['text']};
+                                margin-bottom: 8px;
+                                font-family: 'IBM Plex Sans';
+                            ">{title}</div>
+                            <div style="
+                                font-size: 11px;
+                                color: {theme_colors['muted_text']};
+                                margin-bottom: 8px;
+                                font-family: 'IBM Plex Sans';
+                            ">{' • '.join(filter(None, [str(year) if year else '', duration, library, f'Added {added_date}' if added_date else '']))}</div>
+                            {f'''
+                            <div style="
+                                font-size: 11px;
+                                color: {theme_colors['text']};
+                                opacity: 0.8;
+                                font-family: 'IBM Plex Sans';
+                            ">{summary[:100]}{'...' if len(summary) > 100 else ''}</div>
+                            ''' if summary else ''}
+                        </div>
+                    </div>
+                """
+            
+            row_html += f'<td style="{cell_style}">{card_html}</td>'
+        
+        while len(row_items) < items_per_row:
+            row_html += f'<td style="width: 20%; padding: 8px;"></td>'
+            row_items.append(None)
+        
+        row_html += "</tr>"
+        items_html += row_html
+    
+    container_style = f"""
+        background-color: {theme_colors['card_bg']};
+        padding: 20px;
+        border-radius: 8px;
+        margin: 20px 0;
+        border: 1px solid {theme_colors['border']};
+        font-family: 'IBM Plex Sans';
+    """
+    
+    title_style = f"""
+        text-align: center;
+        color: {theme_colors['text']};
+        margin: 0 0 20px 0;
+        font-size: 24px;
+        font-weight: bold;
+        font-family: 'IBM Plex Sans';
+    """
+    
+    table_style = """
+        width: 100%;
+        border-collapse: collapse;
+        margin: 0;
+        padding: 0;
+    """
+    
+    return f"""
+        <div style="{container_style}">
+            <h2 style="{title_style}">Recently Added{f' - {library_filter}' if library_filter else ''}</h2>
+            <table style="{table_style}">
+                {items_html}
+            </table>
+        </div>
+    """
+
+def build_recommendations_html_with_cids(recs_data, msg_root, theme_colors, user_emails=None, base_url=""):
+    if not recs_data:
+        return ""
+    
+    html_sections = []
+    
+    for user_id, user_recs in recs_data.items():
+        if user_emails and user_id not in user_emails:
+            continue
+            
+        user_email = user_emails.get(user_id, user_id) if user_emails else user_id
+        
+        movies_html = build_recommendations_section_with_cids(
+            user_recs.get('movie_posters', []),
+            user_recs.get('movie_posters_unavailable', []),
+            "Recommended Movies",
+            msg_root,
+            f"recs-movies-{user_id}",
+            theme_colors,
+            base_url
+        )
+        
+        shows_html = build_recommendations_section_with_cids(
+            user_recs.get('show_posters', []),
+            user_recs.get('show_posters_unavailable', []),
+            "Recommended TV Shows",
+            msg_root,
+            f"recs-shows-{user_id}",
+            theme_colors,
+            base_url
+        )
+        
+        if movies_html or shows_html:
+            container_style = f"""
+                margin: 30px 0;
+                padding: 20px;
+                background-color: {theme_colors['card_bg']};
+                border-radius: 8px;
+                border: 1px solid {theme_colors['border']};
+                font-family: 'IBM Plex Sans';
+            """
+            
+            user_title_style = f"""
+                text-align: center;
+                color: {theme_colors['text']};
+                margin: 0 0 20px 0;
+                font-size: 24px;
+                font-weight: bold;
+                font-family: 'IBM Plex Sans';
+            """
+            
+            user_section = f"""
+                <div style="{container_style}" data-recs-user="{user_id}">
+                    <h2 style="{user_title_style}">Recommendations for {user_email}</h2>
+                    {movies_html}
+                    {shows_html}
+                </div>
+            """
+            html_sections.append(user_section)
+    
+    return '\n'.join(html_sections)
+
+def build_recommendations_section_with_cids(available_items, unavailable_items, title, msg_root, section_prefix, theme_colors, base_url=""):
+    if not available_items and not unavailable_items:
+        return ""
+    
+    all_items = available_items + unavailable_items
+    items_per_row = 5
+    
+    rows_html = ""
+    for i in range(0, len(all_items), items_per_row):
+        row_items = all_items[i:i + items_per_row]
+        row_html = "<tr>"
+        
+        for j, item in enumerate(row_items):
+            is_unavailable = (i + j) >= len(available_items)
+            
+            poster_cid = None
+            if item.get('url'):
+                poster_cid = fetch_and_attach_image(
+                    f"/proxy-img?u={item['url']}", 
+                    msg_root, 
+                    f"{section_prefix}-{i}-{j}", 
+                    base_url
+                )
+            
+            title_text = item.get('title', 'Unknown')
+            year = item.get('year', '')
+            vote = item.get('vote', '')
+            href = item.get('href', '#')
+            overview = item.get('overview', '')[:100] + "..." if item.get('overview') else ""
+            runtime = item.get('runtime', '')
+            
+            vote_text = f"★ {vote:.1f}" if isinstance(vote, (int, float)) and vote > 0 else ""
+            
+            cell_style = f"""
+                width: 20%;
+                padding: 6px;
+                vertical-align: top;
+                font-family: 'IBM Plex Sans';
+                {'opacity: 0.7; filter: grayscale(30%);' if is_unavailable else ''}
+            """
+
+            if poster_cid:
+                poster_bg_url = f"cid:{poster_cid}"
+                
+                card_content = f"""
+                    <div style="
+                        background-color: {theme_colors['card_bg']};
+                        border-radius: 12px;
+                        overflow: hidden;
+                        border: 1px solid {theme_colors['border']};
+                        width: 125px;
+                        margin: 0 auto;
+                        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+                    ">
+                        <div style="
+                            background-image: url('{poster_bg_url}');
+                            background-size: cover;
+                            background-position: center;
+                            background-repeat: no-repeat;
+                            height: 185px;
+                            position: relative;
+                            background-color: #f8f9fa;
+                        ">
+                            {f'''
+                            <div style="
+                                float: left;
+                                background-color: rgba(0, 0, 0, 0.7);
+                                color: white;
+                                padding: 2px 6px;
+                                border-radius: 4px;
+                                font-size: 9px;
+                                margin: 4px;
+                                font-family: 'IBM Plex Sans';
+                                line-height: 1;
+                            ">{year} {vote_text}</div>
+                            ''' if year or vote_text else ''}
+                            
+                            {'''
+                            <div style="
+                                float: left;
+                                background-color: rgba(255, 0, 0, 0.8);
+                                color: white;
+                                padding: 2px 6px;
+                                border-radius: 4px;
+                                font-size: 9px;
+                                margin: 0px 10px 0px 4px;
+                                font-family: 'IBM Plex Sans';
+                                line-height: 1;
+                            ">Unavailable</div>
+                            ''' if is_unavailable else ''}
+                            
+                            <div style="
+                                padding: 8px;
+                                height: 60px;
+                            ">
+                                <div style="
+                                    font-weight: bold;
+                                    font-size: 12px;
+                                    color: white;
+                                    line-height: 1.2;
+                                    font-family: 'IBM Plex Sans';
+                                    margin-top: 132px;
+                                ">{title_text}</div>
+                                {f'''
+                                <div style="
+                                    font-size: 10px;
+                                    color: rgba(255, 255, 255, 0.8);
+                                    margin-top: 2px;
+                                    font-family: 'IBM Plex Sans';
+                                ">{runtime}</div>
+                                ''' if runtime else ''}
+                            </div>
+                        </div>
+                        
+                        {f'''
+                        <div style="
+                            padding: 8px;
+                            background-color: {theme_colors['card_bg']};
+                            color: {theme_colors['text']};
+                            font-size: 10px;
+                            line-height: 1.3;
+                            font-family: 'IBM Plex Sans';
+                            border-top: 1px solid {theme_colors['border']};
+                        ">
+                            {overview[:80]}{'...' if len(overview) > 80 else ''}
+                        </div>
+                        ''' if overview else ''}
+                    </div>
+                """
+                
+                if href != '#':
+                    card_html = f'<a href="{href}" style="text-decoration: none; color: inherit; display: block;" target="_blank">{card_content}</a>'
+                else:
+                    card_html = card_content
+                    
+            else:
+                card_html = f"""
+                    <div style="
+                        background-color: {theme_colors['card_bg']};
+                        border-radius: 12px;
+                        border: 1px solid {theme_colors['border']};
+                        padding: 12px;
+                        text-align: center;
+                        max-width: 200px;
+                        margin: 0 auto;
+                        height: 300px;
+                        display: table;
+                    ">
+                        <div style="display: table-cell; vertical-align: middle;">
+                            <div style="
+                                font-weight: bold;
+                                font-size: 12px;
+                                color: {theme_colors['text']};
+                                margin-bottom: 8px;
+                                font-family: 'IBM Plex Sans';
+                            ">{title_text}</div>
+                            <div style="
+                                font-size: 10px;
+                                color: {theme_colors['muted_text']};
+                                margin-bottom: 8px;
+                                font-family: 'IBM Plex Sans';
+                            ">{' • '.join(filter(None, [str(year) if year else '', vote_text, runtime, 'Unavailable' if is_unavailable else '']))}</div>
+                            {f'''
+                            <div style="
+                                font-size: 10px;
+                                color: {theme_colors['text']};
+                                opacity: 0.8;
+                                font-family: 'IBM Plex Sans';
+                                line-height: 1.3;
+                            ">{overview[:100]}{'...' if len(overview) > 100 else ''}</div>
+                            ''' if overview else ''}
+                        </div>
+                    </div>
+                """
+            
+            row_html += f'<td style="{cell_style}">{card_html}</td>'
+        
+        while len(row_items) < items_per_row:
+            row_html += f'<td style="width: 20%; padding: 6px;"></td>'
+            row_items.append(None)
+        
+        row_html += "</tr>"
+        rows_html += row_html
+    
+    section_title_style = f"""
+        color: {theme_colors['text']};
+        margin: 0 0 15px 0;
+        font-size: 20px;
+        font-weight: bold;
+        font-family: 'IBM Plex Sans';
+    """
+    
+    table_style = """
+        width: 100%;
+        border-collapse: collapse;
+        padding: 0;
+        margin: 0;
+    """
+    
+    return f"""
+        <div style="margin: 20px 0;">
+            <h3 style="{section_title_style}">{title}</h3>
+            <table style="{table_style}">
+                {rows_html}
+            </table>
+        </div>
+    """
+
+def attach_logo_image(msg_root, logo_filename, base_url=""):
+    logo_url = f"/static/img/{logo_filename}"
+    return fetch_and_attach_image(logo_url, msg_root, "logo", base_url)
+
+def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, recommendations_data=None, user_dict=None, base_url="", target_user_key=None, is_scheduled=False):
+    selected_items = json.loads(template_data.get('selected_items', '[]'))
+    email_text = template_data.get('email_text', '')
+    subject = template_data.get('subject', '')
+    server_name = tautulli_data.get('settings', {}).get('server_name', 'Plex Server')
+    logo_filename = tautulli_data.get('settings', {}).get('logo_filename', 'Asset_94x.png')
+    logo_width = tautulli_data.get('settings', {}).get('logo_width', 80)
+    
+    theme_colors = get_email_theme_colors()
+    
+    logo_cid = attach_logo_image(msg_root, logo_filename, base_url)
+    logo_src = f"cid:{logo_cid}" if logo_cid else f"/static/img/{logo_filename}"
+    
+    content_html = ""
+    
+    if email_text.strip():
+        content_html += build_text_block_html(email_text, 'textblock', theme_colors)
+    
+    for item in selected_items:
+        item_type = item.get('type', '')
+        
+        if item_type in ['textblock', 'titleblock', 'headerblock']:
+            content = item.get('content', '').strip()
+            if content:
+                content_html += build_text_block_html(content, item_type, theme_colors)
+        
+        elif item_type == 'stat':
+            stat_index = int(item['id'].split('-')[1])
+            if stat_index < len(tautulli_data.get('stats', [])):
+                stat_data = tautulli_data['stats'][stat_index]
+                content_html += build_stats_html_with_cid_background(stat_data, msg_root, theme_colors, base_url)
+        
+        elif item_type == 'graph':
+            content_html += build_graph_html_with_frontend_image(item, msg_root)
+        
+        elif item_type == 'ra':
+            library_filter = item.get('raLibrary')
+            recent_data = tautulli_data.get('recent_data', [])
+            content_html += build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, library_filter, base_url)
+        
+        elif item_type == 'recs':
+            if recommendations_data:
+                if target_user_key:
+                    if item.get('userKey') == str(target_user_key):
+                        filtered_recommendations = {target_user_key: recommendations_data.get(target_user_key, {})}
+                        filtered_user_dict = {target_user_key: user_dict.get(target_user_key, target_user_key)} if user_dict else {target_user_key: target_user_key}
+                        content_html += build_recommendations_html_with_cids(filtered_recommendations, msg_root, theme_colors, filtered_user_dict, base_url)
+                else:
+                    content_html += build_recommendations_html_with_cids(recommendations_data, msg_root, theme_colors, user_dict, base_url)
+    
+    return build_complete_email_html_with_cid_logo(content_html, server_name, subject, logo_src, logo_width, is_scheduled)
+
+def build_complete_email_html_with_cid_logo(content_html, server_name, subject, logo_src, logo_width, is_scheduled=False):
+    theme_colors = get_email_theme_colors()
+    
+    css = build_email_css_from_theme(theme_colors, logo_width)
+    
+    body_style = f"""
+        margin: 0;
+        padding: 0;
+        font-family: 'IBM Plex Sans';
+        background-color: {theme_colors['background']};
+        line-height: 1.6;
+        color: {theme_colors['text']};
+        -webkit-text-size-adjust: 100%;
+        -ms-text-size-adjust: 100%;
+    """
+    
+    container_style = f"""
+        width: 100%;
+        max-width: 800px;
+        margin: 0 auto;
+        background-color: {theme_colors['card_bg']};
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        border: 1px solid {theme_colors['border']};
+        font-family: 'IBM Plex Sans', Arial;
+    """
+    
+    header_style = f"""
+        background: linear-gradient(135deg, {theme_colors['accent']} 0%, {theme_colors['primary']} 100%);
+        color: white;
+        padding: 30px 20px;
+        text-align: center;
+        font-family: 'IBM Plex Sans';
+    """
+    
+    logo_style = f"""
+        max-width: {logo_width}px;
+        width: auto;
+        height: auto;
+        margin-bottom: 15px;
+        border: 0;
+        line-height: 100%;
+        outline: none;
+        text-decoration: none;
+        display: block;
+        margin-left: auto;
+        margin-right: auto;
+    """
+    
+    title_style = """
+        font-size: 28px;
+        font-weight: bold;
+        margin: 0;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        font-family: 'IBM Plex Sans';
+        color: white;
+    """
+    
+    content_style = f"""
+        padding: 20px 15px;
+        color: {theme_colors['text']};
+        background-color: {theme_colors['card_bg']};
+        font-family: 'IBM Plex Sans';
+    """
+    
+    footer_style = f"""
+        background-color: {theme_colors['secondary']};
+        padding: 20px;
+        text-align: center;
+        border-top: 3px solid {theme_colors['primary']};
+        color: {theme_colors['muted_text']};
+        font-size: 12px;
+        font-family: 'IBM Plex Sans';
+    """
+    
+    footer_link_style = f"""
+        color: {theme_colors['accent']};
+        text-decoration: none;
+    """
+    
+    return f"""<!DOCTYPE html>
+        <html lang="en" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <meta http-equiv="X-UA-Compatible" content="IE=edge">
+                <meta name="x-apple-disable-message-reformatting">
+                <meta name="format-detection" content="telephone=no">
+                <title>{subject}</title>
+                <!--[if mso]>
+                <noscript>
+                    <xml>
+                        <o:OfficeDocumentSettings>
+                            <o:PixelsPerInch>96</o:PixelsPerInch>
+                        </o:OfficeDocumentSettings>
+                    </xml>
+                </noscript>
+                <![endif]-->
+                {css}
+            </head>
+            <body style="{body_style}">
+                <div style="width: 100%; background-color: {theme_colors['background']}; padding: 20px 0;">
+                    <!--[if mso | IE]>
+                    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="600" align="center" style="width:8;">
+                    <tr>
+                    <td>
+                    <![endif]-->
+                    <div class="email-container" style="{container_style}">
+                        <div style="{header_style}">
+                            <img src="{logo_src}" alt="{server_name}" class="email-logo" style="{logo_style}">
+                            <h1 style="{title_style}">{server_name} Newsletter</h1>
+                        </div>
+                        
+                        <div style="{content_style}">
+                            {content_html}
+                        </div>
+                        
+                        <div style="{footer_style}">
+                            <div style="margin-bottom: 10px;">
+                                Generated for Plex Media Server by 
+                                <a href="https://github.com/jma1ice/newsletterr" style="{footer_link_style}">newsletterr</a>
+                            </div>
+                            <div>
+                                newsletterr is not affiliated with or a product of Plex, Inc.
+                            </div>
+                        </div>
+                    </div>
+                    <!--[if mso | IE]>
+                    </td>
+                    </tr>
+                    </table>
+                    <![endif]-->
+                </div>
+            </body>
+        </html>"""
+
+def send_standard_email_with_cids(to_emails, subject, selected_items, from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, settings):
+    try:
+        msg_root = MIMEMultipart('related')
+        msg_root['Subject'] = subject
+        if alias_email == '':
+            msg_root['From'] = from_email
+            msg_root['To'] = from_email
+        else:
+            msg_root['From'] = alias_email
+            msg_root['To'] = alias_email
+        
+        if reply_to_email != '':
+            msg_root['Reply-To'] = reply_to_email
+
+        msg_alternative = MIMEMultipart('alternative')
+        msg_root.attach(msg_alternative)
+
+        tautulli_data = get_current_tautulli_data_for_email(settings)
+        
+        template_data = {
+            'selected_items': json.dumps(selected_items),
+            'email_text': '',
+            'subject': subject
+        }
+        
+        base_url = os.environ.get("PUBLIC_BASE_URL", "http://127.0.0.1:6397")
+        
+        email_html = build_email_html_with_all_cids(
+            template_data, 
+            tautulli_data, 
+            msg_root,
+            None,
+            None,
+            base_url,
+            None,
+            False
+        )
+
+        plain_text = convert_html_to_plain_text(email_html)
+        msg_alternative.attach(MIMEText(plain_text, 'plain', 'utf-8'))
+        msg_alternative.attach(MIMEText(email_html, 'html', 'utf-8'))
+
+        if smtp_protocol == 'SSL':
+            server = smtplib.SMTP_SSL(smtp_server, smtp_port)
+            login_username = smtp_username if smtp_username else from_email
+            server.login(login_username, decrypt(password))
+        else:
+            server = smtplib.SMTP(smtp_server, smtp_port)
+            server.starttls()
+            login_username = smtp_username if smtp_username else from_email
+            server.login(login_username, decrypt(password))
+            
+        email_content = msg_root.as_string()
+        content_size_kb = len(email_content.encode('utf-8')) / 1024
+        
+        if alias_email == '':
+            server.sendmail(from_email, [from_email] + to_emails, email_content)
+            all_recipients = [from_email] + to_emails
+        else:
+            server.sendmail(alias_email, [alias_email] + to_emails, email_content)
+            all_recipients = [alias_email] + to_emails
+        
+        try:
+            history_conn = sqlite3.connect(DB_PATH)
+            history_cursor = history_conn.cursor()
+            history_cursor.execute("""
+                INSERT INTO email_history (subject, recipients, email_content, content_size_kb, recipient_count, template_name)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (
+                subject,
+                ', '.join(all_recipients),
+                email_content[:1000],
+                round(content_size_kb, 2),
+                len(all_recipients),
+                'Manual'
+            ))
+            history_conn.commit()
+            history_conn.close()
+        except Exception as history_error:
+            print(f"Error saving email history: {history_error}")
+        
+        server.quit()
+        return jsonify({"success": True, "sent_to": ', '.join(all_recipients), "size": content_size_kb})
+        
+    except Exception as e:
+        print("SMTP send error:", e)
+        return jsonify({"error": str(e)}), 500
+
+def send_recommendations_email_with_cids(to_emails, subject, user_dict, selected_items, from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, settings):
+    try:
+        rec_user_keys = set()
+        for item in selected_items:
+            if item.get('type') == 'recs' and item.get('userKey'):
+                rec_user_keys.add(item['userKey'])
+        
+        if not rec_user_keys:
+            return send_standard_email_with_cids(
+                to_emails, subject, selected_items, from_email, alias_email, 
+                reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, settings
+            )
+        
+        recommendations_data = get_recommendations_for_users(rec_user_keys, to_emails, user_dict, use_cache=True)
+
+        if not recommendations_data:
+            return jsonify({"error": "No recommendations data available. Please pull recommendations first."}), 400
+        
+        groups = group_recipients_by_user(to_emails, user_dict)
+        
+        total_sent = 0
+        sent_info = []
+        
+        for user_key, recipients in groups.items():
+            if user_key is None or user_key not in rec_user_keys:
+                print("Skipping recipients without recommendations:", recipients)
+                continue
+
+            success = send_single_user_email_with_cids(
+                recipients, subject, selected_items, user_key, recommendations_data,
+                from_email, alias_email, reply_to_email, password, smtp_username, 
+                smtp_server, smtp_port, smtp_protocol, settings
+            )
+            
+            if success:
+                total_sent += len(recipients)
+                sent_info.append(', '.join(recipients))
+
+        if total_sent == 0:
+            return jsonify({"error": "No recipients matched a recommendations block. No emails sent."}), 400
+
+        return jsonify({"success": True, "sent_groups": sent_info})
+        
+    except Exception as e:
+        print("Error in send_recommendations_email_with_cids:", e)
+        return jsonify({"error": str(e)}), 500
+
+def send_single_user_email_with_cids(recipients, subject, selected_items, user_key, recommendations_data, from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, settings):
+    try:
+        msg_root = MIMEMultipart('related')
+        msg_root['Subject'] = subject
+        
+        if alias_email:
+            msg_root['From'] = alias_email
+            msg_root['To'] = alias_email
+        else:
+            msg_root['From'] = from_email
+            msg_root['To'] = from_email
+        
+        if reply_to_email:
+            msg_root['Reply-To'] = reply_to_email
+
+        msg_alternative = MIMEMultipart('alternative')
+        msg_root.attach(msg_alternative)
+
+        tautulli_data = get_current_tautulli_data_for_email(settings)
+        
+        template_data = {
+            'selected_items': json.dumps(selected_items),
+            'email_text': '',
+            'subject': subject
+        }
+        
+        base_url = os.environ.get("PUBLIC_BASE_URL", "http://127.0.0.1:6397")
+        
+        user_dict = {user_key: recipients[0]} if recipients else {}
+        
+        email_html = build_email_html_with_all_cids(
+            template_data, 
+            tautulli_data, 
+            msg_root,
+            recommendations_data,
+            user_dict,
+            base_url,
+            target_user_key=user_key,
+            is_scheduled=False
+        )
+
+        plain_text = convert_html_to_plain_text(email_html)
+        msg_alternative.attach(MIMEText(plain_text, 'plain', 'utf-8'))
+        msg_alternative.attach(MIMEText(email_html, 'html', 'utf-8'))
+
+        if smtp_protocol == 'SSL':
+            server = smtplib.SMTP_SSL(smtp_server, smtp_port)
+            login_username = smtp_username if smtp_username else from_email
+            server.login(login_username, decrypt(password))
+        else:
+            server = smtplib.SMTP(smtp_server, smtp_port)
+            server.starttls()
+            login_username = smtp_username if smtp_username else from_email
+            server.login(login_username, decrypt(password))
+            
+        email_content = msg_root.as_string()
+        content_size_kb = len(email_content.encode('utf-8')) / 1024
+        
+        if alias_email:
+            server.sendmail(alias_email, [alias_email] + recipients, email_content)
+            all_recipients = [alias_email] + recipients
+        else:
+            server.sendmail(from_email, [from_email] + recipients, email_content)
+            all_recipients = [from_email] + recipients
+        
+        server.quit()
+        
+        try:
+            history_conn = sqlite3.connect(DB_PATH)
+            history_cursor = history_conn.cursor()
+            history_cursor.execute("""
+                INSERT INTO email_history (subject, recipients, email_content, content_size_kb, recipient_count, template_name)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (
+                subject,
+                ', '.join(all_recipients),
+                email_content[:1000],
+                round(content_size_kb, 2),
+                len(all_recipients),
+                'Manual'
+            ))
+            history_conn.commit()
+            history_conn.close()
+        except Exception as history_error:
+            print(f"Error saving email history: {history_error}")
+        
+        return True
+        
+    except Exception as e:
+        print(f"Error sending single user email: {e}")
+        return False
+
+def get_current_tautulli_data_for_email(settings):
+    data = {
+        'settings': settings,
+        'stats': [],
+        'graph_data': [],
+        'recent_data': [],
+        'graph_commands': []
+    }
+    
+    try:
+        stats = get_cached_data('stats', strict=False)
+        if stats:
+            data['stats'] = stats
+        
+        recent_data = get_cached_data('recent_data', strict=False)
+        if recent_data:
+            data['recent_data'] = recent_data
+            
+        graph_data = get_cached_data('graph_data', strict=False)
+        if graph_data:
+            data['graph_data'] = graph_data
+            
+        data['graph_commands'] = [
+            {'command': 'get_concurrent_streams_by_stream_type', 'name': 'Stream Type'},
+            {'command': 'get_plays_by_date', 'name': 'Plays by Date'},
+            {'command': 'get_plays_by_dayofweek', 'name': 'Plays by Day'},
+            {'command': 'get_plays_by_hourofday', 'name': 'Plays by Hour'},
+            {'command': 'get_plays_by_source_resolution', 'name': 'Plays by Source Res'},
+            {'command': 'get_plays_by_stream_resolution', 'name': 'Plays by Stream Res'},
+            {'command': 'get_plays_by_stream_type', 'name': 'Plays by Stream Type'},
+            {'command': 'get_plays_by_top_10_platforms', 'name': 'Plays by Top Platforms'},
+            {'command': 'get_plays_by_top_10_users', 'name': 'Plays by Top Users'},
+            {'command': 'get_plays_per_month', 'name': 'Plays per Month'},
+            {'command': 'get_stream_type_by_top_10_platforms', 'name': 'Stream Type by Top Platforms'},
+            {'command': 'get_stream_type_by_top_10_users', 'name': 'Stream Type by Top Users'}
+        ]
+        
+    except Exception as e:
+        print(f"Error getting current Tautulli data: {e}")
+    
+    return data
+
+def get_recommendations_for_users(user_keys, to_emails, user_dict, use_cache=True):
+    try:
+        if use_cache:
+            cached_recommendations = get_cached_data('recommendations_json', strict=True) or get_cached_data('recommendations_json', strict=False)
+            cached_filtered_users = get_cached_data('filtered_users', strict=True) or get_cached_data('filtered_users', strict=False)
+            
+            if cached_recommendations and cached_filtered_users:
+                filtered_users = {k: v for k, v in user_dict.items() if k in user_keys and v in to_emails}
+                
+                cached_user_keys = set(str(k) for k in cached_filtered_users.keys())
+                required_user_keys = set(str(k) for k in filtered_users.keys())
+                
+                if required_user_keys.issubset(cached_user_keys):
+                    print(f"Using cached recommendations for users: {list(required_user_keys)}")
+                    return {k: v for k, v in cached_recommendations.items() if str(k) in required_user_keys}
+                else:
+                    print(f"Cache miss - need users {required_user_keys}, cache has {cached_user_keys}")
+            else:
+                print("No cached recommendations available")
+
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT conjurr_url FROM settings WHERE id = 1")
+        row = cursor.fetchone()
+        conn.close()
+        
+        if not row or not row[0]:
+            return {}
+            
+        conjurr_url = row[0].strip()
+        
+        filtered_users = {k: v for k, v in user_dict.items() if k in user_keys and v in to_emails}
+        
+        if not filtered_users:
+            return {}
+            
+        recommendations_data, _ = run_conjurr_command(conjurr_url, filtered_users, None)
+
+        if use_cache and recommendations_data:
+            cache_params = {'timestamp': time.time(), 'manual_fetch': True}
+            set_cached_data('recommendations_json', recommendations_data, cache_params)
+            set_cached_data('filtered_users', filtered_users, cache_params)
+            print("Cached fresh recommendations data")
+
+        return recommendations_data or {}
+        
+    except Exception as e:
+        print(f"Error getting recommendations: {e}")
+        return {}
+
+def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
+    try:
+        schedule_conn = sqlite3.connect(DB_PATH)
+        schedule_cursor = schedule_conn.cursor()
+        schedule_cursor.execute("SELECT date_range FROM email_schedules WHERE id = ?", (schedule_id,))
+        schedule_result = schedule_cursor.fetchone()
+        schedule_conn.close()
+        
+        date_range = schedule_result[0] if schedule_result else 7
+        
+        email_lists_conn = sqlite3.connect(DB_PATH)
+        email_lists_cursor = email_lists_conn.cursor()
+        email_lists_cursor.execute("SELECT emails FROM email_lists WHERE id = ?", (email_list_id,))
+        email_list_result = email_lists_cursor.fetchone()
+        email_lists_conn.close()
+        
+        if not email_list_result:
+            print(f"Email list {email_list_id} not found")
+            return False
+        
+        to_emails = email_list_result[0]
+        to_emails_list = [email.strip() for email in to_emails.split(",")]
+        
+        templates_conn = sqlite3.connect(DB_PATH)
+        templates_cursor = templates_conn.cursor()
+        templates_cursor.execute("SELECT name, subject, email_text, selected_items FROM email_templates WHERE id = ?", (template_id,))
+        template_result = templates_cursor.fetchone()
+        templates_conn.close()
+        
+        if not template_result:
+            print(f"Template {template_id} not found")
+            return False
+        
+        template_name, subject, email_text, selected_items_json = template_result
+        selected_items = json.loads(selected_items_json) if selected_items_json else []
+        
+        settings_conn = sqlite3.connect(DB_PATH)
+        settings_cursor = settings_conn.cursor()
+        settings_cursor.execute("SELECT from_email, alias_email, reply_to_email, password, smtp_server, smtp_port, smtp_protocol, server_name, tautulli_url, tautulli_api, logo_filename, logo_width FROM settings WHERE id = 1")
+        settings_result = settings_cursor.fetchone()
+        settings_conn.close()
+        
+        if not settings_result:
+            print("SMTP settings not found in database")
+            return False
+        
+        from_email, alias_email, reply_to_email, encrypted_password, smtp_server, smtp_port, smtp_protocol, server_name, tautulli_base_url, tautulli_api_key, logo_filename, logo_width = settings_result
+        
+        public_base = os.environ.get("PUBLIC_BASE_URL", "http://127.0.0.1:6397")
+        theme = 'dark'
+        
+        print("Capturing chart images...")
+        chart_images = capture_chart_images_via_headless(schedule_id, public_base, theme)
+        print(f"Captured {len(chart_images)} chart images")
+        
+        for item in selected_items:
+            if item.get('type') == 'graph' and item.get('id') in chart_images:
+                chart_data = chart_images[item['id']]
+                item['chartImage'] = chart_data.get('dataUrl', '')
+                item['chartSVG'] = chart_data.get('svg', '')
+
+        has_recs = any(item.get('type') == 'recs' for item in selected_items)
+        
+        if has_recs:
+            print("Template contains recommendations, splitting emails by user...")
+            
+            users_data, _ = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_users', 'Users', None)
+            user_dict = {}
+            if users_data:
+                user_dict = {
+                    u['user_id']: u['email']
+                    for u in users_data
+                    if u.get('email') and u.get('is_active')
+                }
+            
+            rec_user_keys = set()
+            for item in selected_items:
+                if item.get('type') == 'recs' and item.get('userKey'):
+                    rec_user_keys.add(item['userKey'])
+            
+            if not rec_user_keys:
+                print("No recommendation user keys found in template")
+                return False
+            
+            conjurr_conn = sqlite3.connect(DB_PATH)
+            conjurr_cursor = conjurr_conn.cursor()
+            conjurr_cursor.execute("SELECT conjurr_url FROM settings WHERE id = 1")
+            conjurr_result = conjurr_cursor.fetchone()
+            conjurr_conn.close()
+            
+            if not conjurr_result or not conjurr_result[0]:
+                print("Conjurr URL not configured")
+                return False
+            
+            conjurr_url = conjurr_result[0].strip()
+            filtered_users = {k: v for k, v in user_dict.items() if str(k) in rec_user_keys and v in to_emails_list}
+            
+            if not filtered_users:
+                print("No users found matching recommendation blocks and email recipients")
+                return False
+            
+            recommendations_data, _ = run_conjurr_command(conjurr_url, filtered_users, None)
+            if not recommendations_data:
+                print("Failed to fetch recommendations data")
+                return False
+            
+            groups = group_recipients_by_user(to_emails_list, user_dict)
+            
+            total_sent = 0
+            sent_info = []
+            
+            for user_key, recipients in groups.items():
+                if user_key is None or str(user_key) not in rec_user_keys:
+                    print(f"Skipping recipients without recommendations: {recipients}")
+                    continue
+                
+                success = send_scheduled_user_email_with_cids(
+                    recipients, subject, selected_items, user_key, recommendations_data,
+                    from_email, alias_email, reply_to_email, encrypted_password,
+                    smtp_server, smtp_port, smtp_protocol, 
+                    server_name, tautulli_base_url, tautulli_api_key, date_range, template_name,
+                    logo_filename, logo_width
+                )
+                
+                if success:
+                    total_sent += len(recipients)
+                    sent_info.append(', '.join(recipients))
+                    print(f"Successfully sent scheduled email to user {user_key}: {recipients}")
+                else:
+                    print(f"Failed to send scheduled email to user {user_key}: {recipients}")
+            
+            if total_sent == 0:
+                print("No emails were sent successfully")
+                return False
+            
+            print(f"Scheduled email sent successfully to {total_sent} total recipients across {len(sent_info)} user groups")
+            return True
+            
+        else:
+            print("Template has no recommendations, sending single email to all recipients...")
+            return send_scheduled_single_email_with_cids(
+                to_emails_list, subject, selected_items,
+                from_email, alias_email, reply_to_email, encrypted_password,
+                smtp_server, smtp_port, smtp_protocol,
+                server_name, tautulli_base_url, tautulli_api_key, date_range, template_name,
+                logo_filename, logo_width
+            )
+        
+    except Exception as e:
+        print(f"Error in send_scheduled_email_with_cids: {e}")
+        traceback.print_exc()
+        return False
+
+def send_scheduled_user_email_with_cids(recipients, subject, selected_items, user_key, recommendations_data, from_email, alias_email, reply_to_email, encrypted_password, smtp_server, smtp_port, smtp_protocol, server_name, tautulli_base_url, tautulli_api_key, date_range, template_name, logo_filename, logo_width):
+    try:
+        msg_root = MIMEMultipart('related')
+        msg_root['Subject'] = f"[SCHEDULED] {subject}"
+        
+        if alias_email:
+            msg_root['From'] = alias_email
+            msg_root['To'] = alias_email
+        else:
+            msg_root['From'] = from_email
+            msg_root['To'] = from_email
+        
+        if reply_to_email:
+            msg_root['Reply-To'] = reply_to_email
+
+        msg_alternative = MIMEMultipart('alternative')
+        msg_root.attach(msg_alternative)
+
+        tautulli_data = fetch_tautulli_data_for_email(tautulli_base_url, tautulli_api_key, date_range, server_name)
+        tautulli_data["settings"]["logo_filename"] = logo_filename
+        tautulli_data["settings"]["logo_width"] = logo_width
+        
+        template_data = {
+            'selected_items': json.dumps(selected_items),
+            'email_text': '',
+            'subject': subject
+        }
+        
+        base_url = os.environ.get("PUBLIC_BASE_URL", "http://127.0.0.1:6397")
+        
+        user_dict = {user_key: recipients[0]} if recipients else {}
+        
+        email_html = build_email_html_with_all_cids(
+            template_data, 
+            tautulli_data, 
+            msg_root,
+            recommendations_data,
+            user_dict,
+            base_url,
+            target_user_key=user_key,
+            is_scheduled=True
+        )
+
+        plain_text = convert_html_to_plain_text(email_html)
+        msg_alternative.attach(MIMEText(plain_text, 'plain', 'utf-8'))
+        msg_alternative.attach(MIMEText(email_html, 'html', 'utf-8'))
+
+        if smtp_protocol == 'SSL':
+            server = smtplib.SMTP_SSL(smtp_server, int(smtp_port))
+            server.login(from_email, decrypt(encrypted_password))
+        else:
+            server = smtplib.SMTP(smtp_server, int(smtp_port))
+            server.starttls()
+            server.login(from_email, decrypt(encrypted_password))
+        
+        email_content = msg_root.as_string()
+        content_size_kb = len(email_content.encode('utf-8')) / 1024
+        
+        if alias_email:
+            server.sendmail(alias_email, [alias_email] + recipients, email_content)
+            all_recipients = [alias_email] + recipients
+        else:
+            server.sendmail(from_email, [from_email] + recipients, email_content)
+            all_recipients = [from_email] + recipients
+        
+        server.quit()
+        
+        try:
+            history_conn = sqlite3.connect(DB_PATH)
+            history_cursor = history_conn.cursor()
+            history_cursor.execute('''INSERT INTO email_history (subject, recipients, email_content, content_size_kb, recipient_count, template_name)
+                            VALUES (?, ?, ?, ?, ?, ?)''',
+                            (f"[SCHEDULED] {subject}", ', '.join(all_recipients), email_content[:1000], content_size_kb, len(all_recipients), template_name))
+            history_conn.commit()
+            history_conn.close()
+        except Exception as log_err:
+            print(f"Error logging scheduled email history: {log_err}")
+        
+        return True
+        
+    except Exception as e:
+        print(f"Error sending scheduled user email: {e}")
+        traceback.print_exc()
+        return False
+
+def send_scheduled_single_email_with_cids(to_emails_list, subject, selected_items, from_email, alias_email, reply_to_email, encrypted_password, smtp_server, smtp_port, smtp_protocol, server_name, tautulli_base_url, tautulli_api_key, date_range, template_name, logo_filename, logo_width, email_text=""):
+    try:
+        msg_root = MIMEMultipart('related')
+        msg_root['Subject'] = f"[SCHEDULED] {subject}"
+        
+        if alias_email:
+            msg_root['From'] = alias_email
+            msg_root['To'] = alias_email
+        else:
+            msg_root['From'] = from_email
+            msg_root['To'] = from_email
+
+        if reply_to_email:
+            msg_root['Reply-To'] = reply_to_email
+        
+        msg_alternative = MIMEMultipart('alternative')
+        msg_root.attach(msg_alternative)
+
+        tautulli_data = fetch_tautulli_data_for_email(tautulli_base_url, tautulli_api_key, date_range, server_name)
+        tautulli_data["settings"]["logo_filename"] = logo_filename
+        tautulli_data["settings"]["logo_width"] = logo_width
+        
+        template_data = {
+            'selected_items': json.dumps(selected_items),
+            'email_text': email_text,
+            'subject': subject
+        }
+        
+        base_url = os.environ.get("PUBLIC_BASE_URL", "http://127.0.0.1:6397")
+        
+        email_html = build_email_html_with_all_cids(
+            template_data, 
+            tautulli_data, 
+            msg_root,
+            None,
+            None,
+            base_url,
+            None,
+            True
+        )
+
+        plain_text = convert_html_to_plain_text(email_html)
+        msg_alternative.attach(MIMEText(plain_text, 'plain', 'utf-8'))
+        msg_alternative.attach(MIMEText(email_html, 'html', 'utf-8'))
+
+        if smtp_protocol == 'SSL':
+            server = smtplib.SMTP_SSL(smtp_server, int(smtp_port))
+            server.login(from_email, decrypt(encrypted_password))
+        else:
+            server = smtplib.SMTP(smtp_server, int(smtp_port))
+            server.starttls()
+            server.login(from_email, decrypt(encrypted_password))
+        
+        email_content = msg_root.as_string()
+        content_size_kb = len(email_content.encode('utf-8')) / 1024
+        
+        if alias_email:
+            server.sendmail(alias_email, [alias_email] + to_emails_list, email_content)
+            all_recipients = [alias_email] + to_emails_list
+        else:
+            server.sendmail(from_email, [from_email] + to_emails_list, email_content)
+            all_recipients = [from_email] + to_emails_list
+        
+        server.quit()
+        
+        try:
+            history_conn = sqlite3.connect(DB_PATH)
+            history_cursor = history_conn.cursor()
+            history_cursor.execute('''INSERT INTO email_history (subject, recipients, email_content, content_size_kb, recipient_count, template_name)
+                            VALUES (?, ?, ?, ?, ?, ?)''',
+                            (f"[SCHEDULED] {subject}", ', '.join(all_recipients), email_content[:1000], content_size_kb, len(all_recipients), template_name))
+            history_conn.commit()
+            history_conn.close()
+        except Exception as log_err:
+            print(f"Error logging scheduled email history: {log_err}")
+        
+        print(f"Scheduled email sent successfully to {len(all_recipients)} recipients")
+        return True
+        
+    except Exception as e:
+        print(f"Error in send_scheduled_single_email_with_cids: {e}")
+        traceback.print_exc()
+        return False
+
+def build_graph_html_with_frontend_image(item, msg_root):
+    chart_name = item.get('name', 'Chart')
+    chart_image_data = item.get('chartImage', '')
+    
+    print(f"Processing graph: {chart_name}")
+    
+    if chart_image_data and chart_image_data.startswith('data:image/png'):
+        try:
+            header, encoded = chart_image_data.split(',', 1)
+            image_data = base64.b64decode(encoded)
+            
+            cid = make_msgid(domain="newsletterr.local")[1:-1]
+            
+            img_part = MIMEImage(image_data, _subtype='png')
+            img_part.add_header('Content-ID', f'<{cid}>')
+            img_part.add_header('Content-Disposition', 'inline', filename=f'chart-{cid}.png')
+            msg_root.attach(img_part)
+            
+            print(f"Successfully attached PNG chart with CID: {cid}")
+            
+            container_style = """
+                border-radius: 8px;
+                text-align: center;
+                font-family: 'IBM Plex Sans';
+            """
+            
+            image_style = """
+                max-width: 100%;
+                height: auto;
+                border-radius: 4px;
+                border: 0;
+                line-height: 100%;
+                outline: none;
+                text-decoration: none;
+                display: block;
+                margin: 0 auto;
+            """
+            
+            return f"""
+            <div style="{container_style}">
+                <img src="cid:{cid}" alt="{chart_name}" style="{image_style}">
+            </div>
+            """
+            
+        except Exception as e:
+            print(f"Error processing chart image for {chart_name}: {e}")
+    
+    print(f"No valid chart data for {chart_name}")
+    
+    placeholder_style = """
+        margin: 20px 0;
+        padding: 30px;
+        background-color: #f8f9fa;
+        border: 2px dashed #dee2e6;
+        border-radius: 8px;
+        text-align: center;
+        font-family: 'IBM Plex Sans';
+    """
+    
+    placeholder_title_style = """
+        color: #6c757d;
+        margin: 0 0 10px 0;
+        font-size: 18px;
+        font-weight: bold;
+        font-family: 'IBM Plex Sans';
+    """
+    
+    placeholder_text_style = """
+        color: #6c757d;
+        margin: 0;
+        font-size: 14px;
+        font-family: 'IBM Plex Sans';
+    """
+    
+    placeholder_subtext_style = """
+        color: #6c757d;
+        margin: 5px 0 0;
+        font-size: 12px;
+        font-style: italic;
+        font-family: 'IBM Plex Sans';
+    """
+    
+    return f"""
+    <div style="{placeholder_style}">
+        <h3 style="{placeholder_title_style}">{chart_name}</h3>
+        <p style="{placeholder_text_style}">Chart image not available</p>
+        <p style="{placeholder_subtext_style}">Interactive charts available in dashboard</p>
+    </div>
+    """
+
+def build_text_block_html(content, block_type='textblock', theme_colors=None):
+    if not theme_colors:
+        theme_colors = get_email_theme_colors()
+    
+    if not content or not content.strip():
+        return ""
+    
+    formatted_content = content.strip().replace('\n', '<br>')
+    
+    base_style = f"""
+        margin-bottom: 20px;
+        line-height: 1.6;
+        color: {theme_colors['text']};
+        font-family: 'IBM Plex Sans';
+    """
+    
+    if block_type == 'titleblock':
+        style = base_style + """
+            font-size: 2em;
+            font-weight: bold;
+            text-align: center;
+        """
+    elif block_type == 'headerblock':
+        style = base_style + """
+            font-size: 1.5em;
+            font-weight: bold;
+            text-align: center;
+        """
+    else:
+        style = base_style + """
+            margin-bottom: 15px;
+            text-align: center;
+        """
+    
+    return f'<div style="{style}">{formatted_content}</div>'
 
 @app.before_request
 def _boot_workers():
@@ -1618,9 +3104,9 @@ def index():
         "tautulli_api": decrypt(tautulli_api),
     }
     if logo_filename == '' or logo_filename is None:
-        settings['logo_filename'] = 'Asset_45x.png'
+        settings['logo_filename'] = 'Asset_94x.png'
         cursor.execute("""
-            INSERT INTO settings (id, logo_filename) VALUES (1, 'Asset_45x.png')
+            INSERT INTO settings (id, logo_filename) VALUES (1, 'Asset_94x.png')
             ON CONFLICT (id) DO UPDATE
             SET logo_filename = excluded.logo_filename
         """)
@@ -1732,6 +3218,8 @@ def index():
         'recommendations_json': get_cache_info('recommendations_json'),
         'filtered_users': get_cache_info('filtered_users')
     }
+
+    theme_settings = get_theme_settings()
         
     return render_template('index.html',
                            stats=stats, user_dict=user_dict,
@@ -1739,7 +3227,8 @@ def index():
                            recent_data=recent_data, libs=libs,
                            error=error, alert=alert, settings=settings,
                            email_lists=email_lists, cache_info=cache_info,
-                           recommendations_json=recommendations_json, filtered_users=filtered_users
+                           recommendations_json=recommendations_json, filtered_users=filtered_users,
+                           theme_settings=theme_settings
                         )
 
 @app.route('/proxy-art/<path:art_path>')
@@ -1838,9 +3327,11 @@ def pull_recommendations():
         'filtered_users': get_cache_info('filtered_users')
     }
     
+    theme_settings = get_theme_settings()
+
     return render_template('index.html', stats=stats, user_dict=user_dict, graph_data=graph_data, cache_info=cache_info,
                             graph_commands=graph_commands, recent_data=recent_data, libs=libs, settings=settings,
-                            recommendations_json=recommendations_json, filtered_users=filtered_users, alert=alert)
+                            recommendations_json=recommendations_json, filtered_users=filtered_users, alert=alert, theme_settings=theme_settings)
 
 @app.route('/send_email', methods=['POST'])
 def send_email():
@@ -1848,7 +3339,7 @@ def send_email():
     cursor = conn.cursor()
     cursor.execute("""
         SELECT
-        from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name
+        from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, logo_filename, logo_width
         FROM settings WHERE id = 1
     """)
     row = cursor.fetchone()
@@ -1864,25 +3355,15 @@ def send_email():
             "smtp_server": row[5] or "",
             "smtp_port": int(row[6]) if row[6] is not None else 587,
             "smtp_protocol": row[7] or "TLS",
-            "server_name": row[8] or ""
+            "server_name": row[8] or "",
+            "logo_filename": row[9] or "Asset_94x.png",
+            "logo_width": row[10] or 80
         }
     else:
         return jsonify({"error": "Please enter email info on settings page"}), 500
 
     data = request.get_json()
-    
-    print(f"DEBUG: Received email request")
-    print(f"DEBUG: Subject: {data.get('subject', 'No subject')}")
-    print(f"DEBUG: To emails: {data.get('to_emails', 'No recipients')}")
-    print(f"DEBUG: Email HTML length: {len(data.get('email_html', ''))}")
-    print(f"DEBUG: Number of images: {len(data.get('all_images', []))}")
-    
-    if data.get('all_images'):
-        for i, img in enumerate(data.get('all_images', [])):
-            print(f"DEBUG: Image {i}: CID={img.get('cid')}, MIME={img.get('mime')}, Data length={len(img.get('data', ''))}")
 
-    all_images = data.get('all_images', [])
-    email_html = data.get('email_html', '')
     from_email = settings['from_email']
     alias_email = settings['alias_email']
     reply_to_email = settings['reply_to_email']
@@ -1891,113 +3372,49 @@ def send_email():
     smtp_server = settings['smtp_server']
     smtp_port = int(settings['smtp_port'])
     smtp_protocol = settings['smtp_protocol']
-    server_name = settings['server_name']
     to_emails = data['to_emails'].split(", ")
     subject = data['subject']
+    user_dict = data.get('user_dict', {})
+    selected_items = data.get('selected_items', [])
 
-    static_root = app.static_folder
-    email_html, inline_parts = embed_local_imgs(email_html, static_root)
+    has_recommendations = any(item.get('type') == 'recs' for item in selected_items)
 
-    msg_root = MIMEMultipart('related')
-    msg_root['Subject'] = subject
-    if alias_email == '':
-        msg_root['From'] = from_email
-        msg_root['To'] = from_email
+    if has_recommendations and user_dict:
+        return send_recommendations_email_with_cids(
+            to_emails, subject, user_dict, selected_items,
+            from_email, alias_email, reply_to_email, password, smtp_username, 
+            smtp_server, smtp_port, smtp_protocol, settings
+        )
     else:
-        msg_root['From'] = alias_email
-        msg_root['To'] = alias_email
-    
-    if reply_to_email != '':
-        msg_root['Reply-To'] = reply_to_email
-
-    msg_alternative = MIMEMultipart('alternative')
-    msg_root.attach(msg_alternative)
-
-    html_content = email_html
-
-    html_content, _cids_from_data = inline_data_images_to_cid(html_content, msg_root)
-
-    attached_cids = []
-    for image_data in all_images:
-        try:
-            base64_data = image_data['data']
-            if base64_data.startswith('data:'):
-                base64_data = base64_data.split(',')[1]
-            
-            raw_image_data = base64.b64decode(base64_data)
-            
-            mime_type = image_data.get('mime', 'image/png')
-            subtype = mime_type.split('/')[-1] if '/' in mime_type else 'png'
-            if subtype == 'jpg':
-                subtype = 'jpeg'
-            
-            image_part = MIMEImage(raw_image_data, _subtype=subtype)
-            cid = image_data['cid']
-            image_part.add_header('Content-ID', f'<{cid}>')
-            image_part.add_header('Content-Disposition', 'inline', filename=f'{cid}.{subtype}')
-            msg_root.attach(image_part)
-            attached_cids.append(cid)
-        except Exception as e:
-            print(f"Error processing image {image_data.get('cid', 'unknown')}: {str(e)}")
-            continue
-    
-    plain = re.sub(r'<[^>]+>', ' ', html_content)
-    msg_alternative.attach(MIMEText(plain, 'plain', 'utf-8'))
-
-    msg_alternative.attach(MIMEText(html_content, 'html', 'utf-8'))
-
-    for p in inline_parts:
-        msg_root.attach(p)
-
-    try:
-        if smtp_protocol == 'SSL':
-            server = smtplib.SMTP_SSL(smtp_server, smtp_port)
-            login_username = smtp_username if smtp_username else from_email
-            server.login(login_username, decrypt(password))
-        else:
-            server = smtplib.SMTP(smtp_server, smtp_port)
-            server.starttls()
-            login_username = smtp_username if smtp_username else from_email
-            server.login(login_username, decrypt(password))
-            
-        email_content = msg_root.as_string()
-        content_size_kb = len(email_content.encode('utf-8')) / 1024
-        
-        if alias_email == '':
-            server.sendmail(from_email, [from_email] + to_emails, email_content)
-            all_recipients = [from_email] + to_emails
-        else:
-            server.sendmail(alias_email, [alias_email] + to_emails, email_content)
-            all_recipients = [alias_email] + to_emails
-        
-        try:
-            history_conn = sqlite3.connect(DB_PATH)
-            history_cursor = history_conn.cursor()
-            history_cursor.execute("""
-                INSERT INTO email_history (subject, recipients, email_content, content_size_kb, recipient_count, template_name)
-                VALUES (?, ?, ?, ?, ?, ?)
-            """, (
-                subject,
-                ', '.join(all_recipients),
-                email_content,
-                round(content_size_kb, 2),
-                len(all_recipients),
-                'Manual'
-            ))
-            history_conn.commit()
-            history_conn.close()
-        except Exception as history_error:
-            print(f"Error saving email history: {history_error}")
-        
-        server.quit()
-        return jsonify({"success": True})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return send_standard_email_with_cids(
+            to_emails, subject, selected_items,
+            from_email, alias_email, reply_to_email, password, smtp_username,
+            smtp_server, smtp_port, smtp_protocol, settings
+        )
 
 @app.route('/settings', methods=['GET', 'POST'])
 def settings():
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
+
+    theme_presets = {
+        "newsletterr_blue": {
+            "primary_color": "#8acbd4",
+            "secondary_color": "#222222",
+            "accent_color": "#62a1a4",
+            "background_color": "#333333",
+            "text_color": "#62a1a4",
+            "logo_filename": "Asset_94x.png"
+        },
+        "plex_orange": {
+            "primary_color": "#e5a00d",
+            "secondary_color": "#222222",
+            "accent_color": "#cc7b19",
+            "background_color": "#333333",
+            "text_color": "#cc7b19",
+            "logo_filename": "Asset_45x.png"
+        }
+    }
 
     if request.method == "POST":
         from_email = request.form.get("from_email")
@@ -2015,14 +3432,38 @@ def settings():
         conjurr_url = request.form.get("conjurr_url")
         logo_filename = request.form.get("logo_filename")
         logo_width = request.form.get("logo_width")
+        email_theme = request.form.get("email_theme", "newsletterr_blue")
+
+        if email_theme in theme_presets:
+            preset = theme_presets[email_theme]
+            primary_color = preset["primary_color"]
+            secondary_color = preset["secondary_color"]
+            accent_color = preset["accent_color"]
+            background_color = preset["background_color"]
+            text_color = preset["text_color"]
+            logo_filename = preset["logo_filename"]
+        else:
+            primary_color = request.form.get("primary_color", "#8acbd4")
+            secondary_color = request.form.get("secondary_color", "#222222")
+            accent_color = request.form.get("accent_color", "#62a1a4")
+            background_color = request.form.get("background_color", "#333333")
+            text_color = request.form.get("text_color", "#62a1a4")
 
         cursor.execute("""
             INSERT INTO settings
-            (id, from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, plex_url, tautulli_url, tautulli_api, conjurr_url, logo_filename, logo_width)
-            VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (id, from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, plex_url, tautulli_url,
+                tautulli_api, conjurr_url, logo_filename, logo_width, email_theme, primary_color, secondary_color, accent_color, background_color,
+                text_color)
+            VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (id) DO UPDATE
-            SET from_email = excluded.from_email, alias_email = excluded.alias_email, reply_to_email = excluded.reply_to_email, password = excluded.password, smtp_username = excluded.smtp_username, smtp_server = excluded.smtp_server, smtp_port = excluded.smtp_port, smtp_protocol = excluded.smtp_protocol, server_name = excluded.server_name, plex_url = excluded.plex_url, tautulli_url = excluded.tautulli_url, tautulli_api = excluded.tautulli_api, conjurr_url = excluded.conjurr_url, logo_filename = excluded.logo_filename, logo_width = excluded.logo_width
-        """, (from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, plex_url, tautulli_url, tautulli_api, conjurr_url, logo_filename, logo_width))
+            SET from_email = excluded.from_email, alias_email = excluded.alias_email, reply_to_email = excluded.reply_to_email, password = excluded.password,
+                smtp_username = excluded.smtp_username, smtp_server = excluded.smtp_server, smtp_port = excluded.smtp_port, smtp_protocol = excluded.smtp_protocol,
+                server_name = excluded.server_name, plex_url = excluded.plex_url, tautulli_url = excluded.tautulli_url, tautulli_api = excluded.tautulli_api,
+                conjurr_url = excluded.conjurr_url, logo_filename = excluded.logo_filename, logo_width = excluded.logo_width, email_theme = excluded.email_theme,
+                primary_color = excluded.primary_color, secondary_color = excluded.secondary_color, accent_color = excluded.accent_color,
+                background_color = excluded.background_color, text_color = excluded.text_color
+        """, (from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, plex_url, tautulli_url, tautulli_api,
+              conjurr_url, logo_filename, logo_width, email_theme, primary_color, secondary_color, accent_color, background_color, text_color))
         conn.commit()
         cursor.execute("SELECT plex_token FROM settings WHERE id = 1")
         plex_token = cursor.fetchone()[0]
@@ -2044,7 +3485,13 @@ def settings():
             "tautulli_api": decrypt(tautulli_api),
             "conjurr_url": conjurr_url,
             "logo_filename": logo_filename,
-            "logo_width": logo_width
+            "logo_width": logo_width,
+            "email_theme": email_theme,
+            "primary_color": primary_color,
+            "secondary_color": secondary_color,
+            "accent_color": accent_color,
+            "background_color": background_color,
+            "text_color": text_color
         }
 
         return render_template('settings.html', alert="Settings saved successfully!", settings=settings)
@@ -2066,6 +3513,12 @@ def settings():
         conjurr_url = cursor.execute("SELECT conjurr_url FROM settings WHERE id = 1").fetchone()[0]
         logo_filename = cursor.execute("SELECT logo_filename FROM settings WHERE id = 1").fetchone()[0]
         logo_width = cursor.execute("SELECT logo_width FROM settings WHERE id = 1").fetchone()[0]
+        email_theme = cursor.execute("SELECT email_theme FROM settings WHERE id = 1").fetchone()[0]
+        primary_color = cursor.execute("SELECT primary_color FROM settings WHERE id = 1").fetchone()[0]
+        secondary_color = cursor.execute("SELECT secondary_color FROM settings WHERE id = 1").fetchone()[0]
+        accent_color = cursor.execute("SELECT accent_color FROM settings WHERE id = 1").fetchone()[0]
+        background_color = cursor.execute("SELECT background_color FROM settings WHERE id = 1").fetchone()[0]
+        text_color = cursor.execute("SELECT text_color FROM settings WHERE id = 1").fetchone()[0]
     except:
         from_email = cursor.execute("SELECT from_email FROM settings WHERE id = 1").fetchone()
         alias_email = cursor.execute("SELECT alias_email FROM settings WHERE id = 1").fetchone()
@@ -2083,6 +3536,21 @@ def settings():
         conjurr_url = cursor.execute("SELECT conjurr_url FROM settings WHERE id = 1").fetchone()
         logo_filename = cursor.execute("SELECT logo_filename FROM settings WHERE id = 1").fetchone()
         logo_width = cursor.execute("SELECT logo_width FROM settings WHERE id = 1").fetchone()
+        email_theme = cursor.execute("SELECT email_theme FROM settings WHERE id = 1").fetchone()
+        primary_color = cursor.execute("SELECT primary_color FROM settings WHERE id = 1").fetchone()
+        secondary_color = cursor.execute("SELECT secondary_color FROM settings WHERE id = 1").fetchone()
+        accent_color = cursor.execute("SELECT accent_color FROM settings WHERE id = 1").fetchone()
+        background_color = cursor.execute("SELECT background_color FROM settings WHERE id = 1").fetchone()
+        text_color = cursor.execute("SELECT text_color FROM settings WHERE id = 1").fetchone()
+
+    current_theme = email_theme or "newsletterr_blue"
+    if current_theme in theme_presets and current_theme != "custom":
+        preset = theme_presets[current_theme]
+        primary_color = preset["primary_color"]
+        secondary_color = preset["secondary_color"]
+        accent_color = preset["accent_color"]
+        background_color = preset["background_color"]
+        text_color = preset["text_color"]
 
     settings = {
         "from_email": from_email or "",
@@ -2096,7 +3564,13 @@ def settings():
         "plex_token": plex_token or "",
         "tautulli_url": tautulli_url or "",
         "conjurr_url": conjurr_url or "",
-        "logo_filename": logo_filename or ""
+        "logo_filename": logo_filename or "",
+        "email_theme": email_theme or "newsletterr_blue",
+        "primary_color": primary_color or "#8acbd4",
+        "secondary_color": secondary_color or "#222222",
+        "accent_color": accent_color or "#62a1a4",
+        "background_color": background_color or "#333333",
+        "text_color": text_color or "#62a1a4",
     }
     if password == '' or password is None:
         settings["password"] = ""
@@ -2458,15 +3932,14 @@ def preview_schedule(schedule_id):
         email_lists_conn.close()
         
         if not email_list_result:
-            print(f"Email list {email_list_id} not found")
-            return False
+            return jsonify({"status": "error", "message": "Email list not found"}), 404
         
         to_emails = email_list_result[0]
         to_emails_list = [email.strip() for email in to_emails.split(",")]
         
         settings_conn = sqlite3.connect(DB_PATH)
         settings_cursor = settings_conn.cursor()
-        settings_cursor.execute("SELECT server_name, tautulli_url, tautulli_api FROM settings WHERE id = 1")
+        settings_cursor.execute("SELECT server_name, tautulli_url, tautulli_api, logo_filename, logo_width FROM settings WHERE id = 1")
         settings_row = settings_cursor.fetchone()
         settings_conn.close()
         
@@ -2474,103 +3947,45 @@ def preview_schedule(schedule_id):
             settings = {
                 "server_name": settings_row[0],
                 "tautulli_url": settings_row[1],
-                "tautulli_api": settings_row[2]
+                "tautulli_api": settings_row[2],
+                "logo_filename": settings_row[3],
+                "logo_width": settings_row[4]
             }
         else:
             settings = {"server_name": ""}
-        
-        can_use_cache, cache_reason = can_use_cached_data_for_preview(date_range)
-        
-        stats = []
-        graph_data = []
-        recent_data = []
-        
-        if can_use_cache:
-            print(f"Using cached data for preview: {cache_reason}")
-            stats = get_cached_data('stats', strict=False) or []
-            graph_data = get_cached_data('graph_data', strict=False) or []
-            recent_data = get_cached_data('recent_data', strict=False) or []
-        elif settings.get('tautulli_url') and settings.get('tautulli_api'):
-            tautulli_base_url = settings['tautulli_url'].rstrip('/')
-            tautulli_api_key = settings['tautulli_api']
-            
-            print(f"Fetching fresh Tautulli data for preview - {date_range} days ({cache_reason})")
-            
-            graph_commands = [
-                {'command': 'get_concurrent_streams_by_stream_type', 'name': 'Stream Type'},
-                {'command': 'get_plays_by_date', 'name': 'Plays by Date'},
-                {'command': 'get_plays_by_dayofweek', 'name': 'Plays by Day'},
-                {'command': 'get_plays_by_hourofday', 'name': 'Plays by Hour'},
-                {'command': 'get_plays_by_source_resolution', 'name': 'Plays by Source Res'},
-                {'command': 'get_plays_by_stream_resolution', 'name': 'Plays by Stream Res'},
-                {'command': 'get_plays_by_stream_type', 'name': 'Plays by Stream Type'},
-                {'command': 'get_plays_by_top_10_platforms', 'name': 'Plays by Top Platforms'},
-                {'command': 'get_plays_by_top_10_users', 'name': 'Plays by Top Users'},
-                {'command': 'get_plays_per_month', 'name': 'Plays per Month'},
-                {'command': 'get_stream_type_by_top_10_platforms', 'name': 'Stream Type by Top Platforms'},
-                {'command': 'get_stream_type_by_top_10_users', 'name': 'Stream Type by Top Users'}
-            ]
-            
-            recent_commands = [
-                {'command': 'movie'},
-                {'command': 'show'}
-            ]
-            
+
+        user_dict = {}
+        if settings.get('tautulli_url') and settings.get('tautulli_api'):
             try:
-                stats, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_home_stats', 'Stats', None, str(date_range))
-                if error:
-                    print(f"Error fetching stats: {error}")
-                
-                graph_data = []
-                for command in graph_commands:
-                    gd, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, command["command"], command["name"], error, str(date_range))
-                    if gd:
-                        graph_data.append(gd)
-                    if error:
-                        print(f"Error fetching graph data for {command['name']}: {error}")
-                
-                recent_data = []
-                for command in recent_commands:
-                    rd, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_recently_added', command["command"], error, "10")
-                    if rd:
-                        recent_data.append(rd)
-                    if error:
-                        print(f"Error fetching recent data for {command['command']}: {error}")
-                        
+                users_data, _ = run_tautulli_command(settings['tautulli_url'].rstrip('/'), settings['tautulli_api'], 'get_users', 'Users', None)
+                if users_data:
+                    user_dict = {
+                        str(u['user_id']): u['email']
+                        for u in users_data
+                        if u.get('email') and u.get('is_active')
+                    }
             except Exception as e:
-                print(f"Failed to fetch fresh data: {e}")
-                stats = get_cached_data('stats') or []
-                graph_data = get_cached_data('graph_data') or []
-                recent_data = get_cached_data('recent_data') or []
-        else:
-            print("Tautulli not configured, using cached data")
-            stats = get_cached_data('stats') or []
-            graph_data = get_cached_data('graph_data') or []
-            recent_data = get_cached_data('recent_data') or []
+                print(f"Error fetching user_dict for preview API: {e}")
         
-        graph_commands = [
-            {'command': 'get_concurrent_streams_by_stream_type', 'name': 'Stream Type'},
-            {'command': 'get_plays_by_date', 'name': 'Plays by Date'},
-            {'command': 'get_plays_by_dayofweek', 'name': 'Plays by Day'},
-            {'command': 'get_plays_by_hourofday', 'name': 'Plays by Hour'},
-            {'command': 'get_plays_by_source_resolution', 'name': 'Plays by Source Res'},
-            {'command': 'get_plays_by_stream_resolution', 'name': 'Plays by Stream Res'},
-            {'command': 'get_plays_by_stream_type', 'name': 'Plays by Stream Type'},
-            {'command': 'get_plays_by_top_10_platforms', 'name': 'Plays by Top Platforms'},
-            {'command': 'get_plays_by_top_10_users', 'name': 'Plays by Top Users'},
-            {'command': 'get_plays_per_month', 'name': 'Plays per Month'},
-            {'command': 'get_stream_type_by_top_10_platforms', 'name': 'Stream Type by Top Platforms'},
-            {'command': 'get_stream_type_by_top_10_users', 'name': 'Stream Type by Top Users'}
-        ]
+        tautulli_data = fetch_tautulli_data_for_email(
+            settings['tautulli_url'].rstrip('/'), 
+            settings['tautulli_api'], 
+            date_range, 
+            settings['server_name']
+        ) if settings.get('tautulli_url') and settings.get('tautulli_api') else {
+            'settings': settings,
+            'stats': [],
+            'graph_data': [],
+            'recent_data': [],
+            'graph_commands': []
+        }
+        tautulli_data["settings"]["logo_filename"] = settings["logo_filename"]
+        tautulli_data["settings"]["logo_width"] = settings["logo_width"]
         
-        recent_commands = [
-            {'command': 'movie'},
-            {'command': 'show'}
-        ]
-
-        recs = {}
-
-        if '[RECOMMENDATIONS]' in email_text:
+        recommendations_data = None
+        has_recs = any(item.get('type') == 'recs' for item in selected_items)
+        
+        if has_recs:
             try:
                 conn = sqlite3.connect(DB_PATH)
                 c = conn.cursor()
@@ -2579,23 +3994,13 @@ def preview_schedule(schedule_id):
                 conn.close()
                 conjurr_url = (row[0] or "").strip() if row else ""
 
-                if conjurr_url:
-                    user_dict = {}
-                    users, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_users', 'Users', error)
-                    if users:
-                        for user in users:
-                            if user['email'] != None and user['is_active']:
-                                user_dict[user['user_id']] = user['email']
-                    
+                if conjurr_url and user_dict:
                     filtered_users = {k: v for k, v in user_dict.items() if v in to_emails_list}
-
-                    _recs, _err = run_conjurr_command(conjurr_url, filtered_users, error=None)
-                    if isinstance(_recs, dict):
-                        recs = _recs
+                    recommendations_data, _ = run_conjurr_command(conjurr_url, filtered_users, error=None)
 
             except Exception as e:
                 print("preview_schedule: recommendations unavailable:", e)
-                recs = {}
+                recommendations_data = {}
         
         return jsonify({
             "status": "success",
@@ -2606,12 +4011,13 @@ def preview_schedule(schedule_id):
             "selected_items": selected_items,
             "date_range": date_range,
             "settings": settings,
-            "stats": stats,
-            "graph_data": graph_data,
-            "recent_data": recent_data,
-            "graph_commands": graph_commands,
-            "recent_commands": recent_commands,
-            "recommendations": recs
+            "stats": tautulli_data.get('stats', []),
+            "graph_data": tautulli_data.get('graph_data', []),
+            "recent_data": tautulli_data.get('recent_data', []),
+            "graph_commands": tautulli_data.get('graph_commands', []),
+            "recent_commands": [{'command': 'movie'}, {'command': 'show'}],
+            "recommendations": recommendations_data or {},
+            "user_dict": user_dict
         })
         
     except Exception as e:
@@ -2620,17 +4026,42 @@ def preview_schedule(schedule_id):
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/scheduling/<int:schedule_id>/preview-page', methods=['GET'])
-def preview_schedule_page(schedule_id):    
+def preview_schedule_page(schedule_id):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
     try:
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
         cursor.execute("SELECT date_range FROM email_schedules WHERE id = ?", (schedule_id,))
         schedule_result = cursor.fetchone()
-        conn.close()
         
         date_range = schedule_result[0] if schedule_result else 7
     except:
         date_range = 7
+
+    cursor.execute("SELECT logo_filename, logo_width, tautulli_url, tautulli_api FROM settings WHERE id = 1")
+    settings_row = cursor.fetchone()
+    logo_filename = settings_row[0] if settings_row else 'Asset_94x.png'
+    logo_width = settings_row[1] if settings_row else 80
+    tautulli_url = settings_row[2] if settings_row else ''
+    tautulli_api = settings_row[3] if settings_row else ''
+
+    settings = {
+        "logo_filename": logo_filename,
+        "logo_width": logo_width
+    }
+    conn.close()
+
+    user_dict = {}
+    if tautulli_url and tautulli_api:
+        try:
+            users_data, _ = run_tautulli_command(tautulli_url.rstrip('/'), tautulli_api, 'get_users', 'Users', None)
+            if users_data:
+                user_dict = {
+                    str(u['user_id']): u['email']
+                    for u in users_data
+                    if u.get('email') and u.get('is_active')
+                }
+        except Exception as e:
+            print(f"Error fetching user_dict for preview: {e}")
     
     can_use_cache, cache_reason = can_use_cached_data_for_preview(date_range)
     
@@ -2661,6 +4092,8 @@ def preview_schedule_page(schedule_id):
         {'command': 'get_stream_type_by_top_10_platforms', 'name': 'Stream Type by Top Platforms'},
         {'command': 'get_stream_type_by_top_10_users', 'name': 'Stream Type by Top Users'}
     ]
+
+    theme_settings = get_theme_settings()
     
     return render_template(
         'schedule_preview.html', 
@@ -2668,7 +4101,10 @@ def preview_schedule_page(schedule_id):
         graph_data=graph_data, 
         recent_data=recent_data,
         graph_commands=graph_commands,
-        recommendations=recommendations
+        recommendations=recommendations,
+        settings=settings,
+        user_dict=user_dict,
+        theme_settings=theme_settings
     )
 
 @app.route('/scheduling/calendar-data', methods=['GET'])

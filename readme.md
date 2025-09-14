@@ -9,64 +9,64 @@ Newsletterr is a lightweight Flask application that talks to **[Tautulli](https:
 ## Features
 
 ### Data & Content
-* **One‑click stats pull** – pick a time range (quick buttons: 7 / 30 / 90 / … days) and “recently added” count; Newsletterr queries Tautulli for most watched movies/shows, active users, platforms, libraries, artists and more.
-* **Recently Added injection** – drop `[RECENTLY_ADDED]` where you want the curated recently added block to appear (library selection supported).
-* **User Recommendations** – integrate with **conjurr** and insert `[RECOMMENDATIONS]` to show personalized watch suggestions (per BCC list at fetch time).
-* **Snap‑ins (drag/add workflow)** – add Stats, Graphs, Text Blocks (Title, Intro, Body, Outro) in any order to compose a tailored newsletter body.
+* **One‑click stats pull** - pick a time range (quick buttons: 7 / 30 / 90 / … days) and “recently added” count; Newsletterr queries Tautulli for most watched movies/shows, active users, platforms, libraries, artists and more.
+* **Recently Added injection** - drop `[RECENTLY_ADDED]` where you want the curated recently added block to appear (library selection supported).
+* **User Recommendations** - integrate with **conjurr** and insert `[RECOMMENDATIONS]` to show personalized watch suggestions (per BCC list at fetch time).
+* **Snap‑ins (drag/add workflow)** - add Stats, Graphs, Text Blocks (Title, Intro, Body, Outro) in any order to compose a tailored newsletter body.
 
 ### Visualization
-* **Interactive charts** – Highcharts rendered in‑app; suitable images captured for reliable e‑mail client display.
-* **Styled data tables** – Plex / Tautulli metrics rendered as clean, responsive tables prior to embedding.
-* **Live WYSIWYG preview** – side‑by‑side iframe updates instantly as you assemble the email.
+* **Interactive charts** - Highcharts rendered in‑app; suitable images captured for reliable e‑mail client display.
+* **Styled data tables** - Plex / Tautulli metrics rendered as clean, responsive tables prior to embedding.
+* **Live WYSIWYG preview** - side‑by‑side iframe updates instantly as you assemble the email.
 
 ### Templates & Reuse
-* **Email Templates** – save, load, clone, and delete custom templates (tracks chosen snap‑ins & layout) and re‑apply later.
-* **Template provenance tracking** – every sent email logs which template (or “Manual”) produced it; visible in Email History.
+* **Email Templates** - save, load, clone, and delete custom templates (tracks chosen snap‑ins & layout) and re‑apply later.
+* **Template provenance tracking** - every sent email logs which template (or “Manual”) produced it; visible in Email History.
 
 ### Automation & Scheduling
-* **Automated Schedules** – create Daily / Weekly / Monthly schedules with start date, fixed send time, and data range.
-* **Per‑schedule strict data window** – schedule previews fetch exactly the configured date range (no accidental reuse of broader cached data).
-* **Send Now** – manual immediate dispatch per schedule (with flashing progress state) without disturbing the schedule cadence.
-* **Color‑coded Schedule Calendar** – compact, modern calendar view showing all upcoming sends; each template assigned a stable color (legend included) with brightening hover effect.
-* **Per‑row template color dots** – schedule list includes a left‑edge colored dot consistent with calendar colors.
+* **Automated Schedules** - create Daily / Weekly / Monthly schedules with start date, fixed send time, and data range.
+* **Per‑schedule strict data window** - schedule previews fetch exactly the configured date range (no accidental reuse of broader cached data).
+* **Send Now** - manual immediate dispatch per schedule (with flashing progress state) without disturbing the schedule cadence.
+* **Color‑coded Schedule Calendar** - compact, modern calendar view showing all upcoming sends; each template assigned a stable color (legend included) with brightening hover effect.
+* **Per‑row template color dots** - schedule list includes a left‑edge colored dot consistent with calendar colors.
 
 ### Delivery & Recipients
-* **SMTP (BCC) sending** – works with Gmail app passwords, generic SMTP, Mailgun, etc.; BCC chip input for recipient management & saved recipient lists.
-* **Email list management** – save, load, delete named email lists with instant population of the BCC field.
-* **Size tracking** – sent email content size (KB) logged for each history entry.
+* **SMTP (BCC) sending** - works with Gmail app passwords, generic SMTP, Mailgun, etc.; BCC chip input for recipient management & saved recipient lists.
+* **Email list management** - save, load, delete named email lists with instant population of the BCC field.
+* **Size tracking** - sent email content size (KB) logged for each history entry.
 
 ### Caching & Performance
-* **Smart multi‑segment cache** – stores stats, user data, recent additions, and graph payloads separately.
-* **Global cache status badge** – real‑time indicator (fresh / warn / old / stale / missing) with tooltips and animated attention state if segments absent.
-* **Manual & automatic refresh** – daily auto refresh plus explicit “Get Stats\Users” trigger; one‑click “Clear Cache” button.
+* **Smart multi‑segment cache** - stores stats, user data, recent additions, and graph payloads separately.
+* **Global cache status badge** - real‑time indicator (fresh / warn / old / stale / missing) with tooltips and animated attention state if segments absent.
+* **Manual & automatic refresh** - daily auto refresh plus explicit “Get Stats\Users” trigger; one‑click “Clear Cache” button.
 
 ### History & Auditing
-* **Email History** – full ledger of subject, send timestamp (compact formatting), template used, size, recipient count.
-* **Recipient viewer modal** – drill into any email to list all BCC recipients.
-* **Clear History** – bulk purge with confirmation.
+* **Email History** - full ledger of subject, send timestamp (compact formatting), template used, size, recipient count.
+* **Recipient viewer modal** - drill into any email to list all BCC recipients.
+* **Clear History** - bulk purge with confirmation.
 
 ### UX & Appearance
-* **Light / Dark aware styling** – adaptive colors for dashboard, modals, calendar, and tables.
-* **Animated feedback** – loading spinner, flashing Send Now state, subtle hover depth on calendar days & dots.
-* **Compact date formatting** – standardized abbreviated month formats (e.g. “Mar. 27, 2025” / “Sunday Sep. 21, 2025  09:00”).
-* **Responsive wrapped button groups** – quick time‑range buttons auto‑wrap with padded container.
+* **Light / Dark aware styling** - adaptive colors for dashboard, modals, calendar, and tables.
+* **Animated feedback** - loading spinner, flashing Send Now state, subtle hover depth on calendar days & dots.
+* **Compact date formatting** - standardized abbreviated month formats (e.g. “Mar. 27, 2025” / “Sunday Sep. 21, 2025  09:00”).
+* **Responsive wrapped button groups** - quick time‑range buttons auto‑wrap with padded container.
 
 ### Persistence & Local Footprint
-* **SQLite storage** – schedules, templates, email history, lists & settings contained in local database files (no external service dependency).
-* **Self‑contained runtime** – pure Python + Flask + CDN assets; no Node build or container required (optional packaging roadmap below).
+* **SQLite storage** - schedules, templates, email history, lists & settings contained in local database files (no external service dependency).
+* **Self‑contained runtime** - pure Python + Flask + CDN assets; no Node build or container required (optional packaging roadmap below).
 
 ### Extensibility
-* **Modular stat / graph command list** – extendable set of Tautulli commands for future metrics.
-* **Placeholders system** – simple token replacement for dynamic blocks keeps templating approachable.
+* **Modular stat / graph command list** - extendable set of Tautulli commands for future metrics.
+* **Placeholders system** - simple token replacement for dynamic blocks keeps templating approachable.
 
 ### Safety & Transparency
-* **Explicit cache clearing** – ensures forced fresh pull when data integrity matters.
-* **Exact range enforcement** – avoids quietly reusing mismatched cached spans preventing misleading analytics.
+* **Explicit cache clearing** - ensures forced fresh pull when data integrity matters.
+* **Exact range enforcement** - avoids quietly reusing mismatched cached spans preventing misleading analytics.
 
 ### Quality of Life
-* **Pop‑out live preview** – open newsletter preview in new window while editing.
-* **Visual template color mapping** – instantly correlate schedule entries and calendar occurrences.
-* **Accessible tooltips & titles** – hover details for schedule dots and events.
+* **Pop‑out live preview** - open newsletter preview in new window while editing.
+* **Visual template color mapping** - instantly correlate schedule entries and calendar occurrences.
+* **Accessible tooltips & titles** - hover details for schedule dots and events.
 
 ---
 
@@ -119,16 +119,16 @@ By default the app listens on **http://127.0.0.1:6397**.
 1. Navigate to **Settings** in the navbar.  
 2. Connect to your Plex server with **Connect Plex** button. This is used for media posters.  
 3. Fill in:
-   * **From** – e‑mail address that will appear as the sender  
-   * **Alias (optional)** – _Send As_ alias. If blank, **From** will be used, [setup instructions](https://support.google.com/a/answer/33327?hl=en)  
-   * **Password** – account or [app‑password](https://support.google.com/mail/answer/185833?hl=en) if using Gmail. App Password is required by Gmail for security, it will not work with your regular Gmail password  
-   * **SMTP Server** – e.g. `smtp.gmail.com`  
-   * **SMTP Port** – `465` for SSL or `587` for TLS  
-   * **Plex Server Name** – appears in the newsletter header. This is grabbed when Plex is connected, but can be overwritten if wanted  
+   * **From** - e‑mail address that will appear as the sender  
+   * **Alias (optional)** - _Send As_ alias. If blank, **From** will be used, [setup instructions](https://support.google.com/a/answer/33327?hl=en)  
+   * **Password** - account or [app‑password](https://support.google.com/mail/answer/185833?hl=en) if using Gmail. App Password is required by Gmail for security, it will not work with your regular Gmail password  
+   * **SMTP Server** - e.g. `smtp.gmail.com`  
+   * **SMTP Port** - `465` for SSL or `587` for TLS  
+   * **Plex Server Name** - appears in the newsletter header. This is grabbed when Plex is connected, but can be overwritten if wanted  
    * **Plex URL** - used to pull posters for recently added items. This is grabbed when Plex is connected, but can be overwritten if wanted  
-   * **Tautulli URL** – e.g. `http://localhost:8181`  
-   * **Tautulli API Key** – make sure 'Enable API' is checked, and copy the API key from your [Tautulli settings.](http://localhost:8181/settings#tabs_tabs-web_interface)  
-   * **Conjurr URL** – e.g. `http://localhost:2665`  
+   * **Tautulli URL** - e.g. `http://localhost:8181`  
+   * **Tautulli API Key** - make sure 'Enable API' is checked, and copy the API key from your [Tautulli settings.](http://localhost:8181/settings#tabs_tabs-web_interface)  
+   * **Conjurr URL** - e.g. `http://localhost:2665`  
    * **Logo Filename** - This sets the logo at the top of the newsletter. To use a custom logo, place your logo file in /static/img/ and add the filename here  
    * **Logo Width** - Use this to adjust the size of your custom logo. A small logo should be ~20, medium ~40, and banner size ~80  
 4. Click **Apply Settings**.  Settings are saved to `database/data.db`.
@@ -151,28 +151,31 @@ By default the app listens on **http://127.0.0.1:6397**.
 
 ## License
 
-Released under the **MIT License** – see [LICENSE](LICENSE) for details.
+Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 
 ---
 
 ## Upcoming Changes
 
-### v0.9.14
-* Some issue sending a second scheduled email
-* Recommendations/recently added headers bigger in scheduled send | grid 5 by x instead
-* Schedule send only sends dark mode
+### v0.9.15
+* Look into email formatting across email clients
+* Make clickable posters for available recommendations to take users to Plex to watch
 * Graph titles need to specify the date range - or at least show what time range the data is for somewhere in the email
 * Find email size regulations, warn on too big | reduce image size to better fall with regulations
 * Custom logo logic needs file select to work with docker | add in small/banner/custom dropdown - and possibly a 'no logo' option?
-* Settings for email coloring - plex yellow, newsletterr blue, custom
 * Does Tautulli API support recently added music?
 * Logo positioning setting
+* Managed users show after pulling recommendations
+* Plex 'Secure Connections' setting causing image 401
+* Rename 'ra' and 'recs' snap in block for clarity?
+* In schedule calendar, template names are showing as template #
+* Add more date range options in schedule builder to match dashboard
 
 ### v1.0.0
 * Compile EXE / ELF files
 
 ### v1.1.0
-* Switch TV Show recently added info out to just show the show name, not espisode or season number
+* Switch TV Show recently added info out to just show the show name, not episode or season number || use artwork from the show not the episode/season
 * Get fonts showing on Gmail receive side
 * Api/webhooks
 * Opt out support
@@ -193,12 +196,11 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 * Servarr PR
 * Stats for total items in library
 * Ratings (G, PG, etc) listed on recently added
-* Auto split recommendations email so its not all sent to everyone
-* Can the recommendations in email have clickable posters to the admins overseerr for requesting unavailable items? And for available take user to watch on Plex
 * Export email HTML button
 * Export logs button | link to discord
 * Biweekly/semimonthly option for scheduled emails | possibly CRON
 * Option in settings for width of RA/Recs grids
+* Improved BCC list editing
 * Mobile optimizations, i.e.:
 ```
 <style>
@@ -213,6 +215,16 @@ Released under the **MIT License** – see [LICENSE](LICENSE) for details.
 ---
 
 ## Recent Changes
+
+### v0.9.14
+* If recommendations are in email, email is sent to each user separately
+* Logo updated in scheduled send and centered everywhere for now
+* Fixed issue when sending a second scheduled email
+* Switched from one big image to HTML based for stats/recommendations/recently added
+* The recommendations in email have clickable posters to the admins overseerr for requesting unavailable items
+* Fixed issue where /env was not creating on first start for new users
+* Recently added and recommendations snap-ins integrated into scheduled sending
+* Added settings for email coloring - plex orange, newsletterr blue, custom
 
 ### v0.9.13
 * Adjusted tautulli API error reporting

@@ -102,6 +102,45 @@
                 <input type="number" id="logo_width" name="logo_width"
                     {% if settings.logo_width != "" %}value="{{ settings.logo_width }}"{% endif %}
                     placeholder="80"><br><br>
+
+                <label for="email_theme">Email Theme:</label><br>
+                <select id="email_theme" name="email_theme">
+                    <option value="newsletterr_blue" {% if settings.email_theme == 'newsletterr_blue' %}selected{% endif %}>Newsletterr Blue</option>
+                    <option value="plex_orange" {% if settings.email_theme == 'plex_orange' %}selected{% endif %}>Plex Orange</option>
+                    <option value="custom" {% if settings.email_theme == 'custom' %}selected{% endif %}>Custom</option>
+                </select><br><br>
+
+                <div id="color_inputs" style="display: {% if settings.email_theme == 'custom' %}block{% else %}none{% endif %};">
+                    <label for="primary_color">Primary Color (Main brand color for headers and accents):</label>
+                    <div class="input-group">
+                        <input type="color" id="primary_color" name="primary_color" value="{{ settings.primary_color }}">
+                        <input type="text" value="{{ settings.primary_color }}" readonly>
+                    </div><br>
+
+                    <label for="secondary_color">Secondary Color (Secondary color for footers and borders):</label>
+                    <div class="input-group">
+                        <input type="color" id="secondary_color" name="secondary_color" value="{{ settings.secondary_color }}">
+                        <input type="text" value="{{ settings.secondary_color }}" readonly>
+                    </div><br>
+
+                    <label for="accent_color">Accent Color (Accent color for links and highlights):</label>
+                    <div class="input-group">
+                        <input type="color" id="accent_color" name="accent_color" value="{{ settings.accent_color }}">
+                        <input type="text" value="{{ settings.accent_color }}" readonly>
+                    </div><br>
+
+                    <label for="background_color">Background Color:</label>
+                    <div class="input-group">
+                        <input type="color" id="background_color" name="background_color" value="{{ settings.background_color }}">
+                        <input type="text" value="{{ settings.background_color }}" readonly>
+                    </div><br>
+
+                    <label for="text_color">Text Color:</label>
+                    <div class="input-group">
+                        <input type="color" id="text_color" name="text_color" value="{{ settings.text_color }}">
+                        <input type="text" value="{{ settings.text_color }}" readonly>
+                    </div><br>
+                </div>
                 
                 <button id="apply_settings" class="button">Apply Settings</button>
             </form>
@@ -109,6 +148,31 @@
         <script>
             document.getElementById('settings_form').addEventListener('submit', (e) => {
                 showSpinner('Applying settings...');
+            });
+        </script>
+        <script>
+            document.querySelectorAll('input[type="color"]').forEach(colorInput => {
+                const textInput = colorInput.parentElement.querySelector('input[type="text"]');
+                
+                colorInput.addEventListener('change', function() {
+                    textInput.value = this.value;
+                });
+                
+                textInput.addEventListener('change', function() {
+                    if (this.value.match(/^#[0-9A-F]{6}$/i)) {
+                        colorInput.value = this.value;
+                    }
+                });
+            });
+        </script>
+        <script>
+            document.getElementById('email_theme').addEventListener('change', function() {
+                const colorInputs = document.getElementById('color_inputs');
+                if (this.value === 'custom') {
+                    colorInputs.style.display = 'block';
+                } else {
+                    colorInputs.style.display = 'none';
+                }
             });
         </script>
         <script>

@@ -506,25 +506,6 @@
                 });
             }
 
-            function buildRANodeForLibrary(libName) {
-                const list = items.filter(i => i.library === libName);
-                const wrap = document.createElement('div');
-                wrap.style.cssText = 'background: #282A2D; padding: 8px; width: 1080px; max-width: 100%;';
-
-                const ul = document.createElement('ul');
-                ul.className = 'grid grid-cols-10 gap-3';
-                ul.style.display = 'grid';
-                ul.style.gridTemplateColumns = 'repeat(5, 1fr)';
-                ul.style.gap = '12px';
-                ul.style.listStyle = 'none';
-                ul.style.padding = '0';
-                ul.style.margin = '0';
-
-                wrap.appendChild(ul);
-                renderRAGrid(list, ul);
-                return { node: wrap, list };
-            }
-
             (function buildRALibraryRows() {
                 const libs = [...new Set(items.map(i => i.library).filter(Boolean))].sort();
                 const host = document.getElementById('ra-lib-list');
@@ -570,8 +551,8 @@
                     const imgURL = buildThumb(it.thumb);
                     const li = document.createElement('li');
                     li.className = "group rounded-2xl overflow-hidden bg-[#8acbd4] dark:bg-[#333] " + 
-                    "!shadow-[0_6px_18px_rgba(0,0,0,0.6)] hover:!shadow-[0_10px_28px_rgba(0,0,0,0.6)] " + 
-                    "dark:!shadow-[0_6px_18px_rgba(74,127,130,0.6)] dark:hover:!shadow-[0_10px_28px_rgba(74,127,130,0.6)]";
+                    "!shadow-[0_6px_18px_rgba(0, 0, 0, 0.6)] hover:!shadow-[0_10px_28px_rgba(0, 0, 0, 0.6)] " + 
+                    "dark:!shadow-[0_6px_18px_rgba(74, 127, 130, 0.6)] dark:hover:!shadow-[0_10px_28px_rgba(74, 127, 130, 0.6)]";
                     li.dataset.lib = it.library;
                     li.innerHTML = `
                         <style>
@@ -637,17 +618,206 @@
             });
         </script>
         <script>
-            async function waitForImages(scope){
-                const imgs = Array.from(scope.querySelectorAll('img'));
-                await Promise.all(imgs.map(img => img.complete ? 0 : new Promise(res=>{
-                    img.addEventListener('load', res, {once:true});
-                    img.addEventListener('error', res, {once:true});
-                })));
-                try { await document.fonts?.ready; } catch(_){}
-            }
-        </script>
-        <script>
             let selectedItems = [];
+            const statsList = {{ stats | tojson }};
+            const themeSettings = {{ theme_settings | tojson }};
+
+            function getThemedEmailCSS() {
+                const emailTheme = themeSettings.email_theme || 'newsletter_blue';
+                const isDark = document.documentElement.classList.contains('dark');
+                
+                let bgColor, textColor, cardBg, borderColor, mutedColor;
+                
+                bgColor = themeSettings.background_color || '#333333';
+                textColor = themeSettings.text_color || '#62a1a4';
+                cardBg = '#2d2d2d';
+                borderColor = '#404040';
+                mutedColor = '#cccccc';
+                
+                const primaryColor = themeSettings.primary_color || '#8acbd4';
+                const secondaryColor = themeSettings.secondary_color || '#222222';
+                const accentColor = themeSettings.accent_color || '#62a1a4';
+                const logoWidth = "{{ settings.logo_width or 80 }}";
+                
+                return `
+                    <style>
+                        @import url(https://fonts.googleapis.com/css?family=IBM+Plex+Sans:400,700&display=swap);
+
+                        :root {
+                            --email-bg: ${bgColor};
+                            --email-text: ${textColor};
+                            --email-primary: ${primaryColor};
+                            --email-secondary: ${secondaryColor};
+                            --email-accent: ${accentColor};
+                            --email-card-bg: ${cardBg};
+                            --email-border: ${borderColor};
+                            --email-muted: ${mutedColor};
+                        }
+                        
+                        body {
+                            margin: 0;
+                            padding: 0;
+                            font-family: 'IBM Plex Sans';
+                            background-color: var(--email-bg);
+                            line-height: 1.6;
+                            color: var(--email-text);
+                        }
+                        
+                        .email-container {
+                            width: 100%;
+                            background: var(--email-card-bg);
+                            border-radius: 8px;
+                            overflow: hidden;
+                            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+                            border: 1px solid var(--email-border);
+                        }
+                        
+                        .email-header {
+                            background: linear-gradient(135deg, var(--email-accent) 0%, var(--email-primary) 100%);
+                            color: white;
+                            padding: 10px 20px;
+                            text-align: center;
+                        }
+                        
+                        .email-logo {
+                            max-width: ${logoWidth}px;
+                            height: auto;
+                        }
+                        
+                        .email-title {
+                            font-size: 28px;
+                            font-weight: bold;
+                            margin: 0;
+                            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+                        }
+                        
+                        .email-content {
+                            padding: 30px 20px;
+                            color: var(--email-text);
+                            background: var(--email-card-bg);
+                        }
+                        
+                        .email-footer {
+                            background: var(--email-secondary);
+                            padding: 20px;
+                            text-align: center;
+                            border-top: 3px solid var(--email-primary);
+                            color: var(--email-muted);
+                            font-size: 12px;
+                        }
+                        
+                        .email-footer a {
+                            color: var(--email-accent);
+                            text-decoration: none;
+                        }
+                        
+                        .stats-card {
+                            margin: 20px 0;
+                            border-radius: 8px;
+                            overflow: hidden;
+                            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+                            border: 1px solid var(--email-border);
+                            position: relative;
+                        }
+                        
+                        .stats-bg-blur {
+                            position: absolute;
+                            top: 0;
+                            left: 0;
+                            right: 0;
+                            bottom: 0;
+                            background-size: cover;
+                            background-position: center;
+                            background-repeat: no-repeat;
+                            filter: blur(5px) brightness(1);
+                            z-index: 0;
+                        }
+                        
+                        .stats-overlay {
+                            position: absolute;
+                            top: 0;
+                            left: 0;
+                            right: 0;
+                            bottom: 0;
+                            background: rgba(0, 0, 0, 0.3);
+                            z-index: 1;
+                        }
+                        
+                        .stats-content {
+                            position: relative;
+                            z-index: 2;
+                        }
+                        
+                        .stats-header {
+                            background: var(--email-bg);
+                            color: var(--email-primary);
+                            padding: 15px;
+                            text-align: center;
+                            font-weight: bold;
+                            font-size: 18px;
+                        }
+                        
+                        .stats-table {
+                            width: 100%;
+                            border-collapse: collapse;
+                        }
+                        
+                        .stats-table th {
+                            padding: 12px;
+                            background: rgba(52, 58, 64, 0.9);
+                            color: white;
+                            font-weight: bold;
+                            border: none;
+                        }
+                        
+                        .stats-table td {
+                            padding: 12px;
+                            background: rgba(255, 255, 255, 0.5);
+                            color: #333;
+                            border-bottom: 1px solid rgba(222, 226, 230, 0.8);
+                        }
+                        
+                        .recently-added {
+                            background: var(--email-card-bg);
+                            padding: 20px;
+                            border-radius: 8px;
+                            margin: 20px 0;
+                            border: 1px solid var(--email-border);
+                        }
+                        
+                        .recently-added h2 {
+                            text-align: center;
+                            color: var(--email-text);
+                            margin-bottom: 20px;
+                        }
+                        
+                        .recommendations-block {
+                            margin: 30px 0;
+                            padding: 20px;
+                            background: var(--email-card-bg);
+                            border-radius: 8px;
+                            border: 1px solid var(--email-border);
+                        }
+                        
+                        .recommendations-block h2, .recommendations-block h3 {
+                            color: var(--email-text);
+                        }
+                        
+                        .chart-placeholder {
+                            margin: 20px 0;
+                            padding: 30px;
+                            background: var(--email-card-bg);
+                            border: 2px dashed var(--email-border);
+                            border-radius: 8px;
+                            text-align: center;
+                        }
+                        
+                        .chart-placeholder h3, .chart-placeholder p {
+                            color: var(--email-muted);
+                        }
+                    </style>
+                `;
+            }
 
             async function updatePreview() {
                 try {
@@ -660,336 +830,651 @@
                     
                     const serverName = "{{ settings.server_name }}";
                     const subject = document.getElementById('subject').value;
-                    const isDark = document.documentElement.classList.contains('dark');
+                    const logoFilename = "{{ settings.logo_filename }}";
+                    const logoWidth = "{{ settings.logo_width }}";
+                    const themedCSS = getThemedEmailCSS();
 
-                    console.log('Server name:', serverName);
-                    console.log('Subject:', subject);
-
-                    let html = "";
-
-                    const selectedGraphs = selectedItems.filter(item => item.type === 'graph').map(item => item.id);
-                    const selectedStats = selectedItems.filter(item => item.type === 'stat').map(item => item.id);
-                    
-                    console.log('selectedGraphs:', selectedGraphs);
-                    console.log('selectedStats:', selectedStats);
-
-                    let allItemsHTML = "";
-                    let insertedBreakBeforeStats = false;
+                    let contentHTML = "";
                     
                     for (let item of selectedItems) {
                         if (item.type === 'textblock') {
                             const content = getTextBlockContent(item.id);
                             if (content && content.trim().length > 0) {
                                 const formattedContent = content.trim().replace(/\n/g, "<br>");
-                                allItemsHTML += `<div style="margin-bottom: 15px;">${formattedContent}</div>`;
+                                contentHTML += `<div style="margin-bottom: 15px; line-height: 1.6; text-align: center; color: var(--email-text);">${formattedContent}</div>`;
                             }
                         } else if (item.type === 'headerblock') {
                             const content = getTextBlockContent(item.id);
                             if (content && content.trim().length > 0) {
                                 const formattedContent = content.trim().replace(/\n/g, "<br>");
-                                allItemsHTML += `<div style="margin-bottom: 20px; font-size: 1.5em; font-weight: bold; text-align: center;">${formattedContent}</div>`;
+                                contentHTML += `<div style="margin-bottom: 20px; font-size: 1.5em; font-weight: bold; text-align: center; color: var(--email-text);">${formattedContent}</div>`;
                             }
                         } else if (item.type === 'titleblock') {
                             const content = getTextBlockContent(item.id);
                             if (content && content.trim().length > 0) {
                                 const formattedContent = content.trim().replace(/\n/g, "<br>");
-                                allItemsHTML += `<div style="margin-bottom: 20px; font-size: 2em; font-weight: bold; text-align: center;">${formattedContent}</div>`;
-                            }
-                        } else if (item.type === 'graph') {
-                            const chart = Highcharts.charts.find(c => c && c.renderTo.id === item.id);
-                            if (chart) {
-                                try {
-                                    const svg = chart.getSVG();
-                                    const canvas = document.createElement("canvas");
-                                    const ctx = canvas.getContext("2d");
-                                    const img = new Image();
-
-                                    await new Promise((resolve, reject) => {
-                                        img.onload = () => {
-                                            canvas.width = img.width;
-                                            canvas.height = img.height;
-                                            ctx.drawImage(img, 0, 0);
-                                            const dataUrl = canvas.toDataURL("image/png");
-                                            allItemsHTML += `<img src="${dataUrl}" style="max-width: 100%; margin-bottom: 10px;"><br>`;
-                                            resolve();
-                                        };
-                                        img.onerror = (error) => {
-                                            console.warn('Failed to load graph image for', item.id, error);
-                                            resolve();
-                                        };
-                                        img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)));
-                                    });
-                                } catch (error) {
-                                    console.warn('Error processing graph', item.id, error);
-                                }
+                                contentHTML += `<div style="margin-bottom: 20px; font-size: 2em; font-weight: bold; text-align: center; color: var(--email-text);">${formattedContent}</div>`;
                             }
                         } else if (item.type === 'stat') {
-                            if (!insertedBreakBeforeStats) {
-                                allItemsHTML += `<div style="height:16px;line-height:16px;font-size:16px">&nbsp;</div>`;
-                                insertedBreakBeforeStats = true;
-                            }
-                            const tableElement = document.getElementById(item.id);
-                            if (tableElement) {
-                                try {
-                                    const wasHidden = tableElement.classList.contains('d-none');
-                                    if (wasHidden) {
-                                        tableElement.classList.remove('d-none');
-                                    }
-                                    await new Promise(resolve => setTimeout(resolve, 150));
-
-                                    const original = document.getElementById(item.id);
-                                    if (!original) continue;
-
-                                    const clone = original.cloneNode(true);
-                                    const tempWrapper = document.createElement('div');
-
-                                    clone.style.display = 'inline-block';
-                                    clone.style.width = 'auto';
-
-                                    const table = clone.querySelector('.content-table');
-                                    if (table) {
-                                        table.style.width = 'auto';
-                                    }
-
-                                    tempWrapper.style.position = 'fixed';
-                                    tempWrapper.style.top = '-10000px';
-                                    tempWrapper.style.left = '0';
-                                    tempWrapper.style.zIndex = '-1';
-                                    tempWrapper.style.overflow = 'hidden';
-                                    tempWrapper.appendChild(clone);
-                                    document.body.appendChild(tempWrapper);
-
-                                    const blurImage = clone.querySelector('.bg-blur');
-                                    if (blurImage) {
-                                        await blurImageElement(blurImage);
-                                    }
-
-                                    await new Promise(resolve => setTimeout(resolve, 50));
-                                    
-                                    const canvas = await html2canvas(clone, {
-                                        backgroundColor: null,
-                                        scale: 1,
-                                        useCORS: true
-                                    });
-
-                                    const dataUrl = canvas.toDataURL("image/png");
-                                    allItemsHTML += `<img src="${dataUrl}" style="max-width: 100%; margin-bottom: 10px;"><br>`;
-
-                                    document.body.removeChild(tempWrapper);
-
-                                    if (wasHidden) {
-                                        tableElement.classList.add('d-none');
-                                    }
-                                } catch (error) {
-                                    console.warn('Error processing stat', item.id, error);
-                                    try {
-                                        if (document.body.contains(tempWrapper)) {
-                                            document.body.removeChild(tempWrapper);
-                                        }
-                                        if (wasHidden && tableElement) {
-                                            tableElement.classList.add('d-none');
-                                        }
-                                    } catch (cleanupError) {
-                                        console.warn('Error during stat cleanup', cleanupError);
-                                    }
-                                }
-                            }
+                            contentHTML += buildStatPreviewHTML(item.id);
+                        } else if (item.type === 'graph') {
+                            contentHTML += buildGraphPreviewHTML(item.id);
                         } else if (item.type === 'ra') {
-                            try {
-                                const libName = item.raLibrary;
-                                const img = await captureRAPNGForLibrary(libName);
-
-                                let dataUrl = typeof img === 'string' ? img : img?.dataUrl;
-                                if (!dataUrl) {
-                                    console.warn('RA capture returned empty for', libName);
-                                }
-
-                                if (dataUrl) {
-                                    console.log('RA capture returned for', libName);
-                                    allItemsHTML += `
-                                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin: 0; padding: 0;">
-                                            <tr>
-                                                <td align="center" style="padding: 12px 0 16px 0; text-align: center;">
-                                                    <div style="font-weight: 700; margin: 0 0 8px 0; color: #E5A00D;">
-                                                        Recently Added - ${libName}
-                                                    </div>
-                                                    <center>
-                                                        <img
-                                                            src="${dataUrl}"
-                                                            alt="Recently Added - ${libName}"
-                                                            style="display: block; margin: 0 auto; max-width: 100%; height: auto; border: 0; outline: none; text-decoration: none;"
-                                                            >
-                                                    </center>
-                                                </td>
-                                            </tr>
-                                        </table>`;
-                                }
-                            } catch (err) {
-                                console.warn('Error adding RA for', item, err);
-                            }
+                            contentHTML += buildRecentlyAddedPreviewHTML(item.raLibrary);
                         } else if (item.type === 'recs') {
-                            try {
-                                const userKey = item.userKey;
-                                if (!userKey) continue;
-
-                                const temp = document.createElement('div');
-                                temp.style.cssText = 'position: fixed; left: -99999px; top: 0; z-index: -1; background: #282A2D; padding: 8px;';
-                                const node = buildRecsBlockForUser(userKey, { headingTag: 'h1' }, { bgColorway: 'email' });
-                                temp.appendChild(node);
-                                document.body.appendChild(temp);
-
-                                await waitForImages(temp);
-                                const canvas = await html2canvas(node, {
-                                    useCORS: true,
-                                    backgroundColor: '#282A2D',
-                                    scale: (window.devicePixelRatio > 1 ? 2 : 1),
-                                    onclone: captureRecs
-                                });
-                                document.body.removeChild(temp);
-
-                                const dataUrl = canvas.toDataURL('image/png', 0.92);
-                                allItemsHTML += `
-                                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin: 0; padding: 0;">
-                                        <tr>
-                                            <td align="center" style="padding: 12px 0 16px 0; text-align: center;">
-                                                <center>
-                                                    <img id="recs-img" src="${dataUrl}" style="max-width: 100%; height: auto; margin: 0 auto; display: block; border: 0; outline: none; text-decoration: none;"><br>
-                                                </center>
-                                            </td>
-                                        </tr>
-                                    </table>`;
-                            } catch (err) {
-                                console.warn('Error adding recommendations for', item, err);
-                            }
+                            contentHTML += buildRecommendationsPreviewHTML(item.userKey);
                         }
                     }
 
-                    let content = allItemsHTML || "";
-
-                    html = `
-                            <link href="https://fonts.googleapis.com/css?family=IBM+Plex+Sans:400,500,600,700&display=swap" rel="stylesheet">
-                            <style>
-                                :root { color-scheme: ${isDark ? 'dark' : 'light'}; }
-                                html, body { background: ${isDark ? '#333' : '#8acbd4'}; }
-                                @media only screen and (max-width:1900px) {
-                                    .logo-img { margin-left: 44rem !important; }
-                                    .recs-img { max-width: 60% !important; }
-                                }
-                                @media only screen and (max-width:1700px) {
-                                    .logo-img { margin-left: 38rem !important; }
-                                    .recs-img { max-width: 60% !important; }
-                                }
-                                @media only screen and (max-width:1500px) {
-                                    .logo-img { margin-left: 30rem !important; }
-                                    .recs-img { max-width: 60% !important; }
-                                }
-                                @media only screen and (max-width:1300px) {
-                                    .logo-img { margin-left: 24rem !important; }
-                                    .recs-img { max-width: 60% !important; }
-                                }
-                                @media only screen and (max-width:1100px) {
-                                    .logo-img { margin-left: 16rem !important; }
-                                }
-                                @media only screen and (max-width:900px) {
-                                    .logo-img { margin-left: 10rem !important; }
-                                }
-                                @media only screen and (max-width:700px) {
-                                    .logo-img { margin-left: 4rem !important; }
-                                }
-                                @media only screen and (max-width:500px) {
-                                    .logo-img { margin-left: 2rem !important; }
-                                }
-                            </style>
-                            <html>
-                            <body style="font-family: IBM Plex Sans; margin: 0;">
-                                <table class="body" style="border-collapse: separate; mso-table-lspace: 0pt; mso-table-rspace: 0pt; width: 100%;" border="0" cellspacing="0" cellpadding="0">
-                                    <tbody>
-                                        <tr>
-                                            <td class="preview-container" style="font-family: IBM Plex Sans; font-size: 14px; vertical-align: top; display: block;">
-                                                <div class="content" style="box-sizing: border-box; display: block;"><span class="preheader" style="color: transparent; display: none; height: 0; max-height: 0; max-width: 0; opacity: 0; overflow: hidden; mso-hide: all; visibility: hidden; width: 0;">${serverName} Newsletter</span>
-                                                    <table class="main" style="border-collapse: separate; mso-table-lspace: 0pt; mso-table-rspace: 0pt; width: 100%; background: #282A2D; border-radius: 3px; color: #ffffff;" border="0" cellspacing="0" cellpadding="3">
-                                                        <tbody>
-                                                            <tr>
-                                                                <td class="wrapper" style="font-family: IBM Plex Sans; font-size: 14px; vertical-align: top; box-sizing: border-box; padding: 5px; overflow: auto;">
-                                                                    <div class="header" style="text-align: center; line-height: 0;"><img class="header-img logo-img" style="display: block; outline: 0; text-decoration: none; height: auto; border: 0; -ms-interpolation-mode: bicubic; max-width: 100%; margin-left: 40em;" src="/static/img/{{ settings.logo_filename }}" width="{{ settings.logo_width }}" /></div>
-                                                                    <div class="server-name" style="font-size: 25px; text-align: center; margin-bottom: 0;">${serverName} Newsletter</div>
-                                                                </td>
-                                                            </tr>
-                                                            <tr>
-                                                                <td class="footer" style="font-family: IBM Plex Sans; font-size: 12px; vertical-align: top; clear: both; margin-top: 0; text-align: center; width: 100%;">
-                                                                    <h1 class="footer-bar" style="margin-left: auto; margin-right: auto; width: 300px; border-top: 1px solid #E5A00D; margin-top: 5px; margin-bottom: 8px;"></h1>
-                                                                    ${content}
-                                                                    <div class="footer-bar" style="margin-left: auto; margin-right: auto; width: 250px; border-top: 1px solid #E5A00D; margin-top: 25px;">&nbsp;</div>
-                                                                    <div class="content-block powered-by" style="padding-bottom: 5px; padding-top: 0;">Generated for Plex Media Server by <a href="https://github.com/jma1ice/newsletterr" style="color: #E5A00D; text-decoration: none;">newsletterr</a></div>
-                                                                    <div style="font-size: 8px; padding: 0;">(newsletterr is not affiliated with or a product of Plex, Inc.)</div>
-                                                                </td>
-                                                            </tr>
-                                                        </tbody>
-                                                    </table>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    </tbody>
-                                </table></body></html>`;
-
+                    const completeHTML = buildPreviewEmailHTML(contentHTML, serverName, subject, logoFilename, logoWidth, themedCSS);
+                    
                     const frame = document.getElementById('preview');
-                    console.log('Frame element:', frame);
                     if (!frame) {
                         console.error('Preview iframe not found!');
                         return;
                     }
                     
-                    console.log('HTML content length:', html.length);
-                    console.log('HTML content preview:', html.substring(0, 200) + '...');
-                    
-                    frame.srcdoc = html;
-                    
-                    function resizeIframe() {
-                        try {
-                            const doc = frame.contentDocument || frame.contentWindow.document;
-                            if (doc && doc.body) {
-                                const contentHeight = Math.max(
-                                    doc.body.scrollHeight,
-                                    doc.body.offsetHeight,
-                                    doc.documentElement.clientHeight,
-                                    doc.documentElement.scrollHeight,
-                                    doc.documentElement.offsetHeight
-                                );
-                                
-                                const minHeight = 480;
-                                const maxHeight = 960;
-                                const newHeight = Math.max(minHeight, Math.min(maxHeight, contentHeight + 20));
-                                
-                                frame.style.height = newHeight + 'px';
-                                console.log('Iframe resized to:', newHeight + 'px', 'Content height:', contentHeight);
-                            }
-                        } catch (e) {
-                            console.log('Could not resize iframe:', e);
-                        }
-                    }
+                    frame.srcdoc = completeHTML;
                     
                     frame.onload = function() {
                         try {
                             const doc = frame.contentDocument || frame.contentWindow.document;
                             if (doc && doc.documentElement) {
-                                if (isDark) {
-                                    doc.documentElement.classList.add('dark');
-                                }
-                                setTimeout(resizeIframe, 100);
+                                resizePreviewFrame(frame);
                             }
                         } catch (e) {
-                            console.log('Could not apply dark mode or resize iframe:', e);
+                            console.log('Could not resize iframe:', e);
                         }
                     };
                     
                     console.log('Preview updated successfully');
                 } catch (error) {
                     console.error('Error in updatePreview:', error);
-                    console.error('Error stack:', error.stack);
                     const frame = document.getElementById('preview');
                     if (frame) {
-                        frame.srcdoc = `<html><body><p>Error updating preview: ${error.message}</p><p>Check console for details</p></body></html>`;
+                        frame.srcdoc = `<html><body><p>Error updating preview: ${error.message}</p></body></html>`;
                     }
+                }
+            }
+
+            function buildStatPreviewHTML(statId) {
+                const statIndex = parseInt(statId.split('-')[1]);
+                
+                if (!statsList || !Array.isArray(statsList) || statIndex >= statsList.length) {
+                    console.warn(`Stat index ${statIndex} not found in stats array`);
+                    return `<div class="stats-card"><div class="stats-content"><div class="stats-header">Statistics data not available</div></div></div>`;
+                }
+                
+                const stat = statsList[statIndex];
+                if (!stat || !stat.rows || !Array.isArray(stat.rows)) {
+                    console.warn(`Stat data invalid for index ${statIndex}`);
+                    return `<div class="stats-card"><div class="stats-content"><div class="stats-header">Statistics data not available</div></div></div>`;
+                }
+                
+                const title = stat.stat_title || 'Statistics';
+                const rows = stat.rows;
+                
+                let backgroundElements = '';
+                if (rows.length > 0) {
+                    const artwork = rows[0].art || rows[0].grandparent_thumb;
+                    if (artwork) {
+                        const artworkUrl = `/proxy-art${artwork}`;
+                        backgroundElements = `
+                            <div class="stats-bg-blur" style="background-image: url('${artworkUrl}');"></div>
+                            <div class="stats-overlay"></div>
+                        `;
+                    }
+                }
+
+                function getStatHeaders(title) {
+                    if (title === "Most Watched Movies" || title === "Most Watched TV Shows") {
+                        return ["Title", "Year", "Plays", "Hours Played", "Rating"];
+                    } else if (title === "Most Popular Movies" || title === "Most Popular TV Shows") {
+                        return ["Title", "Year", "Plays", "Users", "Rating"];
+                    } else if (title === "Most Played Artists") {
+                        return ["Author", "Year", "Plays", "Hours Played"];
+                    } else if (title === "Most Popular Artists") {
+                        return ["Author", "Year", "Plays", "Users"];
+                    } else if (title === "Recently Watched") {
+                        return ["Title", "Year", "Rating"];
+                    } else if (title === "Most Active Libraries") {
+                        return ["Library", "Plays", "Hours Played"];
+                    } else if (title === "Most Active Users") {
+                        return ["Username", "Plays", "Hours Played"];
+                    } else if (title === "Most Active Platforms") {
+                        return ["Platform", "Plays", "Hours Played"];
+                    } else if (title === "Most Concurrent Streams") {
+                        return ["Category", "Count"];
+                    }
+                    return ["Title", "Value"];
+                }
+                
+                function getStatCells(title, row) {
+                    const cells = [];
+                    
+                    if (title === "Most Active Libraries") {
+                        cells.push(row.section_name || '');
+                    } else if (title === "Most Active Users") {
+                        cells.push(row.user || '');
+                    } else if (title === "Most Active Platforms") {
+                        cells.push(row.platform || '');
+                    } else {
+                        cells.push(row.title || '');
+                    }
+                    
+                    const skipYearStats = ["Most Active Libraries", "Most Active Users", "Most Active Platforms", "Most Concurrent Streams"];
+                    if (!skipYearStats.includes(title)) {
+                        cells.push(row.year || '');
+                    }
+                    
+                    if (!title.includes("Recently") && !title.includes("Concurrent")) {
+                        cells.push(row.total_plays || 0);
+                    }
+                    
+                    const hoursStats = ["Most Watched Movies", "Most Watched TV Shows", "Most Played Artists", "Most Active Libraries", "Most Active Users", "Most Active Platforms"];
+                    const usersStats = ["Most Popular Movies", "Most Popular TV Shows", "Most Popular Artists"];
+                    
+                    if (hoursStats.includes(title)) {
+                        const hours = Math.ceil((row.total_duration || 0) / 3600);
+                        cells.push(hours);
+                    } else if (usersStats.includes(title)) {
+                        cells.push(row.users_watched || '');
+                    }
+                    
+                    const skipRatingStats = ["Most Active Libraries", "Most Played Artists", "Most Popular Artists", "Most Active Users", "Most Active Platforms", "Most Concurrent Streams"];
+                    if (!skipRatingStats.includes(title)) {
+                        cells.push(row.content_rating || '');
+                    }
+                    
+                    if (title === "Most Concurrent Streams") {
+                        cells.push(row.count || 0);
+                    }
+                    
+                    return cells;
+                }
+                
+                const headers = getStatHeaders(title);
+                const headerHTML = headers.map(h => `<th>${h}</th>`).join('');
+                
+                const rowsHTML = rows.map(row => {
+                    const cells = getStatCells(title, row);
+                    const cellsHTML = cells.map(cell => `<td>${cell}</td>`).join('');
+                    return `<tr>${cellsHTML}</tr>`;
+                }).join('');
+                
+                return `
+                    <div class="stats-card">
+                        ${backgroundElements}
+                        <div class="stats-content">
+                            <div class="stats-header">${title}</div>
+                            <table class="stats-table">
+                                <thead><tr>${headerHTML}</tr></thead>
+                                <tbody>${rowsHTML}</tbody>
+                            </table>
+                        </div>
+                    </div>
+                `;
+            }
+
+            function buildGraphPreviewHTML(graphId) {
+                const graphIndex = parseInt(graphId.split('-')[1]);
+                
+                if (graphIndex >= graphCommands.length || graphIndex >= graphDataList.length) {
+                    return `
+                        <div style="margin: 20px 0; padding: 30px; background: #f8f9fa; border: 2px dashed #dee2e6; border-radius: 8px; text-align: center;">
+                            <h3 style="color: #6c757d; margin-bottom: 10px;">Graph data not available</h3>
+                            <p style="color: #6c757d; margin: 0; font-size: 14px;">Index ${graphIndex} out of range</p>
+                        </div>
+                    `;
+                }
+                
+                const commandInfo = graphCommands[graphIndex];
+                const graphData = graphDataList[graphIndex];
+                
+                if (!graphData || (!graphData.categories && !graphData.series)) {
+                    return `
+                        <div style="margin: 20px 0; padding: 30px; background: #f8f9fa; border: 2px dashed #dee2e6; border-radius: 8px; text-align: center;">
+                            <h3 style="color: #6c757d; margin-bottom: 10px;">${commandInfo.name}</h3>
+                            <p style="color: #6c757d; margin: 0; font-size: 14px;">No chart data available</p>
+                            <p style="color: #6c757d; margin: 5px 0 0; font-size: 12px; font-style: italic;">Interactive charts available in dashboard</p>
+                        </div>
+                    `;
+                }
+                
+                let chart = Highcharts.charts.find(c => c && c.renderTo.id === graphId);
+                
+                if (!chart) {
+                    const possibleIds = [
+                        graphId,
+                        `chart-${graphIndex}`,
+                        `graph-${graphIndex}`,
+                        `preview-${graphId}`,
+                        graphId.replace('graph-', 'chart-')
+                    ];
+                    
+                    for (const id of possibleIds) {
+                        chart = Highcharts.charts.find(c => c && c.renderTo.id === id);
+                        if (chart) break;
+                    }
+                }
+                
+                if (!chart) {
+                    console.log('No existing chart found for', graphId, ', creating one...');
+                    
+                    const tempContainer = document.createElement('div');
+                    tempContainer.id = `temp-${graphId}-${Date.now()}`;
+                    tempContainer.style.cssText = 'position: fixed; left: -9999px; top: -9999px; width: 800px; height: 400px;';
+                    document.body.appendChild(tempContainer);
+                    
+                    try {
+                        chart = Highcharts.chart(tempContainer.id, {
+                            chart: { type: 'line' },
+                            title: { text: commandInfo.name },
+                            exporting: { enabled: true },
+                            xAxis: { categories: graphData.categories },
+                            yAxis: { title: { text: 'Plays' } },
+                            series: graphData.series
+                        });
+                        
+                        renderedCharts.add(graphId);
+                        const nowDark = document.documentElement.classList.contains('dark');
+                        applyChartTheme(nowDark);
+                        
+                        console.log('Auto-created chart for preview:', graphId);
+                    } catch (error) {
+                        console.error('Error creating chart for preview:', error);
+                        document.body.removeChild(tempContainer);
+                        return `
+                            <div style="margin: 20px 0; padding: 30px; background: #f8f9fa; border: 2px dashed #dee2e6; border-radius: 8px; text-align: center;">
+                                <h3 style="color: #6c757d; margin-bottom: 10px;">${commandInfo.name}</h3>
+                                <p style="color: #6c757d; margin: 0; font-size: 14px;">Error creating chart</p>
+                                <p style="color: #6c757d; margin: 5px 0 0; font-size: 12px; font-style: italic;">Try clicking "View" first to render the chart</p>
+                            </div>
+                        `;
+                    }
+                }
+                
+                if (chart) {
+                    try {
+                        const svg = chart.getSVG();
+                        
+                        const svgBlob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
+                        const svgUrl = URL.createObjectURL(svgBlob);
+                        
+                        const tempElements = document.querySelectorAll(`[id^="temp-${graphId}"]`);
+                        tempElements.forEach(el => {
+                            if (el.parentNode) el.parentNode.removeChild(el);
+                        });
+                        
+                        return `
+                            <div style="width: 100%; border-radius: 4px; text-align: center;">
+                                <img src="${svgUrl}" style="max-width: 100%; height: auto; border-radius: 4px;" alt="${commandInfo.name}" onload="URL.revokeObjectURL(this.src)">
+                            </div>
+                        `;
+                        
+                    } catch (error) {
+                        console.error('Error processing graph', graphId, error);
+                        
+                        const tempElements = document.querySelectorAll(`[id^="temp-${graphId}"]`);
+                        tempElements.forEach(el => {
+                            if (el.parentNode) el.parentNode.removeChild(el);
+                        });
+                    }
+                }
+                
+                return `
+                    <div style="margin: 20px 0; padding: 30px; background: #f8f9fa; border: 2px dashed #dee2e6; border-radius: 8px; text-align: center;">
+                        <h3 style="color: #6c757d; margin-bottom: 10px;">${commandInfo.name}</h3>
+                        <p style="color: #6c757d; margin: 0; font-size: 14px;">Chart rendering failed</p>
+                        <p style="color: #6c757d; margin: 5px 0 0; font-size: 12px; font-style: italic;">Try clicking "View" in the dashboard to render the chart first</p>
+                    </div>
+                `;
+            }
+
+            function buildRecentlyAddedPreviewHTML(libraryFilter) {
+                if (!recentPayload || recentPayload.length === 0) {
+                    return `<div class="recently-added"><p style="text-align: center; color: var(--email-muted); padding: 20px;">No recently added items available</p></div>`;
+                }
+                
+                let allItems = [];
+                recentPayload.forEach(section => {
+                    if (section && section.recently_added) {
+                        allItems = allItems.concat(section.recently_added);
+                    }
+                });
+                
+                if (libraryFilter) {
+                    allItems = allItems.filter(item => 
+                        item.library_name && item.library_name.toLowerCase().includes(libraryFilter.toLowerCase())
+                    );
+                }
+                
+                allItems = allItems.slice(0, 10);
+                
+                if (allItems.length === 0) {
+                    return `<div class="recently-added"><p style="text-align: center; color: var(--email-muted); padding: 20px;">No recently added items found${libraryFilter ? ` for ${libraryFilter}` : ''}</p></div>`;
+                }
+                
+                const gridItems = allItems.map(item => {
+                    const title = item.title || item.full_title || item.parent_title || item.grandparent_title || '(untitled)';
+                    const sub = item.year || item.grandparent_title || item.parent_title || '';
+                    const thumbPath = pickThumb(item);
+                    const duration = msToHMS(item.duration);
+                    const added = formatDate(item.added_at || item.originally_available_at);
+                    const library = item.library_name || item.section_name || '';
+                    
+                    return {
+                        title,
+                        sub,
+                        summary: item.tagline || item.summary || '',
+                        duration,
+                        added,
+                        thumb: thumbPath,
+                        library
+                    };
+                });
+                
+                const itemsHTML = gridItems.map(item => {
+                    const imgURL = item.thumb ? `/proxy-art${item.thumb.startsWith('/') ? item.thumb : '/' + item.thumb}` : '/static/img/no-poster.png';
+                    
+                    return `
+                        <div style="
+                            position: relative;
+                            background: var(--email-card-bg);
+                            border-radius: 12px;
+                            overflow: hidden;
+                            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.6);
+                            border: 1px solid var(--email-border);
+                            width: 100%;
+                            max-width: 200px;
+                            margin: 0 auto;
+                        ">
+                            <div style="position: relative; aspect-ratio: 2/3; background: #f8f9fa;">
+                                <img src="${imgURL}" style="width: 100%; height: 100%; object-fit: cover; display: block;" alt="${item.title}">
+                                ${item.library ? `
+                                    <div style="
+                                        position: absolute;
+                                        top: 4px;
+                                        right: 4px;
+                                        background: rgba(0, 0, 0, 0.7);
+                                        color: white;
+                                        padding: 2px 8px;
+                                        border-radius: 12px;
+                                        font-size: 10px;
+                                        line-height: 1;
+                                    ">${item.library}</div>
+                                ` : ''}
+                                ${item.added ? `
+                                    <div style="
+                                        position: absolute;
+                                        bottom: 4px;
+                                        right: 4px;
+                                        background: rgba(0, 0, 0, 0.6);
+                                        color: rgba(255, 255, 255, 0.9);
+                                        padding: 2px 6px;
+                                        border-radius: 4px;
+                                        font-size: 9px;
+                                        line-height: 1;
+                                    ">${item.added}</div>
+                                ` : ''}
+                            </div>
+                            <div style="padding: 12px;">
+                                <div style="font-weight: bold; font-size: 14px; color: var(--email-text); margin-bottom: 4px; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                                    ${item.title}
+                                </div>
+                                <div style="font-size: 11px; color: var(--email-muted); margin-bottom: 8px;">
+                                    ${item.sub ? item.sub + ' • ' : ''}${item.duration}
+                                </div>
+                                ${item.summary ? `
+                                    <div style="font-size: 11px; color: var(--email-text); opacity: 0.8; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden;">
+                                        ${item.summary}
+                                    </div>
+                                ` : ''}
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+                
+                return `
+                    <div class="recently-added">
+                        <h2>Recently Added${libraryFilter ? ` - ${libraryFilter}` : ''}</h2>
+                        <div style="
+                            display: grid;
+                            grid-template-columns: repeat(5, 1fr);
+                            gap: 12px;
+                            margin: 15px auto 0 auto;
+                            padding: 0;
+                            width: 80%;
+                        ">
+                            ${itemsHTML}
+                        </div>
+                    </div>
+                `;
+            }
+
+            function buildRecommendationsPreviewHTML(userKey) {
+                if (!recsPayload || !userKey || !recsPayload[userKey]) {
+                    return `<div class="recommendations-block"><p style="text-align: center; color: var(--email-muted); padding: 20px;">No recommendations available for this user</p></div>`;
+                }
+                
+                const userRecs = recsPayload[userKey];
+                const userEmail = userDict[userKey] || userKey;
+                
+                let sectionsHTML = '';
+                
+                if (userRecs.movie_posters && userRecs.movie_posters.length > 0) {
+                    sectionsHTML += buildRecommendationsSectionHTML(
+                        userRecs.movie_posters.slice(0, 20), 
+                        userRecs.movie_posters_unavailable?.slice(0, 20) || [], 
+                        'Recommended Movies'
+                    );
+                }
+                
+                if (userRecs.show_posters && userRecs.show_posters.length > 0) {
+                    sectionsHTML += buildRecommendationsSectionHTML(
+                        userRecs.show_posters.slice(0, 20), 
+                        userRecs.show_posters_unavailable?.slice(0, 20) || [], 
+                        'Recommended TV Shows'
+                    );
+                }
+                
+                if (!sectionsHTML) {
+                    return `<div class="recommendations-block"><p style="text-align: center; color: var(--email-muted); padding: 20px;">No recommendations for ${userEmail}</p></div>`;
+                }
+                
+                return `
+                    <div class="recommendations-block" data-recs-user="${userKey}">
+                        <h2>Recommendations for ${userEmail}</h2>
+                        ${sectionsHTML}
+                    </div>
+                `;
+            }
+
+            function buildRecommendationsSectionHTML(availableItems, unavailableItems, title) {
+                const allItems = [...availableItems, ...unavailableItems];
+                
+                const itemsHTML = allItems.map((item, index) => {
+                    const isUnavailable = index >= availableItems.length;
+                    const posterURL = item.url ? `/proxy-img?u=${encodeURIComponent(item.url)}` : '/static/img/no-poster.png';
+                    const titleText = item.title || 'Unknown';
+                    const year = item.year || '';
+                    const vote = item.vote ? `★ ${item.vote.toFixed(1)}` : '';
+                    const href = item.href || '#';
+                    const overview = item.overview || '';
+                    const runtime = item.runtime || '';
+                    
+                    const unavailableStyle = isUnavailable ? 'opacity: 0.7; filter: grayscale(30%);' : '';
+                    
+                    return `
+                        <div style="
+                            position: relative;
+                            background: var(--email-card-bg);
+                            border-radius: 12px;
+                            overflow: hidden;
+                            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                            border: 1px solid var(--email-border);
+                            ${unavailableStyle}
+                            width: 100%;
+                            max-width: 200px;
+                            margin: 0 auto;
+                        ">
+                            <a href="${href}" style="text-decoration: none; color: inherit; display: block;" target="_blank">
+                                <div style="position: relative; aspect-ratio: 2/3; background: #f8f9fa;">
+                                    <img src="${posterURL}" style="width: 100%; height: 100%; object-fit: cover; display: block;" alt="${titleText}">
+                                    
+                                    ${(year || vote) ? `
+                                        <div style="
+                                            position: absolute;
+                                            top: 1px;
+                                            left: 1px;
+                                            background: rgba(0, 0, 0, 0.7);
+                                            color: white;
+                                            padding: 2px 6px;
+                                            border-radius: 4px;
+                                            font-size: 9px;
+                                            line-height: 1;
+                                        ">${year} ${vote}</div>
+                                    ` : ''}
+                                    
+                                    ${isUnavailable ? `
+                                        <div style="
+                                            position: absolute;
+                                            top: 16px;
+                                            left: 1px;
+                                            background: rgba(255, 0, 0, 0.8);
+                                            color: white;
+                                            padding: 2px 6px;
+                                            border-radius: 4px;
+                                            font-size: 9px;
+                                            line-height: 1;
+                                        ">Unavailable</div>
+                                    ` : ''}
+                                    
+                                    <div style="
+                                        position: absolute;
+                                        bottom: 0;
+                                        left: 0;
+                                        right: 0;
+                                        padding: 8px;
+                                        background: linear-gradient(to top, rgba(0, 0, 0, 0.7), transparent);
+                                    ">
+                                        <div style="font-weight: bold; font-size: 12px; color: white; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                                            ${titleText}
+                                        </div>
+                                        ${runtime ? `<div style="font-size: 10px; color: rgba(255, 255, 255, 0.8); margin-top: 2px;">${runtime}</div>` : ''}
+                                    </div>
+                                </div>
+                            </a>
+                            
+                            ${overview ? `
+                                <div style="
+                                    position: absolute;
+                                    left: 0;
+                                    right: 0;
+                                    bottom: 0;
+                                    transform: translateY(100%);
+                                    transition: transform 0.3s ease;
+                                    background: rgba(0, 0, 0, 0.8);
+                                    color: white;
+                                    padding: 8px;
+                                    font-size: 10px;
+                                    line-height: 1.3;
+                                    display: -webkit-box;
+                                    -webkit-line-clamp: 3;
+                                    -webkit-box-orient: vertical;
+                                    overflow: hidden;
+                                " 
+                                onmouseover="this.style.transform='translateY(0)'"
+                                onmouseout="this.style.transform='translateY(100%)'"
+                                >${overview}</div>
+                            ` : ''}
+                        </div>
+                    `;
+                }).join('');
+                
+                return `
+                    <div style="margin: 20px 0;">
+                        <h3 style="color: var(--email-text); margin-bottom: 15px; padding-bottom: 16px;">${title}</h3>
+                        <div style="
+                            display: grid;
+                            grid-template-columns: repeat(5, 1fr);
+                            gap: 12px;
+                            padding: 0;
+                            margin: 0 auto 0 auto;
+                            width: 80%;
+                        ">
+                            ${itemsHTML}
+                        </div>
+                    </div>
+                `;
+            }
+
+            function getItemPosterURL(item) {
+                const candidates = [item.thumb, item.art, item.parent_thumb, item.grandparent_thumb];
+                for (const candidate of candidates) {
+                    if (candidate) {
+                        return `/proxy-art${candidate.startsWith('/') ? candidate : '/' + candidate}`;
+                    }
+                }
+                return '/static/img/no-poster.png';
+            }
+
+            function buildPreviewEmailHTML(contentHTML, serverName, subject, logoFilename, logoWidth, themedCSS) {
+                const logoSrc = `/static/img/${logoFilename}`;
+                
+                return `<!DOCTYPE html>
+                    <html lang="en">
+                        <head>
+                            <meta charset="UTF-8">
+                            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                            <title>${subject}</title>
+                            ${themedCSS}
+                        </head>
+                        <body>
+                            <div class="email-container">
+                                <div class="email-header">
+                                    <img src="${logoSrc}" alt="${serverName}" class="email-logo">
+                                    <h1 class="email-title">${serverName} Newsletter</h1>
+                                </div>
+                                
+                                <div class="email-content">
+                                    ${contentHTML}
+                                </div>
+                                
+                                <div class="email-footer">
+                                    <div style="margin-bottom: 10px;">
+                                        Generated for Plex Media Server by 
+                                        <a href="https://github.com/jma1ice/newsletterr">newsletterr</a>
+                                    </div>
+                                    <div>
+                                        newsletterr is not affiliated with or a product of Plex, Inc.
+                                    </div>
+                                </div>
+                            </div>
+                        </body>
+                    </html>`;
+            }
+
+            function resizePreviewFrame(frame) {
+                try {
+                    const doc = frame.contentDocument || frame.contentWindow.document;
+                    if (doc && doc.body) {
+                        const contentHeight = Math.max(
+                            doc.body.scrollHeight,
+                            doc.body.offsetHeight,
+                            doc.documentElement.clientHeight,
+                            doc.documentElement.scrollHeight,
+                            doc.documentElement.offsetHeight
+                        );
+                        
+                        const minHeight = 480;
+                        const maxHeight = 1200;
+                        const newHeight = Math.max(minHeight, Math.min(maxHeight, contentHeight + 40));
+                        
+                        frame.style.height = newHeight + 'px';
+                    }
+                } catch (e) {
+                    console.log('Could not resize iframe:', e);
                 }
             }
 
@@ -1044,262 +1529,6 @@
                 body.innerHTML = '';
                 body.appendChild(buildRecsBlockForUser(userKey, { headingTag: 'h4' }, { bgColorway: 'view' }));
                 preview.style.display = 'block';
-            }
-
-            async function captureRecs(doc) {
-                const root = doc.getElementById('rec-grid') || doc.body;
-                const g = root.querySelector('#rec-grid') || root;
-
-                const kill = doc.createElement('style');
-                kill.textContent = `
-                    *{ box-shadow:none !important; filter:none !important; }
-                    [class*="shadow"]{ box-shadow:none !important; }
-                    [style*="box-shadow"]{ box-shadow:none !important; }
-                    .line-clamp-2, .line-clamp-3, .line-clamp-4, .line-clamp-5 {
-                        -webkit-line-clamp: unset !important; line-clamp: unset !important;
-                        display: block !important; overflow: visible !important;
-                    }
-                    .rec-user-card a, .rec-user-card a * { color: inherit !important; }
-                `;
-                doc.head.appendChild(kill);
-
-                if (!g) return;
-
-                g.querySelectorAll('.aspect-\\[2\\/3\\]').forEach(el => {
-                    const w = el.getBoundingClientRect().width || el.clientWidth || 0;
-                    if (w > 0) el.style.height = Math.round(w * 3 / 2) + 'px';
-                });
-
-                g.querySelectorAll('.absolute.left-0.right-0.bottom-0').forEach(el => {
-                    const cls = el.className || '';
-                    if (cls.includes('bg-black/80')) {
-                        el.style.transform = 'translateY(100%)';
-                        el.style.transition = 'none';
-                        el.style.maxHeight = '40%';
-                        el.style.pointerEvents = 'none';
-                    }
-                });
-
-                g.querySelectorAll('.pill_text').forEach(s => {
-                    s.style.position = 'relative';
-                    s.style.top = '-12px';
-                    s.style.fontWeight = '600';
-                    s.style.color = '#fff';
-                });
-
-                g.querySelectorAll('.text-\\[12px\\]').forEach(el => el.style.fontSize = '30px');
-                g.querySelectorAll('.text-\\[11px\\]').forEach(el => el.style.fontSize = '27px');
-                g.querySelectorAll('.text-\\[10px\\]').forEach(el => el.style.fontSize = '25px');
-
-                g.querySelectorAll('.absolute.top-1 .pill_text, .absolute.top-6 .pill_text').forEach(el => {
-                    el.style.fontSize = '24px';
-                    const parent = el.closest('div, span');
-                });
-
-                g.querySelectorAll('.absolute.top-6').forEach(el => {
-                    if (el.classList.replace) {
-                        el.classList.replace('top-6', 'top-12');
-                    } else {
-                        el.classList.remove('top-6');
-                        el.classList.add('top-12');
-                    }
-                });
-
-                g.querySelectorAll('img').forEach(img => {
-                    const u = img.getAttribute('src') || '';
-                    if (/^https?:/i.test(u)) {
-                        img.setAttribute('crossorigin', 'anonymous');
-                        img.setAttribute('src', '/proxy-img?u=' + encodeURIComponent(u));
-                    }
-                });
-            }
-
-            async function captureRAPNGForList(list) {
-                if (!list.length) return null;
-
-                const wrap = document.createElement('div');
-                wrap.style.cssText = 'position: fixed; left: -99999px; top: 0; z-index: -1; background: #282A2D; padding: 8px; width: 1920px; max-width: 100%;';
-                const ul = document.createElement('ul');
-                ul.className = 'grid grid-cols-10 gap-3';
-                ul.style.display = 'grid';
-                ul.style.gridTemplateColumns = 'repeat(5, 1fr)';
-                ul.style.gap = '12px';
-                ul.style.listStyle = 'none';
-                ul.style.padding = '0';
-                ul.style.margin = '0';
-
-                wrap.appendChild(ul);
-                document.body.appendChild(wrap);
-                renderRAGrid(list, ul);
-
-                const imgs = ul.querySelectorAll('img');
-                await Promise.all([...imgs].map(img => img.complete ? 0 : new Promise(r => {
-                    img.addEventListener('load', r, {once:true});
-                    img.addEventListener('error', r, {once:true});
-                })));
-                try { await document.fonts?.ready; } catch(_){}
-
-                function renderPass(useFO){
-                    return html2canvas(ul, {
-                        useCORS: true,
-                        backgroundColor: '#282A2D',
-                        scale: window.devicePixelRatio > 1 ? 2 : 1,
-                        foreignObjectRendering: useFO,
-                        onclone: (doc) => {
-                            const g = doc.body.querySelector('ul');
-                            if (!g) return;
-                            const kill = doc.createElement('style');
-                            kill.textContent = `
-                                *{ box-shadow:none !important; filter:none !important; }
-                                [class*="shadow"]{ box-shadow:none !important; }
-                                [style*="box-shadow"]{ box-shadow:none !important; }
-                            `;
-                            doc.head.appendChild(kill);
-                            g.querySelectorAll('.aspect-\\[2\\/3\\]').forEach(el => {
-                                const w = el.getBoundingClientRect().width || el.clientWidth || 0;
-                                if (w>0) el.style.height = Math.round(w*3/2) + 'px';
-                            });
-                            g.querySelectorAll('.pill_text').forEach(s => { s.style.position='relative'; s.style.top='-6px'; });
-                        }
-                    });
-                }
-
-                let canvas = await renderPass(false);
-                if (!canvas || !canvas.width) canvas = await renderPass(true);
-
-                document.body.removeChild(wrap);
-                if (!canvas || !canvas.width) return null;
-
-                const blob = await new Promise(r => canvas.toBlob(r, 'image/png', 0.92));
-                const dataUrl = canvas.toDataURL('image/png', 0.92);
-                return { blob, dataUrl, cid: `recently-added-${Date.now()}.png` };
-            }
-
-            async function captureRAPNGForLibrary(libName) {
-                const { node, list } = buildRANodeForLibrary(libName);
-                if (!list.length) return null;
-
-                const tempWrapper = document.createElement('div');
-                tempWrapper.style.position = 'fixed';
-                tempWrapper.style.top = '-10000px';
-                tempWrapper.style.left = '0';
-                tempWrapper.style.zIndex = '-1';
-                tempWrapper.style.overflow = 'hidden';
-                tempWrapper.style.width = '1920px';
-                tempWrapper.style.maxWidth = '100%';
-                tempWrapper.appendChild(node);
-                document.body.appendChild(tempWrapper);
-
-                const target = node.querySelector('ul.grid') || node;
-                for (const img of target.querySelectorAll('img')) {
-                    if (img.getAttribute('loading') === 'lazy') img.removeAttribute('loading');
-                    img.setAttribute('loading', 'eager');
-                    img.decoding = 'sync';
-                }
-
-                await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-
-                const waitFor = (img) => img.decode
-                    ? img.decode().catch(() => {})
-                    : new Promise(res => {
-                        if (img.complete) return res();
-                        img.addEventListener('load', res, { once: true });
-                        img.addEventListener('error', res, { once: true });
-                        setTimeout(res, 2500);
-                    });
-
-                const imgs = [...target.querySelectorAll('img')];
-                await Promise.race([
-                    Promise.all(imgs.map(waitFor)),
-                    new Promise(res => setTimeout(res, 3000))
-                ]);
-
-                const canvas = await html2canvas(target, {
-                    backgroundColor: '#282A2D',
-                    scale: window.devicePixelRatio > 1 ? 2 : 1,
-                    windowWidth: 1080,
-                    windowHeight: 720,
-                    useCORS: true,
-                    onclone: (doc, cloned) => {
-                        const g = cloned && (cloned.matches?.('ul.grid') ? cloned : cloned.querySelector?.('ul.grid'));
-                        if (!g) return;
-
-                        const kill = doc.createElement('style');
-                        kill.textContent = `
-                            *{ box-shadow:none !important; filter:none !important; }
-                            [class*="shadow"]{ box-shadow:none !important; }
-                            [style*="box-shadow"]{ box-shadow:none !important; }
-                        `;
-                        doc.head.appendChild(kill);
-
-                        g.querySelectorAll('img').forEach(img => {
-                            if (img.getAttribute('loading') === 'lazy') img.removeAttribute('loading');
-                            img.setAttribute('loading', 'eager');
-                            img.decoding = 'sync';
-
-                            img.style.filter = 'none';
-                            img.style.boxShadow = 'none';
-
-                            img.style.width = '100%';
-                            img.style.height = '100%';
-                            img.style.objectFit = 'cover';
-                            img.style.display = 'block';
-                        });
-
-                        g.querySelectorAll('.aspect-\\[2\\/3\\]').forEach(el => {
-                            let w = el.getBoundingClientRect().width || el.clientWidth || 0;
-                            if (!w) {
-                                el.style.width = '200px';
-                                w = 200;
-                            }
-                            el.style.height = Math.round(w * 3 / 2) + 'px';
-                            el.style.position = 'relative';
-                            const inner = el.firstElementChild;
-                            if (inner) {
-                                inner.style.width = '100%';
-                                inner.style.height = '100%';
-                            }
-                        });
-
-                        g.querySelectorAll('.pill_text').forEach(s => {
-                            s.style.position = 'relative';
-                            s.style.top = '-6px';
-                        });
-
-                        g.querySelectorAll('.font-semibold.line-clamp-2').forEach(el => {
-                            el.style.display = 'block';
-                            el.style.webkitLineClamp = 'unset';
-                            el.style.overflow = 'hidden';
-                            el.style.lineHeight = '1.5';
-                            el.style.maxHeight = (1.75 * 2) + 'em';
-                            el.style.paddingBottom = '3px';
-                        });
-                        g.querySelectorAll('.p-3 > .text-xs:first-of-type').forEach(el => {
-                            el.style.lineHeight = '1.75';
-                            el.style.paddingBottom = '1px';
-                        });
-                        g.querySelectorAll('.line-clamp-5').forEach(el => {
-                            el.style.display = 'block';
-                            el.style.webkitLineClamp = 'unset';
-                            el.style.overflow = 'hidden';
-                            el.style.lineHeight = '1.4';
-                            el.style.maxHeight = (1.5 * 5) + 'em';
-                            el.style.paddingBottom = '4px';
-                        });
-                        g.querySelectorAll('.p-3').forEach(c => {
-                            const cs = doc.defaultView.getComputedStyle(c);
-                            const pb = parseFloat(cs.paddingBottom) || 0;
-                            if (pb < 8) c.style.paddingBottom = '8px';
-                        });
-                    }
-                });
-
-                document.body.removeChild(tempWrapper);
-                if (!canvas || !canvas.width) return null;
-
-                console.log('RA clone size', node.scrollWidth, node.scrollHeight, 'imgs=', node.querySelectorAll('img').length);
-                const dataUrl = canvas.toDataURL('image/png', 0.92);
-                return dataUrl && dataUrl.startsWith('data:image') ? { dataUrl, cid: `recently-added-${Date.now()}.png` } : null;
             }
 
             document.addEventListener('click', (e) => {
@@ -1425,36 +1654,6 @@
             const graphCommands = {{ graph_commands | tojson }};
 
             const renderedCharts = new Set();
-
-            document.getElementById('graphSelector').addEventListener('change', function () {
-                const selectedId = this.value;
-
-                document.querySelectorAll('.graph-table').forEach(el => el.classList.add('d-none'));
-
-                const container = document.getElementById(selectedId);
-                container.classList.remove('d-none');
-
-                if (!renderedCharts.has(selectedId)) {
-                    const index = parseInt(selectedId.split('-')[1]);
-                    const graphData = graphDataList[index];
-
-                    Highcharts.chart(selectedId, {
-                        chart: { type: 'line' },
-                        title: { text: graphCommands[index].name },
-                        exporting: {
-                            enabled: true
-                        },
-                        xAxis: { categories: graphData.categories },
-                        yAxis: { title: { text: 'Plays' } },
-                        series: graphData.series
-                    });
-
-                    renderedCharts.add(selectedId);
-                }
-
-                const nowDark = document.documentElement.classList.contains('dark');
-                applyChartTheme(nowDark);
-            });
         </script>
         <script>
             function updateSelectedItemsDisplay() {
@@ -1530,6 +1729,109 @@
                 }
                 
                 updatePreview();
+            }
+
+            function captureChartAsBase64(chartId) {
+                const chart = Highcharts.charts.find(c => c && c.renderTo.id === chartId);
+                if (!chart) {
+                    console.log('Chart not found for ID:', chartId);
+                    return null;
+                }
+                
+                try {
+                    const svg = chart.getSVG({
+                        width: 600,
+                        height: 400
+                    });
+                    
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    canvas.width = 600;
+                    canvas.height = 400;
+                    
+                    const img = new Image();
+                    const svgBlob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
+                    const url = URL.createObjectURL(svgBlob);
+                    
+                    return new Promise((resolve) => {
+                        img.onload = function() {
+                            ctx.drawImage(img, 0, 0);
+                            const dataUrl = canvas.toDataURL('image/png');
+                            URL.revokeObjectURL(url);
+                            resolve(dataUrl);
+                        };
+                        img.onerror = function() {
+                            console.error('Failed to load chart image');
+                            URL.revokeObjectURL(url);
+                            resolve(null);
+                        };
+                        img.src = url;
+                    });
+                } catch (error) {
+                    console.error('Error capturing chart:', error);
+                    return null;
+                }
+            }
+
+            async function addItemWithChartCapture(id, name, type, extra = {}) {
+                if (!id || !type) {
+                    console.warn('addItem aborted: missing id/type', { id, type, name, extra });
+                    return false;
+                }
+
+                if (selectedItems.some(it => it.id === id && it.type === type)) {
+                    console.log('Item already added:', { id, type });
+                    return false;
+                }
+
+                const item = { id, name: name || id, type, ...extra };
+
+                if (type === 'graph') {
+                    console.log('Capturing chart for:', id);
+                    
+                    if (!renderedCharts.has(id)) {
+                        try {
+                            const index = parseInt(id.split('-')[1], 10);
+                            const graphData = graphDataList[index];
+
+                            Highcharts.chart(id, {
+                                chart: { type: 'line' },
+                                title: { text: graphCommands[index].name },
+                                exporting: { enabled: true },
+                                xAxis: { categories: graphData.categories },
+                                yAxis: { title: { text: 'Plays' } },
+                                series: graphData.series
+                            });
+
+                            renderedCharts.add(id);
+                            const nowDark = document.documentElement.classList.contains('dark');
+                            applyChartTheme(nowDark);
+                        } catch (err) {
+                            console.warn('Failed to render graph', id, err);
+                        }
+                    }
+                    
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    
+                    const chartImage = await captureChartAsBase64(id);
+                    if (chartImage) {
+                        item.chartImage = chartImage;
+                        console.log('Successfully captured chart image for:', id);
+                    } else {
+                        console.warn('Failed to capture chart image for:', id);
+                    }
+                }
+
+                if (type === 'titleblock') {
+                    const existing = selectedItems.findIndex(it => it.type === 'titleblock');
+                    if (existing !== -1) selectedItems.splice(existing, 1);
+                    selectedItems.unshift(item);
+                } else {
+                    selectedItems.push(item);
+                }
+
+                updateSelectedItemsDisplay();
+                return true;
             }
 
             function addItem(id, name, type, extra = {}) {
@@ -1823,8 +2125,12 @@
                 if (type === 'recs') {
                     if (btn.dataset.userKey) extra.userKey = btn.dataset.userKey;
                 }
+                if (type === 'graph') {
+                    btn.textContent = 'Capturing...';
+                    btn.disabled = true;
+                }
 
-                if (addItem(id, name || id, type, extra)) {
+                if (await addItemWithChartCapture(id, name || id, type, extra)) {
                     btn.textContent = 'Added';
                     btn.classList.remove('button');
                     btn.classList.add('btn-success');
@@ -1832,6 +2138,10 @@
 
                     console.log('Item added. Current selectedItems:', selectedItems);
                 } else {
+                    if (type === 'graph') {
+                        btn.textContent = 'Add';
+                        btn.disabled = false;
+                    }
                     console.log('Item already exists');
                 }
             });
@@ -2143,33 +2453,18 @@
                     .filter(Boolean);
             }
 
-            function blobToBase64(blob) {
-                return new Promise(r => {
-                    const fr = new FileReader();
-                    fr.onload = () => r(fr.result.split(',')[1]);
-                    fr.readAsDataURL(blob);
-                });
-            }
-
             document.getElementById('sendEmailBtn').addEventListener('click', async () => {
                 const subject = document.getElementById('subject').value;
                 
-                const textBlocks = selectedItems
-                    .filter(item => item.type === 'textblock')
-                    .map(item => getTextBlockContent(item.id))
-                    .filter(content => content.trim().length > 0);
-                
-                let email_text = textBlocks.join('\n\n');
-
                 const chipInput = document.getElementById('email_chip_input');
-                    if (chipInput && chipInput.value.trim()) {
-                        chipInput.dispatchEvent(new Event('blur'));
+                if (chipInput && chipInput.value.trim()) {
+                    chipInput.dispatchEvent(new Event('blur'));
                 }
 
                 const toList = collectEmailsFromChips();
-                    if (!toList.length) {
-                        alert('Please add at least one recipient.');
-                        return;
+                if (!toList.length) {
+                    alert('Please add at least one recipient.');
+                    return;
                 }
 
                 const to_emails = toList.join(', ');
@@ -2181,119 +2476,23 @@
 
                 showSpinner('Preparing email content...');
 
-                let emailHTML = '';
-                let emailImages = [];
-
                 try {
                     const previewFrame = document.getElementById('preview');
-                    console.log('Preview frame found:', !!previewFrame);
-                    
                     const previewDoc = previewFrame.contentDocument || previewFrame.contentWindow.document;
-                    console.log('Preview document found:', !!previewDoc);
-                    console.log('Preview body found:', !!previewDoc?.body);
-                    
-                    if (previewDoc && previewDoc.body) {
-                        await new Promise(resolve => setTimeout(resolve, 500));
-                        
-                        const previewHTML = previewDoc.documentElement.outerHTML;
-                        console.log('Preview HTML length:', previewHTML.length);
-                        console.log('Preview HTML preview:', previewHTML.substring(0, 500));
-                        
-                        const charts = previewDoc.querySelectorAll('[data-highcharts-chart]');
-                        console.log('Found charts:', charts.length);
-                        
-                        let processedHTML = previewHTML;
-                        
-                        for (let i = 0; i < charts.length; i++) {
-                            const chart = charts[i];
-                            const chartId = chart.id || `chart-${i}`;
-                            
-                            try {
-                                const chartInstance = Highcharts.charts.find(c => c && c.container === chart);
-                                if (chartInstance) {
-                                    const svgData = chartInstance.getSVG();
-                                    const canvas = document.createElement('canvas');
-                                    const ctx = canvas.getContext('2d');
-                                    const img = new Image();
-                                    
-                                    const svgBlob = new Blob([svgData], {type: 'image/svg+xml'});
-                                    const url = URL.createObjectURL(svgBlob);
-                                    
-                                    await new Promise((resolve, reject) => {
-                                        img.onload = () => {
-                                            canvas.width = img.width || 800;
-                                            canvas.height = img.height || 400;
-                                            ctx.drawImage(img, 0, 0);
-                                            
-                                            const imageData = canvas.toDataURL('image/png');
-                                            const cid = `chart-${i}`;
-                                            
-                                            emailImages.push({
-                                                cid: cid,
-                                                mime: 'image/png',
-                                                data: imageData
-                                            });
-                                            
-                                            processedHTML = processedHTML.replace(
-                                                chart.outerHTML,
-                                                `<img src="cid:${cid}" alt="Chart" style="max-width:100%;height:auto;">`
-                                            );
-                                            
-                                            URL.revokeObjectURL(url);
-                                            resolve();
-                                        };
-                                        img.onerror = reject;
-                                        img.src = url;
-                                    });
-                                }
-                            } catch (chartError) {
-                                console.warn('Error processing chart:', chartError);
+                    const emailHTML = previewDoc.documentElement.outerHTML;
+
+                    for (let item of selectedItems) {
+                        if (item.type === 'graph' && !item.chartImage) {
+                            console.log('Capturing missing chart for:', item.id);
+                            const chartImage = await captureChartAsBase64(item.id);
+                            if (chartImage) {
+                                item.chartImage = chartImage;
                             }
                         }
-                        
-                        emailHTML = processedHTML
-                            .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-                            .replace(/style="[^"]*"/gi, (match) => {
-                                return match.includes('color') || match.includes('font') || match.includes('text-align') || 
-                                       match.includes('background') || match.includes('padding') || match.includes('margin') ||
-                                       match.includes('width') || match.includes('height') ? match : '';
-                            });
-                        
-                        console.log('Processed email HTML length:', emailHTML.length);
-                        
-                        console.log('Email content prepared successfully');
-                    } else {
-                        throw new Error('Could not access preview content');
                     }
-                } catch (error) {
-                    console.error('Error preparing email content:', error);
-                    emailHTML = `
-                        <!DOCTYPE html>
-                        <html>
-                        <head>
-                            <meta charset="UTF-8">
-                            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                            <title>${subject || 'Newsletter'}</title>
-                        </head>
-                        <body style="font-family: Arial, sans-serif; padding: 20px; line-height: 1.6;">
-                            <h2>${subject || 'Newsletter'}</h2>
-                            <div>${email_text.replace(/\n/g, '<br>')}</div>
-                        </body>
-                        </html>
-                    `;
-                    console.log('Using fallback HTML:', emailHTML);
-                }
 
-                showSpinner('Sending email...');
+                    showSpinner('Sending email...');
 
-                try {
-                    console.log('Sending email with data:', {
-                        to_emails,
-                        subject,
-                        email_html_length: emailHTML.length,
-                        all_images_count: emailImages.length
-                    });
-                    
                     const resp = await fetch('/send_email', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -2301,17 +2500,16 @@
                             to_emails,
                             subject,
                             email_html: emailHTML,
-                            all_images: emailImages
+                            selected_items: selectedItems,
+                            user_dict: userDict
                         })
                     });
                     
-                    console.log('Response status:', resp.status);
-                    
                     if (resp.ok) {
+                        const data = await resp.json();
                         alert(`Email sent successfully to ${toList.length} recipient${toList.length !== 1 ? 's' : ''}!`);
                     } else {
                         const data = await resp.json();
-                        console.error('Server error response:', data);
                         alert("Error sending email: " + data.error);
                     }
                 } catch (err) {
@@ -2326,36 +2524,6 @@
             document.getElementById('stats_form').addEventListener('submit', (e) => {
                 showSpinner('Getting stats and users...');
             });
-        </script>
-        <script>
-            async function blurImageElement(imgElement) {
-                const tempImg = new Image();
-                tempImg.crossOrigin = 'anonymous';
-                tempImg.src = imgElement.src;
-
-                await new Promise((resolve, reject) => {
-                    tempImg.onload = resolve;
-                    tempImg.onerror = reject;
-                });
-
-                const rect = imgElement.getBoundingClientRect();
-                const canvas = document.createElement('canvas');
-                canvas.width = rect.width || 800;
-                canvas.height = rect.height || 450;
-
-                const ctx = canvas.getContext('2d');
-                ctx.filter = 'blur(4px) brightness(0.75)';
-                ctx.drawImage(tempImg, 0, 0, canvas.width, canvas.height);
-
-                const blurredDataURL = canvas.toDataURL('image/png');
-                imgElement.src = blurredDataURL;
-                imgElement.style.position = 'absolute';
-                imgElement.style.width = '100%';
-                imgElement.style.height = '100%';
-                imgElement.style.objectFit = 'cover';
-                imgElement.style.zIndex = '0';
-                imgElement.style.filter = 'none';
-            }
         </script>
         <script>
             (function () {

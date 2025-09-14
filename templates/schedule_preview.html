@@ -15,7 +15,7 @@
                         <div class="spinner-border text-primary" role="status">
                             <span class="visually-hidden">Loading...</span>
                         </div>
-                        <p class="mt-2">Loading template data and generating preview...</p>
+                        <p class="mt-2 text-info">Loading template data and generating preview...</p>
                     </div>
                     
                     <div id="error" class="alert alert-danger" style="display: none;"></div>
@@ -50,9 +50,14 @@
     </div>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highcharts/10.3.3/highcharts.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highcharts/10.3.3/modules/exporting.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
 <script>
     const urlParams = new URLSearchParams(window.location.search);
     const scheduleId = urlParams.get('schedule_id');
+    const themeSettings = {{ theme_settings | tojson }};
 
     let templateData = {};
     let stats = [];
@@ -62,426 +67,7 @@
     let selectedItems = [];
     let graphCommands = [];
     let recentCommands = [];
-
-    const TOKEN_PAT = {
-        RA:   '(RECENTLY_ADDED|recently_added)',
-        RECS: '(RECOMMENDATIONS|recommendations|RECS|recs)'
-    };
-    const RX = {
-        RA:    new RegExp(`\\[${TOKEN_PAT.RA}\\]`, 'i'),
-        RA_G:  new RegExp(`\\[${TOKEN_PAT.RA}\\]`, 'gi'),
-        RECS:  new RegExp(`\\[${TOKEN_PAT.RECS}\\]`, 'i'),
-        RECS_G:new RegExp(`\\[${TOKEN_PAT.RECS}\\]`, 'gi')
-    };
-
-    async function raElementToPNG(el, { scale = (window.devicePixelRatio > 1 ? 2 : 1), bg = null, minWidth = 1920, onCloneTweak = null } = {}) {
-        const prevMark = el.getAttribute('data-capture-root');
-        el.setAttribute('data-capture-root', '1');
-
-        const prevWidth = el.style.width;
-        if (!el.offsetWidth) el.style.width = `${minWidth}px`;
-
-        await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-
-        const imgs = Array.from(el.querySelectorAll('img'));
-        await Promise.all(imgs.map(img => new Promise(resolve => {
-            if (img.complete) return resolve();
-            const done = () => resolve();
-            img.addEventListener('load', done,  { once:true });
-            img.addEventListener('error', done, { once:true });
-            setTimeout(done, 2000);
-        })));
-
-        const canvas = await html2canvas(el, {
-            backgroundColor: bg,
-            scale,
-            useCORS: true,
-            logging: false,
-            removeContainer: true,
-            onclone: (doc) => {
-                const root = doc.querySelector('[data-capture-root="1"]');
-                if (!root) return;
-
-                const kill = doc.createElement('style');
-                kill.textContent = `
-                    *{ box-shadow:none !important; filter:none !important; }
-                    [class*="shadow"]{ box-shadow:none !important; }
-                    [style*="box-shadow"]{ box-shadow:none !important; }
-                `;
-                doc.head.appendChild(kill);
-
-                root.querySelectorAll('.aspect-\\[2\\/3\\]').forEach(el => {
-                    const w = el.getBoundingClientRect().width || el.clientWidth || 0;
-                    if (w > 0) el.style.height = Math.round(w * 3 / 2) + 'px';
-                });
-
-                root.querySelectorAll('.absolute.top-1.right-1, .absolute.bottom-1.right-1 span, .ra-pill')
-                    .forEach(p => {
-                        p.style.display = 'inline-flex';
-                        p.style.alignItems = 'center';
-                        p.style.justifyContent = 'center';
-                        p.style.lineHeight = '1';
-                        if (!p.style.padding) p.style.padding = '2px 6px';
-                        p.style.minHeight = '18px';
-                        p.style.borderRadius = '9999px';
-                    });
-
-                root.querySelectorAll('.pill_text').forEach(s => {
-                    s.style.position = 'relative';
-                    s.style.top = '-6px';
-                });
-
-                root.querySelectorAll('.font-semibold.line-clamp-2').forEach(el => {
-                    el.style.display = 'block';
-                    el.style.webkitLineClamp = 'unset';
-                    el.style.overflow = 'hidden';
-                    el.style.lineHeight = '1.5';
-                    el.style.maxHeight = (1.75 * 2) + 'em';
-                    el.style.paddingBottom = '3px';
-                });
-
-                root.querySelectorAll('.p-3 > .text-xs:first-of-type').forEach(el => {
-                    el.style.lineHeight = '1.75';
-                    el.style.paddingBottom = '1px';
-                });
-
-                root.querySelectorAll('.line-clamp-5').forEach(el => {
-                    el.style.display = 'block';
-                    el.style.webkitLineClamp = 'unset';
-                    el.style.overflow = 'hidden';
-                    el.style.lineHeight = '1.4';
-                    el.style.maxHeight = (1.5 * 5) + 'em';
-                    el.style.paddingBottom = '4px';
-                });
-
-                root.querySelectorAll('.p-3').forEach(c => {
-                    const cs = doc.defaultView.getComputedStyle(c);
-                    const pb = parseFloat(cs.paddingBottom) || 0;
-                    if (pb < 8) c.style.paddingBottom = '8px';
-                });
-
-                root.querySelectorAll('ul').forEach(u => { u.style.margin = '0'; u.style.padding = '0'; });
-
-                if (typeof onCloneTweak === 'function') {
-                    try { onCloneTweak(doc, root); } catch {}
-                }
-            }
-        });
-
-        if (prevMark === null) el.removeAttribute('data-capture-root');
-        else el.setAttribute('data-capture-root', prevMark);
-        el.style.width = prevWidth;
-
-        const url = canvas.toDataURL('image/png', 0.92);
-        if (!url || url === 'data:,') return '';
-        if (!url.startsWith('data:image')) return '';
-        return url;
-    }
-
-    async function recElementToPNG(el, { scale = (window.devicePixelRatio > 1 ? 2 : 1), bg = null, minWidth = 1920,onCloneTweak = null } = {}) {
-        const prevMark = el.getAttribute('data-capture-root');
-        el.setAttribute('data-capture-root', '1');
-
-        const prevWidth = el.style.width;
-        if (!el.offsetWidth) el.style.width = `${minWidth}px`;
-
-        await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-
-        const imgs = Array.from(el.querySelectorAll('img'));
-        await Promise.all(imgs.map(img => new Promise(resolve => {
-            if (img.complete) return resolve();
-            const done = () => resolve();
-            img.addEventListener('load', done,  { once:true });
-            img.addEventListener('error', done, { once:true });
-            setTimeout(done, 2000);
-        })));
-
-        const canvas = await html2canvas(el, {
-            backgroundColor: bg,
-            scale,
-            useCORS: true,
-            logging: false,
-            removeContainer: true,
-            onclone: (doc) => {
-                const root = doc.querySelector('[data-capture-root="1"]');
-                if (!root) return;
-
-                const kill = doc.createElement('style');
-                kill.textContent = `
-                    *{ box-shadow:none !important; filter:none !important; }
-                    [class*="shadow"]{ box-shadow:none !important; }
-                    [style*="box-shadow"]{ box-shadow:none !important; }
-                `;
-                doc.head.appendChild(kill);
-
-                root.querySelectorAll('.aspect-\\[2\\/3\\]').forEach(el => {
-                    const w = el.getBoundingClientRect().width || el.clientWidth || 0;
-                    if (w > 0) el.style.height = Math.round(w * 3 / 2) + 'px';
-                });
-
-                root.querySelectorAll('.absolute.top-1.right-1, .absolute.bottom-1.right-1 span, .ra-pill')
-                    .forEach(p => {
-                        p.style.display = 'inline-flex';
-                        p.style.alignItems = 'center';
-                        p.style.justifyContent = 'center';
-                        p.style.lineHeight = '1';
-                        if (!p.style.padding) p.style.padding = '2px 6px';
-                        p.style.minHeight = '18px';
-                        p.style.borderRadius = '9999px';
-                    });
-
-                root.querySelectorAll('.pill_text').forEach(s => {
-                    s.style.position = 'relative';
-                    s.style.top = '-6px';
-                });
-
-                root.querySelectorAll('.font-semibold.line-clamp-2').forEach(el => {
-                    el.style.display = 'block';
-                    el.style.webkitLineClamp = 'unset';
-                    el.style.overflow = 'hidden';
-                    el.style.lineHeight = '1.5';
-                    el.style.maxHeight = (1.75 * 2) + 'em';
-                    el.style.paddingBottom = '3px';
-                });
-
-                root.querySelectorAll('.line-clamp-5').forEach(el => {
-                    el.style.display = 'block';
-                    el.style.webkitLineClamp = 'unset';
-                    el.style.overflow = 'hidden';
-                    el.style.lineHeight = '1.4';
-                    el.style.maxHeight = (1.5 * 5) + 'em';
-                    el.style.paddingBottom = '4px';
-                });
-
-                root.querySelectorAll('ul').forEach(u => { u.style.margin = '0'; u.style.padding = '0'; });
-
-                if (typeof onCloneTweak === 'function') {
-                    try { onCloneTweak(doc, root); } catch {}
-                }
-            }
-        });
-
-        if (prevMark === null) el.removeAttribute('data-capture-root');
-        else el.setAttribute('data-capture-root', prevMark);
-        el.style.width = prevWidth;
-
-        const url = canvas.toDataURL('image/png', 0.92);
-        if (!url || url === 'data:,') return '';
-        if (!url.startsWith('data:image')) return '';
-        return url;
-    }
-
-    function buildRecentBlock(recentPayload) {
-        const flatten = (arr) => arr.flatMap(x => x?.recently_added || []);
-        const items = flatten(recentPayload || []);
-
-        const wrap = document.createElement('div');
-        wrap.style.cssText = "display:block; width:100%; padding:8px;";
-        const h = document.createElement('h3');
-        h.textContent = "Recently Added";
-        h.style.cssText = "margin:0 0 8px; font-weight:700; font-size:16px; text-align:left; color: #62a1a4;";
-        wrap.appendChild(h);
-
-        if (!items.length) {
-            wrap.innerHTML += `<div style="text-align:center; color:#666;">No recently added items.</div>`;
-            return wrap;
-        }
-
-        function pickThumb(it) {
-            const type = (it.media_type || it.type || "").toLowerCase();
-            const c = (type === "episode" || type === "season")
-                ? [it.grandparent_thumb, it.parent_thumb, it.thumb, it.art]
-                : [it.thumb, it.art, it.parent_thumb, it.grandparent_thumb];
-            return c.find(Boolean) || "";
-        }
-        const buildThumb = (p) => p ? `/proxy-art${p.startsWith('/') ? p : '/'+p}` : "";
-        const msToHMS = (ms) => {
-            ms = parseInt(ms || 0, 10);
-            const s = Math.round(ms / 1000);
-            const h = Math.floor(s/3600), m = Math.floor((s%3600)/60);
-            return h ? `${h}h ${m}m` : `${m}m`;
-        };
-        const formatDate = (d) => {
-            if (!d) return '';
-            if (/^\d+$/.test(String(d))) return new Date(parseInt(d,10)*1000).toLocaleDateString();
-            const dt = new Date(d); return isNaN(dt) ? '' : dt.toLocaleDateString();
-        };
-
-        const grid = document.createElement('ul');
-        grid.style.cssText = "display:grid; grid-template-columns:repeat(10,minmax(0,1fr)); gap:12px; list-style:none; padding:0; margin:0;";
-
-        items.forEach(it => {
-            const li = document.createElement('li');
-            li.style.cssText = "border-radius:12px; overflow:hidden; background:#8acbd4; box-shadow:0 6px 18px rgba(0,0,0,.6);";
-            const t = pickThumb(it);
-            li.innerHTML = `
-                <div style="position:relative; aspect-ratio:2/3; background:#e5e7eb;">
-                    ${t ? `<img src="${buildThumb(t)}" style="width:100%;height:100%;object-fit:cover;" crossorigin="anonymous">` : ``}
-                    ${it.library_name ? `<div class="ra-pill absolute top-1 right-1 text-xs px-2 py-1 rounded-full bg-black/70 text-white"><span class="pill_text">${it.library_name}</span></div>` : ``}
-                    ${it.added_at || it.originally_available_at ? `<div class="ra-pill absolute bottom-1 right-1 text-[11px] text-white/90 bg-black/60 rounded px-1.5 py-0.5"><span class="pill_text">${formatDate(it.added_at || it.originally_available_at)}</span></div>` : ``}
-                </div>
-                <div class="p-3">
-                    <div class="font-semibold line-clamp-2">${it.title || it.full_title || it.parent_title || it.grandparent_title || '(untitled)'}</div>
-                    <div class="text-xs text-gray-500">
-                    ${(it.year || it.grandparent_title || it.parent_title || '')} ${it.duration ? ` • ${msToHMS(it.duration)}` : ``}
-                    </div>
-                    ${it.summary || it.tagline ? `<div class="mt-2 text-xs text-gray-600 line-clamp-5">${it.tagline || it.summary}</div>` : ``}
-                </div>`;
-            grid.appendChild(li);
-        });
-
-        wrap.appendChild(grid);
-        return wrap;
-    }
-
-    function buildRecsBlock(recs) {
-        const wrap = document.createElement('div');
-        wrap.style.cssText = "display:block; width:100%; padding:8px;";
-
-        const entries = Object.entries(recs || {});
-        if (!entries.length) {
-            wrap.innerHTML = `<div style="text-align:center; color:#666;">No recommendations.</div>`;
-            return wrap;
-        }
-
-        const COLUMNS = 10;
-
-        const posterCard = (p, unavailable=false) => {
-            const href = p.href || '#';
-            const img  = p.url ? `/proxy-img?u=${encodeURIComponent(p.url)}` : '';
-            const title = p.title || '(untitled)';
-            const year  = p.year;
-            const vote  = (p.vote != null) ? String(Number(p.vote).toFixed(1)).replace('.0','') : '';
-            const runtime = p.runtime || '';
-            const overview = p.overview || '';
-
-            const li = document.createElement('li');
-            li.className = 'relative group';
-            li.style.cssText = 'border-radius:12px; overflow:hidden; background:#e5e7eb;';
-
-            li.innerHTML = `
-            <a href="${href}" style="text-decoration:none; color:inherit; display:block; position:relative;">
-                <div class="aspect-[2/3]" style="position:relative; background:#e5e7eb;">
-                ${img
-                    ? `<img src="${img}" crossorigin="anonymous"
-                            style="width:100%;height:100%;object-fit:cover;${unavailable?'filter:grayscale(65%);opacity:.7;':''}">`
-                    : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;
-                                font-size:12px;color:#374151;${unavailable?'filter:grayscale(65%);opacity:.7;':''}">
-                        No image
-                    </div>`}
-                </div>
-
-                <!-- year / ★vote pill -->
-                <div class="absolute top-1 left-1 text-[11px] text-white/90">
-                ${ (year || vote)
-                    ? `<span class="bg-black/70 rounded px-1.5 py-0.5"><span class="pill_text">
-                        ${[year, vote ? `★ ${vote}` : ''].filter(Boolean).join(' • ')}
-                    </span></span>` : '' }
-                </div>
-
-                ${ unavailable
-                    ? `<div class="absolute top-1 right-1 text-[10px] bg-rose-600/85 text-white rounded px-1.5 py-0.5">
-                        <span class="pill_text">Unavailable</span>
-                    </div>`
-                    : '' }
-
-                <!-- gradient footer -->
-                <div class="absolute inset-x-0 bottom-0 p-2 bg-gradient-to-t from-black/70 to-transparent">
-                    <div class="text-[12px] font-semibold text-white line-clamp-2">
-                        ${title} ${p.year ? `(${p.year})` : ''}
-                    </div>
-                    ${ runtime ? `<div class="text-[11px] text-white/80">${runtime}</div>` : '' }
-                </div>
-            </a>
-
-            ${ overview
-                ? `<div style="position:absolute; left:0; right:0; bottom:0; transform:translateY(100%);
-                                background:rgba(0,0,0,.8); color:#fff; font-size:10px; padding:4px 8px; line-height:1.3;">
-                    ${overview}
-                    </div>`
-                : '' }
-            `;
-            return li;
-        };
-
-        let movies_avail = [], movies_un = [], shows_avail = [], shows_un = [];
-        for (const [, v] of entries) {
-            movies_avail.push(...(v.movie_posters || []));
-            movies_un.push(...(v.movie_posters_unavailable || []));
-            shows_avail.push(...(v.show_posters || []));
-            shows_un.push(...(v.show_posters_unavailable || []));
-        }
-
-        const section = (title) => {
-            const h = document.createElement('h3');
-            h.textContent = title;
-            h.style.cssText = "margin:16px 0 8px; font-weight:700; font-size:16px; color:#62a1a4;";
-            wrap.appendChild(h);
-        };
-
-        const grid = () => {
-            const ul = document.createElement('ul');
-            ul.style.cssText = `display:grid; grid-template-columns:repeat(${COLUMNS},minmax(0,1fr));
-                                gap:12px; list-style:none; padding:0; margin:0;`;
-            return ul;
-        };
-
-        const addSection = (title, availArr, unArr) => {
-            section(title);
-            const ul = grid();
-
-            availArr.forEach(p => ul.appendChild(posterCard(p, false)));
-
-            const avail = availArr.length;
-            const remainder = (COLUMNS - (avail % COLUMNS)) % COLUMNS;
-            const span = remainder !== 0 ? remainder : COLUMNS;
-
-            if (unArr && unArr.length) {
-                const first_row = unArr.slice(0, span);
-                const rest = unArr.slice(span);
-
-                if (first_row.length) {
-                    const li = document.createElement('li');
-                    li.style.cssText = `grid-column: span ${span} / span ${span};`;
-                    li.innerHTML = `
-                        <div class="gold-frame" style="position:relative; border-radius:12px;">
-                            <div class="gold-frame-border" style="position:absolute; inset:0; pointer-events:none; border-radius:12px;
-                                                                box-shadow:0 0 0 1px #f59e0b inset;"></div>
-                            <ul style="display:grid; grid-template-columns:repeat(${span},minmax(0,1fr));
-                                    gap:${(span/(span-1.5)).toFixed(3)}rem; list-style:none; padding:8px; margin:0;"></ul>
-                        </div>`;
-                    const inner = li.querySelector('ul');
-                    first_row.forEach(p => inner.appendChild(posterCard(p, true)));
-                    ul.appendChild(li);
-                }
-
-                if (rest.length) {
-                    for (let i = 0; i < rest.length; i += COLUMNS) {
-                        const chunk = rest.slice(i, i + COLUMNS);
-                        const li = document.createElement('li');
-                        li.style.cssText = `grid-column: 1 / -1;`;
-                        li.innerHTML = `
-                            <div class="gold-frame" style="position:relative; border-radius:12px;">
-                            <div class="gold-frame-border" style="position:absolute; inset:0; pointer-events:none; border-radius:12px;
-                                                                    box-shadow:0 0 0 1px #f59e0b inset;"></div>
-                            <ul style="display:grid; grid-template-columns:repeat(${COLUMNS},minmax(0,1fr));
-                                        gap:0.75rem; list-style:none; padding:8px; margin:0;"></ul>
-                            </div>`;
-                        const inner = li.querySelector('ul');
-                        chunk.forEach(p => inner.appendChild(posterCard(p, true)));
-                        ul.appendChild(li);
-                    }
-                }
-            }
-
-            wrap.appendChild(ul);
-        };
-
-        addSection('Recommended Movies', movies_avail, movies_un);
-        addSection('Recommended Shows',  shows_avail,  shows_un);
-
-        return wrap;
-    }
+    let userDict = {};
 
     async function blurImageElement(imgElement) {
         const tempImg = new Image();
@@ -514,6 +100,226 @@
     const esc = (s='') => String(s)
         .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
         .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+
+    function getThemedEmailCSS() {
+        const emailTheme = themeSettings.email_theme || 'newsletter_blue';
+        const isDark = document.documentElement.classList.contains('dark');
+        
+        let bgColor, textColor, cardBg, borderColor, mutedColor;
+
+        bgColor = themeSettings.background_color || '#333333';
+        textColor = themeSettings.text_color || '#62a1a4';
+        cardBg = '#2d2d2d';
+        borderColor = '#404040';
+        mutedColor = '#cccccc';
+        
+        const primaryColor = themeSettings.primary_color || '#8acbd4';
+        const secondaryColor = themeSettings.secondary_color || '#222222';
+        const accentColor = themeSettings.accent_color || '#62a1a4';
+        const logoWidth = "{{ settings.logo_width or 80 }}";
+        
+        return `
+            <style>
+                @import url(https://fonts.googleapis.com/css?family=IBM+Plex+Sans:400,700&display=swap);
+
+                :root {
+                    --email-bg: ${bgColor};
+                    --email-text: ${textColor};
+                    --email-primary: ${primaryColor};
+                    --email-secondary: ${secondaryColor};
+                    --email-accent: ${accentColor};
+                    --email-card-bg: ${cardBg};
+                    --email-border: ${borderColor};
+                    --email-muted: ${mutedColor};
+                }
+                
+                body {
+                    margin: 0;
+                    padding: 0;
+                    font-family: 'IBM Plex Sans';
+                    background-color: var(--email-bg);
+                    line-height: 1.6;
+                    color: var(--email-text);
+                }
+                
+                .email-container {
+                    width: 100%;
+                    background: var(--email-card-bg);
+                    border-radius: 8px;
+                    overflow: hidden;
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+                    border: 1px solid var(--email-border);
+                }
+                
+                .email-header {
+                    background: linear-gradient(135deg, var(--email-accent) 0%, var(--email-primary) 100%);
+                    color: white;
+                    padding: 10px 20px;
+                    text-align: center;
+                }
+                
+                .email-logo {
+                    max-width: ${logoWidth}px;
+                    height: auto;
+                }
+                
+                .email-title {
+                    font-size: 28px;
+                    font-weight: bold;
+                    margin: 0;
+                    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+                }
+                
+                .email-content {
+                    padding: 30px 20px;
+                    color: var(--email-text);
+                    background: var(--email-card-bg);
+                }
+                
+                .email-footer {
+                    background: var(--email-secondary);
+                    padding: 20px;
+                    text-align: center;
+                    border-top: 3px solid var(--email-primary);
+                    color: var(--email-muted);
+                    font-size: 12px;
+                }
+                
+                .email-footer a {
+                    color: var(--email-accent);
+                    text-decoration: none;
+                }
+                
+                .stats-card {
+                    margin: 20px 0;
+                    border-radius: 8px;
+                    overflow: hidden;
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+                    border: 1px solid var(--email-border);
+                    position: relative;
+                }
+                
+                .stats-bg-blur {
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    background-size: cover;
+                    background-position: center;
+                    background-repeat: no-repeat;
+                    filter: blur(5px) brightness(1);
+                    z-index: 0;
+                }
+                
+                .stats-overlay {
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    background: rgba(0, 0, 0, 0.3);
+                    z-index: 1;
+                }
+                
+                .stats-content {
+                    position: relative;
+                    z-index: 2;
+                }
+                
+                .stats-header {
+                    background: var(--email-bg);
+                    color: var(--email-primary);
+                    padding: 15px;
+                    text-align: center;
+                    font-weight: bold;
+                    font-size: 18px;
+                }
+                
+                .stats-table {
+                    width: 100%;
+                    border-collapse: collapse;
+                }
+                
+                .stats-table th {
+                    padding: 12px;
+                    background: rgba(52, 58, 64, 0.9);
+                    color: white;
+                    font-weight: bold;
+                    border: none;
+                }
+                
+                .stats-table td {
+                    padding: 12px;
+                    background: rgba(255, 255, 255, 0.5);
+                    color: #333;
+                    border-bottom: 1px solid rgba(222, 226, 230, 0.8);
+                }
+                
+                .recently-added {
+                    background: var(--email-card-bg);
+                    padding: 20px;
+                    border-radius: 8px;
+                    margin: 20px 0;
+                    border: 1px solid var(--email-border);
+                }
+                
+                .recently-added h2 {
+                    text-align: center;
+                    color: var(--email-text);
+                    margin-bottom: 20px;
+                }
+                
+                .recommendations-block {
+                    margin: 30px 0;
+                    padding: 20px;
+                    background: var(--email-card-bg);
+                    border-radius: 8px;
+                    border: 1px solid var(--email-border);
+                }
+                
+                .recommendations-block h2, .recommendations-block h3 {
+                    color: var(--email-text);
+                }
+                
+                .chart-placeholder {
+                    margin: 20px 0;
+                    padding: 30px;
+                    background: var(--email-card-bg);
+                    border: 2px dashed var(--email-border);
+                    border-radius: 8px;
+                    text-align: center;
+                }
+                
+                .chart-placeholder h3, .chart-placeholder p {
+                    color: var(--email-muted);
+                }
+            </style>
+        `;
+    }
+
+    function msToHMS(ms) {
+        ms = parseInt(ms || 0, 10);
+        const s = Math.round(ms / 1000);
+        const h = Math.floor(s/3600);
+        const m = Math.floor((s%3600)/60);
+        return h ? `${h}h ${m}m` : `${m}m`;
+    }
+
+    function formatDate(d) {
+        if (!d) return '';
+        if (/^\d+$/.test(String(d))) return new Date(parseInt(d,10)*1000).toLocaleDateString();
+        const dt = new Date(d);
+        return isNaN(dt) ? '' : dt.toLocaleDateString();
+    }
+
+    function pickThumb(it) {
+        const type = (it.media_type || it.type || '').toLowerCase();
+        const candidates = (type === 'episode' || type === 'season')
+            ? [it.grandparent_thumb, it.parent_thumb, it.thumb, it.art]
+            : [it.thumb, it.art, it.parent_thumb, it.grandparent_thumb];
+        return candidates.find(Boolean) || '';
+    }
 
     function statTheadHTML(title='') {
         if (title === "Most Watched Movies" || title === "Most Watched TV Shows") {
@@ -592,8 +398,8 @@
 
     function buildStatCardHTML(stat) {
         const title = stat.stat_title || 'Stats';
-        const rows  = Array.isArray(stat.rows) ? stat.rows : [];
-        const bg    = rows[0]?.art || rows[0]?.grandparent_thumb || '';
+        const rows = Array.isArray(stat.rows) ? stat.rows : [];
+        const bg = rows[0]?.art || rows[0]?.grandparent_thumb || '';
 
         const body = rows.length
             ? rows.map(r => statRowHTML(title, r)).join('')
@@ -658,10 +464,11 @@
             stats = data.stats || [];
             graphData = data.graph_data || [];
             recentData = data.recent_data || [];
-            recsPayload = data.recs || data.recommendations || {};
+            recsPayload = data.recommendations || {};
             graphCommands = data.graph_commands || [];
             recentCommands = data.recent_commands || [];
-            
+            userDict = data.user_dict || {};
+
             console.log('Loaded fresh data:', { 
                 stats: stats.length, 
                 graphs: graphData.length, 
@@ -677,11 +484,9 @@
             document.getElementById('email_text').value = data.email_text || '';
             document.getElementById('layout').value = data.layout || 'standard';
             
-            await loadTautulliData(data.date_range || 7);
-            console.log('After loadTautulliData - stats:', stats);
-            
             await generateStatsAndGraphs();
-            console.log('After generateStatsAndGraphs');
+
+            await new Promise(resolve => setTimeout(resolve, 5000));
             
             await updatePreview();
             
@@ -698,11 +503,9 @@
         }
     }
 
-    async function loadTautulliData(dateRange) {
-        console.log('Data will be loaded from API response');
-    }
-
     async function generateStatsAndGraphs() {
+        console.log('generateStatsAndGraphs: Starting with graphData:', graphData);
+        
         const statsContainer = document.getElementById('stats-container');
         const graphsContainer = document.getElementById('graphs-container');
         
@@ -720,7 +523,10 @@
                 statsContainer.appendChild(wrap);
             });
         }
+        
         if (Array.isArray(graphData) && graphData.length) {
+            console.log(`generateStatsAndGraphs: Processing ${graphData.length} graphs`);
+            
             graphData.forEach((g, i) => {
                 const id = `graph-${i}`;
                 const div = document.createElement('div');
@@ -729,20 +535,57 @@
                 div.style.width = '100%';
                 div.style.minHeight = '360px';
                 graphsContainer.appendChild(div);
-
-                const cmd = graphCommands[i] || { name: `Chart ${i+1}`, command: '' };
-                const cfg = {
-                    chart: { type: 'line', style:{ fontFamily:'IBM Plex Sans' } },
-                    title: { text: cmd.name },
-                    exporting: { enabled: true },
-                    xAxis: { categories: g.categories || [] },
-                    yAxis: { title: { text: 'Plays' } },
-                    series: g.series || []
-                };
-
-                Highcharts.chart(id, cfg);
             });
+
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            for (let i = 0; i < graphData.length; i++) {
+                const g = graphData[i];
+                const id = `graph-${i}`;
+                const cmd = graphCommands[i] || { name: `Chart ${i+1}`, command: '' };
+                                
+                const container = document.getElementById(id);
+                
+                if (!container) {
+                    console.error(`generateStatsAndGraphs: Container ${id} not found!`);
+                    continue;
+                }
+                
+                try {
+                    const cfg = {
+                        chart: { type: 'line', style: { fontFamily: 'IBM Plex Sans' } },
+                        title: { text: cmd.name },
+                        exporting: { enabled: true },
+                        xAxis: { categories: g.categories || [] },
+                        yAxis: { title: { text: 'Plays' } },
+                        series: g.series || []
+                    };
+                    
+                    if (typeof Highcharts === 'undefined') {
+                        console.error('generateStatsAndGraphs: Highcharts is not available!');
+                        break;
+                    }
+                    
+                    const chart = Highcharts.chart(id, cfg);
+                    
+                    const chartInArray = Highcharts.charts.find(c => c && c.renderTo && c.renderTo.id === id);
+                    
+                    await new Promise(resolve => setTimeout(resolve, 50));
+                } catch (error) {
+                    console.error(`generateStatsAndGraphs: Error creating chart ${id}:`, error);
+                }
+            }
+            
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            const totalCharts = Highcharts.charts.filter(Boolean).length;
+            console.log(`generateStatsAndGraphs: Final chart count: ${totalCharts}`);
+            console.log(`generateStatsAndGraphs: All chart IDs:`, 
+                Highcharts.charts.filter(Boolean).map(c => c.renderTo?.id).filter(Boolean));
+        } else {
+            console.log('generateStatsAndGraphs: No graph data available');
         }
+        
         const nowDark = document.documentElement.classList.contains('dark');
         applyChartTheme(nowDark);
         document.getElementById('theme-toggle')?.addEventListener('click', () => {
@@ -760,514 +603,626 @@
                 return;
             }
             
-            const layout = document.getElementById('layout').value;
-            const serverName = templateData.settings?.server_name || '';
-            const subject = document.getElementById('subject').value;
-            const isDark = document.documentElement.classList.contains('dark');
-
-            console.log('Layout:', layout);
-            console.log('Server name:', serverName);
-            console.log('Subject:', subject);
-
-            let html = "";
-            let displaySubject = subject.startsWith(serverName) 
-                ? subject.slice(serverName.length).trimStart()
-                : subject;
-
-            const selectedGraphs = selectedItems.filter(item => item.type === 'graph').map(item => item.id);
-            const selectedStats = selectedItems.filter(item => item.type === 'stat').map(item => item.id);
+            const emailHTML = await generateEmailHTML();
             
-            console.log('selectedGraphs:', selectedGraphs);
-            console.log('selectedStats:', selectedStats);
-
-            let allItemsHTML = "";
+            const frame = document.getElementById('preview');
+            if (!frame) {
+                console.error('Preview iframe not found!');
+                return;
+            }
             
-            for (let item of selectedItems) {
-                if (item.type === 'textblock') {
-                    const content = item.content || '';
-                    if (content && content.trim().length > 0) {
-                        const formattedContent = content.trim().replace(/\n/g, "<br>");
-                        allItemsHTML += `<div style="margin-bottom: 15px;">${formattedContent}</div>`;
+            frame.srcdoc = emailHTML;
+            
+            frame.onload = function() {
+                try {
+                    const doc = frame.contentDocument || frame.contentWindow.document;
+                    if (doc && doc.documentElement) {
+                        resizePreviewFrame(frame);
                     }
-                } else if (item.type === 'titleblock') {
-                    const content = item.content || '';
-                    if (content && content.trim().length > 0) {
-                        const formattedContent = content.trim().replace(/\n/g, "<br>");
-                        allItemsHTML += `<div style="margin-bottom: 20px; font-size: 1.5em; font-weight: bold; text-align: center;">${formattedContent}</div>`;
-                    }
-                } else if (item.type === 'stat') {
-                    console.log('Processing stat item:', item.id);
-                    const tableElement = document.getElementById(item.id);
-                    console.log('Found stat element:', !!tableElement);
-                    if (tableElement) {
-                        console.log('Element content preview:', tableElement.innerHTML.substring(0, 100));
-                        try {
-                            const wasHidden = tableElement.classList.contains('d-none');
-                            if (wasHidden) {
-                                tableElement.classList.remove('d-none');
-                            }
-                            await new Promise(resolve => setTimeout(resolve, 150));
+                } catch (e) {
+                    console.log('Could not resize iframe:', e);
+                }
+            };
+            
+            console.log('Preview updated successfully');
+        } catch (error) {
+            console.error('Error in updatePreview:', error);
+            const frame = document.getElementById('preview');
+            if (frame) {
+                frame.srcdoc = `<html><body><p>Error updating preview: ${error.message}</p></body></html>`;
+            }
+        }
+    }
 
-                            const original = document.getElementById(item.id);
-                            if (!original) continue;
+    async function generateEmailHTML() {
+        const serverName = templateData.settings?.server_name || '';
+        const subject = document.getElementById('subject').value;
+        const emailText = document.getElementById('email_text').value;
 
-                            const clone = original.cloneNode(true);
-                            const tempWrapper = document.createElement('div');
+        let contentHTML = "";
+        
+        for (let item of selectedItems) {
+            if (item.type === 'textblock') {
+                const content = item.content || '';
+                if (content && content.trim().length > 0) {
+                    const formattedContent = content.trim().replace(/\n/g, "<br>");
+                    contentHTML += `<div style="margin-bottom: 15px; line-height: 1.6; text-align: center">${formattedContent}</div>`;
+                }
+            } else if (item.type === 'headerblock') {
+                const content = item.content || '';
+                if (content && content.trim().length > 0) {
+                    const formattedContent = content.trim().replace(/\n/g, "<br>");
+                    contentHTML += `<div style="margin-bottom: 20px; font-size: 1.5em; font-weight: bold; text-align: center;">${formattedContent}</div>`;
+                }
+            } else if (item.type === 'titleblock') {
+                const content = item.content || '';
+                if (content && content.trim().length > 0) {
+                    const formattedContent = content.trim().replace(/\n/g, "<br>");
+                    contentHTML += `<div style="margin-bottom: 20px; font-size: 2em; font-weight: bold; text-align: center;">${formattedContent}</div>`;
+                }
+            } else if (item.type === 'stat') {
+                contentHTML += buildStatHTML(item.id);
+            } else if (item.type === 'graph') {
+                console.log('Processing graph item:', item.id);
+                
+                await new Promise(resolve => setTimeout(resolve, 100));
+                
+                const availableCharts = Highcharts.charts.filter(Boolean);
+                
+                const chart = Highcharts.charts.find(c => c && c.renderTo && c.renderTo.id === item.id);
+                
+                if (chart) {
+                    try {
+                        console.log(`Processing chart ${item.id} - Title: ${chart.title?.textStr || 'No title'}`);
+                        
+                        const svg = chart.getSVG();
+                        
+                        const canvas = document.createElement("canvas");
+                        const ctx = canvas.getContext("2d");
+                        const img = new Image();
 
-                            clone.style.display = 'inline-block';
-                            clone.style.width = 'auto';
-
-                            const table = clone.querySelector('.content-table');
-                            if (table) {
-                                table.style.width = 'auto';
-                            }
-
-                            tempWrapper.style.position = 'fixed';
-                            tempWrapper.style.top = '-10000px';
-                            tempWrapper.style.left = '0';
-                            tempWrapper.style.zIndex = '-1';
-                            tempWrapper.style.overflow = 'hidden';
-                            tempWrapper.appendChild(clone);
-                            document.body.appendChild(tempWrapper);
-
-                            const blurImage = clone.querySelector('.bg-blur');
-                            if (blurImage) {
-                                await blurImageElement(blurImage);
-                            }
-
-                            await new Promise(resolve => setTimeout(resolve, 50));
-                            
-                            const canvas = await html2canvas(clone, {
-                                backgroundColor: null,
-                                scale: 1,
-                                useCORS: true
-                            });
-
-                            document.body.removeChild(tempWrapper);
-
-                            if (wasHidden) {
-                                tableElement.classList.add('d-none');
-                            }
-                            
-                            console.log('Successfully created canvas for stat:', item.id);
-                            
-                            const dataUrl = canvas.toDataURL("image/png");
-                            allItemsHTML += `<img src="${dataUrl}" style="max-width: 100%; margin-bottom: 10px;">`;
-                        } catch (error) {
-                            console.warn('Error processing stat', item.id, error);
-                            try {
-                                if (tempWrapper && document.body.contains(tempWrapper)) {
-                                    document.body.removeChild(tempWrapper);
-                                }
-                                if (wasHidden && tableElement) {
-                                    tableElement.classList.add('d-none');
-                                }
-                            } catch (cleanupError) {
-                                console.warn('Error during stat cleanup', cleanupError);
-                            }
-                            const statIndex = parseInt(item.id.split('-')[1]);
-                            const statData = stats[statIndex];
-                            console.log('Error fallback - looking for stat index:', statIndex, 'from:', stats);
-                            if (statData && statData.rows && statData.rows.length > 0) {
-                                let fallbackHTML = `
-                                    <div class="card my-4" style="margin: 20px auto; max-width: 800px;">
-                                        <div class="card-header bg-primary text-white" style="background-color: #007bff !important; color: white !important; padding: 15px; font-weight: bold;">
-                                            ${statData.stat_title || 'Statistics'}
-                                        </div>
-                                        <div class="card-body blur-container p-0" style="padding: 0 !important; position: relative;">`;
-                                
-                                if (statData.rows[0] && (statData.rows[0].art || statData.rows[0].grandparent_thumb)) {
-                                    const bgImage = statData.rows[0].art || statData.rows[0].grandparent_thumb;
-                                    fallbackHTML += `<img src="/proxy-art${bgImage}" class="bg-blur" alt="" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; filter: blur(4px) brightness(0.75); z-index: 0;" />`;
-                                }
-                                
-                                fallbackHTML += `<table class="table table-striped content-table m-0" style="position: relative; z-index: 1; margin: 0 !important; background: transparent;">`;
-                                
-                                const statTitle = statData.stat_title || '';
-                                if (statTitle.includes("Most Watched Movies") || statTitle.includes("Most Watched TV Shows")) {
-                                    fallbackHTML += `
-                                        <thead class="table-dark" style="background-color: #343a40 !important; color: white;">
-                                            <tr>
-                                                <th style="padding: 12px; color: white;">Title</th>
-                                                <th style="padding: 12px; color: white;">Year</th>
-                                                <th style="padding: 12px; color: white;">Plays</th>
-                                                <th style="padding: 12px; color: white;">Hours Played</th>
-                                                <th style="padding: 12px; color: white;">Rating</th>
-                                            </tr>
-                                        </thead>`;
-                                } else if (statTitle.includes("Most Active Users")) {
-                                    fallbackHTML += `
-                                        <thead class="table-dark" style="background-color: #343a40 !important; color: white;">
-                                            <tr>
-                                                <th style="padding: 12px; color: white;">Username</th>
-                                                <th style="padding: 12px; color: white;">Plays</th>
-                                                <th style="padding: 12px; color: white;">Hours Played</th>
-                                            </tr>
-                                        </thead>`;
-                                } else {
-                                    fallbackHTML += `
-                                        <thead class="table-dark" style="background-color: #343a40 !important; color: white;">
-                                            <tr>
-                                                <th style="padding: 12px; color: white;">Title</th>
-                                                <th style="padding: 12px; color: white;">Plays</th>
-                                            </tr>
-                                        </thead>`;
-                                }
-                                
-                                fallbackHTML += `<tbody>`;
-                                
-                                statData.rows.slice(0, 10).forEach((row, index) => {
-                                    const title = row.title || row.user || row.section_name || 'Unknown';
-                                    const year = row.year || '';
-                                    const plays = row.total_plays || row.count || row.plays || 0;
-                                    const hours = row.total_duration ? Math.round(row.total_duration / 3600) : '';
-                                    const rating = row.content_rating || '';
-                                    
-                                    fallbackHTML += `<tr style="background-blend-mode: overlay; background-color: rgba(255, 255, 255, 0.5);">`;
-                                    fallbackHTML += `<td style="padding: 12px; font-weight: 500;">${title}</td>`;
-                                    
-                                    if (statTitle.includes("Most Watched") || statTitle.includes("Most Popular")) {
-                                        fallbackHTML += `<td style="padding: 12px;">${year}</td>`;
-                                    }
-                                    
-                                    if (!statTitle.includes("Recently")) {
-                                        fallbackHTML += `<td style="padding: 12px; font-weight: bold;">${plays}</td>`;
-                                    }
-                                    
-                                    if (statTitle.includes("Most Watched") || statTitle.includes("Most Active")) {
-                                        fallbackHTML += `<td style="padding: 12px;">${hours}</td>`;
-                                    }
-                                    
-                                    if (statTitle.includes("Movies") || statTitle.includes("TV Shows")) {
-                                        fallbackHTML += `<td style="padding: 12px;">${rating}</td>`;
-                                    }
-                                    
-                                    fallbackHTML += `</tr>`;
-                                });
-                                
-                                fallbackHTML += `</tbody></table></div></div>`;
-                                allItemsHTML += fallbackHTML;
-                            } else {
-                                allItemsHTML += `
-                                    <div class="card my-4" style="margin: 20px auto; max-width: 800px;">
-                                        <div class="card-header bg-primary text-white" style="background-color: #007bff !important; color: white !important; padding: 15px; font-weight: bold;">
-                                            ${item.name || 'Statistics'}
-                                        </div>
-                                        <div class="card-body" style="padding: 20px; text-align: center;">
-                                            <p style="color: #333; margin: 0;">Statistical data for the specified date range</p>
-                                        </div>
-                                    </div>`;
-                            }
-                        }
-                    } else {
-                        console.warn('Stat element not found:', item.id);
-                        const statIndex = parseInt(item.id.split('-')[1]);
-                        const statData = stats[statIndex];
-                        console.log('Missing element fallback - looking for stat index:', statIndex, 'from:', stats);
-                        if (statData && statData.rows && statData.rows.length > 0) {
-                            let fallbackHTML = `
-                            <div class="card my-4" style="margin: 20px auto; max-width: 800px;">
-                                <div class="card-header bg-primary text-white" style="background-color: #007bff !important; color: white !important; padding: 15px; font-weight: bold;">
-                                    ${statData.stat_title || 'Statistics'}
-                                </div>
-                                <div class="card-body blur-container p-0" style="padding: 0 !important; position: relative;">`;
-                            
-                            if (statData.rows[0] && (statData.rows[0].art || statData.rows[0].grandparent_thumb)) {
-                                const bgImage = statData.rows[0].art || statData.rows[0].grandparent_thumb;
-                                fallbackHTML += `<img src="/proxy-art${bgImage}" class="bg-blur" alt="" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; filter: blur(4px) brightness(0.75); z-index: 0;" />`;
-                            }
-                            
-                            fallbackHTML += `<table class="table table-striped content-table m-0" style="position: relative; z-index: 1; margin: 0 !important; background: transparent;">`;
-                            
-                            const statTitle = statData.stat_title || '';
-                            if (statTitle.includes("Most Watched Movies") || statTitle.includes("Most Watched TV Shows")) {
-                                fallbackHTML += `
-                                    <thead class="table-dark" style="background-color: #343a40 !important; color: white;">
-                                        <tr>
-                                            <th style="padding: 12px; color: white;">Title</th>
-                                            <th style="padding: 12px; color: white;">Year</th>
-                                            <th style="padding: 12px; color: white;">Plays</th>
-                                            <th style="padding: 12px; color: white;">Hours Played</th>
-                                            <th style="padding: 12px; color: white;">Rating</th>
-                                        </tr>
-                                    </thead>`;
-                            } else if (statTitle.includes("Most Active Users")) {
-                                fallbackHTML += `
-                                    <thead class="table-dark" style="background-color: #343a40 !important; color: white;">
-                                        <tr>
-                                            <th style="padding: 12px; color: white;">Username</th>
-                                            <th style="padding: 12px; color: white;">Plays</th>
-                                            <th style="padding: 12px; color: white;">Hours Played</th>
-                                        </tr>
-                                    </thead>`;
-                            } else {
-                                fallbackHTML += `
-                                    <thead class="table-dark" style="background-color: #343a40 !important; color: white;">
-                                        <tr>
-                                            <th style="padding: 12px; color: white;">Title</th>
-                                            <th style="padding: 12px; color: white;">Plays</th>
-                                        </tr>
-                                    </thead>`;
-                            }
-                            
-                            fallbackHTML += `<tbody>`;
-                            
-                            statData.rows.slice(0, 10).forEach((row, index) => {
-                                const title = row.title || row.user || row.section_name || 'Unknown';
-                                const year = row.year || '';
-                                const plays = row.total_plays || row.count || row.plays || 0;
-                                const hours = row.total_duration ? Math.round(row.total_duration / 3600) : '';
-                                const rating = row.content_rating || '';
-                                
-                                fallbackHTML += `<tr style="background-blend-mode: overlay; background-color: rgba(255, 255, 255, 0.5);">`;
-                                fallbackHTML += `<td style="padding: 12px; font-weight: 500;">${title}</td>`;
-                                
-                                if (statTitle.includes("Most Watched") || statTitle.includes("Most Popular")) {
-                                    fallbackHTML += `<td style="padding: 12px;">${year}</td>`;
-                                }
-                                
-                                if (!statTitle.includes("Recently")) {
-                                    fallbackHTML += `<td style="padding: 12px; font-weight: bold;">${plays}</td>`;
-                                }
-                                
-                                if (statTitle.includes("Most Watched") || statTitle.includes("Most Active")) {
-                                    fallbackHTML += `<td style="padding: 12px;">${hours}</td>`;
-                                }
-                                
-                                if (statTitle.includes("Movies") || statTitle.includes("TV Shows")) {
-                                    fallbackHTML += `<td style="padding: 12px;">${rating}</td>`;
-                                }
-                                
-                                fallbackHTML += `</tr>`;
-                            });
-                            
-                            fallbackHTML += `</tbody></table></div></div>`;
-                            allItemsHTML += fallbackHTML;
-                        } else {
-                            allItemsHTML += `
-                                <div class="card my-4" style="margin: 20px auto; max-width: 800px;">
-                                    <div class="card-header bg-primary text-white" style="background-color: #007bff !important; color: white !important; padding: 15px; font-weight: bold;">
-                                        ${item.name || 'Statistics'}
-                                    </div>
-                                    <div class="card-body" style="padding: 20px; text-align: center;">
-                                        <p style="color: #333; margin: 0;">Statistical data for the specified date range</p>
-                                    </div>
-                                </div>`;
-                        }
-                    }
-                } else if (item.type === 'graph') {
-                    const chart = Highcharts.charts.find(c => c && c.renderTo.id === item.id);
-                    if (chart) {
-                        try {
-                            const svg = chart.getSVG();
-                            const canvas = document.createElement("canvas");
-                            const ctx = canvas.getContext("2d");
-                            const img = new Image();
-
-                            await new Promise((resolve, reject) => {
-                                img.onload = () => {
-                                    canvas.width = img.width;
-                                    canvas.height = img.height;
-                                    ctx.drawImage(img, 0, 0);
-                                    const dataUrl = canvas.toDataURL("image/png");
-                                    allItemsHTML += `<img src="${dataUrl}" style="max-width: 100%; margin-bottom: 10px;">`;
-                                    resolve();
-                                };
-                                img.onerror = (error) => {
-                                    console.warn('Failed to load graph image for', item.id, error);
-                                    resolve();
-                                };
-                                img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)));
-                            });
-                        } catch (error) {
-                            console.warn('Error processing graph', item.id, error);
-                            const graphIndex = parseInt(item.id.split('-')[1]);
-                            const commandInfo = graphCommands[graphIndex] || { name: 'Chart' };
-                            allItemsHTML += `
-                                <div style="margin: 20px 0; padding: 20px; background: #333; border-radius: 5px; border-left: 4px solid #E5A00D;">
-                                    <h3 style="color: #E5A00D;">${commandInfo.name}</h3>
-                                    <p style="color: #fff;">Chart data for the past ${templateData.date_range || 7} days</p>
-                                    <p style="color: #ccc; font-size: 14px;">Chart will be generated when email is sent with fresh data</p>
-                                </div>`;
-                        }
-                    } else {
+                        await new Promise((resolve, reject) => {
+                            img.onload = () => {
+                                canvas.width = img.width;
+                                canvas.height = img.height;
+                                ctx.drawImage(img, 0, 0);
+                                const dataUrl = canvas.toDataURL("image/png");
+                                contentHTML += `<div style="text-align: center"><img src="${dataUrl}" style="max-width: 100%; margin-bottom: 10px;"></div>`;
+                                resolve();
+                            };
+                            img.onerror = (error) => {
+                                console.warn('Failed to load graph image for', item.id, error);
+                                reject(error);
+                            };
+                            img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)));
+                        });
+                    } catch (error) {
+                        console.warn('Error processing graph', item.id, error);
                         const graphIndex = parseInt(item.id.split('-')[1]);
                         const commandInfo = graphCommands[graphIndex] || { name: 'Chart' };
-                        allItemsHTML += `
+                        contentHTML += `
                             <div style="margin: 20px 0; padding: 20px; background: #333; border-radius: 5px; border-left: 4px solid #E5A00D;">
                                 <h3 style="color: #E5A00D;">${commandInfo.name}</h3>
                                 <p style="color: #fff;">Chart data for the past ${templateData.date_range || 7} days</p>
                                 <p style="color: #ccc; font-size: 14px;">Chart will be generated when email is sent with fresh data</p>
                             </div>`;
                     }
+                } else {
+                    console.warn('Chart not found for', item.id, 'Available chart IDs:', 
+                        Highcharts.charts.filter(Boolean).map(c => c.renderTo?.id).filter(Boolean));
+                    const graphIndex = parseInt(item.id.split('-')[1]);
+                    const commandInfo = graphCommands[graphIndex] || { name: 'Chart' };
+                    contentHTML += `
+                        <div style="margin: 20px 0; padding: 20px; background: #333; border-radius: 5px; border-left: 4px solid #E5A00D;">
+                            <h3 style="color: #E5A00D;">${commandInfo.name}</h3>
+                            <p style="color: #fff;">Chart data for the past ${templateData.date_range || 7} days</p>
+                            <p style="color: #ccc; font-size: 14px;">Chart will be generated when email is sent with fresh data</p>
+                        </div>`;
                 }
+            } else if (item.type === 'ra') {
+                contentHTML += buildRecentlyAddedHTML(item.raLibrary);
+            } else if (item.type === 'recs') {
+                contentHTML += buildRecommendationsHTML(item.userKey);
             }
+        }
 
-            const baseTextRaw = (document.getElementById('email_text').value || '').trim();
-            let bodyHTML = (baseTextRaw ? `<div style="margin-bottom:15px;">${baseTextRaw.replace(/\n/g,'<br>')}</div>` : '');
-            bodyHTML += (allItemsHTML || '');
+        return buildCompleteEmailHTML(contentHTML, serverName, subject);
+    }
 
-            let html0 = `
-                <link href="https://fonts.googleapis.com/css?family=IBM+Plex+Sans:400,500,600,700&display=swap" rel="stylesheet">
-                <style>
-                    :root { color-scheme: ${isDark ? 'dark' : 'light'}; }
-                    html, body { background: ${isDark ? '#333' : '#8acbd4'}; }
-                    @media only screen and (max-width:1900px) {
-                        .plex-img { margin-left: 44rem !important; }
-                    }
-                    @media only screen and (max-width:1700px) {
-                        .plex-img { margin-left: 38rem !important; }
-                    }
-                    @media only screen and (max-width:1500px) {
-                        .plex-img { margin-left: 30rem !important; }
-                    }
-                    @media only screen and (max-width:1300px) {
-                        .plex-img { margin-left: 24rem !important; }
-                    }
-                    @media only screen and (max-width:1100px) {
-                        .plex-img { margin-left: 16rem !important; }
-                    }
-                    @media only screen and (max-width:900px) {
-                        .plex-img { margin-left: 10rem !important; }
-                    }
-                    @media only screen and (max-width:700px) {
-                        .plex-img { margin-left: 4rem !important; }
-                    }
-                    @media only screen and (max-width:500px) {
-                        .plex-img { margin-left: 2rem !important; }
-                    }
-                </style>
-                <html><body style="font-family: IBM Plex Sans; margin: 0;">
-                    <table class="body" style="width: 100%;" border="0" cellspacing="0" cellpadding="0">
-                        <tbody><tr>
-                            <td class="container" style="display:block; max-width: 1042px; padding:10px; width:1042px; margin:0 auto !important;">
-                                <div class="content" style="max-width:1037px; padding:10px; margin:0 auto;">
-                                    <span class="preheader" style="display:none; opacity:0; visibility:hidden; height:0; width:0;">${serverName} Newsletter</span>
-                                    <table class="main" style="width:100%; background:#282A2D; border-radius:3px; color:#fff;" border="0" cellspacing="0" cellpadding="3"><tbody>
-                                        <tr><td class="wrapper" style="padding:5px;">
-                                            <div class="header" style="text-align:center; line-height:0;">
-                                                <img class="header-img plex-img" style="display:block; height:auto; border:0; max-width:100%; margin-left:22em;"
-                                                    src="https://d15k2d11r6t6rl.cloudfront.net/public/users/Integrators/669d5713-9b6a-46bb-bd7e-c542cff6dd6a/3bef3c50f13f4320a9e31b8be79c6ad2/Plex%20Logo%20Update%202022/plex-logo-heavy-stroke.png" width="40" />
-                                            </div>
-                                            <div class="server-name" style="font-size:25px; text-align:center; margin-bottom:0;">${serverName} Newsletter</div>
-                                        </td></tr>
-                                        <tr><td class="footer" style="font-size:12px; text-align:center; width:100%;">
-                                            <h1 class="footer-bar" style="margin: 5px auto 0; width:300px; border-top:1px solid #E5A00D;">${displaySubject}</h1>
-                                            <div style="margin:20px 0;">
-                                                ${bodyHTML}
-                                            </div>
-                                            <div class="footer-bar" style="margin:25px auto 0; width:250px; border-top:1px solid #E5A00D;">&nbsp;</div>
-                                            <div class="content-block powered-by" style="padding-bottom:10px;">Generated for Plex Media Server by
-                                                <a href="https://github.com/jma1ice/newsletterr" style="color:#E5A00D; text-decoration:none;">newsletterr</a>
-                                            </div>
-                                        </td></tr>
-                                    </tbody></table>
-                                </div>
-                            </td>
-                        </tr></tbody>
+    function buildStatHTML(statId) {
+        const statIndex = parseInt(statId.split('-')[1]);
+        if (statIndex >= stats.length) return '';
+        
+        const stat = stats[statIndex];
+        if (!stat || !stat.rows) return '';
+        
+        const title = stat.stat_title || 'Statistics';
+        const rows = stat.rows;
+        
+        let backgroundElements = '';
+        let hasBackground = false;
+        if (rows.length > 0) {
+            const artwork = rows[0].art || rows[0].grandparent_thumb;
+            if (artwork) {
+                const baseUrl = window.location.origin;
+                const artworkUrl = `${baseUrl}/proxy-art${artwork}`;
+                hasBackground = true;
+                backgroundElements = `
+                    <div style="
+                        position: absolute;
+                        top: 0;
+                        left: 0;
+                        right: 0;
+                        bottom: 0;
+                        background-image: url('${artworkUrl}');
+                        background-size: cover;
+                        background-position: center;
+                        background-repeat: no-repeat;
+                        filter: blur(5px) brightness(1);
+                        z-index: 0;
+                    "></div>
+                    <div style="
+                        position: absolute;
+                        top: 0;
+                        left: 0;
+                        right: 0;
+                        bottom: 0;
+                        background: rgba(0, 0, 0, 0.3);
+                        z-index: 1;
+                    "></div>
+                `;
+            }
+        }
+        
+        function getStatHeaders(title) {
+            if (title === "Most Watched Movies" || title === "Most Watched TV Shows") {
+                return ["Title", "Year", "Plays", "Hours Played", "Rating"];
+            } else if (title === "Most Popular Movies" || title === "Most Popular TV Shows") {
+                return ["Title", "Year", "Plays", "Users", "Rating"];
+            } else if (title === "Most Played Artists") {
+                return ["Author", "Year", "Plays", "Hours Played"];
+            } else if (title === "Most Popular Artists") {
+                return ["Author", "Year", "Plays", "Users"];
+            } else if (title === "Recently Watched") {
+                return ["Title", "Year", "Rating"];
+            } else if (title === "Most Active Libraries") {
+                return ["Library", "Plays", "Hours Played"];
+            } else if (title === "Most Active Users") {
+                return ["Username", "Plays", "Hours Played"];
+            } else if (title === "Most Active Platforms") {
+                return ["Platform", "Plays", "Hours Played"];
+            } else if (title === "Most Concurrent Streams") {
+                return ["Category", "Count"];
+            }
+            return ["Title", "Value"];
+        }
+        
+        function getStatCells(title, row) {
+            const cells = [];
+            
+            if (title === "Most Active Libraries") {
+                cells.push(row.section_name || '');
+            } else if (title === "Most Active Users") {
+                cells.push(row.user || '');
+            } else if (title === "Most Active Platforms") {
+                cells.push(row.platform || '');
+            } else {
+                cells.push(row.title || '');
+            }
+            
+            const skipYearStats = ["Most Active Libraries", "Most Active Users", "Most Active Platforms", "Most Concurrent Streams"];
+            if (!skipYearStats.includes(title)) {
+                cells.push(row.year || '');
+            }
+            
+            if (!title.includes("Recently") && !title.includes("Concurrent")) {
+                cells.push(row.total_plays || 0);
+            }
+            
+            const hoursStats = ["Most Watched Movies", "Most Watched TV Shows", "Most Played Artists", "Most Active Libraries", "Most Active Users", "Most Active Platforms"];
+            const usersStats = ["Most Popular Movies", "Most Popular TV Shows", "Most Popular Artists"];
+            
+            if (hoursStats.includes(title)) {
+                const hours = Math.ceil((row.total_duration || 0) / 3600);
+                cells.push(hours);
+            } else if (usersStats.includes(title)) {
+                cells.push(row.users_watched || '');
+            }
+            
+            const skipRatingStats = ["Most Active Libraries", "Most Played Artists", "Most Popular Artists", "Most Active Users", "Most Active Platforms", "Most Concurrent Streams"];
+            if (!skipRatingStats.includes(title)) {
+                cells.push(row.content_rating || '');
+            }
+            
+            if (title === "Most Concurrent Streams") {
+                cells.push(row.count || 0);
+            }
+            
+            return cells;
+        }
+        
+        const headers = getStatHeaders(title);
+        const headerHTML = headers.map(h => 
+            `<th style="padding: 12px; background: rgba(52, 58, 64, 0.9); color: white; font-weight: bold;">${h}</th>`
+        ).join('');
+        
+        const rowsHTML = rows.map(row => {
+            const cells = getStatCells(title, row);
+            const cellsHTML = cells.map(cell => 
+                `<td style="color: black; padding: 12px; background: rgba(255, 255, 255, 0.5); border-bottom: 1px solid rgba(222, 226, 230, 0.8);">${cell}</td>`
+            ).join('');
+            return `<tr>${cellsHTML}</tr>`;
+        }).join('');
+
+        const containerStyle = `
+            margin: 20px 0;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            border: 1px solid var(--email-border);
+            position: relative;
+            ${hasBackground ? '' : 'background: var(--email-card-bg);'}
+        `;
+        
+        const headerStyle = `
+            background: var(--email-bg);
+            color: var(--email-primary);
+            padding: 15px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 18px;
+            position: relative;
+            z-index: 2;
+        `;
+        
+        const tableStyle = `
+            width: 100%;
+            border-collapse: collapse;
+            position: relative;
+            z-index: 2;
+        `;
+        
+        return `
+            <div class="stats-card" style="${containerStyle}">
+                ${backgroundElements}
+                <div class="stats-content" style="position: relative; z-index: 2;">
+                    <div class="stats-header" style="${headerStyle}">${title}</div>
+                    <table class="stats-table" style="${tableStyle}">
+                        <thead>
+                            <tr>${headerHTML}</tr>
+                        </thead>
+                        <tbody>
+                            ${rowsHTML}
+                        </tbody>
                     </table>
-                </body></html>`;
+                </div>
+            </div>
+        `;
+    }
 
-            const needRA = RX.RA.test(html0);
-            const needRECS = RX.RECS.test(html0);
-
-            const raCount = (html0.match(RX.RA_G) || []).length;
-            const recsCount = (html0.match(RX.RECS_G) || []).length;
-
-            console.log('RA tokens:', raCount, 'RECS tokens:', recsCount);
-
-            if (needRA && raCount > 0 && Array.isArray(recentData) && recentData.length) {
-                const bench = document.getElementById('workbench');
-                const raNode = buildRecentBlock(recentData);
-                bench.appendChild(raNode);
-                await new Promise(r => setTimeout(r, 0));
-                const raPNG = await raElementToPNG(raNode, {
-                    bg: '#282A2D',
-                    minWidth: 1920
-                });
-                bench.removeChild(raNode);
-                const raHTML = raPNG ? `<div style="margin:16px 0;"><img src="${raPNG}" style="max-width:100%; display:block; margin:0 auto;"></div>` : '';
-                html0 = html0.replace(RX.RA, raHTML);
-                if (raCount > 1) html0 = html0.replace(RX.RA_G, '');
-            } else {
-                html0 = html0.replace(RX.RA_G, '');
+    function buildRecentlyAddedHTML(libraryFilter) {
+        if (!recentData || recentData.length === 0) {
+            return `<div class="recently-added"><p style="text-align: center; color: var(--email-muted); padding: 20px;">No recently added items available</p></div>`;
+        }
+        
+        let allItems = [];
+        recentData.forEach(section => {
+            if (section && section.recently_added) {
+                allItems = allItems.concat(section.recently_added);
             }
-
-            if (needRECS && recsCount > 0 && recsPayload && Object.keys(recsPayload).length) {
-                const bench = document.getElementById('workbench');
-                const recNode = buildRecsBlock(recsPayload);
-                bench.appendChild(recNode);
-                await new Promise(r => setTimeout(r, 0));
-                const recPNG = await recElementToPNG(recNode, {
-                    bg: '#282A2D',
-                    minWidth: 1920
-                });
-                bench.removeChild(recNode);
-                const recHTML = recPNG ? `<div style="margin:16px 0;"><img src="${recPNG}" style="max-width:100%; display:block; margin:0 auto;"></div>` : '';
-                html0 = html0.replace(RX.RECS, recHTML);
-                if (recsCount > 1) html0 = html0.replace(RX.RECS_G, '');
-            } else {
-                html0 = html0.replace(RX.RECS_G, '');
-            }
-
-            window.__emailHTML = html0;
-            window.__emailReady = true;
-
-            const frame = document.getElementById('preview');
-            console.log('Frame element:', frame);
-            if (!frame) {
-                console.error('Preview iframe not found!');
-                return;
-            }
+        });
+        
+        if (libraryFilter) {
+            allItems = allItems.filter(item => 
+                item.library_name && item.library_name.toLowerCase().includes(libraryFilter.toLowerCase())
+            );
+        }
+        
+        allItems = allItems.slice(0, 10);
+        
+        if (allItems.length === 0) {
+            return `<div class="recently-added"><p style="text-align: center; color: var(--email-muted); padding: 20px;">No recently added items found${libraryFilter ? ` for ${libraryFilter}` : ''}</p></div>`;
+        }
+        
+        const gridItems = allItems.map(item => {
+            const title = item.title || item.full_title || item.parent_title || item.grandparent_title || '(untitled)';
+            const sub = item.year || item.grandparent_title || item.parent_title || '';
+            const thumbPath = pickThumb(item);
+            const duration = msToHMS(item.duration);
+            const added = formatDate(item.added_at || item.originally_available_at);
+            const library = item.library_name || item.section_name || '';
             
-            console.log('HTML content length:', html.length);
-            console.log('HTML content preview:', html.substring(0, 200) + '...');
-            
-            frame.srcdoc = html0;
-            
-            function resizeIframe() {
-                try {
-                    const doc = frame.contentDocument || frame.contentWindow.document;
-                    if (doc && doc.body) {
-                        const contentHeight = Math.max(
-                            doc.body.scrollHeight,
-                            doc.body.offsetHeight,
-                            doc.documentElement.clientHeight,
-                            doc.documentElement.scrollHeight,
-                            doc.documentElement.offsetHeight
-                        );
-                        
-                        const minHeight = 480;
-                        const maxHeight = 960;
-                        const newHeight = Math.max(minHeight, Math.min(maxHeight, contentHeight + 20));
-                        
-                        frame.style.height = newHeight + 'px';
-                        console.log('Iframe resized to:', newHeight + 'px', 'Content height:', contentHeight);
-                    }
-                } catch (e) {
-                    console.log('Could not resize iframe:', e);
-                }
-            }
-            
-            frame.onload = function() {
-                try {
-                    const doc = frame.contentDocument || frame.contentWindow.document;
-                    if (doc && doc.documentElement) {
-                        if (isDark) {
-                            doc.documentElement.classList.add('dark');
-                        }
-                        setTimeout(resizeIframe, 100);
-                    }
-                } catch (e) {
-                    console.log('Could not apply dark mode or resize iframe:', e);
-                }
+            return {
+                title,
+                sub,
+                summary: item.tagline || item.summary || '',
+                duration,
+                added,
+                thumb: thumbPath,
+                library
             };
+        });
+        
+        const itemsHTML = gridItems.map(item => {
+            const imgURL = item.thumb ? `/proxy-art${item.thumb.startsWith('/') ? item.thumb : '/' + item.thumb}` : '/static/img/no-poster.png';
             
-            console.log('Preview updated successfully');
+            return `
+                <div style="
+                    position: relative;
+                    background: var(--email-card-bg);
+                    border-radius: 12px;
+                    overflow: hidden;
+                    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.6);
+                    border: 1px solid var(--email-border);
+                    width: 100%;
+                    max-width: 200px;
+                    margin: 0 auto;
+                ">
+                    <div style="position: relative; aspect-ratio: 2/3; background: #f8f9fa;">
+                        <img src="${imgURL}" style="width: 100%; height: 100%; object-fit: cover; display: block;" alt="${item.title}">
+                        ${item.library ? `
+                            <div style="
+                                position: absolute;
+                                top: 4px;
+                                right: 4px;
+                                background: rgba(0, 0, 0, 0.7);
+                                color: white;
+                                padding: 2px 8px;
+                                border-radius: 12px;
+                                font-size: 10px;
+                                line-height: 1;
+                            ">${item.library}</div>
+                        ` : ''}
+                        ${item.added ? `
+                            <div style="
+                                position: absolute;
+                                bottom: 4px;
+                                right: 4px;
+                                background: rgba(0, 0, 0, 0.6);
+                                color: rgba(255, 255, 255, 0.9);
+                                padding: 2px 6px;
+                                border-radius: 4px;
+                                font-size: 9px;
+                                line-height: 1;
+                            ">${item.added}</div>
+                        ` : ''}
+                    </div>
+                    <div style="padding: 12px;">
+                        <div style="font-weight: bold; font-size: 14px; color: var(--email-text); margin-bottom: 4px; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                            ${item.title}
+                        </div>
+                        <div style="font-size: 11px; color: var(--email-muted); margin-bottom: 8px;">
+                            ${item.sub ? item.sub + ' • ' : ''}${item.duration}
+                        </div>
+                        ${item.summary ? `
+                            <div style="font-size: 11px; color: var(--email-text); opacity: 0.8; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden;">
+                                ${item.summary}
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+        }).join('');
+        
+        return `
+            <div class="recently-added">
+                <h2>Recently Added${libraryFilter ? ` - ${libraryFilter}` : ''}</h2>
+                <div style="
+                    display: grid;
+                    grid-template-columns: repeat(5, 1fr);
+                    gap: 12px;
+                    margin: 15px auto 0 auto;
+                    padding: 0;
+                    width: 60%;
+                ">
+                    ${itemsHTML}
+                </div>
+            </div>
+        `;
+    }
+
+    function buildRecommendationsHTML(userKey) {
+        if (!recsPayload || !userKey || !recsPayload[userKey]) {
+            return `<div style="text-align: center; color: #666; padding: 20px; background: #f8f9fa; border-radius: 8px; margin: 20px 0;">No recommendations available for this user</div>`;
+        }
+        
+        const userRecs = recsPayload[userKey];
+        const userEmail = userDict[userKey];
+        
+        let sectionsHTML = '';
+        
+        if (userRecs.movie_posters && userRecs.movie_posters.length > 0) {
+            sectionsHTML += buildRecommendationsSectionHTML(
+                userRecs.movie_posters.slice(0, 20),
+                userRecs.movie_posters_unavailable?.slice(0, 20) || [],
+                'Recommended Movies'
+            );
+        }
+        
+        if (userRecs.show_posters && userRecs.show_posters.length > 0) {
+            sectionsHTML += buildRecommendationsSectionHTML(
+                userRecs.show_posters.slice(0, 20),
+                userRecs.show_posters_unavailable?.slice(0, 20) || [],
+                'Recommended TV Shows'
+            );
+        }
+        
+        if (!sectionsHTML) {
+            return `<div style="text-align: center; color: #666; padding: 20px; background: #f8f9fa; border-radius: 8px; margin: 20px 0;">No recommendations for ${userEmail}</div>`;
+        }
+        
+        return `
+            <div class="recs-block" data-recs-user="${userKey}" style="margin: 30px 0; background: --email-bg; padding: 20px; border-radius: 8px;">
+                <h2 style="text-align: center; color: --email-text; margin-bottom: 20px;">Recommendations for ${userEmail}</h2>
+                ${sectionsHTML}
+            </div>
+        `;
+    }
+
+    function buildRecommendationsSectionHTML(availableItems, unavailableItems, title) {
+        const allItems = [...availableItems, ...unavailableItems];
+        
+        const itemsHTML = allItems.map((item, index) => {
+            const isUnavailable = index >= availableItems.length;
+            const posterURL = item.url ? `/proxy-img?u=${encodeURIComponent(item.url)}` : '/static/img/no-poster.png';
+            const titleText = item.title || 'Unknown';
+            const year = item.year || '';
+            const vote = item.vote ? `★ ${item.vote.toFixed(1)}` : '';
+            const href = item.href || '#';
+            const overview = item.overview || '';
+            const runtime = item.runtime || '';
             
-        } catch (error) {
-            console.error('Error generating preview:', error);
-            throw error;
+            const unavailableStyle = isUnavailable ? 'opacity: 0.7; filter: grayscale(30%);' : '';
+            
+            return `
+                <div style="
+                    position: relative;
+                    background: var(--email-card-bg);
+                    border-radius: 12px;
+                    overflow: hidden;
+                    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+                    border: 1px solid var(--email-border);
+                    ${unavailableStyle}
+                    width: 100%;
+                    max-width: 200px;
+                    margin: 0 auto;
+                ">
+                    <a href="${href}" style="text-decoration: none; color: inherit; display: block;" target="_blank">
+                        <div style="position: relative; aspect-ratio: 2/3; background: #f8f9fa;">
+                            <img src="${posterURL}" style="width: 100%; height: 100%; object-fit: cover; display: block;" alt="${titleText}">
+                            
+                            ${(year || vote) ? `
+                                <div style="
+                                    position: absolute;
+                                    top: 1px;
+                                    left: 1px;
+                                    background: rgba(0, 0, 0, 0.7);
+                                    color: white;
+                                    padding: 2px 6px;
+                                    border-radius: 4px;
+                                    font-size: 9px;
+                                    line-height: 1;
+                                ">${year} ${vote}</div>
+                            ` : ''}
+                            
+                            ${isUnavailable ? `
+                                <div style="
+                                    position: absolute;
+                                    top: 16px;
+                                    left: 1px;
+                                    background: rgba(255, 0, 0, 0.8);
+                                    color: white;
+                                    padding: 2px 6px;
+                                    border-radius: 4px;
+                                    font-size: 9px;
+                                    line-height: 1;
+                                ">Unavailable</div>
+                            ` : ''}
+                            
+                            <div style="
+                                position: absolute;
+                                bottom: 0;
+                                left: 0;
+                                right: 0;
+                                padding: 8px;
+                                background: linear-gradient(to top, rgba(0, 0, 0, 0.7), transparent);
+                            ">
+                                <div style="font-weight: bold; font-size: 12px; color: white; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                                    ${titleText}
+                                </div>
+                                ${runtime ? `<div style="font-size: 10px; color: rgba(255, 255, 255, 0.8); margin-top: 2px;">${runtime}</div>` : ''}
+                            </div>
+                        </div>
+                    </a>
+                </div>
+            `;
+        }).join('');
+        
+        return `
+            <div style="margin: 20px 0;">
+                <h3 style="color: var(--email-text); margin-bottom: 5px;">${title}</h3>
+                <div style="
+                    display: grid;
+                    grid-template-columns: repeat(5, 1fr);
+                    gap: 12px;
+                    padding: 0;
+                    margin: 0 auto 0 auto;
+                    width: 80%;
+                ">
+                    ${itemsHTML}
+                </div>
+            </div>
+        `;
+    }
+
+    function getItemPosterURL(item) {
+        const candidates = [item.thumb, item.art, item.parent_thumb, item.grandparent_thumb];
+        for (const candidate of candidates) {
+            if (candidate) {
+                return `/proxy-art${candidate.startsWith('/') ? candidate : '/' + candidate}`;
+            }
+        }
+        return '/static/img/no-poster.png';
+    }
+
+    function buildCompleteEmailHTML(contentHTML, serverName, subject) {
+        const logoFilename = "{{ settings.logo_filename }}";
+        const logoWidth = "{{ settings.logo_width }}";
+        const themedCSS = getThemedEmailCSS();
+        
+        return `<!DOCTYPE html>
+            <html lang="en">
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <title>${subject}</title>
+                    ${themedCSS}
+                </head>
+                <body>
+                    <div class="email-container">
+                        <div class="email-header">
+                            <img src="/static/img/${logoFilename}" alt="${serverName}" class="email-logo">
+                            <h1 class="email-title">${serverName} Newsletter</h1>
+                        </div>
+                        
+                        <div class="email-content">
+                            ${contentHTML}
+                        </div>
+                        
+                        <div class="email-footer">
+                            <div style="margin-bottom: 10px;">
+                                Generated for Plex Media Server by 
+                                <a href="https://github.com/jma1ice/newsletterr">newsletterr</a>
+                            </div>
+                            <div>
+                                newsletterr is not affiliated with or a product of Plex, Inc.
+                            </div>
+                        </div>
+                    </div>
+                </body>
+            </html>`;
+    }
+
+    function resizePreviewFrame(frame) {
+        try {
+            const doc = frame.contentDocument || frame.contentWindow.document;
+            if (doc && doc.body) {
+                const contentHeight = Math.max(
+                    doc.body.scrollHeight,
+                    doc.body.offsetHeight,
+                    doc.documentElement.clientHeight,
+                    doc.documentElement.scrollHeight,
+                    doc.documentElement.offsetHeight
+                );
+                
+                const minHeight = 480;
+                const maxHeight = 1200;
+                const newHeight = Math.max(minHeight, Math.min(maxHeight, contentHeight + 40));
+                
+                frame.style.height = newHeight + 'px';
+            }
+        } catch (e) {
+            console.log('Could not resize iframe:', e);
         }
     }
 

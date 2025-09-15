@@ -157,7 +157,7 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 
 ## Upcoming Changes
 
-### v0.9.15
+### v0.9.16
 * Look into email formatting across email clients
 * Make clickable posters for available recommendations to take users to Plex to watch
 * Graph titles need to specify the date range - or at least show what time range the data is for somewhere in the email
@@ -165,7 +165,6 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Custom logo logic needs file select to work with docker | add in small/banner/custom dropdown - and possibly a 'no logo' option?
 * Does Tautulli API support recently added music?
 * Logo positioning setting
-* Managed users show after pulling recommendations
 * Plex 'Secure Connections' setting causing image 401
 * Rename 'ra' and 'recs' snap in block for clarity?
 * In schedule calendar, template names are showing as template #
@@ -215,6 +214,9 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 ---
 
 ## Recent Changes
+
+### v0.9.15
+* Managed users no longer show when pulling recommendations
 
 ### v0.9.14
 * If recommendations are in email, email is sent to each user separately

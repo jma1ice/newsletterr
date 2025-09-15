@@ -15,8 +15,8 @@ from plex_api_client import PlexAPI
 from urllib.parse import quote_plus, urljoin
 
 app = Flask(__name__)
-app.jinja_env.globals["version"] = "v0.9.14"
-app.jinja_env.globals["publish_date"] = "September 14, 2025"
+app.jinja_env.globals["version"] = "v0.9.15"
+app.jinja_env.globals["publish_date"] = "September 15, 2025"
 
 def get_global_cache_status():
     try:
@@ -944,8 +944,15 @@ def refresh_daily_cache():
             print("✓ Stats cache refreshed")
         
         users, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_users', 'Users', error)
+        user_list = []
         if users:
-            set_cached_data('users', users, cache_params)
+            user_list = [
+                u
+                for u in users
+                if u.get('email') != None and u.get('email') != '' and u.get('is_active')
+            ]
+        if user_list:
+            set_cached_data('users', user_list, cache_params)
             print("✓ Users cache refreshed")
         
         graph_data = []
@@ -2617,7 +2624,7 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
                 user_dict = {
                     u['user_id']: u['email']
                     for u in users_data
-                    if u.get('email') and u.get('is_active')
+                    if u.get('email') != None and u.get('email') != '' and u.get('is_active')
                 }
             
             rec_user_keys = set()
@@ -3195,7 +3202,7 @@ def index():
             user_dict = {}
             if users:
                 for user in users:
-                    if user['email'] != None and user['is_active']:
+                    if user['email'] != None and user['email'] != '' and user['is_active']:
                         user_dict[user['user_id']] = user['email']
             
             alert = f"Fresh data loaded! Stats/graphs for {time_range} days, and {count} recently added items."
@@ -3962,7 +3969,7 @@ def preview_schedule(schedule_id):
                     user_dict = {
                         str(u['user_id']): u['email']
                         for u in users_data
-                        if u.get('email') and u.get('is_active')
+                        if u.get('email') != None and u.get('email') != '' and u.get('is_active')
                     }
             except Exception as e:
                 print(f"Error fetching user_dict for preview API: {e}")
@@ -4058,7 +4065,7 @@ def preview_schedule_page(schedule_id):
                 user_dict = {
                     str(u['user_id']): u['email']
                     for u in users_data
-                    if u.get('email') and u.get('is_active')
+                    if u.get('email') != None and u.get('email') != '' and u.get('is_active')
                 }
         except Exception as e:
             print(f"Error fetching user_dict for preview: {e}")

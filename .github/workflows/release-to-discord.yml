@@ -24,12 +24,10 @@ jobs:
           username: "Release Bot"
           content: "✏️ **Release updated:** ${{ github.event.release.tag_name }}"
 
-      # ——— OPTIONAL: include prereleases too ———
-      # Uncomment to announce prereleases (or send these to a different webhook/channel).
-      # - name: Pre-release published
-      #   if: github.event.action == 'published' && github.event.release.prerelease
-      #   uses: SethCohen/github-releases-to-discord@v1.15.1
-      #   with:
-      #     webhook: ${{ secrets.PRERELEASE_WEBHOOK_URL }}
-      #     username: "Release Bot"
-      #     content: "🧪 **Pre-release:** ${{ github.event.release.tag_name }}"
+      - name: Pre-release published
+        if: github.event.action == 'published' && github.event.release.prerelease
+        uses: SethCohen/github-releases-to-discord@v1.15.1
+        with:
+          webhook_url: ${{ secrets.WEBHOOK_URL }}
+          username: "Release Bot"
+          content: "🧪 **Pre-release:** ${{ github.event.release.tag_name }}"

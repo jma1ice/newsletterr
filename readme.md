@@ -221,6 +221,7 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Managed users no longer show when pulling recommendations
 * Added warning message when email content is over 25mb
 * Added more debug messaging when sending emails
+* Pre-releases push to discord release channel
 
 ### v0.9.14
 * If recommendations are in email, email is sent to each user separately

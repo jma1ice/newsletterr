@@ -15,8 +15,8 @@ from plex_api_client import PlexAPI
 from urllib.parse import quote_plus, urljoin
 
 app = Flask(__name__)
-app.jinja_env.globals["version"] = "v0.9.14"
-app.jinja_env.globals["publish_date"] = "September 14, 2025"
+app.jinja_env.globals["version"] = "v0.9.15"
+app.jinja_env.globals["publish_date"] = "September 15, 2025"
 
 def get_global_cache_status():
     try:
@@ -944,8 +944,15 @@ def refresh_daily_cache():
             print("✓ Stats cache refreshed")
         
         users, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_users', 'Users', error)
+        user_list = []
         if users:
-            set_cached_data('users', users, cache_params)
+            user_list = [
+                u
+                for u in users
+                if u.get('email') != None and u.get('email') != '' and u.get('is_active')
+            ]
+        if user_list:
+            set_cached_data('users', user_list, cache_params)
             print("✓ Users cache refreshed")
         
         graph_data = []
@@ -2228,6 +2235,18 @@ def build_complete_email_html_with_cid_logo(content_html, server_name, subject, 
 
 def send_standard_email_with_cids(to_emails, subject, selected_items, from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, settings):
     try:
+        print(f"SMTP Config: {smtp_server}:{smtp_port} using {smtp_protocol}")
+
+        if smtp_port == 465 and smtp_protocol == 'TLS':
+            print("WARNING: Port 465 with TLS protocol detected!")
+            print("Port 465 requires SSL protocol. Consider changing to:")
+            print("- Port 587 with TLS, OR")
+            print("- Port 465 with SSL")
+        
+        if smtp_port == 587 and smtp_protocol == 'SSL':
+            print("WARNING: Port 587 with SSL protocol detected!")
+            print("Port 587 typically uses TLS (STARTTLS)")
+
         msg_root = MIMEMultipart('related')
         msg_root['Subject'] = subject
         if alias_email == '':
@@ -2243,6 +2262,7 @@ def send_standard_email_with_cids(to_emails, subject, selected_items, from_email
         msg_alternative = MIMEMultipart('alternative')
         msg_root.attach(msg_alternative)
 
+        print("Building email content...")
         tautulli_data = get_current_tautulli_data_for_email(settings)
         
         template_data = {
@@ -2268,25 +2288,41 @@ def send_standard_email_with_cids(to_emails, subject, selected_items, from_email
         msg_alternative.attach(MIMEText(plain_text, 'plain', 'utf-8'))
         msg_alternative.attach(MIMEText(email_html, 'html', 'utf-8'))
 
+        print(f"Attempting SMTP connection...")
+
         if smtp_protocol == 'SSL':
+            print(f"Using SMTP_SSL on port {smtp_port}")
             server = smtplib.SMTP_SSL(smtp_server, smtp_port)
             login_username = smtp_username if smtp_username else from_email
             server.login(login_username, decrypt(password))
         else:
+            print(f"Using SMTP with STARTTLS on port {smtp_port}")
             server = smtplib.SMTP(smtp_server, smtp_port)
+            print("Starting TLS...")
             server.starttls()
             login_username = smtp_username if smtp_username else from_email
             server.login(login_username, decrypt(password))
+
+        print("SMTP connection established successfully")
             
         email_content = msg_root.as_string()
+
         content_size_kb = len(email_content.encode('utf-8')) / 1024
-        
+        content_size_mb = len(email_content.encode('utf-8')) / (1024 * 1024)
+        print(f"Email size: {content_size_mb:.2f} MB")
+        if content_size_mb > 25:
+            print("WARNING: Email exceeds typical size limits")
+
+        print("Sending email...")
+
         if alias_email == '':
             server.sendmail(from_email, [from_email] + to_emails, email_content)
             all_recipients = [from_email] + to_emails
         else:
             server.sendmail(alias_email, [alias_email] + to_emails, email_content)
             all_recipients = [alias_email] + to_emails
+
+        print(f"Email sent successfully!")
         
         try:
             history_conn = sqlite3.connect(DB_PATH)
@@ -2309,7 +2345,14 @@ def send_standard_email_with_cids(to_emails, subject, selected_items, from_email
         
         server.quit()
         return jsonify({"success": True, "sent_to": ', '.join(all_recipients), "size": content_size_kb})
-        
+    except smtplib.SMTPConnectError as e:
+        print(f"SMTP Connection Error: {e}")
+        print("This often indicates wrong port/protocol combination")
+        return False
+    except smtplib.SMTPServerDisconnected as e:
+        print(f"SMTP Server Disconnected: {e}")
+        print("Server closed connection - likely protocol mismatch")
+        return False
     except Exception as e:
         print("SMTP send error:", e)
         return jsonify({"error": str(e)}), 500
@@ -2363,6 +2406,18 @@ def send_recommendations_email_with_cids(to_emails, subject, user_dict, selected
 
 def send_single_user_email_with_cids(recipients, subject, selected_items, user_key, recommendations_data, from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, settings):
     try:
+        print(f"SMTP Config: {smtp_server}:{smtp_port} using {smtp_protocol}")
+
+        if smtp_port == 465 and smtp_protocol == 'TLS':
+            print("WARNING: Port 465 with TLS protocol detected!")
+            print("Port 465 requires SSL protocol. Consider changing to:")
+            print("- Port 587 with TLS, OR")
+            print("- Port 465 with SSL")
+        
+        if smtp_port == 587 and smtp_protocol == 'SSL':
+            print("WARNING: Port 587 with SSL protocol detected!")
+            print("Port 587 typically uses TLS (STARTTLS)")
+
         msg_root = MIMEMultipart('related')
         msg_root['Subject'] = subject
         
@@ -2379,6 +2434,7 @@ def send_single_user_email_with_cids(recipients, subject, selected_items, user_k
         msg_alternative = MIMEMultipart('alternative')
         msg_root.attach(msg_alternative)
 
+        print("Building email content...")
         tautulli_data = get_current_tautulli_data_for_email(settings)
         
         template_data = {
@@ -2406,18 +2462,32 @@ def send_single_user_email_with_cids(recipients, subject, selected_items, user_k
         msg_alternative.attach(MIMEText(plain_text, 'plain', 'utf-8'))
         msg_alternative.attach(MIMEText(email_html, 'html', 'utf-8'))
 
+        print(f"Attempting SMTP connection...")
+
         if smtp_protocol == 'SSL':
+            print(f"Using SMTP_SSL on port {smtp_port}")
             server = smtplib.SMTP_SSL(smtp_server, smtp_port)
             login_username = smtp_username if smtp_username else from_email
             server.login(login_username, decrypt(password))
         else:
+            print(f"Using SMTP with STARTTLS on port {smtp_port}")
             server = smtplib.SMTP(smtp_server, smtp_port)
+            print("Starting TLS...")
             server.starttls()
             login_username = smtp_username if smtp_username else from_email
             server.login(login_username, decrypt(password))
+
+        print("SMTP connection established successfully")
             
         email_content = msg_root.as_string()
+
         content_size_kb = len(email_content.encode('utf-8')) / 1024
+        content_size_mb = len(email_content.encode('utf-8')) / (1024 * 1024)
+        print(f"Email size: {content_size_mb:.2f} MB")
+        if content_size_mb > 25:
+            print("WARNING: Email exceeds typical size limits")
+        
+        print("Sending email...")
         
         if alias_email:
             server.sendmail(alias_email, [alias_email] + recipients, email_content)
@@ -2427,6 +2497,7 @@ def send_single_user_email_with_cids(recipients, subject, selected_items, user_k
             all_recipients = [from_email] + recipients
         
         server.quit()
+        print(f"Email sent successfully!")
         
         try:
             history_conn = sqlite3.connect(DB_PATH)
@@ -2448,7 +2519,14 @@ def send_single_user_email_with_cids(recipients, subject, selected_items, user_k
             print(f"Error saving email history: {history_error}")
         
         return True
-        
+    except smtplib.SMTPConnectError as e:
+        print(f"SMTP Connection Error: {e}")
+        print("This often indicates wrong port/protocol combination")
+        return False
+    except smtplib.SMTPServerDisconnected as e:
+        print(f"SMTP Server Disconnected: {e}")
+        print("Server closed connection - likely protocol mismatch")
+        return False
     except Exception as e:
         print(f"Error sending single user email: {e}")
         return False
@@ -2617,7 +2695,7 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
                 user_dict = {
                     u['user_id']: u['email']
                     for u in users_data
-                    if u.get('email') and u.get('is_active')
+                    if u.get('email') != None and u.get('email') != '' and u.get('is_active')
                 }
             
             rec_user_keys = set()
@@ -2700,6 +2778,18 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
 
 def send_scheduled_user_email_with_cids(recipients, subject, selected_items, user_key, recommendations_data, from_email, alias_email, reply_to_email, encrypted_password, smtp_server, smtp_port, smtp_protocol, server_name, tautulli_base_url, tautulli_api_key, date_range, template_name, logo_filename, logo_width):
     try:
+        print(f"SMTP Config: {smtp_server}:{smtp_port} using {smtp_protocol}")
+
+        if smtp_port == 465 and smtp_protocol == 'TLS':
+            print("WARNING: Port 465 with TLS protocol detected!")
+            print("Port 465 requires SSL protocol. Consider changing to:")
+            print("- Port 587 with TLS, OR")
+            print("- Port 465 with SSL")
+        
+        if smtp_port == 587 and smtp_protocol == 'SSL':
+            print("WARNING: Port 587 with SSL protocol detected!")
+            print("Port 587 typically uses TLS (STARTTLS)")
+
         msg_root = MIMEMultipart('related')
         msg_root['Subject'] = f"[SCHEDULED] {subject}"
         
@@ -2716,6 +2806,7 @@ def send_scheduled_user_email_with_cids(recipients, subject, selected_items, use
         msg_alternative = MIMEMultipart('alternative')
         msg_root.attach(msg_alternative)
 
+        print("Building email content...")
         tautulli_data = fetch_tautulli_data_for_email(tautulli_base_url, tautulli_api_key, date_range, server_name)
         tautulli_data["settings"]["logo_filename"] = logo_filename
         tautulli_data["settings"]["logo_width"] = logo_width
@@ -2745,16 +2836,30 @@ def send_scheduled_user_email_with_cids(recipients, subject, selected_items, use
         msg_alternative.attach(MIMEText(plain_text, 'plain', 'utf-8'))
         msg_alternative.attach(MIMEText(email_html, 'html', 'utf-8'))
 
+        print(f"Attempting SMTP connection...")
+
         if smtp_protocol == 'SSL':
+            print(f"Using SMTP_SSL on port {smtp_port}")
             server = smtplib.SMTP_SSL(smtp_server, int(smtp_port))
             server.login(from_email, decrypt(encrypted_password))
         else:
+            print(f"Using SMTP with STARTTLS on port {smtp_port}")
             server = smtplib.SMTP(smtp_server, int(smtp_port))
+            print("Starting TLS...")
             server.starttls()
             server.login(from_email, decrypt(encrypted_password))
         
+        print("SMTP connection established successfully")
+        
         email_content = msg_root.as_string()
+
         content_size_kb = len(email_content.encode('utf-8')) / 1024
+        content_size_mb = len(email_content.encode('utf-8')) / (1024 * 1024)
+        print(f"Email size: {content_size_mb:.2f} MB")
+        if content_size_mb > 25:
+            print("WARNING: Email exceeds typical size limits")
+
+        print("Sending email...")
         
         if alias_email:
             server.sendmail(alias_email, [alias_email] + recipients, email_content)
@@ -2764,6 +2869,7 @@ def send_scheduled_user_email_with_cids(recipients, subject, selected_items, use
             all_recipients = [from_email] + recipients
         
         server.quit()
+        print(f"Email sent successfully!")
         
         try:
             history_conn = sqlite3.connect(DB_PATH)
@@ -2777,7 +2883,14 @@ def send_scheduled_user_email_with_cids(recipients, subject, selected_items, use
             print(f"Error logging scheduled email history: {log_err}")
         
         return True
-        
+    except smtplib.SMTPConnectError as e:
+        print(f"SMTP Connection Error: {e}")
+        print("This often indicates wrong port/protocol combination")
+        return False
+    except smtplib.SMTPServerDisconnected as e:
+        print(f"SMTP Server Disconnected: {e}")
+        print("Server closed connection - likely protocol mismatch")
+        return False
     except Exception as e:
         print(f"Error sending scheduled user email: {e}")
         traceback.print_exc()
@@ -2785,6 +2898,18 @@ def send_scheduled_user_email_with_cids(recipients, subject, selected_items, use
 
 def send_scheduled_single_email_with_cids(to_emails_list, subject, selected_items, from_email, alias_email, reply_to_email, encrypted_password, smtp_server, smtp_port, smtp_protocol, server_name, tautulli_base_url, tautulli_api_key, date_range, template_name, logo_filename, logo_width, email_text=""):
     try:
+        print(f"SMTP Config: {smtp_server}:{smtp_port} using {smtp_protocol}")
+
+        if smtp_port == 465 and smtp_protocol == 'TLS':
+            print("WARNING: Port 465 with TLS protocol detected!")
+            print("Port 465 requires SSL protocol. Consider changing to:")
+            print("- Port 587 with TLS, OR")
+            print("- Port 465 with SSL")
+        
+        if smtp_port == 587 and smtp_protocol == 'SSL':
+            print("WARNING: Port 587 with SSL protocol detected!")
+            print("Port 587 typically uses TLS (STARTTLS)")
+
         msg_root = MIMEMultipart('related')
         msg_root['Subject'] = f"[SCHEDULED] {subject}"
         
@@ -2801,6 +2926,7 @@ def send_scheduled_single_email_with_cids(to_emails_list, subject, selected_item
         msg_alternative = MIMEMultipart('alternative')
         msg_root.attach(msg_alternative)
 
+        print("Building email content...")
         tautulli_data = fetch_tautulli_data_for_email(tautulli_base_url, tautulli_api_key, date_range, server_name)
         tautulli_data["settings"]["logo_filename"] = logo_filename
         tautulli_data["settings"]["logo_width"] = logo_width
@@ -2828,16 +2954,30 @@ def send_scheduled_single_email_with_cids(to_emails_list, subject, selected_item
         msg_alternative.attach(MIMEText(plain_text, 'plain', 'utf-8'))
         msg_alternative.attach(MIMEText(email_html, 'html', 'utf-8'))
 
+        print(f"Attempting SMTP connection...")
+
         if smtp_protocol == 'SSL':
+            print(f"Using SMTP_SSL on port {smtp_port}")
             server = smtplib.SMTP_SSL(smtp_server, int(smtp_port))
             server.login(from_email, decrypt(encrypted_password))
         else:
+            print(f"Using SMTP with STARTTLS on port {smtp_port}")
             server = smtplib.SMTP(smtp_server, int(smtp_port))
+            print("Starting TLS...")
             server.starttls()
             server.login(from_email, decrypt(encrypted_password))
         
+        print("SMTP connection established successfully")
+        
         email_content = msg_root.as_string()
+
         content_size_kb = len(email_content.encode('utf-8')) / 1024
+        content_size_mb = len(email_content.encode('utf-8')) / (1024 * 1024)
+        print(f"Email size: {content_size_mb:.2f} MB")
+        if content_size_mb > 25:
+            print("WARNING: Email exceeds typical size limits")
+
+        print("Sending email...")
         
         if alias_email:
             server.sendmail(alias_email, [alias_email] + to_emails_list, email_content)
@@ -2847,6 +2987,7 @@ def send_scheduled_single_email_with_cids(to_emails_list, subject, selected_item
             all_recipients = [from_email] + to_emails_list
         
         server.quit()
+        print(f"Email sent successfully!")
         
         try:
             history_conn = sqlite3.connect(DB_PATH)
@@ -2861,7 +3002,14 @@ def send_scheduled_single_email_with_cids(to_emails_list, subject, selected_item
         
         print(f"Scheduled email sent successfully to {len(all_recipients)} recipients")
         return True
-        
+    except smtplib.SMTPConnectError as e:
+        print(f"SMTP Connection Error: {e}")
+        print("This often indicates wrong port/protocol combination")
+        return False
+    except smtplib.SMTPServerDisconnected as e:
+        print(f"SMTP Server Disconnected: {e}")
+        print("Server closed connection - likely protocol mismatch")
+        return False
     except Exception as e:
         print(f"Error in send_scheduled_single_email_with_cids: {e}")
         traceback.print_exc()
@@ -3195,7 +3343,7 @@ def index():
             user_dict = {}
             if users:
                 for user in users:
-                    if user['email'] != None and user['is_active']:
+                    if user['email'] != None and user['email'] != '' and user['is_active']:
                         user_dict[user['user_id']] = user['email']
             
             alert = f"Fresh data loaded! Stats/graphs for {time_range} days, and {count} recently added items."
@@ -3962,7 +4110,7 @@ def preview_schedule(schedule_id):
                     user_dict = {
                         str(u['user_id']): u['email']
                         for u in users_data
-                        if u.get('email') and u.get('is_active')
+                        if u.get('email') != None and u.get('email') != '' and u.get('is_active')
                     }
             except Exception as e:
                 print(f"Error fetching user_dict for preview API: {e}")
@@ -4058,7 +4206,7 @@ def preview_schedule_page(schedule_id):
                 user_dict = {
                     str(u['user_id']): u['email']
                     for u in users_data
-                    if u.get('email') and u.get('is_active')
+                    if u.get('email') != None and u.get('email') != '' and u.get('is_active')
                 }
         except Exception as e:
             print(f"Error fetching user_dict for preview: {e}")

@@ -158,10 +158,10 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 ## Upcoming Changes
 
 ### v0.9.16
+* Find email size regulations, warn on too big | reduce image size to better fall with regulations
 * Look into email formatting across email clients
 * Make clickable posters for available recommendations to take users to Plex to watch
 * Graph titles need to specify the date range - or at least show what time range the data is for somewhere in the email
-* Find email size regulations, warn on too big | reduce image size to better fall with regulations
 * Custom logo logic needs file select to work with docker | add in small/banner/custom dropdown - and possibly a 'no logo' option?
 * Does Tautulli API support recently added music?
 * Logo positioning setting
@@ -217,6 +217,7 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 
 ### v0.9.15
 * Managed users no longer show when pulling recommendations
+* Added warning message when email content is over 25mb
 
 ### v0.9.14
 * If recommendations are in email, email is sent to each user separately

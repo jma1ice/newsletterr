@@ -2286,7 +2286,12 @@ def send_standard_email_with_cids(to_emails, subject, selected_items, from_email
             server.login(login_username, decrypt(password))
             
         email_content = msg_root.as_string()
+
         content_size_kb = len(email_content.encode('utf-8')) / 1024
+        content_size_mb = len(email_content.encode('utf-8')) / (1024 * 1024)
+        print(f"Email size: {content_size_mb:.2f} MB")
+        if content_size_mb > 25:
+            print("WARNING: Email exceeds typical size limits")
         
         if alias_email == '':
             server.sendmail(from_email, [from_email] + to_emails, email_content)
@@ -2424,7 +2429,12 @@ def send_single_user_email_with_cids(recipients, subject, selected_items, user_k
             server.login(login_username, decrypt(password))
             
         email_content = msg_root.as_string()
+
         content_size_kb = len(email_content.encode('utf-8')) / 1024
+        content_size_mb = len(email_content.encode('utf-8')) / (1024 * 1024)
+        print(f"Email size: {content_size_mb:.2f} MB")
+        if content_size_mb > 25:
+            print("WARNING: Email exceeds typical size limits")
         
         if alias_email:
             server.sendmail(alias_email, [alias_email] + recipients, email_content)
@@ -2761,7 +2771,12 @@ def send_scheduled_user_email_with_cids(recipients, subject, selected_items, use
             server.login(from_email, decrypt(encrypted_password))
         
         email_content = msg_root.as_string()
+
         content_size_kb = len(email_content.encode('utf-8')) / 1024
+        content_size_mb = len(email_content.encode('utf-8')) / (1024 * 1024)
+        print(f"Email size: {content_size_mb:.2f} MB")
+        if content_size_mb > 25:
+            print("WARNING: Email exceeds typical size limits")
         
         if alias_email:
             server.sendmail(alias_email, [alias_email] + recipients, email_content)
@@ -2844,7 +2859,12 @@ def send_scheduled_single_email_with_cids(to_emails_list, subject, selected_item
             server.login(from_email, decrypt(encrypted_password))
         
         email_content = msg_root.as_string()
+
         content_size_kb = len(email_content.encode('utf-8')) / 1024
+        content_size_mb = len(email_content.encode('utf-8')) / (1024 * 1024)
+        print(f"Email size: {content_size_mb:.2f} MB")
+        if content_size_mb > 25:
+            print("WARNING: Email exceeds typical size limits")
         
         if alias_email:
             server.sendmail(alias_email, [alias_email] + to_emails_list, email_content)

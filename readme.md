@@ -163,7 +163,6 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Make clickable posters for available recommendations to take users to Plex to watch
 * Graph titles need to specify the date range - or at least show what time range the data is for somewhere in the email
 * Custom logo logic needs file select to work with docker | add in small/banner/custom dropdown - and possibly a 'no logo' option?
-* Does Tautulli API support recently added music?
 * Logo positioning setting
 * Plex 'Secure Connections' setting causing image 401
 * Rename 'ra' and 'recs' snap in block for clarity?
@@ -224,11 +223,12 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Added more debug messaging when sending emails
 * Pre-releases push to discord release channel
 * Contributions section added to about
+* Tautulli recently added pull get libraries first to ensure all are captured
+* Tautulli recently added pulls music libraries
+* Fixed recipients text in view recipients modal in Email History so it is readable in dark mode
 
- - - tautulli ra pull get libraries first - - 
  - - fix everywhere days and # of items is hardcoded - - 
  - - test api button - - 
- - - email history view recips is not visible in dark mode - - 
  - - mjml? - - 
  - - syncerr button? - - 
 

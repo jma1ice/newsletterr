@@ -16,7 +16,7 @@ from urllib.parse import quote_plus, urljoin
 
 app = Flask(__name__)
 app.jinja_env.globals["version"] = "v0.9.15"
-app.jinja_env.globals["publish_date"] = "September 15, 2025"
+app.jinja_env.globals["publish_date"] = "September 16, 2025"
 
 def get_global_cache_status():
     try:
@@ -924,8 +924,10 @@ def refresh_daily_cache():
         ]
         
         recent_commands = [
-            {'command': 'movie'},
-            {'command': 'show'}
+            { 'command': 'movie' },
+            { 'command': 'show' },
+            { 'command' : 'artist' },
+            { 'command' : 'live' },
         ]
         
         cache_params = {
@@ -1102,6 +1104,11 @@ def run_tautulli_command(base_url, api_key, command, data_type, error, time_rang
             api_url = f"{base_url}/api/v2?apikey={decrypt(api_key)}&cmd={command}&time_range={time_range}"
 
     try:
+        if command == 'get_recently_added':
+            response = requests.get(f"{base_url}/api/v2?apikey={decrypt(api_key)}&cmd=get_library_names")
+            response.raise_for_status()
+            data = response.json()
+            print(data['response']['data'])
         response = requests.get(api_url)
         response.raise_for_status()
         data = response.json()
@@ -1307,7 +1314,7 @@ def fetch_tautulli_data_for_email(tautulli_base_url, tautulli_api_key, date_rang
         data['graph_data'] = graph_data
         data['graph_commands'] = graph_commands
         
-        recent_commands = [{'command': 'movie'}, {'command': 'show'}]
+        recent_commands = [{'command': 'movie'}, {'command': 'show'}, {'command': 'artist'}, {'command': 'live'}]
         for command in recent_commands:
             recent, _ = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_recently_added', command["command"], None, "10")
             if recent:
@@ -3214,12 +3221,10 @@ def index():
         }
     ]
     recent_commands = [
-        {
-            'command' : 'movie'
-        },
-        {
-            'command' : 'show'
-        }
+        { 'command' : 'movie' },
+        { 'command' : 'show' },
+        { 'command' : 'artist' },
+        { 'command' : 'live' }
     ]
     graph_data = []
     recent_data = []

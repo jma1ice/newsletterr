@@ -202,6 +202,7 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Biweekly/semimonthly option for scheduled emails | possibly CRON
 * Option in settings for width of RA/Recs grids
 * Improved BCC list editing
+* Ko-fi -> Discord integration for contributor role
 * Mobile optimizations, i.e.:
 ```
 <style>
@@ -222,6 +223,14 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Added warning message when email content is over 25mb
 * Added more debug messaging when sending emails
 * Pre-releases push to discord release channel
+* Contributions section added to about
+
+ - - tautulli ra pull get libraries first - - 
+ - - fix everywhere days and # of items is hardcoded - - 
+ - - test api button - - 
+ - - email history view recips is not visible in dark mode - - 
+ - - mjml? - - 
+ - - syncerr button? - - 
 
 ### v0.9.14
 * If recommendations are in email, email is sent to each user separately

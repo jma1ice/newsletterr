@@ -227,6 +227,7 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Tautulli recently added pulls music libraries
 * Fixed recipients text in view recipients modal in Email History so it is readable in dark mode
 
+ - - email name option for email - - 
  - - fix everywhere days and # of items is hardcoded - - 
  - - test api button - - 
  - - mjml? - - 

@@ -473,7 +473,7 @@
                 const sub = it.year || it.grandparent_title || it.parent_title || '';
                 const thumbPath = pickThumb(it);
                 return {
-                    library: it.library_name || it.section_name || '',
+                    library: it.library_name || it.section_name || it.media_type || '',
                     title,
                     sub,
                     summary: it.tagline || it.summary || '',

@@ -967,10 +967,17 @@ def refresh_daily_cache():
             set_cached_data('graph_data', graph_data, cache_params)
             print("✓ Graph data cache refreshed")
         
+        libraries, _ = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_library_names', None, None, "10")
+        library_section_ids = {}
+        for library in libraries:
+            library_section_ids[f"{library["section_id"]}"] = library["section_name"]
+
         recent_data = []
-        for command in recent_commands:
-            rd, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_recently_added', command["command"], error, count)
+        for section_id in library_section_ids.keys():
+            rd, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_recently_added', section_id, error, count)
             if rd:
+                for item in rd['recently_added']:
+                    item['library_name'] = library_section_ids[section_id]
                 recent_data.append(rd)
         
         if recent_data:
@@ -1089,13 +1096,13 @@ def group_recipients_by_user(to_emails_list, user_dict):
 def send_scheduled_email(schedule_id, email_list_id, template_id):
     return send_scheduled_email_with_cids(schedule_id, email_list_id, template_id)
 
-def run_tautulli_command(base_url, api_key, command, data_type, error, time_range='30'):
+def run_tautulli_command(base_url, api_key, command, section_id, error, time_range='30'):
     out_data = None
     
-    if command == 'get_users':
+    if command == 'get_users' or command == 'get_library_names':
         api_url = f"{base_url}/api/v2?apikey={decrypt(api_key)}&cmd={command}"
     elif command == 'get_recently_added':
-        api_url = f"{base_url}/api/v2?apikey={decrypt(api_key)}&cmd={command}&count={time_range}&media_type={data_type}"
+        api_url = f"{base_url}/api/v2?apikey={decrypt(api_key)}&cmd={command}&count={time_range}&section_id={section_id}"
     else:
         if command == 'get_plays_per_month':
             month_range = str(math.ceil(int(time_range) / 30))
@@ -1104,11 +1111,6 @@ def run_tautulli_command(base_url, api_key, command, data_type, error, time_rang
             api_url = f"{base_url}/api/v2?apikey={decrypt(api_key)}&cmd={command}&time_range={time_range}"
 
     try:
-        if command == 'get_recently_added':
-            response = requests.get(f"{base_url}/api/v2?apikey={decrypt(api_key)}&cmd=get_library_names")
-            response.raise_for_status()
-            data = response.json()
-            print(data['response']['data'])
         response = requests.get(api_url)
         response.raise_for_status()
         data = response.json()
@@ -1313,11 +1315,17 @@ def fetch_tautulli_data_for_email(tautulli_base_url, tautulli_api_key, date_rang
         
         data['graph_data'] = graph_data
         data['graph_commands'] = graph_commands
+
+        libraries, _ = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_library_names', None, None, "10")
+        library_section_ids = {}
+        for library in libraries:
+            library_section_ids[f"{library["section_id"]}"] = library["section_name"]
         
-        recent_commands = [{'command': 'movie'}, {'command': 'show'}, {'command': 'artist'}, {'command': 'live'}]
-        for command in recent_commands:
-            recent, _ = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_recently_added', command["command"], None, "10")
+        for section_id in library_section_ids.keys():
+            recent, _ = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_recently_added', section_id, None, "10")
             if recent:
+                for item in recent['recently_added']:
+                    item['library_name'] = library_section_ids[section_id]
                 data['recent_data'].append(recent)
                 
         print(f"Fetched Tautulli data: {len(data['stats'])} stats, {len(data['graph_data'])} graphs, {len(data['recent_data'])} recent sections")
@@ -3331,11 +3339,18 @@ def index():
                     else:
                         error += f", Graph Error: {str(e)}"
             set_cached_data('graph_data', graph_data, cache_params)
+
+            libraries, _ = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_library_names', None, None, "10")
+            library_section_ids = {}
+            for library in libraries:
+                library_section_ids[f"{library["section_id"]}"] = library["section_name"]
             
             recent_data = []
-            for command in recent_commands:
+            for section_id in library_section_ids.keys():
                 try:
-                    rd, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_recently_added', command["command"], error, count)
+                    rd, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_recently_added', section_id, error, count)
+                    for item in rd['recently_added']:
+                        item['library_name'] = library_section_ids[section_id]
                     recent_data.append(rd if rd is not None else {})
                 except Exception as e:
                     recent_data.append({})

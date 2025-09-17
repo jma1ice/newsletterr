@@ -158,6 +158,10 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 ## Upcoming Changes
 
 ### v0.9.16
+* Fix everywhere days and # of items is hardcoded
+* Test api button
+* mjml?
+* syncerr button?
 * Find email size regulations, warn on too big | reduce image size to better fall with regulations
 * Look into email formatting across email clients
 * Make clickable posters for available recommendations to take users to Plex to watch
@@ -226,12 +230,8 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Tautulli recently added pull get libraries first to ensure all are captured
 * Tautulli recently added pulls music libraries
 * Fixed recipients text in view recipients modal in Email History so it is readable in dark mode
-
- - - email name option for email - - 
- - - fix everywhere days and # of items is hardcoded - - 
- - - test api button - - 
- - - mjml? - - 
- - - syncerr button? - - 
+* Fixed missing text from emails on dashboard
+* Added email option in setting for From Name
 
 ### v0.9.14
 * If recommendations are in email, email is sent to each user separately

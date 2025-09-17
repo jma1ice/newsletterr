@@ -6,7 +6,7 @@ from dotenv import load_dotenv, set_key, find_dotenv
 from email.mime.text import MIMEText
 from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
-from email.utils import make_msgid
+from email.utils import make_msgid, formataddr
 from flask import Flask, render_template, request, jsonify, Response, redirect, url_for
 from pathlib import Path
 from PIL import Image, ImageFilter, ImageEnhance
@@ -16,7 +16,7 @@ from urllib.parse import quote_plus, urljoin
 
 app = Flask(__name__)
 app.jinja_env.globals["version"] = "v0.9.15"
-app.jinja_env.globals["publish_date"] = "September 16, 2025"
+app.jinja_env.globals["publish_date"] = "September 17, 2025"
 
 def get_global_cache_status():
     try:
@@ -261,7 +261,8 @@ def init_db(db_path):
             accent_color TEXT DEFAULT "#62a1a4",
             background_color TEXT DEFAULT "#333333",
             text_color TEXT DEFAULT "#62a1a4",
-            email_theme TEXT DEFAULT "newsletterr_blue"
+            email_theme TEXT DEFAULT "newsletterr_blue",
+            from_name TEXT
         )
     """)
     
@@ -373,6 +374,11 @@ def init_db(db_path):
             print(f"Adding {col_name} column to settings table...")
             cursor.execute(f'ALTER TABLE settings ADD COLUMN {col_name} {col_def}')
             conn.commit()
+
+    if 'from_name' not in settings_columns:
+        print("Adding from_name column to settings table...")
+        cursor.execute("ALTER TABLE settings ADD COLUMN from_name TEXT")
+        conn.commit()
     
     conn.close()
 
@@ -2248,7 +2254,7 @@ def build_complete_email_html_with_cid_logo(content_html, server_name, subject, 
             </body>
         </html>"""
 
-def send_standard_email_with_cids(to_emails, subject, selected_items, from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, settings):
+def send_standard_email_with_cids(to_emails, subject, selected_items, from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, settings, from_name):
     try:
         print(f"SMTP Config: {smtp_server}:{smtp_port} using {smtp_protocol}")
 
@@ -2265,10 +2271,16 @@ def send_standard_email_with_cids(to_emails, subject, selected_items, from_email
         msg_root = MIMEMultipart('related')
         msg_root['Subject'] = subject
         if alias_email == '':
-            msg_root['From'] = from_email
+            if from_name == '':
+                msg_root['From'] = from_email
+            else:
+                msg_root['From'] = formataddr((from_name, from_email))
             msg_root['To'] = from_email
         else:
-            msg_root['From'] = alias_email
+            if from_name == '':
+                msg_root['From'] = alias_email
+            else:
+                msg_root['From'] = formataddr((from_name, alias_email))
             msg_root['To'] = alias_email
         
         if reply_to_email != '':
@@ -2372,7 +2384,7 @@ def send_standard_email_with_cids(to_emails, subject, selected_items, from_email
         print("SMTP send error:", e)
         return jsonify({"error": str(e)}), 500
 
-def send_recommendations_email_with_cids(to_emails, subject, user_dict, selected_items, from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, settings):
+def send_recommendations_email_with_cids(to_emails, subject, user_dict, selected_items, from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, settings, from_name):
     try:
         rec_user_keys = set()
         for item in selected_items:
@@ -2382,7 +2394,7 @@ def send_recommendations_email_with_cids(to_emails, subject, user_dict, selected
         if not rec_user_keys:
             return send_standard_email_with_cids(
                 to_emails, subject, selected_items, from_email, alias_email, 
-                reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, settings
+                reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, settings, from_name
             )
         
         recommendations_data = get_recommendations_for_users(rec_user_keys, to_emails, user_dict, use_cache=True)
@@ -2403,7 +2415,7 @@ def send_recommendations_email_with_cids(to_emails, subject, user_dict, selected
             success = send_single_user_email_with_cids(
                 recipients, subject, selected_items, user_key, recommendations_data,
                 from_email, alias_email, reply_to_email, password, smtp_username, 
-                smtp_server, smtp_port, smtp_protocol, settings
+                smtp_server, smtp_port, smtp_protocol, settings, from_name
             )
             
             if success:
@@ -2419,7 +2431,7 @@ def send_recommendations_email_with_cids(to_emails, subject, user_dict, selected
         print("Error in send_recommendations_email_with_cids:", e)
         return jsonify({"error": str(e)}), 500
 
-def send_single_user_email_with_cids(recipients, subject, selected_items, user_key, recommendations_data, from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, settings):
+def send_single_user_email_with_cids(recipients, subject, selected_items, user_key, recommendations_data, from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, settings, from_name):
     try:
         print(f"SMTP Config: {smtp_server}:{smtp_port} using {smtp_protocol}")
 
@@ -2437,10 +2449,16 @@ def send_single_user_email_with_cids(recipients, subject, selected_items, user_k
         msg_root['Subject'] = subject
         
         if alias_email:
-            msg_root['From'] = alias_email
+            if from_name == '':
+                msg_root['From'] = alias_email
+            else:
+                msg_root['From'] = formataddr((from_name, alias_email))
             msg_root['To'] = alias_email
         else:
-            msg_root['From'] = from_email
+            if from_name == '':
+                msg_root['From'] = from_email
+            else:
+                msg_root['From'] = formataddr((from_name, from_email))
             msg_root['To'] = from_email
         
         if reply_to_email:
@@ -2676,7 +2694,7 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
         
         settings_conn = sqlite3.connect(DB_PATH)
         settings_cursor = settings_conn.cursor()
-        settings_cursor.execute("SELECT from_email, alias_email, reply_to_email, password, smtp_server, smtp_port, smtp_protocol, server_name, tautulli_url, tautulli_api, logo_filename, logo_width FROM settings WHERE id = 1")
+        settings_cursor.execute("SELECT from_email, alias_email, reply_to_email, password, smtp_server, smtp_port, smtp_protocol, server_name, tautulli_url, tautulli_api, logo_filename, logo_width, from_name FROM settings WHERE id = 1")
         settings_result = settings_cursor.fetchone()
         settings_conn.close()
         
@@ -2684,7 +2702,7 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
             print("SMTP settings not found in database")
             return False
         
-        from_email, alias_email, reply_to_email, encrypted_password, smtp_server, smtp_port, smtp_protocol, server_name, tautulli_base_url, tautulli_api_key, logo_filename, logo_width = settings_result
+        from_email, alias_email, reply_to_email, encrypted_password, smtp_server, smtp_port, smtp_protocol, server_name, tautulli_base_url, tautulli_api_key, logo_filename, logo_width, from_name = settings_result
         
         public_base = os.environ.get("PUBLIC_BASE_URL", "http://127.0.0.1:6397")
         theme = 'dark'
@@ -2759,7 +2777,7 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
                     from_email, alias_email, reply_to_email, encrypted_password,
                     smtp_server, smtp_port, smtp_protocol, 
                     server_name, tautulli_base_url, tautulli_api_key, date_range, template_name,
-                    logo_filename, logo_width
+                    logo_filename, logo_width, from_name
                 )
                 
                 if success:
@@ -2783,7 +2801,7 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
                 from_email, alias_email, reply_to_email, encrypted_password,
                 smtp_server, smtp_port, smtp_protocol,
                 server_name, tautulli_base_url, tautulli_api_key, date_range, template_name,
-                logo_filename, logo_width
+                logo_filename, logo_width, from_name
             )
         
     except Exception as e:
@@ -2791,7 +2809,7 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
         traceback.print_exc()
         return False
 
-def send_scheduled_user_email_with_cids(recipients, subject, selected_items, user_key, recommendations_data, from_email, alias_email, reply_to_email, encrypted_password, smtp_server, smtp_port, smtp_protocol, server_name, tautulli_base_url, tautulli_api_key, date_range, template_name, logo_filename, logo_width):
+def send_scheduled_user_email_with_cids(recipients, subject, selected_items, user_key, recommendations_data, from_email, alias_email, reply_to_email, encrypted_password, smtp_server, smtp_port, smtp_protocol, server_name, tautulli_base_url, tautulli_api_key, date_range, template_name, logo_filename, logo_width, from_name):
     try:
         print(f"SMTP Config: {smtp_server}:{smtp_port} using {smtp_protocol}")
 
@@ -2809,10 +2827,16 @@ def send_scheduled_user_email_with_cids(recipients, subject, selected_items, use
         msg_root['Subject'] = f"[SCHEDULED] {subject}"
         
         if alias_email:
-            msg_root['From'] = alias_email
+            if from_name == '':
+                msg_root['From'] = alias_email
+            else:
+                msg_root['From'] = formataddr((from_name, alias_email))
             msg_root['To'] = alias_email
         else:
-            msg_root['From'] = from_email
+            if from_name == '':
+                msg_root['From'] = from_email
+            else:
+                msg_root['From'] = formataddr((from_name, from_email))
             msg_root['To'] = from_email
         
         if reply_to_email:
@@ -2911,7 +2935,7 @@ def send_scheduled_user_email_with_cids(recipients, subject, selected_items, use
         traceback.print_exc()
         return False
 
-def send_scheduled_single_email_with_cids(to_emails_list, subject, selected_items, from_email, alias_email, reply_to_email, encrypted_password, smtp_server, smtp_port, smtp_protocol, server_name, tautulli_base_url, tautulli_api_key, date_range, template_name, logo_filename, logo_width, email_text=""):
+def send_scheduled_single_email_with_cids(to_emails_list, subject, selected_items, from_email, alias_email, reply_to_email, encrypted_password, smtp_server, smtp_port, smtp_protocol, server_name, tautulli_base_url, tautulli_api_key, date_range, template_name, logo_filename, logo_width, from_name, email_text=""):
     try:
         print(f"SMTP Config: {smtp_server}:{smtp_port} using {smtp_protocol}")
 
@@ -2929,10 +2953,16 @@ def send_scheduled_single_email_with_cids(to_emails_list, subject, selected_item
         msg_root['Subject'] = f"[SCHEDULED] {subject}"
         
         if alias_email:
-            msg_root['From'] = alias_email
+            if from_name == '':
+                msg_root['From'] = alias_email
+            else:
+                msg_root['From'] = formataddr((from_name, alias_email))
             msg_root['To'] = alias_email
         else:
-            msg_root['From'] = from_email
+            if from_name == '':
+                msg_root['From'] = from_email
+            else:
+                msg_root['From'] = formataddr((from_name, from_email))
             msg_root['To'] = from_email
 
         if reply_to_email:
@@ -3125,6 +3155,7 @@ def build_text_block_html(content, block_type='textblock', theme_colors=None):
         theme_colors = get_email_theme_colors()
     
     if not content or not content.strip():
+        print(f"Textblock called but no text present: {content}")
         return ""
     
     formatted_content = content.strip().replace('\n', '<br>')
@@ -3507,7 +3538,7 @@ def send_email():
     cursor = conn.cursor()
     cursor.execute("""
         SELECT
-        from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, logo_filename, logo_width
+        from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, logo_filename, logo_width, from_name
         FROM settings WHERE id = 1
     """)
     row = cursor.fetchone()
@@ -3525,7 +3556,8 @@ def send_email():
             "smtp_protocol": row[7] or "TLS",
             "server_name": row[8] or "",
             "logo_filename": row[9] or "Asset_94x.png",
-            "logo_width": row[10] or 80
+            "logo_width": row[10] or 80,
+            "from_name": row[11] or ""
         }
     else:
         return jsonify({"error": "Please enter email info on settings page"}), 500
@@ -3544,6 +3576,7 @@ def send_email():
     subject = data['subject']
     user_dict = data.get('user_dict', {})
     selected_items = data.get('selected_items', [])
+    from_name = settings['from_name']
 
     has_recommendations = any(item.get('type') == 'recs' for item in selected_items)
 
@@ -3551,13 +3584,13 @@ def send_email():
         return send_recommendations_email_with_cids(
             to_emails, subject, user_dict, selected_items,
             from_email, alias_email, reply_to_email, password, smtp_username, 
-            smtp_server, smtp_port, smtp_protocol, settings
+            smtp_server, smtp_port, smtp_protocol, settings, from_name
         )
     else:
         return send_standard_email_with_cids(
             to_emails, subject, selected_items,
             from_email, alias_email, reply_to_email, password, smtp_username,
-            smtp_server, smtp_port, smtp_protocol, settings
+            smtp_server, smtp_port, smtp_protocol, settings, from_name
         )
 
 @app.route('/settings', methods=['GET', 'POST'])
@@ -3601,6 +3634,7 @@ def settings():
         logo_filename = request.form.get("logo_filename")
         logo_width = request.form.get("logo_width")
         email_theme = request.form.get("email_theme", "newsletterr_blue")
+        from_name = request.form.get("from_name")
 
         if email_theme in theme_presets:
             preset = theme_presets[email_theme]
@@ -3621,17 +3655,17 @@ def settings():
             INSERT INTO settings
             (id, from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, plex_url, tautulli_url,
                 tautulli_api, conjurr_url, logo_filename, logo_width, email_theme, primary_color, secondary_color, accent_color, background_color,
-                text_color)
-            VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                text_color, from_name)
+            VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (id) DO UPDATE
             SET from_email = excluded.from_email, alias_email = excluded.alias_email, reply_to_email = excluded.reply_to_email, password = excluded.password,
                 smtp_username = excluded.smtp_username, smtp_server = excluded.smtp_server, smtp_port = excluded.smtp_port, smtp_protocol = excluded.smtp_protocol,
                 server_name = excluded.server_name, plex_url = excluded.plex_url, tautulli_url = excluded.tautulli_url, tautulli_api = excluded.tautulli_api,
                 conjurr_url = excluded.conjurr_url, logo_filename = excluded.logo_filename, logo_width = excluded.logo_width, email_theme = excluded.email_theme,
                 primary_color = excluded.primary_color, secondary_color = excluded.secondary_color, accent_color = excluded.accent_color,
-                background_color = excluded.background_color, text_color = excluded.text_color
+                background_color = excluded.background_color, text_color = excluded.text_color, from_name = excluded.from_name
         """, (from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, plex_url, tautulli_url, tautulli_api,
-              conjurr_url, logo_filename, logo_width, email_theme, primary_color, secondary_color, accent_color, background_color, text_color))
+              conjurr_url, logo_filename, logo_width, email_theme, primary_color, secondary_color, accent_color, background_color, text_color, from_name))
         conn.commit()
         cursor.execute("SELECT plex_token FROM settings WHERE id = 1")
         plex_token = cursor.fetchone()[0]
@@ -3659,7 +3693,8 @@ def settings():
             "secondary_color": secondary_color,
             "accent_color": accent_color,
             "background_color": background_color,
-            "text_color": text_color
+            "text_color": text_color,
+            "from_name": from_name,
         }
 
         return render_template('settings.html', alert="Settings saved successfully!", settings=settings)
@@ -3687,6 +3722,7 @@ def settings():
         accent_color = cursor.execute("SELECT accent_color FROM settings WHERE id = 1").fetchone()[0]
         background_color = cursor.execute("SELECT background_color FROM settings WHERE id = 1").fetchone()[0]
         text_color = cursor.execute("SELECT text_color FROM settings WHERE id = 1").fetchone()[0]
+        from_name = cursor.execute("SELECT from_name FROM settings WHERE id = 1").fetchone()[0]
     except:
         from_email = cursor.execute("SELECT from_email FROM settings WHERE id = 1").fetchone()
         alias_email = cursor.execute("SELECT alias_email FROM settings WHERE id = 1").fetchone()
@@ -3710,6 +3746,7 @@ def settings():
         accent_color = cursor.execute("SELECT accent_color FROM settings WHERE id = 1").fetchone()
         background_color = cursor.execute("SELECT background_color FROM settings WHERE id = 1").fetchone()
         text_color = cursor.execute("SELECT text_color FROM settings WHERE id = 1").fetchone()
+        from_name = cursor.execute("SELECT from_name FROM settings WHERE id = 1").fetchone()
 
     current_theme = email_theme or "newsletterr_blue"
     if current_theme in theme_presets and current_theme != "custom":
@@ -3739,6 +3776,7 @@ def settings():
         "accent_color": accent_color or "#62a1a4",
         "background_color": background_color or "#333333",
         "text_color": text_color or "#62a1a4",
+        "from_name": from_name or ""
     }
     if password == '' or password is None:
         settings["password"] = ""

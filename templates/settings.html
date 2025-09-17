@@ -32,6 +32,11 @@
                     {% if settings.from_email != "" %}value="{{ settings.from_email }}"{% endif %}
                     placeholder="Your email" required><br><br>
 
+                <label for="from_name">From Name (Optional - used to specify a name for who the email is from, shows next to email address):</label><br>
+                <input type="text" id="from_name" name="from_name"
+                    {% if settings.from_name != "" %}value="{{ settings.from_name }}"{% endif %}
+                    placeholder="Your name"><br><br>
+
                 <label for="alias_email">Send-As Alias (Optional - used for domain specific email addresses):</label><br>
                 <input type="email" id="alias_email" name="alias_email"
                     {% if settings.alias_email != "" %}value="{{ settings.alias_email }}"{% endif %}

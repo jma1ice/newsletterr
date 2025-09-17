@@ -2491,6 +2491,13 @@
                         }
                     }
 
+                    selectedItems.forEach(item => {
+                        if (['textblock', 'titleblock', 'headerblock'].includes(item.type)) {
+                            const content = getTextBlockContent(item.id);
+                            item.content = content;
+                        }
+                    });
+
                     showSpinner('Sending email...');
 
                     const resp = await fetch('/send_email', {

@@ -9,10 +9,9 @@ Newsletterr is a lightweight Flask application that talks to **[Tautulli](https:
 ## Features
 
 ### Data & Content
-* **One‑click stats pull** - pick a time range (quick buttons: 7 / 30 / 90 / … days) and “recently added” count; Newsletterr queries Tautulli for most watched movies/shows, active users, platforms, libraries, artists and more.
-* **Recently Added injection** - drop `[RECENTLY_ADDED]` where you want the curated recently added block to appear (library selection supported).
-* **User Recommendations** - integrate with **conjurr** and insert `[RECOMMENDATIONS]` to show personalized watch suggestions (per BCC list at fetch time).
-* **Snap‑ins (drag/add workflow)** - add Stats, Graphs, Text Blocks (Title, Intro, Body, Outro) in any order to compose a tailored newsletter body.
+* **One‑click stats pull** - pick a time range (quick buttons: 7 / 30 / 90 / … days) and "recently added" count; Newsletterr queries Tautulli for most watched movies/shows, active users, platforms, libraries, artists and more.
+* **User Recommendations** - integrate with **conjurr** to show personalized watch suggestions (per BCC list at fetch time).
+* **Snap‑ins (drag/add workflow)** - add Stats, Graphs, Recently Added (library selection supported), Recommendations, and Text Blocks (Title, Header, Intro, Body, Outro) in any order (Title sticks to the top) to compose a tailored newsletter body.
 
 ### Visualization
 * **Interactive charts** - Highcharts rendered in‑app; suitable images captured for reliable e‑mail client display.
@@ -36,7 +35,7 @@ Newsletterr is a lightweight Flask application that talks to **[Tautulli](https:
 * **Size tracking** - sent email content size (KB) logged for each history entry.
 
 ### Caching & Performance
-* **Smart multi‑segment cache** - stores stats, user data, recent additions, and graph payloads separately.
+* **Smart multi‑segment cache** - stores stats, user data, recent additions, recommendations and graph payloads separately.
 * **Global cache status badge** - real‑time indicator (fresh / warn / old / stale / missing) with tooltips and animated attention state if segments absent.
 * **Manual & automatic refresh** - daily auto refresh plus explicit “Get Stats\Users” trigger; one‑click “Clear Cache” button.
 
@@ -52,7 +51,7 @@ Newsletterr is a lightweight Flask application that talks to **[Tautulli](https:
 * **Responsive wrapped button groups** - quick time‑range buttons auto‑wrap with padded container.
 
 ### Persistence & Local Footprint
-* **SQLite storage** - schedules, templates, email history, lists & settings contained in local database files (no external service dependency).
+* **SQLite storage** - schedules, templates, email history, lists & settings contained in a local database file (no external service dependency).
 * **Self‑contained runtime** - pure Python + Flask + CDN assets; no Node build or container required (optional packaging roadmap below).
 
 ### Extensibility
@@ -120,30 +119,33 @@ By default the app listens on **http://127.0.0.1:6397**.
 2. Connect to your Plex server with **Connect Plex** button. This is used for media posters.  
 3. Fill in:
    * **From** - e‑mail address that will appear as the sender  
+   * **From Name (optional)** - the name you wish to appear when your e-mail is sent  
    * **Alias (optional)** - _Send As_ alias. If blank, **From** will be used, [setup instructions](https://support.google.com/a/answer/33327?hl=en)  
    * **Password** - account or [app‑password](https://support.google.com/mail/answer/185833?hl=en) if using Gmail. App Password is required by Gmail for security, it will not work with your regular Gmail password  
+   * **SMTP Username (optional)** - used for SMTP clients that need username login  
    * **SMTP Server** - e.g. `smtp.gmail.com`  
    * **SMTP Port** - `465` for SSL or `587` for TLS  
-   * **Plex Server Name** - appears in the newsletter header. This is grabbed when Plex is connected, but can be overwritten if wanted  
-   * **Plex URL** - used to pull posters for recently added items. This is grabbed when Plex is connected, but can be overwritten if wanted  
-   * **Tautulli URL** - e.g. `http://localhost:8181`  
-   * **Tautulli API Key** - make sure 'Enable API' is checked, and copy the API key from your [Tautulli settings.](http://localhost:8181/settings#tabs_tabs-web_interface)  
-   * **Conjurr URL** - e.g. `http://localhost:2665`  
-   * **Logo Filename** - This sets the logo at the top of the newsletter. To use a custom logo, place your logo file in /static/img/ and add the filename here  
-   * **Logo Width** - Use this to adjust the size of your custom logo. A small logo should be ~20, medium ~40, and banner size ~80  
+   * **SMTP Protocol** - select TLS or SSL  
+   * **Plex Server Name (optional)** - appears in the newsletter header. This is grabbed when Plex is connected, but can be overwritten if wanted  
+   * **Plex URL (optional)** - used to pull posters for recently added items. This is grabbed when Plex is connected, but can be overwritten if wanted  
+   * **Tautulli URL (optional)** - e.g. `http://localhost:8181`  
+   * **Tautulli API Key (optional)** - make sure 'Enable API' is checked, and copy the API key from your [Tautulli settings.](http://localhost:8181/settings#tabs_tabs-web_interface)  
+   * **Conjurr URL (optional)** - e.g. `http://localhost:2665`  
+   * **Logo Filename (optional)** - this sets the logo at the top of the newsletter. To use a custom logo, place your logo file in /static/img/ and add the filename here  
+   * **Logo Width (optional)** - use this to adjust the size of your custom logo. A small logo should be ~20, medium ~40, and banner size ~80  
+   * **Email Theme** - choose from one of our preset newsletterr blue or plex orange themes, or create your own custom theme! Preset themes use our newsletterr banners, so if you want a custom logo you must choose to use a custom theme  
 4. Click **Apply Settings**.  Settings are saved to `database/data.db`.
 
 ---
 
 ## Sending a Newsletter
 
-1. On the **Dashboard** choose a number of **Recently Added** items to pull from TV and Movies, a **Time Range** in days and click **Get Stats\\Users**.  
+1. On the **Dashboard** choose a number of **Recently Added** items to pull from TV, Movies and Audio, a **Time Range** in days for your stats/graphs and click **Get Stats\\Users**.  
 2. Wait for the spinner to disappear, then the BCC, charts, and tables will populate.  
 3. Alter the BCC field to specify the recipient e‑mails (comma‑separated) if needed.  
 4. After altering, if you have connected conjurr, you can click **Get Recommendations** to pull conjurr recommendations for the users currently listed in the BCC field.  
-5. Draft the body, use the stats/graphs pane on the right to include these in your email. 
-6. Choose a library option under Recently Added and insert `[RECENTLY_ADDED]` or `[RECOMMENDATIONS]` in the text box to include these.  
-7. Hit **Send Email**. Success and error messages will show after running.  
+5. Draft the body, use the stats, graphs, recently added, and recommendations snap-ins on the right to include these in your email. 
+6. Hit **Send Email**. Success and error messages will show after running.  
 
 ---
 
@@ -155,37 +157,33 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 
 ---
 
-## Upcoming Changes
+## Planned Changes
 
-### v0.9.16
+### For the v0.9.17 sprint, these items are to be addressed:
 * Fix everywhere days and # of items is hardcoded
-* Test api button
-* mjml?
-* syncerr button?
-* Find email size regulations, warn on too big | reduce image size to better fall with regulations
-* Look into email formatting across email clients
+* Custom logo logic needs file select to work with docker | add in small/banner/custom dropdown - and possibly a 'no logo' option?
+* Plex 'Secure Connections' setting causing image 401
+* Make sure custom templates can't override defaults
+* RA cards can all show up as different heights in email
+
+#### And these items are feature requests:
+* Look into email formatting across email clients | mjml?
+* Reduce image size to better fall with regulations
 * Make clickable posters for available recommendations to take users to Plex to watch
 * Graph titles need to specify the date range - or at least show what time range the data is for somewhere in the email
-* Custom logo logic needs file select to work with docker | add in small/banner/custom dropdown - and possibly a 'no logo' option?
-* Logo positioning setting
-* Plex 'Secure Connections' setting causing image 401
 * Rename 'ra' and 'recs' snap in block for clarity?
-* In schedule calendar, template names are showing as template #
 * Add more date range options in schedule builder to match dashboard
 * Keep settings details on error so user won't have to re-enter them
-* Preview limits to 20 RA items
 
-### v1.0.0
+
+### For the v2025.1 sprint, these items are feature requests:
 * Compile EXE / ELF files
-
-### v1.1.0
-* Switch TV Show recently added info out to just show the show name, not episode or season number || use artwork from the show not the episode/season
+* Switch TV Show recently added info out to just show the show name, not episode or season number | use artwork from the show not the episode/season
 * Get fonts showing on Gmail receive side
 * Api/webhooks
 * Opt out support
 * Option for small cover art of each item in a stat table
 * IMDb ratings in stat tables
-* Make sure custom templates can't override defaults
 * Auth page for hosted users
 * Snap-in for images/gifs
 * Functionality for custom HTML templates | ability to add embedded links to services, ie StatusCake, Uptime Robot
@@ -206,6 +204,9 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Option in settings for width of RA/Recs grids
 * Improved BCC list editing
 * Ko-fi -> Discord integration for contributor role
+* syncerr button?
+* Logo positioning setting
+* Test api button
 * Mobile optimizations, i.e.:
 ```
 <style>
@@ -220,6 +221,16 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 ---
 
 ## Recent Changes
+
+### v0.9.16
+
+#### Fixed:
+* Readme updated to reflect recent changes
+* Inner quote fix that was breaking systems running on Python versions under 3.13
+* Fixed issue where schedule calendar would show template number instead of name when that template was paused
+* Fixed issue where preview was limited to 10 recently added items regardless of # pulled
+* Added pop up block detection in settings, some error messaging, and a manual authorization link to ensure users can connect Plex
+
 
 ### v0.9.15
 * Managed users no longer show when pulling recommendations

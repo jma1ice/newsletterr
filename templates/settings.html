@@ -198,9 +198,41 @@
                                 `resizable=yes,scrollbars=yes,toolbar=no,menubar=no,location=yes,noopener,noreferrer`;
 
                 const win = window.open(url, name, features);
-                if (!win) return window.open(url, '_blank', 'noopener,noreferrer');
-                win.focus();
+
+                try {
+                    win.focus();
+                } catch (e) {
+                    console.warn('Could not focus popup window');
+                    if (!win) {
+                        return null;
+                    }
+                }
+
                 return win;
+            }
+
+            function showPopupBlockedWarning() {
+                const statusEl = document.getElementById('plex_status');
+                statusEl.innerHTML = `
+                    <div style="color: #f39c12; margin: 10px 0;">
+                        <strong>Popup Blocked!</strong><br>
+                        Please allow popups for this site and try again.<br>
+                        <small>Look for a popup blocker icon in your browser's address bar.</small>
+                    </div>
+                `;
+            }
+
+            function createManualLinkFallback(authUrl, code) {
+                const statusEl = document.getElementById('plex_status');
+                statusEl.innerHTML = `
+                    <div style="color: #3498db; margin: 10px 0;">
+                        <strong>Manual Authorization May Be Required</strong><br>
+                        Enter this code into Plex: <strong style="background: #f8f9fa; padding: 2px 6px; border-radius: 3px;">${code}</strong><br>
+                        <a href="${authUrl}" target="_blank" rel="noopener noreferrer" style="color: #007bff; text-decoration: underline;">
+                            Click here to open Plex authorization page if it did not pop up
+                        </a>
+                    </div>
+                `;
             }
             
             const button = document.getElementById('connect_plex');
@@ -222,59 +254,79 @@
                     showSpinner(`Enter this code into Plex: ${data.code}`);
                     const authWin = openCenteredPopup(data.auth_url, 520, 480, 'plex-auth', 520);
 
-                    const start = Date.now();
-                    const timeoutMs = (data.expires_in ?? 600) * 1000;
-
-                    async function waitForPIN() {
-                        return new Promise((resolve, reject) => {
-                            const poll = async () => {
-                                const pollr = await fetch(`/api/plex/pin/${data.pin_id}`);
-                                const polld = await pollr.json();
-                                if (polld.connected) {
-                                    hideSpinner();
-                                    statusEl.textContent = 'Connected! Your Plex token is saved.';
-                                    clearInterval(pollTimer);
-                                    button.disabled = false;
-                                    resolve(polld);
-                                    return;
-                                }
-                                if (Date.now() - start > timeoutMs) {
-                                    hideSpinner();
-                                    statusEl.textContent = 'PIN expired. Please try again.';
-                                    clearInterval(pollTimer);
-                                    button.disabled = false;
-                                    reject(new Error('PIN expired.'));
-                                }
-                            };
-                            pollTimer = setInterval(poll, 1500);
-                            poll();
-                        });
+                    if (!authWin) {
+                        hideSpinner();
+                        showPopupBlockedWarning();
+                        setTimeout(() => {
+                            createManualLinkFallback(data.auth_url, data.code);
+                        }, 2000);
+                        
+                        startPolling(data, null);
+                        return;
                     }
 
-                    async function getPlexInfo(authWin) {
-                        const polld = await waitForPIN();
-
-                        showSpinner('Retreiving Plex information...');
-                        const infor = await fetch('/api/plex/info', {method: 'GET'});
-                        if (!infor.ok) throw new Error('Failed to get info');
-                        const infod = await infor.json();
-
-                        if (infod.connected) {
-                            try { if (authWin && !authWin.closed) authWin.close(); } catch {}
-                            hideSpinner();
-                            statusEl.textContent = 'Plex information retrieved.';
-                            setTimeout(() => location.replace(location.href), 2000);
-                            return;
-                        }
-                    }
-
-                    getPlexInfo(authWin);
+                    startPolling(data, authWin);
                 } catch (e) {
                     hideSpinner();
-                    statusEl.textContent = 'Error starting Plex connection.';
+                    statusEl.innerHTML = `
+                        <div style="color: #e74c3c;">
+                            <strong>Error starting Plex connection:</strong><br>
+                            ${e.message}
+                        </div>
+                    `;
                     button.disabled = false;
                 }
             });
+
+            function startPolling(data, authWin) {
+                const start = Date.now();
+                const timeoutMs = (data.expires_in ?? 600) * 1000;
+
+                async function waitForPIN() {
+                    return new Promise((resolve, reject) => {
+                        const poll = async () => {
+                            const pollr = await fetch(`/api/plex/pin/${data.pin_id}`);
+                            const polld = await pollr.json();
+                            if (polld.connected) {
+                                hideSpinner();
+                                statusEl.textContent = 'Connected! Your Plex token is saved.';
+                                clearInterval(pollTimer);
+                                button.disabled = false;
+                                resolve(polld);
+                                return;
+                            }
+                            if (Date.now() - start > timeoutMs) {
+                                hideSpinner();
+                                statusEl.textContent = 'PIN expired. Please try again.';
+                                clearInterval(pollTimer);
+                                button.disabled = false;
+                                reject(new Error('PIN expired.'));
+                            }
+                        };
+                        pollTimer = setInterval(poll, 1500);
+                        poll();
+                    });
+                }
+
+                async function getPlexInfo(authWin) {
+                    const polld = await waitForPIN();
+
+                    showSpinner('Retreiving Plex information...');
+                    const infor = await fetch('/api/plex/info', {method: 'GET'});
+                    if (!infor.ok) throw new Error('Failed to get info');
+                    const infod = await infor.json();
+
+                    if (infod.connected) {
+                        try { if (authWin && !authWin.closed) authWin.close(); } catch {}
+                        hideSpinner();
+                        statusEl.textContent = 'Plex information retrieved.';
+                        setTimeout(() => location.replace(location.href), 2000);
+                        return;
+                    }
+                }
+
+                getPlexInfo(authWin);
+            }
 
             document.addEventListener('keydown', function(event) {
                 if (event.ctrlKey && event.key === 's') {

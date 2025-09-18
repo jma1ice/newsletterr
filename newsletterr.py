@@ -15,8 +15,8 @@ from plex_api_client import PlexAPI
 from urllib.parse import quote_plus, urljoin
 
 app = Flask(__name__)
-app.jinja_env.globals["version"] = "v0.9.15"
-app.jinja_env.globals["publish_date"] = "September 17, 2025"
+app.jinja_env.globals["version"] = "v0.9.16"
+app.jinja_env.globals["publish_date"] = "September 18, 2025"
 
 def get_global_cache_status():
     try:
@@ -976,7 +976,7 @@ def refresh_daily_cache():
         libraries, _ = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_library_names', None, None, "10")
         library_section_ids = {}
         for library in libraries:
-            library_section_ids[f"{library["section_id"]}"] = library["section_name"]
+            library_section_ids[f"{library['section_id']}"] = library["section_name"]
 
         recent_data = []
         for section_id in library_section_ids.keys():
@@ -1325,7 +1325,7 @@ def fetch_tautulli_data_for_email(tautulli_base_url, tautulli_api_key, date_rang
         libraries, _ = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_library_names', None, None, "10")
         library_section_ids = {}
         for library in libraries:
-            library_section_ids[f"{library["section_id"]}"] = library["section_name"]
+            library_section_ids[f"{library['section_id']}"] = library["section_name"]
         
         for section_id in library_section_ids.keys():
             recent, _ = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_recently_added', section_id, None, "10")
@@ -3374,7 +3374,7 @@ def index():
             libraries, _ = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_library_names', None, None, "10")
             library_section_ids = {}
             for library in libraries:
-                library_section_ids[f"{library["section_id"]}"] = library["section_name"]
+                library_section_ids[f"{library['section_id']}"] = library["section_name"]
             
             recent_data = []
             for section_id in library_section_ids.keys():

@@ -15,8 +15,8 @@ from plex_api_client import PlexAPI
 from urllib.parse import quote_plus, urljoin
 
 app = Flask(__name__)
-app.jinja_env.globals["version"] = "v0.9.15"
-app.jinja_env.globals["publish_date"] = "September 17, 2025"
+app.jinja_env.globals["version"] = "v0.9.16"
+app.jinja_env.globals["publish_date"] = "September 18, 2025"
 
 def get_global_cache_status():
     try:

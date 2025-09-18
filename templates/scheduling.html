@@ -264,7 +264,7 @@
         width: 100%;
         border-radius: 18px;
         overflow: hidden;
-        box-shadow: 0 5px 14px -4px rgba(0,0,0,0.32);
+        box-shadow: 0 5px 14px -4px rgba(0, 0, 0, 0.32);
     }
 
     .calendar-card .card-header {
@@ -282,12 +282,12 @@
 
     .calendar-card .card-body {
         padding: 1rem .85rem .75rem;
-        background: radial-gradient(circle at 85% 12%, rgba(255,255,255,0.04), transparent 55%);
+        background: radial-gradient(circle at 85% 12%, rgba(255, 255, 255, 0.04), transparent 55%);
     }
 
     .calendar-container {
         display: grid;
-        grid-template-columns: repeat(7,1fr);
+        grid-template-columns: repeat(7, 1fr);
         gap: 6px;
         width: 100%;
         margin: 0 auto 0;
@@ -323,7 +323,7 @@
         aspect-ratio: 1;
         box-sizing: border-box;
         overflow: hidden;
-        border: 1px solid rgba(255,255,255,0.1);
+        border: 1px solid rgba(255, 255, 255, 0.1);
         backdrop-filter: blur(2px);
         -webkit-backdrop-filter: blur(2px);
         transition: background .18s ease, transform .18s ease, box-shadow .18s ease, border-color .18s ease;
@@ -336,12 +336,12 @@
     
     .calendar-day:hover {
         transform: translateY(-3px);
-        box-shadow: 0 6px 18px -4px rgba(0,0,0,0.35);
+        box-shadow: 0 6px 18px -4px rgba(0, 0, 0, 0.35);
     }
     
     .calendar-day.has-schedule {
-        background: linear-gradient(170deg, rgba(13,110,253,.18), rgba(13,110,253,.07));
-        border-color: rgba(13,110,253,.42);
+        background: linear-gradient(170deg, rgba(13, 110, 253, .18), rgba(13, 110, 253, .07));
+        border-color: rgba(13, 110, 253, .42);
     }
     
     body:not(.dark) .calendar-day.has-schedule {
@@ -357,11 +357,11 @@
     .calendar-day.today {
         outline: 2px solid var(--bs-primary);
         outline-offset: 2px;
-        box-shadow: 0 0 0 3px rgba(13,110,253,0.35);
+        box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.35);
     }
     
     .dark .calendar-day.today {
-        box-shadow: 0 0 0 3px rgba(111,66,193,0.45);
+        box-shadow: 0 0 0 3px rgba(111, 66, 193, 0.45);
     }
 
     .calendar-day-number {
@@ -370,18 +370,18 @@
         line-height: 1;
         letter-spacing: .4px;
         padding: 2px 5px;
-        background: rgba(255,255,255,0.38);
+        background: rgba(255, 255, 255, 0.38);
         border-radius: 12px;
         backdrop-filter: blur(3px);
         -webkit-backdrop-filter: blur(3px);
-        box-shadow: inset 0 0 0 1px rgba(255,255,255,0.55), 0 1px 2px rgba(0,0,0,0.28);
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.55), 0 1px 2px rgba(0, 0, 0, 0.28);
         color: #000;
     }
     
     .dark .calendar-day-number {
         background: rgba(0,0,0,0.4);
         color: #fff;
-        box-shadow: inset 0 0 0 1px rgba(255,255,255,0.07), 0 1px 2px rgba(0,0,0,0.5);
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07), 0 1px 2px rgba(0, 0, 0, 0.5);
     }
 
     .calendar-dots {
@@ -401,7 +401,7 @@
         border-radius: 50%;
         position: relative;
         background: #0d6efd;
-        box-shadow: 0 0 0 2px rgba(255,255,255,0.6), 0 3px 6px -1px rgba(0,0,0,.5);
+        box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.6), 0 3px 6px -1px rgba(0, 0, 0, .5);
         cursor: pointer;
         transition: transform .22s ease, box-shadow .22s ease;
     }
@@ -409,11 +409,11 @@
     .calendar-dot:hover {
         transform: none;
         filter: brightness(1.35) saturate(1.3);
-        box-shadow: 0 0 0 2px rgba(255,255,255,0.9), 0 4px 10px -2px rgba(0,0,0,.6);
+        box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.9), 0 4px 10px -2px rgba(0, 0, 0, .6);
     }
     
     .dark .calendar-dot {
-        box-shadow: 0 0 0 2px rgba(0,0,0,0.55), 0 3px 6px -2px rgba(0,0,0,.9);
+        box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.55), 0 3px 6px -2px rgba(0, 0, 0, .9);
     }
 
     @media (max-width: 1100px) {
@@ -471,7 +471,7 @@
         font-size: 0.75rem;
         z-index: 1000;
         white-space: nowrap;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
     }
 
     body:not(.dark) .theme-modal {
@@ -626,18 +626,18 @@
         border-radius: 50%;
         display: inline-block;
         background: var(--bs-secondary);
-        box-shadow: 0 0 0 2px rgba(255,255,255,.6), 0 2px 4px -1px rgba(0,0,0,.4);
+        box-shadow: 0 0 0 2px rgba(255, 255, 255, .6), 0 2px 4px -1px rgba(0, 0, 0, .4);
         position: relative;
         transition: filter .2s ease, box-shadow .25s ease;
     }
     
     .template-color-dot:hover {
         filter: brightness(1.3) saturate(1.25);
-        box-shadow: 0 0 0 2px rgba(255,255,255,.9), 0 3px 8px -2px rgba(0,0,0,.55);
+        box-shadow: 0 0 0 2px rgba(255, 255, 255, .9), 0 3px 8px -2px rgba(0, 0, 0, .55);
     }
     
     .dark .template-color-dot {
-        box-shadow: 0 0 0 2px rgba(0,0,0,.55), 0 2px 4px -2px rgba(0,0,0,.85);
+        box-shadow: 0 0 0 2px rgba(0, 0, 0, .55), 0 2px 4px -2px rgba(0, 0, 0, .85);
     }
 </style>
 
@@ -720,7 +720,7 @@
                 const color = assignTemplateColor(tid);
                 if (color) {
                     dot.style.background = color;
-                    dot.style.boxShadow = `0 0 0 2px rgba(255,255,255,0.7), 0 2px 4px -1px ${color}80`;
+                    dot.style.boxShadow = `0 0 0 2px rgba(255, 255, 255, 0.7), 0 2px 4px -1px ${color}80`;
                 }
             });
         }
@@ -797,7 +797,7 @@
                         if (schedule.template_id !== undefined && templateColors[schedule.template_id]) {
                             const c = templateColors[schedule.template_id];
                             dot.style.background = c;
-                            dot.style.boxShadow = `0 0 0 2px rgba(255,255,255,0.6), 0 2px 4px -1px ${c}90`;
+                            dot.style.boxShadow = `0 0 0 2px rgba(255, 255, 255, 0.6), 0 2px 4px -1px ${c}90`;
                         }
                         dot.title = `${schedule.name} at ${schedule.time}`;
                         
@@ -819,12 +819,21 @@
             });
 
             legend.innerHTML = '';
+
+            const tableTemplateNames = {};
+            document.querySelectorAll('.template-badge[data-template-id]').forEach(badge => {
+                const templateId = badge.getAttribute('data-template-id');
+                if (templateId && templateId !== 'null') {
+                    tableTemplateNames[templateId] = badge.textContent.trim();
+                }
+            });
+
             Object.entries(templateColors).forEach(([tid, color]) => {
                 const item = document.createElement('div');
                 item.className = 'd-flex align-items-center gap-1 px-2 py-1 rounded';
-                item.style.background = 'rgba(0,0,0,0.05)';
+                item.style.background = 'rgba(0, 0, 0, 0.05)';
                 if (document.documentElement.classList.contains('dark')) {
-                    item.style.background = 'rgba(255,255,255,0.05)';
+                    item.style.background = 'rgba(255, 255, 255, 0.05)';
                 }
                 const swatch = document.createElement('span');
                 swatch.style.display = 'inline-block';
@@ -832,9 +841,9 @@
                 swatch.style.height = '10px';
                 swatch.style.borderRadius = '50%';
                 swatch.style.background = color;
-                swatch.style.boxShadow = '0 0 0 1px rgba(0,0,0,0.2)';
+                swatch.style.boxShadow = '0 0 0 1px rgba(0, 0, 0, 0.2)';
                 const label = document.createElement('span');
-                label.textContent = templateNames[tid] || `Template ${tid}`;
+                label.textContent = templateNames[tid] || tableTemplateNames[tid] || `Template ${tid}`;
                 item.appendChild(swatch);
                 item.appendChild(label);
                 legend.appendChild(item);

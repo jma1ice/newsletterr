@@ -1149,8 +1149,6 @@
                     );
                 }
                 
-                allItems = allItems.slice(0, 10);
-                
                 if (allItems.length === 0) {
                     return `<div class="recently-added"><p style="text-align: center; color: var(--email-muted); padding: 20px;">No recently added items found${libraryFilter ? ` for ${libraryFilter}` : ''}</p></div>`;
                 }

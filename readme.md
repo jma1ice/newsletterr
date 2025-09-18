@@ -160,10 +160,9 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 ### v0.9.16
 * Fix everywhere days and # of items is hardcoded
 * Test api button
-* mjml?
+* Look into email formatting across email clients | mjml?
 * syncerr button?
-* Find email size regulations, warn on too big | reduce image size to better fall with regulations
-* Look into email formatting across email clients
+* Reduce image size to better fall with regulations
 * Make clickable posters for available recommendations to take users to Plex to watch
 * Graph titles need to specify the date range - or at least show what time range the data is for somewhere in the email
 * Custom logo logic needs file select to work with docker | add in small/banner/custom dropdown - and possibly a 'no logo' option?
@@ -179,7 +178,7 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Compile EXE / ELF files
 
 ### v1.1.0
-* Switch TV Show recently added info out to just show the show name, not episode or season number || use artwork from the show not the episode/season
+* Switch TV Show recently added info out to just show the show name, not episode or season number | use artwork from the show not the episode/season
 * Get fonts showing on Gmail receive side
 * Api/webhooks
 * Opt out support

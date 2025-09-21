@@ -15,8 +15,8 @@ from plex_api_client import PlexAPI
 from urllib.parse import quote_plus, urljoin
 
 app = Flask(__name__)
-app.jinja_env.globals["version"] = "v0.9.16"
-app.jinja_env.globals["publish_date"] = "September 18, 2025"
+app.jinja_env.globals["version"] = "v0.9.17"
+app.jinja_env.globals["publish_date"] = "September 19, 2025"
 
 def get_global_cache_status():
     try:
@@ -723,6 +723,7 @@ def calculate_next_send(frequency, start_date, send_time='09:00', last_sent=None
     
     if frequency == 'daily':
         next_date = base_date + timedelta(days=1)
+
     elif frequency == 'weekly':
         start_dt = datetime.fromisoformat(start_date)
         target_weekday = start_dt.weekday()
@@ -731,6 +732,37 @@ def calculate_next_send(frequency, start_date, send_time='09:00', last_sent=None
         if days_until_target == 0:
             days_until_target = 7
         next_date = base_date + timedelta(days=days_until_target)
+    
+    elif frequency == 'biweekly':
+        next_date = base_date + timedelta(days=14)
+
+    elif frequency == 'bimonthly':
+        start_dt = datetime.fromisoformat(start_date)
+
+        if start_dt.day <= 15:
+            target_days = [1, 15]
+        else:
+            target_days = [15, 1]
+        
+        current_month = base_date.month
+        current_year = base_date.year
+        current_day = base_date.day
+        
+        next_target_day = None
+        for day in target_days:
+            if day > current_day:
+                next_target_day = day
+                break
+        
+        if next_target_day:
+            next_date = datetime(current_year, current_month, next_target_day)
+        else:
+            next_month = current_month + 1
+            next_year = current_year
+            if next_month > 12:
+                next_month = 1
+                next_year += 1
+            next_date = datetime(next_year, next_month, target_days[0])
         
     elif frequency == 'monthly':
         start_dt = datetime.fromisoformat(start_date)
@@ -743,10 +775,70 @@ def calculate_next_send(frequency, start_date, send_time='09:00', last_sent=None
             next_year += 1
         
         last_day_of_month = calendar.monthrange(next_year, next_month)[1]
-        
         actual_day = min(target_day, last_day_of_month)
         
         next_date = datetime(next_year, next_month, actual_day)
+
+    elif frequency == 'bimonthly_interval':
+        start_dt = datetime.fromisoformat(start_date)
+        target_day = start_dt.day
+        
+        next_month = base_date.month + 2
+        next_year = base_date.year
+        while next_month > 12:
+            next_month -= 12
+            next_year += 1
+        
+        last_day_of_month = calendar.monthrange(next_year, next_month)[1]
+        actual_day = min(target_day, last_day_of_month)
+        
+        next_date = datetime(next_year, next_month, actual_day)
+        
+    elif frequency == 'quarterly':
+        start_dt = datetime.fromisoformat(start_date)
+        target_day = start_dt.day
+        
+        next_month = base_date.month + 3
+        next_year = base_date.year
+        while next_month > 12:
+            next_month -= 12
+            next_year += 1
+        
+        last_day_of_month = calendar.monthrange(next_year, next_month)[1]
+        actual_day = min(target_day, last_day_of_month)
+        
+        next_date = datetime(next_year, next_month, actual_day)
+        
+    elif frequency == 'biannually':
+        start_dt = datetime.fromisoformat(start_date)
+        target_day = start_dt.day
+        
+        next_month = base_date.month + 6
+        next_year = base_date.year
+        while next_month > 12:
+            next_month -= 12
+            next_year += 1
+        
+        last_day_of_month = calendar.monthrange(next_year, next_month)[1]
+        actual_day = min(target_day, last_day_of_month)
+        
+        next_date = datetime(next_year, next_month, actual_day)
+        
+    elif frequency == 'yearly':
+        start_dt = datetime.fromisoformat(start_date)
+        target_month = start_dt.month
+        target_day = start_dt.day
+        
+        next_year = base_date.year + 1
+        
+        if target_month == 2 and target_day == 29:
+            if not calendar.isleap(next_year):
+                target_day = 28
+        
+        last_day_of_month = calendar.monthrange(next_year, target_month)[1]
+        actual_day = min(target_day, last_day_of_month)
+        
+        next_date = datetime(next_year, target_month, actual_day)
         
     else:
         next_date = base_date + timedelta(days=1)
@@ -4349,39 +4441,128 @@ def get_calendar_data():
             
             current_date = schedule_start
             
-            if frequency == 'weekly' and current_date < start_date:
-                weeks_to_skip = (start_date - current_date).days // 7
-                current_date += timedelta(weeks=weeks_to_skip)
-                
-                target_weekday = schedule_start.weekday()
-                days_ahead = (target_weekday - current_date.weekday()) % 7
-                current_date += timedelta(days=days_ahead)
-                
-                if current_date < start_date:
-                    current_date += timedelta(days=7)
-            
-            elif frequency == 'monthly' and current_date < start_date:
-                target_day = schedule_start.day
-                current_date = datetime(year, month, min(target_day, calendar.monthrange(year, month)[1]))
-            
-            while current_date <= end_date:
-                if current_date >= start_date and current_date >= schedule_start:
-                    date_key = current_date.strftime('%Y-%m-%d')
-                    if date_key not in calendar_data:
-                        calendar_data[date_key] = []
+            if current_date < start_date:
+                if frequency == 'weekly':
+                    weeks_to_skip = (start_date - current_date).days // 7
+                    current_date += timedelta(weeks=weeks_to_skip)
                     
-                    calendar_data[date_key].append({
-                        'id': schedule_id,
-                        'name': name,
-                        'time': send_time or '09:00',
-                        'frequency': frequency,
-                        'template_id': template_id
-                    })
+                    target_weekday = schedule_start.weekday()
+                    days_ahead = (target_weekday - current_date.weekday()) % 7
+                    current_date += timedelta(days=days_ahead)
+                    
+                    if current_date < start_date:
+                        current_date += timedelta(days=7)
+
+                elif frequency == 'biweekly':
+                    weeks_to_skip = ((start_date - current_date).days // 14) * 2
+                    current_date += timedelta(weeks=weeks_to_skip)
+                    
+                    target_weekday = schedule_start.weekday()
+                    days_ahead = (target_weekday - current_date.weekday()) % 7
+                    current_date += timedelta(days=days_ahead)
+                    
+                    if current_date < start_date:
+                        current_date += timedelta(days=14)
+                
+                elif frequency in ['monthly', 'bimonthly_interval', 'quarterly', 'biannually', 'yearly']:
+                    target_day = schedule_start.day
+                    target_month = schedule_start.month
+                    
+                    if frequency == 'monthly':
+                        current_date = datetime(year, month, min(target_day, calendar.monthrange(year, month)[1]))
+
+                    elif frequency == 'bimonthly_interval':
+                        months_diff = (year - schedule_start.year) * 12 + (month - target_month)
+                        cycle_position = months_diff % 2
+                        if cycle_position == 0:
+                            current_date = datetime(year, month, min(target_day, calendar.monthrange(year, month)[1]))
+                        else:
+                            continue
+
+                    elif frequency == 'quarterly':
+                        months_diff = (year - schedule_start.year) * 12 + (month - target_month)
+                        cycle_position = months_diff % 3
+                        if cycle_position == 0:
+                            current_date = datetime(year, month, min(target_day, calendar.monthrange(year, month)[1]))
+                        else:
+                            continue
+
+                    elif frequency == 'biannually':
+                        months_diff = (year - schedule_start.year) * 12 + (month - target_month)
+                        cycle_position = months_diff % 6
+                        if cycle_position == 0:
+                            current_date = datetime(year, month, min(target_day, calendar.monthrange(year, month)[1]))
+                        else:
+                            continue
+
+                    elif frequency == 'yearly':
+                        if month == target_month:
+                            if target_month == 2 and target_day == 29 and not calendar.isleap(year):
+                                actual_day = 28
+                            else:
+                                actual_day = min(target_day, calendar.monthrange(year, month)[1])
+                            current_date = datetime(year, month, actual_day)
+                        else:
+                            continue
+                            
+                elif frequency == 'bimonthly':
+                    if schedule_start.day <= 15:
+                        target_days = [1, 15]
+                    else:
+                        target_days = [15, 1]
+                    current_date = datetime(year, month, 1)
+            
+            iteration_count = 0
+            max_iterations = 50
+
+            while current_date <= end_date and iteration_count < max_iterations:
+                iteration_count += 1
+
+                if current_date >= start_date and current_date >= schedule_start:
+                    if frequency == 'bimonthly':
+                        if schedule_start.day <= 15:
+                            target_days = [1, 15]
+                        else:
+                            target_days = [15, 1]
+                        
+                        for target_day in target_days:
+                            if target_day >= current_date.day:
+                                target_date = current_date.replace(day=target_day)
+                                if start_date <= target_date <= end_date:
+                                    date_key = target_date.strftime('%Y-%m-%d')
+                                    if date_key not in calendar_data:
+                                        calendar_data[date_key] = []
+                                    
+                                    calendar_data[date_key].append({
+                                        'id': schedule_id,
+                                        'name': name,
+                                        'time': send_time or '09:00',
+                                        'frequency': frequency,
+                                        'template_id': template_id
+                                    })
+                        break
+                    else:
+                        date_key = current_date.strftime('%Y-%m-%d')
+                        if date_key not in calendar_data:
+                            calendar_data[date_key] = []
+                        
+                        calendar_data[date_key].append({
+                            'id': schedule_id,
+                            'name': name,
+                            'time': send_time or '09:00',
+                            'frequency': frequency,
+                            'template_id': template_id
+                        })
                 
                 if frequency == 'daily':
                     current_date += timedelta(days=1)
+
                 elif frequency == 'weekly':
                     current_date += timedelta(days=7)
+
+                elif frequency == 'biweekly':
+                    current_date += timedelta(days=14)
+
                 elif frequency == 'monthly':
                     target_day = schedule_start.day
                     if current_date.month == 12:
@@ -4394,6 +4575,59 @@ def get_calendar_data():
                     last_day_of_month = calendar.monthrange(next_year, next_month)[1]
                     actual_day = min(target_day, last_day_of_month)
                     current_date = current_date.replace(year=next_year, month=next_month, day=actual_day)
+
+                elif frequency == 'bimonthly_interval':
+                    target_day = schedule_start.day
+                    next_month = current_date.month + 2
+                    next_year = current_date.year
+                    while next_month > 12:
+                        next_month -= 12
+                        next_year += 1
+                    
+                    last_day_of_month = calendar.monthrange(next_year, next_month)[1]
+                    actual_day = min(target_day, last_day_of_month)
+                    current_date = current_date.replace(year=next_year, month=next_month, day=actual_day)
+
+                elif frequency == 'quarterly':
+                    target_day = schedule_start.day
+                    next_month = current_date.month + 3
+                    next_year = current_date.year
+                    while next_month > 12:
+                        next_month -= 12
+                        next_year += 1
+                    
+                    last_day_of_month = calendar.monthrange(next_year, next_month)[1]
+                    actual_day = min(target_day, last_day_of_month)
+                    current_date = current_date.replace(year=next_year, month=next_month, day=actual_day)
+
+                elif frequency == 'biannually':
+                    target_day = schedule_start.day
+                    next_month = current_date.month + 6
+                    next_year = current_date.year
+                    while next_month > 12:
+                        next_month -= 12
+                        next_year += 1
+                    
+                    last_day_of_month = calendar.monthrange(next_year, next_month)[1]
+                    actual_day = min(target_day, last_day_of_month)
+                    current_date = current_date.replace(year=next_year, month=next_month, day=actual_day)
+
+                elif frequency == 'yearly':
+                    target_day = schedule_start.day
+                    target_month = schedule_start.month
+                    next_year = current_date.year + 1
+                    
+                    if target_month == 2 and target_day == 29 and not calendar.isleap(next_year):
+                        actual_day = 28
+                    else:
+                        last_day_of_month = calendar.monthrange(next_year, target_month)[1]
+                        actual_day = min(target_day, last_day_of_month)
+                    
+                    current_date = datetime(next_year, target_month, actual_day)
+
+                elif frequency == 'bimonthly':
+                    break
+                
                 else:
                     break
         

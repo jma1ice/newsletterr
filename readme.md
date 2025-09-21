@@ -168,11 +168,10 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 
 #### And these items are feature requests:
 * Look into email formatting across email clients | mjml?
-* Reduce image size to better fall with regulations
+* Reduce image size to better fall within size regulations
 * Make clickable posters for available recommendations to take users to Plex to watch
 * Graph titles need to specify the date range - or at least show what time range the data is for somewhere in the email
 * Rename 'ra' and 'recs' snap in block for clarity?
-* Add more date range options in schedule builder to match dashboard
 * Keep settings details on error so user won't have to re-enter them
 
 
@@ -200,7 +199,6 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Ratings (G, PG, etc) listed on recently added
 * Export email HTML button
 * Export logs button | link to discord
-* Biweekly/semimonthly option for scheduled emails | possibly CRON
 * Option in settings for width of RA/Recs grids
 * Improved BCC list editing
 * Ko-fi -> Discord integration for contributor role
@@ -221,6 +219,15 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 ---
 
 ## Recent Changes
+
+### v0.9.17
+
+#### Fixed:
+*
+
+#### New Features:
+* Added more date range options in schedule builder to match dashboard
+* Added many more options for scheduled emails frequency
 
 ### v0.9.16
 

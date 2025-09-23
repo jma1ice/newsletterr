@@ -176,6 +176,7 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 
 
 ### For the v2025.1 sprint, these items are feature requests:
+* GitHub link should be the stylized logo
 * Compile EXE / ELF files
 * Switch TV Show recently added info out to just show the show name, not episode or season number | use artwork from the show not the episode/season
 * Get fonts showing on Gmail receive side
@@ -202,7 +203,6 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Option in settings for width of RA/Recs grids
 * Improved BCC list editing
 * Ko-fi -> Discord integration for contributor role
-* syncerr button?
 * Logo positioning setting
 * Test api button
 * Mobile optimizations, i.e.:

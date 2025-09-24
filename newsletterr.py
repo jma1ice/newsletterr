@@ -1452,15 +1452,19 @@ def convert_html_to_plain_text(html_content):
 
 def fetch_and_attach_image(image_url, msg_root, cid_name, base_url=""):
     try:
+        print(f"fetch_and_attach_image called with: {image_url}")
         if image_url.startswith('/'):
             full_url = urljoin(base_url or "http://127.0.0.1:6397", image_url)
         else:
             full_url = image_url
         
+        print(f"Final URL to fetch: {full_url}")
         response = requests.get(full_url, timeout=10)
+        print(f"Response status: {response.status_code}")
         response.raise_for_status()
         
         content_type = response.headers.get('Content-Type')
+        print(f"Content-Type: {content_type}")
         if not content_type or not content_type.startswith('image/'):
             content_type = mimetypes.guess_type(full_url)[0] or 'image/png'
         
@@ -1475,6 +1479,7 @@ def fetch_and_attach_image(image_url, msg_root, cid_name, base_url=""):
         img_part.add_header('Content-Disposition', 'inline', filename=f'{cid_name}.{subtype}')
         msg_root.attach(img_part)
         
+        print(f"Successfully attached image with CID: {cid}")
         return cid
         
     except Exception as e:
@@ -2153,6 +2158,161 @@ def build_recommendations_section_with_cids(available_items, unavailable_items, 
         </div>
     """
 
+def build_collections_html_with_cids(collections_data, title, msg_root, theme_colors, base_url=""):
+    """Build HTML for collections with embedded images using CIDs"""
+    if not collections_data:
+        return ""
+    
+    section_title_style = f"""
+        color: {theme_colors['text_color']};
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        font-size: 24px;
+        font-weight: 700;
+        margin: 30px 0 20px 0;
+        padding-bottom: 10px;
+        border-bottom: 2px solid {theme_colors['accent_color']};
+        text-align: left;
+        line-height: 1.2;
+    """
+    
+    collections_html = []
+    for collection in collections_data:
+        # Debug: Print collection data
+        print(f"Processing collection: {collection.get('title', 'Unknown')}")
+        print(f"Collection subtype: {collection.get('subtype', 'Unknown')}")
+        print(f"Collection thumb URL: {collection.get('thumb', 'No thumb')}")
+        print(f"Collection art URL: {collection.get('art', 'No art')}")
+        
+        # Attach collection poster image
+        poster_url = collection.get('thumb', '')
+        collection_cid = None
+        if poster_url:
+            print(f"Attempting to fetch thumb image: {poster_url}")
+            # Check if it's already a full URL or needs proxy-art prefix
+            if poster_url.startswith('http'):
+                # It's already a full URL from the API
+                collection_cid = fetch_and_attach_image(poster_url, msg_root, f"collection_{hash(poster_url)}", base_url)
+            else:
+                # It's a relative path, use proxy-art
+                full_poster_url = f"/proxy-art{poster_url if poster_url.startswith('/') else '/' + poster_url}"
+                collection_cid = fetch_and_attach_image(full_poster_url, msg_root, f"collection_{hash(poster_url)}", base_url)
+            print(f"Thumb CID result: {collection_cid}")
+        
+        if not collection_cid:
+            print("No thumb CID, trying art URL...")
+            art_url = collection.get('art', '')
+            if art_url:
+                print(f"Attempting to fetch art image: {art_url}")
+                if art_url.startswith('http'):
+                    collection_cid = fetch_and_attach_image(art_url, msg_root, f"collection_{hash(art_url)}", base_url)
+                else:
+                    full_art_url = f"/proxy-art{art_url if art_url.startswith('/') else '/' + art_url}"
+                    collection_cid = fetch_and_attach_image(full_art_url, msg_root, f"collection_{hash(art_url)}", base_url)
+                print(f"Art CID result: {collection_cid}")
+        
+        poster_src = f"cid:{collection_cid}" if collection_cid else "/static/img/Asset_94x.png"
+        print(f"Final poster src for {collection.get('title')}: {poster_src}")
+        print("---")
+        
+        # Collection details
+        collection_title = collection.get('title', 'Unknown Collection')
+        count = collection.get('childCount', 0)
+        subtype = collection.get('subtype', 'unknown')
+        type_icon = '🎬' if subtype == 'movie' else '📺'
+        
+        # Disable links for now - Plex Web URLs are complex and server-specific
+        collection_url = "#"
+        
+        collection_html = f"""
+            <td style="width: 33.33%; vertical-align: top; padding: 12px;">
+                <div style="
+                    position: relative;
+                    border-radius: 8px;
+                    overflow: hidden;
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+                    background: #1a1a1a;
+                    transition: transform 0.2s ease;
+                ">
+                    <img src="{poster_src}" 
+                         alt="{collection_title}"
+                         style="
+                             width: 100%;
+                             height: 400px;
+                             object-fit: cover;
+                             display: block;
+                             aspect-ratio: 2/3;
+                         ">
+                    <div style="
+                        position: absolute;
+                        top: 12px;
+                        right: 12px;
+                        background: rgba(0, 0, 0, 0.8);
+                        color: white;
+                        padding: 6px 12px;
+                        border-radius: 4px;
+                        font-size: 14px;
+                        font-weight: bold;
+                        font-family: 'Segoe UI', Arial, sans-serif;
+                    ">
+                        {type_icon} {count}
+                    </div>
+                    <div style="
+                        position: absolute;
+                        bottom: 0;
+                        left: 0;
+                        right: 0;
+                        padding: 12px;
+                        background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent);
+                    ">
+                        <div style="
+                            font-weight: bold;
+                            font-size: 14px;
+                            color: white;
+                            line-height: 1.2;
+                            font-family: 'Segoe UI', Arial, sans-serif;
+                            overflow: hidden;
+                            text-overflow: ellipsis;
+                            display: -webkit-box;
+                            -webkit-line-clamp: 2;
+                            -webkit-box-orient: vertical;
+                        ">
+                            {collection_title}
+                        </div>
+                    </div>
+                </div>
+            </td>
+        """
+        collections_html.append(collection_html)
+    
+    # Split into rows of 3 collections each
+    rows_html = []
+    for i in range(0, len(collections_html), 3):
+        row_collections = collections_html[i:i+3]
+        # Pad row with empty cells if needed
+        while len(row_collections) < 3:
+            row_collections.append('<td style="width: 33.33%; padding: 12px;"></td>')
+        
+        row_html = f"""
+            <tr>
+                {''.join(row_collections)}
+            </tr>
+        """
+        rows_html.append(row_html)
+    
+    return f"""
+        <div style="margin: 20px 0;">
+            <h3 style="{section_title_style}">{title}</h3>
+            <table style="
+                width: 100%;
+                border-collapse: collapse;
+                margin: 0;
+                padding: 0;
+            ">
+                {''.join(rows_html)}
+            </table>
+        </div>
+    """
+
 def attach_logo_image(msg_root, logo_filename, base_url=""):
     logo_url = f"/static/img/{logo_filename}"
     return fetch_and_attach_image(logo_url, msg_root, "logo", base_url)
@@ -2206,6 +2366,12 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, recom
                         content_html += build_recommendations_html_with_cids(filtered_recommendations, msg_root, theme_colors, filtered_user_dict, base_url)
                 else:
                     content_html += build_recommendations_html_with_cids(recommendations_data, msg_root, theme_colors, user_dict, base_url)
+        
+        elif item_type == 'collection':
+            collection_data = item.get('collection', {})
+            if collection_data:
+                collection_title = f"{collection_data.get('title', 'Unknown')} Collection"
+                content_html += build_collections_html_with_cids([collection_data], collection_title, msg_root, theme_colors, base_url)
     
     return build_complete_email_html_with_cid_logo(content_html, server_name, subject, logo_src, logo_width, is_scheduled)
 
@@ -3559,6 +3725,81 @@ def proxy_img():
     r = requests.get(url, timeout=15)
     ct = r.headers.get("Content-Type", "image/jpeg")
     return Response(r.content, headers={"Content-Type": ct, "Cache-Control": "public, max-age=86400"})
+
+@app.route('/fetch_collections/<collection_type>', methods=['GET'])
+def fetch_collections(collection_type):
+    """Fetch Plex collections for specified type (movies or shows)"""
+    try:
+        # Get Plex settings
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT plex_url, plex_token FROM settings WHERE id = 1")
+        row = cursor.fetchone()
+        conn.close()
+
+        if not row or not row[0] or not row[1]:
+            return jsonify({"status": "error", "message": "Plex connection not configured"})
+
+        plex_url = row[0].rstrip('/')
+        plex_token = decrypt(row[1])
+
+        # Get library sections first
+        sections_url = f"{plex_url}/library/sections"
+        headers = {"X-Plex-Token": plex_token, "Accept": "application/json"}
+        
+        sections_response = requests.get(sections_url, headers=headers, timeout=10)
+        if sections_response.status_code != 200:
+            return jsonify({"status": "error", "message": "Failed to fetch library sections"})
+
+        sections_data = sections_response.json()
+        collections = []
+
+        # Filter sections by type and get collections
+        target_type = "movie" if collection_type == "movies" else "show"
+        
+        for section in sections_data.get("MediaContainer", {}).get("Directory", []):
+            if section.get("type") == target_type:
+                section_id = section.get("key")
+                section_title = section.get("title", "Unknown Library")
+                
+                # Fetch collections for this section
+                collections_url = f"{plex_url}/library/sections/{section_id}/collections"
+                collections_response = requests.get(collections_url, headers=headers, timeout=10)
+                
+                if collections_response.status_code == 200:
+                    collections_data = collections_response.json()
+                    
+                    for collection in collections_data.get("MediaContainer", {}).get("Metadata", []):
+                        # Build full image URLs
+                        thumb = collection.get("thumb", "")
+                        if thumb and not thumb.startswith("http"):
+                            thumb = f"{plex_url}{thumb}?X-Plex-Token={plex_token}"
+                        
+                        art = collection.get("art", "")
+                        if art and not art.startswith("http"):
+                            art = f"{plex_url}{art}?X-Plex-Token={plex_token}"
+                        
+                        collections.append({
+                            "key": collection.get("ratingKey"),
+                            "title": collection.get("title", "Unknown Collection"),
+                            "summary": collection.get("summary", ""),
+                            "thumb": thumb,
+                            "art": art,
+                            "childCount": collection.get("childCount", 0),
+                            "subtype": collection.get("subtype", target_type),
+                            "sectionTitle": section_title,
+                            "sectionId": section_id
+                        })
+
+        return jsonify({
+            "status": "success", 
+            "collections": collections,
+            "type": collection_type
+        })
+
+    except Exception as e:
+        print(f"Error fetching collections: {e}")
+        return jsonify({"status": "error", "message": str(e)})
 
 @app.route('/pull_recommendations', methods=['POST'])
 def pull_recommendations():

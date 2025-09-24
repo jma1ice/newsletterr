@@ -259,6 +259,49 @@
                             </div>
                         </div>
 
+                        <!-- Collections Section -->
+                        <div class="row mt-4">
+                            <div class="col-12">
+                                <h2>Plex Collections</h2>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <h4>📽️ Movie Collections</h4>
+                                        <div class="d-flex align-items-center gap-2 mb-3">
+                                            <select id="movie-collections-dropdown" class="form-select" style="flex: 1;">
+                                                <option value="">Select a movie collection...</option>
+                                            </select>
+                                            <button id="add-movie-collection-btn" class="btn button btn-sm" disabled>
+                                                Add
+                                            </button>
+                                        </div>
+                                        <div id="movie-collections-loading" class="text-center d-none">
+                                            <div class="spinner-border spinner-border-sm" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                            <span class="ms-2">Loading movie collections...</span>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <h4>📺 TV Show Collections</h4>
+                                        <div class="d-flex align-items-center gap-2 mb-3">
+                                            <select id="show-collections-dropdown" class="form-select" style="flex: 1;">
+                                                <option value="">Select a TV show collection...</option>
+                                            </select>
+                                            <button id="add-show-collection-btn" class="btn button btn-sm" disabled>
+                                                Add
+                                            </button>
+                                        </div>
+                                        <div id="show-collections-loading" class="text-center d-none">
+                                            <div class="spinner-border spinner-border-sm" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                            <span class="ms-2">Loading TV collections...</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         {% if stats %}
                             <div id="stat-preview" class="mt-3" style="display: none;">
                                 {% for stat in stats %}
@@ -863,6 +906,9 @@
                             contentHTML += buildRecentlyAddedPreviewHTML(item.raLibrary);
                         } else if (item.type === 'recs') {
                             contentHTML += buildRecommendationsPreviewHTML(item.userKey);
+                        } else if (item.type === 'collection') {
+                            const collectionTitle = `${item.collection.title} Collection`;
+                            contentHTML += buildCollectionPreviewHTMLForEmail(collectionTitle, [item.collection]);
                         }
                     }
 
@@ -1415,6 +1461,122 @@
                     }
                 }
                 return '/static/img/no-poster.png';
+            }
+
+            function buildCollectionPreviewHTMLForEmail(title, collections) {
+                const itemsHTML = collections.map(collection => {
+                    // For preview, always use proxy-art to handle authentication
+                    let posterURL = '/static/img/Asset_94x.png'; // fallback
+                    
+                    const thumbUrl = collection.thumb;
+                    const artUrl = collection.art;
+                    
+                    if (thumbUrl) {
+                        if (thumbUrl.startsWith('http')) {
+                            // Extract the path part from the full URL for proxy-art
+                            try {
+                                const url = new URL(thumbUrl);
+                                posterURL = `/proxy-art${url.pathname}`;
+                            } catch (e) {
+                                console.log('Failed to parse thumb URL:', thumbUrl);
+                            }
+                        } else {
+                            // Already a relative path
+                            posterURL = `/proxy-art${thumbUrl.startsWith('/') ? thumbUrl : '/' + thumbUrl}`;
+                        }
+                    } else if (artUrl) {
+                        if (artUrl.startsWith('http')) {
+                            // Extract the path part from the full URL for proxy-art
+                            try {
+                                const url = new URL(artUrl);
+                                posterURL = `/proxy-art${url.pathname}`;
+                            } catch (e) {
+                                console.log('Failed to parse art URL:', artUrl);
+                            }
+                        } else {
+                            // Already a relative path
+                            posterURL = `/proxy-art${artUrl.startsWith('/') ? artUrl : '/' + artUrl}`;
+                        }
+                    }
+                    
+                    const count = collection.childCount || 0;
+                    const typeIcon = collection.subtype === 'movie' ? '🎬' : '📺';
+                    
+                    // Disable links for now - Plex Web URLs are complex and server-specific
+                    const collectionUrl = '#';
+                    
+                    return `
+                        <div style="
+                            position: relative;
+                            border-radius: 8px;
+                            overflow: hidden;
+                            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+                            background: #1a1a1a;
+                            aspect-ratio: 2/3;
+                            transition: transform 0.2s ease;
+                        "
+                        onmouseover="this.style.transform='scale(1.02)'"
+                        onmouseout="this.style.transform='scale(1)'">
+                            <div style="
+                                position: relative;
+                                width: 100%;
+                                height: 100%;
+                                background: url('${posterURL}') center/cover;
+                            ">
+                                <div style="
+                                    position: absolute;
+                                    top: 8px;
+                                    right: 8px;
+                                    background: rgba(0, 0, 0, 0.8);
+                                    color: white;
+                                    padding: 4px 8px;
+                                    border-radius: 4px;
+                                    font-size: 12px;
+                                    font-weight: bold;
+                                ">
+                                    ${typeIcon} ${count}
+                                </div>
+                                <div style="
+                                    position: absolute;
+                                    bottom: 0;
+                                    left: 0;
+                                    right: 0;
+                                    padding: 8px;
+                                    background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent);
+                                ">
+                                    <div style="
+                                        font-weight: bold;
+                                        font-size: 12px;
+                                        color: white;
+                                        line-height: 1.2;
+                                        display: -webkit-box;
+                                        -webkit-line-clamp: 2;
+                                        -webkit-box-orient: vertical;
+                                        overflow: hidden;
+                                    ">
+                                        ${collection.title || 'Unknown Collection'}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+                
+                return `
+                    <div style="margin: 20px 0;">
+                        <h3 style="color: var(--email-text); margin-bottom: 15px; padding-bottom: 16px;">${title}</h3>
+                        <div style="
+                            display: grid;
+                            grid-template-columns: repeat(5, 1fr);
+                            gap: 12px;
+                            padding: 0;
+                            margin: 0 auto 0 auto;
+                            width: 80%;
+                        ">
+                            ${itemsHTML}
+                        </div>
+                    </div>
+                `;
             }
 
             function buildPreviewEmailHTML(contentHTML, serverName, subject, logoFilename, logoWidth, themedCSS) {
@@ -3124,6 +3286,174 @@
             document.addEventListener('DOMContentLoaded', () => {
                 loadEmailTemplates();
             });
+        </script>
+
+        <script>
+            // Collections functionality
+            let movieCollections = [];
+            let showCollections = [];
+
+            // Load collections when page loads
+            async function loadCollections() {
+                try {
+                    // Load movie collections
+                    document.getElementById('movie-collections-loading').classList.remove('d-none');
+                    const movieResponse = await fetch('/fetch_collections/movies');
+                    const movieData = await movieResponse.json();
+                    
+                    if (movieData.status === 'success') {
+                        movieCollections = movieData.collections;
+                        populateCollectionsDropdown('movie-collections-dropdown', movieCollections);
+                    } else {
+                        console.error('Error loading movie collections:', movieData.message);
+                    }
+                    document.getElementById('movie-collections-loading').classList.add('d-none');
+
+                    // Load show collections
+                    document.getElementById('show-collections-loading').classList.remove('d-none');
+                    const showResponse = await fetch('/fetch_collections/shows');
+                    const showData = await showResponse.json();
+                    
+                    if (showData.status === 'success') {
+                        showCollections = showData.collections;
+                        populateCollectionsDropdown('show-collections-dropdown', showCollections);
+                    } else {
+                        console.error('Error loading show collections:', showData.message);
+                    }
+                    document.getElementById('show-collections-loading').classList.add('d-none');
+
+                } catch (error) {
+                    console.error('Error loading collections:', error);
+                    document.getElementById('movie-collections-loading').classList.add('d-none');
+                    document.getElementById('show-collections-loading').classList.add('d-none');
+                }
+            }
+
+            function populateCollectionsDropdown(dropdownId, collections) {
+                const dropdown = document.getElementById(dropdownId);
+                
+                // Clear existing options except the first one
+                while (dropdown.children.length > 1) {
+                    dropdown.removeChild(dropdown.lastChild);
+                }
+
+                collections.forEach(collection => {
+                    const option = document.createElement('option');
+                    option.value = collection.key;
+                    option.textContent = `${collection.title} (${collection.childCount} items)`;
+                    option.dataset.collection = JSON.stringify(collection);
+                    dropdown.appendChild(option);
+                });
+            }
+
+            function buildCollectionPreviewHTML(collection) {
+                const typeIcon = collection.subtype === 'movie' ? '🎬' : '📺';
+                
+                return `
+                    <div class="collection-preview card my-3">
+                        <div class="card-header d-flex align-items-center">
+                            <span class="me-2" style="font-size: 1.2em;">${typeIcon}</span>
+                            <h5 class="mb-0">${collection.title}</h5>
+                            <span class="badge bg-secondary ms-auto">${collection.childCount} items</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    ${collection.thumb ? 
+                                        `<img src="${collection.thumb}" class="img-fluid rounded" alt="${collection.title}" style="max-height: 200px; object-fit: cover;">` :
+                                        `<div class="placeholder-image d-flex align-items-center justify-content-center bg-light rounded" style="height: 200px;">
+                                            <span class="text-muted">${typeIcon} No Poster</span>
+                                        </div>`
+                                    }
+                                </div>
+                                <div class="col-md-9">
+                                    <p><strong>Library:</strong> ${collection.sectionTitle}</p>
+                                    <p><strong>Type:</strong> ${collection.subtype.charAt(0).toUpperCase() + collection.subtype.slice(1)} Collection</p>
+                                    ${collection.summary ? `<p><strong>Description:</strong> ${collection.summary}</p>` : ''}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Setup dropdown change handlers
+            document.getElementById('movie-collections-dropdown').addEventListener('change', function() {
+                const button = document.getElementById('add-movie-collection-btn');
+                
+                if (this.value) {
+                    button.disabled = false;
+                } else {
+                    button.disabled = true;
+                }
+                
+                // Clear the other dropdown
+                document.getElementById('show-collections-dropdown').value = '';
+                document.getElementById('add-show-collection-btn').disabled = true;
+            });
+
+            document.getElementById('show-collections-dropdown').addEventListener('change', function() {
+                const button = document.getElementById('add-show-collection-btn');
+                
+                if (this.value) {
+                    button.disabled = false;
+                } else {
+                    button.disabled = true;
+                }
+                
+                // Clear the other dropdown
+                document.getElementById('movie-collections-dropdown').value = '';
+                document.getElementById('add-movie-collection-btn').disabled = true;
+            });
+
+            // Setup add button handlers
+            document.getElementById('add-movie-collection-btn').addEventListener('click', function() {
+                const dropdown = document.getElementById('movie-collections-dropdown');
+                if (dropdown.value) {
+                    const collection = JSON.parse(dropdown.selectedOptions[0].dataset.collection);
+                    addCollectionItem(collection);
+                }
+            });
+
+            document.getElementById('add-show-collection-btn').addEventListener('click', function() {
+                const dropdown = document.getElementById('show-collections-dropdown');
+                if (dropdown.value) {
+                    const collection = JSON.parse(dropdown.selectedOptions[0].dataset.collection);
+                    addCollectionItem(collection);
+                }
+            });
+
+            function addCollectionItem(collection) {
+                const id = `collection-${collection.key}`;
+                const name = `${collection.title} Collection`;
+                const type = 'collection';
+                
+                if (selectedItems.some(item => item.id === id && item.type === type)) {
+                    console.log('Collection already added:', name);
+                    return;
+                }
+
+                const item = { 
+                    id, 
+                    name, 
+                    type, 
+                    collection: collection
+                };
+                
+                selectedItems.push(item);
+                updateSelectedItemsDisplay();
+                
+                // Clear dropdowns
+                document.getElementById('movie-collections-dropdown').value = '';
+                document.getElementById('show-collections-dropdown').value = '';
+                document.getElementById('add-movie-collection-btn').disabled = true;
+                document.getElementById('add-show-collection-btn').disabled = true;
+                
+                console.log('Added collection:', name);
+            }
+
+            // Load collections when page is ready
+            document.addEventListener('DOMContentLoaded', loadCollections);
         </script>
     </div>
 </div>

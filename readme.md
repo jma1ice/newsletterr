@@ -231,6 +231,7 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
  - - make sure this pulls audio - - 
  - - center collections in preview - - 
  - - collections functionality in scheduler - - 
+ - - sending collections email gives "SMTP send error: 'text_color'"
 
 ### v0.9.16
 

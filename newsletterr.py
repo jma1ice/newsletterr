@@ -3734,8 +3734,7 @@ def fetch_collections(collection_type):
         
         sections_response = requests.get(
             sections_url,
-            headers={"X-Plex-Token": decrypt(plex_token),
-            "Accept": "application/json"},
+            headers={"X-Plex-Token": decrypt(plex_token), "Accept": "application/json"},
             timeout = 10
         )
         if sections_response.status_code != 200:
@@ -3752,7 +3751,7 @@ def fetch_collections(collection_type):
                 section_title = section.get("title", "Unknown Library")
                 
                 collections_url = f"{plex_url}/library/sections/{section_id}/collections"
-                collections_response = requests.get(collections_url, headers=headers, timeout=10)
+                collections_response = requests.get(collections_url, headers={"X-Plex-Token": decrypt(plex_token), "Accept": "application/json"}, timeout=10)
                 
                 if collections_response.status_code == 200:
                     collections_data = collections_response.json()

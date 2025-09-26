@@ -1,11 +1,11 @@
 import os, math, uuid, base64, smtplib, sqlite3, requests, time, threading, re, json, mimetypes, shutil, calendar, traceback, io
 from collections import defaultdict
-from datetime import datetime, timezone, timedelta
 from cryptography.fernet import Fernet, InvalidToken
+from datetime import datetime, timezone, timedelta
 from dotenv import load_dotenv, set_key, find_dotenv
-from email.mime.text import MIMEText
 from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from email.utils import make_msgid, formataddr
 from flask import Flask, render_template, request, jsonify, Response, redirect, url_for
 from pathlib import Path
@@ -16,7 +16,7 @@ from urllib.parse import quote_plus, urljoin
 
 app = Flask(__name__)
 app.jinja_env.globals["version"] = "v0.9.17"
-app.jinja_env.globals["publish_date"] = "September 19, 2025"
+app.jinja_env.globals["publish_date"] = "September 25, 2025"
 
 def get_global_cache_status():
     try:
@@ -1314,7 +1314,6 @@ def _background_update_checker():
             time.sleep(app.config["UPDATE_CHECK_INTERVAL_SEC"])
 
 def get_stat_headers(title):
-    """Updated to match the exact logic from the dashboard template"""
     if title == "Most Watched Movies" or title == "Most Watched TV Shows":
         return ["Title", "Year", "Plays", "Hours Played", "Rating"]
     elif title == "Most Popular Movies" or title == "Most Popular TV Shows":
@@ -2159,41 +2158,35 @@ def build_recommendations_section_with_cids(available_items, unavailable_items, 
     """
 
 def build_collections_html_with_cids(collections_data, title, msg_root, theme_colors, base_url=""):
-    """Build HTML for collections with embedded images using CIDs"""
     if not collections_data:
         return ""
     
     section_title_style = f"""
         color: {theme_colors['text_color']};
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        font-family: 'IBM Plex Sans';
         font-size: 24px;
         font-weight: 700;
         margin: 30px 0 20px 0;
         padding-bottom: 10px;
         border-bottom: 2px solid {theme_colors['accent_color']};
-        text-align: left;
+        text-align: center;
         line-height: 1.2;
     """
     
     collections_html = []
     for collection in collections_data:
-        # Debug: Print collection data
         print(f"Processing collection: {collection.get('title', 'Unknown')}")
         print(f"Collection subtype: {collection.get('subtype', 'Unknown')}")
         print(f"Collection thumb URL: {collection.get('thumb', 'No thumb')}")
         print(f"Collection art URL: {collection.get('art', 'No art')}")
         
-        # Attach collection poster image
         poster_url = collection.get('thumb', '')
         collection_cid = None
         if poster_url:
             print(f"Attempting to fetch thumb image: {poster_url}")
-            # Check if it's already a full URL or needs proxy-art prefix
             if poster_url.startswith('http'):
-                # It's already a full URL from the API
                 collection_cid = fetch_and_attach_image(poster_url, msg_root, f"collection_{hash(poster_url)}", base_url)
             else:
-                # It's a relative path, use proxy-art
                 full_poster_url = f"/proxy-art{poster_url if poster_url.startswith('/') else '/' + poster_url}"
                 collection_cid = fetch_and_attach_image(full_poster_url, msg_root, f"collection_{hash(poster_url)}", base_url)
             print(f"Thumb CID result: {collection_cid}")
@@ -2214,13 +2207,11 @@ def build_collections_html_with_cids(collections_data, title, msg_root, theme_co
         print(f"Final poster src for {collection.get('title')}: {poster_src}")
         print("---")
         
-        # Collection details
         collection_title = collection.get('title', 'Unknown Collection')
         count = collection.get('childCount', 0)
         subtype = collection.get('subtype', 'unknown')
         type_icon = '🎬' if subtype == 'movie' else '📺'
         
-        # Disable links for now - Plex Web URLs are complex and server-specific
         collection_url = "#"
         
         collection_html = f"""
@@ -2252,7 +2243,7 @@ def build_collections_html_with_cids(collections_data, title, msg_root, theme_co
                         border-radius: 4px;
                         font-size: 14px;
                         font-weight: bold;
-                        font-family: 'Segoe UI', Arial, sans-serif;
+                        font-family: 'IBM Plex Sans';
                     ">
                         {type_icon} {count}
                     </div>
@@ -2269,7 +2260,7 @@ def build_collections_html_with_cids(collections_data, title, msg_root, theme_co
                             font-size: 14px;
                             color: white;
                             line-height: 1.2;
-                            font-family: 'Segoe UI', Arial, sans-serif;
+                            font-family: 'IBM Plex Sans';
                             overflow: hidden;
                             text-overflow: ellipsis;
                             display: -webkit-box;
@@ -2284,11 +2275,9 @@ def build_collections_html_with_cids(collections_data, title, msg_root, theme_co
         """
         collections_html.append(collection_html)
     
-    # Split into rows of 3 collections each
     rows_html = []
     for i in range(0, len(collections_html), 3):
         row_collections = collections_html[i:i+3]
-        # Pad row with empty cells if needed
         while len(row_collections) < 3:
             row_collections.append('<td style="width: 33.33%; padding: 12px;"></td>')
         
@@ -3728,9 +3717,7 @@ def proxy_img():
 
 @app.route('/fetch_collections/<collection_type>', methods=['GET'])
 def fetch_collections(collection_type):
-    """Fetch Plex collections for specified type (movies or shows)"""
     try:
-        # Get Plex settings
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         cursor.execute("SELECT plex_url, plex_token FROM settings WHERE id = 1")
@@ -3741,28 +3728,29 @@ def fetch_collections(collection_type):
             return jsonify({"status": "error", "message": "Plex connection not configured"})
 
         plex_url = row[0].rstrip('/')
-        plex_token = decrypt(row[1])
+        plex_token = row[1]
 
-        # Get library sections first
         sections_url = f"{plex_url}/library/sections"
-        headers = {"X-Plex-Token": plex_token, "Accept": "application/json"}
         
-        sections_response = requests.get(sections_url, headers=headers, timeout=10)
+        sections_response = requests.get(
+            sections_url,
+            headers={"X-Plex-Token": decrypt(plex_token),
+            "Accept": "application/json"},
+            timeout = 10
+        )
         if sections_response.status_code != 200:
             return jsonify({"status": "error", "message": "Failed to fetch library sections"})
 
         sections_data = sections_response.json()
         collections = []
 
-        # Filter sections by type and get collections
-        target_type = "movie" if collection_type == "movies" else "show"
+        target_type = "movie" if collection_type == "movies" else "show"  # test if this puts audio collections into show section
         
         for section in sections_data.get("MediaContainer", {}).get("Directory", []):
             if section.get("type") == target_type:
                 section_id = section.get("key")
                 section_title = section.get("title", "Unknown Library")
                 
-                # Fetch collections for this section
                 collections_url = f"{plex_url}/library/sections/{section_id}/collections"
                 collections_response = requests.get(collections_url, headers=headers, timeout=10)
                 
@@ -3770,14 +3758,13 @@ def fetch_collections(collection_type):
                     collections_data = collections_response.json()
                     
                     for collection in collections_data.get("MediaContainer", {}).get("Metadata", []):
-                        # Build full image URLs
                         thumb = collection.get("thumb", "")
                         if thumb and not thumb.startswith("http"):
-                            thumb = f"{plex_url}{thumb}?X-Plex-Token={plex_token}"
+                            thumb = f"{plex_url}{thumb}?X-Plex-Token={decrypt(plex_token)}"
                         
                         art = collection.get("art", "")
                         if art and not art.startswith("http"):
-                            art = f"{plex_url}{art}?X-Plex-Token={plex_token}"
+                            art = f"{plex_url}{art}?X-Plex-Token={decrypt(plex_token)}"
                         
                         collections.append({
                             "key": collection.get("ratingKey"),

@@ -259,7 +259,6 @@
                             </div>
                         </div>
 
-                        <!-- Collections Section -->
                         <div class="row mt-4">
                             <div class="col-12">
                                 <h2>Plex Collections</h2>
@@ -1465,15 +1464,13 @@
 
             function buildCollectionPreviewHTMLForEmail(title, collections) {
                 const itemsHTML = collections.map(collection => {
-                    // For preview, always use proxy-art to handle authentication
-                    let posterURL = '/static/img/Asset_94x.png'; // fallback
+                    let posterURL = '/static/img/Asset_94x.png';
                     
                     const thumbUrl = collection.thumb;
                     const artUrl = collection.art;
                     
                     if (thumbUrl) {
                         if (thumbUrl.startsWith('http')) {
-                            // Extract the path part from the full URL for proxy-art
                             try {
                                 const url = new URL(thumbUrl);
                                 posterURL = `/proxy-art${url.pathname}`;
@@ -1481,12 +1478,10 @@
                                 console.log('Failed to parse thumb URL:', thumbUrl);
                             }
                         } else {
-                            // Already a relative path
                             posterURL = `/proxy-art${thumbUrl.startsWith('/') ? thumbUrl : '/' + thumbUrl}`;
                         }
                     } else if (artUrl) {
                         if (artUrl.startsWith('http')) {
-                            // Extract the path part from the full URL for proxy-art
                             try {
                                 const url = new URL(artUrl);
                                 posterURL = `/proxy-art${url.pathname}`;
@@ -1494,7 +1489,6 @@
                                 console.log('Failed to parse art URL:', artUrl);
                             }
                         } else {
-                            // Already a relative path
                             posterURL = `/proxy-art${artUrl.startsWith('/') ? artUrl : '/' + artUrl}`;
                         }
                     }
@@ -1502,7 +1496,6 @@
                     const count = collection.childCount || 0;
                     const typeIcon = collection.subtype === 'movie' ? '🎬' : '📺';
                     
-                    // Disable links for now - Plex Web URLs are complex and server-specific
                     const collectionUrl = '#';
                     
                     return `
@@ -3289,14 +3282,11 @@
         </script>
 
         <script>
-            // Collections functionality
             let movieCollections = [];
             let showCollections = [];
 
-            // Load collections when page loads
             async function loadCollections() {
                 try {
-                    // Load movie collections
                     document.getElementById('movie-collections-loading').classList.remove('d-none');
                     const movieResponse = await fetch('/fetch_collections/movies');
                     const movieData = await movieResponse.json();
@@ -3309,7 +3299,6 @@
                     }
                     document.getElementById('movie-collections-loading').classList.add('d-none');
 
-                    // Load show collections
                     document.getElementById('show-collections-loading').classList.remove('d-none');
                     const showResponse = await fetch('/fetch_collections/shows');
                     const showData = await showResponse.json();
@@ -3332,7 +3321,6 @@
             function populateCollectionsDropdown(dropdownId, collections) {
                 const dropdown = document.getElementById(dropdownId);
                 
-                // Clear existing options except the first one
                 while (dropdown.children.length > 1) {
                     dropdown.removeChild(dropdown.lastChild);
                 }
@@ -3377,7 +3365,6 @@
                 `;
             }
 
-            // Setup dropdown change handlers
             document.getElementById('movie-collections-dropdown').addEventListener('change', function() {
                 const button = document.getElementById('add-movie-collection-btn');
                 
@@ -3387,7 +3374,6 @@
                     button.disabled = true;
                 }
                 
-                // Clear the other dropdown
                 document.getElementById('show-collections-dropdown').value = '';
                 document.getElementById('add-show-collection-btn').disabled = true;
             });
@@ -3401,12 +3387,10 @@
                     button.disabled = true;
                 }
                 
-                // Clear the other dropdown
                 document.getElementById('movie-collections-dropdown').value = '';
                 document.getElementById('add-movie-collection-btn').disabled = true;
             });
 
-            // Setup add button handlers
             document.getElementById('add-movie-collection-btn').addEventListener('click', function() {
                 const dropdown = document.getElementById('movie-collections-dropdown');
                 if (dropdown.value) {
@@ -3443,7 +3427,6 @@
                 selectedItems.push(item);
                 updateSelectedItemsDisplay();
                 
-                // Clear dropdowns
                 document.getElementById('movie-collections-dropdown').value = '';
                 document.getElementById('show-collections-dropdown').value = '';
                 document.getElementById('add-movie-collection-btn').disabled = true;
@@ -3452,7 +3435,6 @@
                 console.log('Added collection:', name);
             }
 
-            // Load collections when page is ready
             document.addEventListener('DOMContentLoaded', loadCollections);
         </script>
     </div>

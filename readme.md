@@ -192,7 +192,6 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Setting to hide play counts in stats/graphs
 * Option to sort recently added by IMDb rating
 * Option to pull recently added by # of days - when this is in should be able to show 'new items since x date' in email
-* Playlist/Collections in email content - helpful for Kometa seasonal lists
 * GitHub webhook to pull submitted issues to Discord channel
 * Sonarr/Radarr calendar integration for 'coming soon'
 * Servarr PR
@@ -228,6 +227,10 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 #### New Features:
 * Added more date range options in schedule builder to match dashboard
 * Added many more options for scheduled emails frequency
+* Added collections snap-in
+ - - make sure this pulls audio - - 
+ - - center collections in preview - - 
+ - - collections functionality in scheduler - - 
 
 ### v0.9.16
 

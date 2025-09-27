@@ -196,7 +196,13 @@
                             <option value="">Select frequency...</option>
                             <option value="daily">Daily</option>
                             <option value="weekly">Weekly</option>
+                            <option value="biweekly">Every 2 weeks</option>
+                            <option value="bimonthly">Twice monthly (1st & 15th)</option>
                             <option value="monthly">Monthly</option>
+                            <option value="bimonthly_interval">Every 2 months</option>
+                            <option value="quarterly">Quarterly</option>
+                            <option value="biannually">Biannually</option>
+                            <option value="yearly">Yearly</option>
                         </select>
                     </div>
                     
@@ -208,9 +214,13 @@
                             <option value="3">3 days</option>
                             <option value="7" selected>7 days (1 week)</option>
                             <option value="14">14 days (2 weeks)</option>
+                            <option value="21">21 days (3 weeks)</option>
                             <option value="30">30 days (1 month)</option>
                             <option value="60">60 days (2 months)</option>
-                            <option value="90">90 days (3 months)</option>
+                            <option value="90">90 days (1 quarter)</option>
+                            <option value="180">180 days (2 quarters)</option>
+                            <option value="270">270 days (3 quarters)</option>
+                            <option value="365">365 days (1 year)</option>
                         </select>
                         <div class="form-text">How many days of Tautulli data to include in stats and graphs</div>
                     </div>
@@ -727,8 +737,15 @@
 
         async function loadCalendarData() {
             try {
+                console.log('Current date object:', currentDate);
+                console.log('Requesting year:', currentDate.getFullYear());
+                console.log('Requesting month:', currentDate.getMonth() + 1);
+
                 const response = await fetch(`/scheduling/calendar-data?month=${currentDate.getMonth() + 1}&year=${currentDate.getFullYear()}`);
                 const result = await response.json();
+
+                console.log('Calendar data response:', result);
+
                 if (result.status === 'success') {
                     calendarData = result.data;
                     renderCalendar();

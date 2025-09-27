@@ -168,15 +168,17 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 
 #### And these items are feature requests:
 * Look into email formatting across email clients | mjml?
-* Reduce image size to better fall with regulations
+* Reduce image size to better fall within size regulations
 * Make clickable posters for available recommendations to take users to Plex to watch
 * Graph titles need to specify the date range - or at least show what time range the data is for somewhere in the email
 * Rename 'ra' and 'recs' snap in block for clarity?
-* Add more date range options in schedule builder to match dashboard
 * Keep settings details on error so user won't have to re-enter them
+* Nix the view buttons
+* No library name on recently added overlay | change date to days since added
 
 
 ### For the v2025.1 sprint, these items are feature requests:
+* GitHub link should be the stylized logo
 * Compile EXE / ELF files
 * Switch TV Show recently added info out to just show the show name, not episode or season number | use artwork from the show not the episode/season
 * Get fonts showing on Gmail receive side
@@ -192,7 +194,6 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Setting to hide play counts in stats/graphs
 * Option to sort recently added by IMDb rating
 * Option to pull recently added by # of days - when this is in should be able to show 'new items since x date' in email
-* Playlist/Collections in email content - helpful for Kometa seasonal lists
 * GitHub webhook to pull submitted issues to Discord channel
 * Sonarr/Radarr calendar integration for 'coming soon'
 * Servarr PR
@@ -200,11 +201,9 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Ratings (G, PG, etc) listed on recently added
 * Export email HTML button
 * Export logs button | link to discord
-* Biweekly/semimonthly option for scheduled emails | possibly CRON
 * Option in settings for width of RA/Recs grids
 * Improved BCC list editing
 * Ko-fi -> Discord integration for contributor role
-* syncerr button?
 * Logo positioning setting
 * Test api button
 * Mobile optimizations, i.e.:
@@ -221,6 +220,19 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 ---
 
 ## Recent Changes
+
+### v0.9.17
+
+#### Fixed:
+*
+
+#### New Features:
+* Added more date range options in schedule builder to match dashboard
+* Added many more options for scheduled emails frequency
+* Added collections snap-in
+ - - get this to pull audio - - 
+ - - collections functionality in scheduler - - 
+
 
 ### v0.9.16
 

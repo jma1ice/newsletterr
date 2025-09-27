@@ -198,6 +198,48 @@
                             </div>
                         </div>
 
+                        <div class="row mt-4">
+                            <div class="col-12">
+                                <h2>Plex Collections</h2>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <h4>📽️ Movie Collections</h4>
+                                        <div class="d-flex align-items-center gap-2 mb-3">
+                                            <select id="movie-collections-dropdown" class="form-select" style="flex: 1;">
+                                                <option value="">Select a movie collection...</option>
+                                            </select>
+                                            <button id="add-movie-collection-btn" class="btn button btn-sm" disabled>
+                                                Add
+                                            </button>
+                                        </div>
+                                        <div id="movie-collections-loading" class="text-center d-none">
+                                            <div class="spinner-border spinner-border-sm" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                            <span class="ms-2">Loading movie collections...</span>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <h4>📺 TV Show Collections</h4>
+                                        <div class="d-flex align-items-center gap-2 mb-3">
+                                            <select id="show-collections-dropdown" class="form-select" style="flex: 1;">
+                                                <option value="">Select a TV show collection...</option>
+                                            </select>
+                                            <button id="add-show-collection-btn" class="btn button btn-sm" disabled>
+                                                Add
+                                            </button>
+                                        </div>
+                                        <div id="show-collections-loading" class="text-center d-none">
+                                            <div class="spinner-border spinner-border-sm" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                            <span class="ms-2">Loading TV collections...</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="row">
                             <div class="col-md-6">
                                 {% if stats %}
@@ -835,6 +877,7 @@
                     const themedCSS = getThemedEmailCSS();
 
                     let contentHTML = "";
+                    const collectionItems = [];
                     
                     for (let item of selectedItems) {
                         if (item.type === 'textblock') {
@@ -863,7 +906,14 @@
                             contentHTML += buildRecentlyAddedPreviewHTML(item.raLibrary);
                         } else if (item.type === 'recs') {
                             contentHTML += buildRecommendationsPreviewHTML(item.userKey);
+                        } else if (item.type === 'collection') {
+                            collectionItems.push(item.collection);
+                            continue;
                         }
+                    }
+
+                    if (collectionItems.length > 0) {
+                        contentHTML += buildCollectionPreviewHTMLForEmail("Collections", collectionItems);
                     }
 
                     const completeHTML = buildPreviewEmailHTML(contentHTML, serverName, subject, logoFilename, logoWidth, themedCSS);
@@ -1415,6 +1465,238 @@
                     }
                 }
                 return '/static/img/no-poster.png';
+            }
+
+            function buildCollectionCard(collection, themeColors) {
+                const collectionTitle = collection.title || 'Unknown Collection';
+                const count = collection.childCount || 0;
+                const subtype = collection.subtype || 'unknown';
+                const typeIcon = subtype === 'movie' ? '🎬' : '📺';
+                
+                let posterURL = null;
+                const thumbUrl = collection.thumb;
+                const artUrl = collection.art;
+                
+                if (thumbUrl) {
+                    if (thumbUrl.startsWith('http')) {
+                        try {
+                            const url = new URL(thumbUrl);
+                            posterURL = `/proxy-art${url.pathname}`;
+                        } catch (e) {
+                            console.log('Failed to parse thumb URL:', thumbUrl);
+                        }
+                    } else {
+                        posterURL = `/proxy-art${thumbUrl.startsWith('/') ? thumbUrl : '/' + thumbUrl}`;
+                    }
+                } else if (artUrl) {
+                    if (artUrl.startsWith('http')) {
+                        try {
+                            const url = new URL(artUrl);
+                            posterURL = `/proxy-art${url.pathname}`;
+                        } catch (e) {
+                            console.log('Failed to parse art URL:', artUrl);
+                        }
+                    } else {
+                        posterURL = `/proxy-art${artUrl.startsWith('/') ? artUrl : '/' + artUrl}`;
+                    }
+                }
+                
+                if (posterURL) {
+                    return `
+                        <table cellpadding="0" cellspacing="0" border="0" style="
+                            background-color: ${themeColors.card_bg};
+                            border-radius: 12px;
+                            width: 120px;
+                            margin: 0 auto;
+                        ">
+                            <tr>
+                                <td style="
+                                    background-image: url('${posterURL}');
+                                    background-size: cover;
+                                    background-position: center;
+                                    background-repeat: no-repeat;
+                                    height: 180px;
+                                    background-color: #f8f9fa;
+                                    border-radius: 12px;
+                                    position: relative;
+                                    vertical-align: top;
+                                ">
+                                    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+                                        <tr>
+                                            <td style="text-align: right;">
+                                                <div style="
+                                                    background-color: rgba(0, 0, 0, 0.8);
+                                                    color: white;
+                                                    padding: 4px 6px;
+                                                    border-radius: 4px;
+                                                    font-size: 10px;
+                                                    font-family: 'IBM Plex Sans';
+                                                    line-height: 1;
+                                                    display: inline-block;
+                                                    margin: 6px;
+                                                ">
+                                                    ${typeIcon} ${count}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td style="height: 150px; vertical-align: bottom;">
+                                                <div style="
+                                                    background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent);
+                                                    border-radius: 0 0 11px 11px;
+                                                    padding: 6px;
+                                                ">
+                                                    <div style="
+                                                        font-weight: bold;
+                                                        font-size: 12px;
+                                                        color: white;
+                                                        line-height: 1.2;
+                                                        font-family: 'IBM Plex Sans';
+                                                    ">${collectionTitle}</div>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                </td>
+                            </tr>
+                        </table>
+                    `;
+                } else {
+                    return `
+                        <table cellpadding="0" cellspacing="0" border="0" style="
+                            background-color: ${themeColors.card_bg};
+                            border-radius: 12px;
+                            border: 1px solid ${themeColors.border};
+                            width: 120px;
+                            height: 180px;
+                            margin: 0 auto;
+                        ">
+                            <tr>
+                                <td style="
+                                    text-align: center;
+                                    vertical-align: middle;
+                                    padding: 12px;
+                                ">
+                                    <div style="
+                                        font-weight: bold;
+                                        font-size: 14px;
+                                        color: ${themeColors.text};
+                                        margin-bottom: 8px;
+                                        font-family: 'IBM Plex Sans';
+                                        padding: 2px;
+                                    ">${collectionTitle}</div>
+                                    <div style="
+                                        font-size: 11px;
+                                        color: ${themeColors.muted_text};
+                                        font-family: 'IBM Plex Sans';
+                                    ">${typeIcon} ${count} items</div>
+                                </td>
+                            </tr>
+                        </table>
+                    `;
+                }
+            }
+
+            function buildCollectionPreviewHTMLForEmail(title, collections) {
+                const themeColors = {
+                    card_bg: 'var(--email-card-bg)',
+                    text: 'var(--email-text)', 
+                    border: 'var(--email-border)',
+                    muted_text: 'var(--email-muted)'
+                };
+                
+                if (!collections || collections.length === 0) {
+                    return `
+                        <div style="background-color: ${themeColors.card_bg}; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid ${themeColors.border}; font-family: 'IBM Plex Sans';">
+                            <p style="text-align: center; color: ${themeColors.muted_text}; padding: 20px; margin: 0; font-family: 'IBM Plex Sans';">No collections available.</p>
+                        </div>
+                    `;
+                }
+
+                const itemsPerRow = 5;
+                let itemsHTML = "";
+                
+                for (let i = 0; i < collections.length; i += itemsPerRow) {
+                    const rowItems = collections.slice(i, i + itemsPerRow);
+                    const isPartialRow = rowItems.length < itemsPerRow;
+                    
+                    if (isPartialRow) {
+                        const itemsCount = rowItems.length;
+                        
+                        let rowHTML = `<tr><td colspan="${itemsPerRow}" style="text-align: center; padding: 8px;">`;
+                        rowHTML += '<table cellpadding="0" cellspacing="0" border="0" style="margin: 0 auto; border-collapse: separate;">';
+                        rowHTML += '<tr>';
+                        
+                        rowItems.forEach((collection, j) => {
+                            let cellSpacing = "0";
+                            if (itemsCount === 2) {
+                                cellSpacing = j === 0 ? "60px" : "0";
+                            } else if (itemsCount === 3) {
+                                cellSpacing = j < 2 ? "40px" : "0";
+                            } else if (itemsCount === 4) {
+                                cellSpacing = j < 3 ? "20px" : "0";
+                            } else if (itemsCount > 1) {
+                                cellSpacing = j < itemsCount - 1 ? "6px" : "0";
+                            }
+                            
+                            const cardHTML = buildCollectionCard(collection, themeColors);
+                            rowHTML += `<td style="vertical-align: top; padding-right: ${cellSpacing};">${cardHTML}</td>`;
+                        });
+                        
+                        rowHTML += '</tr></table></td></tr>';
+                        itemsHTML += rowHTML;
+                    } else {
+                        let rowHTML = "<tr style='text-align: center;'>";
+                        
+                        rowItems.forEach((collection) => {
+                            const cellStyle = `
+                                width: 20%;
+                                padding: 6px;
+                                vertical-align: top;
+                                font-family: 'IBM Plex Sans';
+                            `;
+                            
+                            const cardHTML = buildCollectionCard(collection, themeColors);
+                            rowHTML += `<td style="${cellStyle}">${cardHTML}</td>`;
+                        });
+                        
+                        rowHTML += "</tr>";
+                        itemsHTML += rowHTML;
+                    }
+                }
+                
+                const containerStyle = `
+                    background-color: ${themeColors.card_bg};
+                    border-radius: 8px;
+                    margin: 20px 0;
+                    border: 1px solid ${themeColors.border};
+                    font-family: 'IBM Plex Sans';
+                `;
+                
+                const titleStyle = `
+                    text-align: center;
+                    color: ${themeColors.text};
+                    margin: 0 0 20px 0;
+                    font-size: 24px;
+                    font-weight: bold;
+                    font-family: 'IBM Plex Sans';
+                `;
+                
+                const tableStyle = `
+                    width: 100%;
+                    border-collapse: collapse;
+                    margin: 0;
+                    padding: 0;
+                `;
+                
+                return `
+                    <div style="${containerStyle}">
+                        <h2 style="${titleStyle}">${title}</h2>
+                        <table cellpadding="0" cellspacing="0" border="0" style="${tableStyle}">
+                            ${itemsHTML}
+                        </table>
+                    </div>
+                `;
             }
 
             function buildPreviewEmailHTML(contentHTML, serverName, subject, logoFilename, logoWidth, themedCSS) {
@@ -3124,6 +3406,163 @@
             document.addEventListener('DOMContentLoaded', () => {
                 loadEmailTemplates();
             });
+        </script>
+
+        <script>
+            let movieCollections = [];
+            let showCollections = [];
+
+            async function loadCollections() {
+                try {
+                    document.getElementById('movie-collections-loading').classList.remove('d-none');
+                    const movieResponse = await fetch('/fetch_collections/movies');
+                    const movieData = await movieResponse.json();
+                    
+                    if (movieData.status === 'success') {
+                        movieCollections = movieData.collections;
+                        populateCollectionsDropdown('movie-collections-dropdown', movieCollections);
+                    } else {
+                        console.error('Error loading movie collections:', movieData.message);
+                    }
+                    document.getElementById('movie-collections-loading').classList.add('d-none');
+
+                    document.getElementById('show-collections-loading').classList.remove('d-none');
+                    const showResponse = await fetch('/fetch_collections/shows');
+                    const showData = await showResponse.json();
+                    
+                    if (showData.status === 'success') {
+                        showCollections = showData.collections;
+                        populateCollectionsDropdown('show-collections-dropdown', showCollections);
+                    } else {
+                        console.error('Error loading show collections:', showData.message);
+                    }
+                    document.getElementById('show-collections-loading').classList.add('d-none');
+
+                } catch (error) {
+                    console.error('Error loading collections:', error);
+                    document.getElementById('movie-collections-loading').classList.add('d-none');
+                    document.getElementById('show-collections-loading').classList.add('d-none');
+                }
+            }
+
+            function populateCollectionsDropdown(dropdownId, collections) {
+                const dropdown = document.getElementById(dropdownId);
+                
+                while (dropdown.children.length > 1) {
+                    dropdown.removeChild(dropdown.lastChild);
+                }
+
+                collections.forEach(collection => {
+                    const option = document.createElement('option');
+                    option.value = collection.key;
+                    option.textContent = `${collection.title} (${collection.childCount} items)`;
+                    option.dataset.collection = JSON.stringify(collection);
+                    dropdown.appendChild(option);
+                });
+            }
+
+            function buildCollectionPreviewHTML(collection) {
+                const typeIcon = collection.subtype === 'movie' ? '🎬' : '📺';
+                
+                return `
+                    <div class="collection-preview card my-3">
+                        <div class="card-header d-flex align-items-center">
+                            <span class="me-2" style="font-size: 1.2em;">${typeIcon}</span>
+                            <h5 class="mb-0">${collection.title}</h5>
+                            <span class="badge bg-secondary ms-auto">${collection.childCount} items</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    ${collection.thumb ? 
+                                        `<img src="${collection.thumb}" class="img-fluid rounded" alt="${collection.title}" style="max-height: 200px; object-fit: cover;">` :
+                                        `<div class="placeholder-image d-flex align-items-center justify-content-center bg-light rounded" style="height: 200px;">
+                                            <span class="text-muted">${typeIcon} No Poster</span>
+                                        </div>`
+                                    }
+                                </div>
+                                <div class="col-md-9">
+                                    <p><strong>Library:</strong> ${collection.sectionTitle}</p>
+                                    <p><strong>Type:</strong> ${collection.subtype.charAt(0).toUpperCase() + collection.subtype.slice(1)} Collection</p>
+                                    ${collection.summary ? `<p><strong>Description:</strong> ${collection.summary}</p>` : ''}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            document.getElementById('movie-collections-dropdown').addEventListener('change', function() {
+                const button = document.getElementById('add-movie-collection-btn');
+                
+                if (this.value) {
+                    button.disabled = false;
+                } else {
+                    button.disabled = true;
+                }
+                
+                document.getElementById('show-collections-dropdown').value = '';
+                document.getElementById('add-show-collection-btn').disabled = true;
+            });
+
+            document.getElementById('show-collections-dropdown').addEventListener('change', function() {
+                const button = document.getElementById('add-show-collection-btn');
+                
+                if (this.value) {
+                    button.disabled = false;
+                } else {
+                    button.disabled = true;
+                }
+                
+                document.getElementById('movie-collections-dropdown').value = '';
+                document.getElementById('add-movie-collection-btn').disabled = true;
+            });
+
+            document.getElementById('add-movie-collection-btn').addEventListener('click', function() {
+                const dropdown = document.getElementById('movie-collections-dropdown');
+                if (dropdown.value) {
+                    const collection = JSON.parse(dropdown.selectedOptions[0].dataset.collection);
+                    addCollectionItem(collection);
+                }
+            });
+
+            document.getElementById('add-show-collection-btn').addEventListener('click', function() {
+                const dropdown = document.getElementById('show-collections-dropdown');
+                if (dropdown.value) {
+                    const collection = JSON.parse(dropdown.selectedOptions[0].dataset.collection);
+                    addCollectionItem(collection);
+                }
+            });
+
+            function addCollectionItem(collection) {
+                const id = `collection-${collection.key}`;
+                const name = `${collection.title} Collection`;
+                const type = 'collection';
+                
+                if (selectedItems.some(item => item.id === id && item.type === type)) {
+                    console.log('Collection already added:', name);
+                    return;
+                }
+
+                const item = { 
+                    id, 
+                    name, 
+                    type, 
+                    collection: collection
+                };
+                
+                selectedItems.push(item);
+                updateSelectedItemsDisplay();
+                
+                document.getElementById('movie-collections-dropdown').value = '';
+                document.getElementById('show-collections-dropdown').value = '';
+                document.getElementById('add-movie-collection-btn').disabled = true;
+                document.getElementById('add-show-collection-btn').disabled = true;
+                
+                console.log('Added collection:', name);
+            }
+
+            document.addEventListener('DOMContentLoaded', loadCollections);
         </script>
     </div>
 </div>

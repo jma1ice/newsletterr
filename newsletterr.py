@@ -1,11 +1,11 @@
 import os, math, uuid, base64, smtplib, sqlite3, requests, time, threading, re, json, mimetypes, shutil, calendar, traceback, io
 from collections import defaultdict
-from datetime import datetime, timezone, timedelta
 from cryptography.fernet import Fernet, InvalidToken
+from datetime import datetime, timezone, timedelta
 from dotenv import load_dotenv, set_key, find_dotenv
-from email.mime.text import MIMEText
 from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from email.utils import make_msgid, formataddr
 from flask import Flask, render_template, request, jsonify, Response, redirect, url_for
 from pathlib import Path
@@ -15,8 +15,8 @@ from plex_api_client import PlexAPI
 from urllib.parse import quote_plus, urljoin
 
 app = Flask(__name__)
-app.jinja_env.globals["version"] = "v0.9.16"
-app.jinja_env.globals["publish_date"] = "September 18, 2025"
+app.jinja_env.globals["version"] = "v0.9.17"
+app.jinja_env.globals["publish_date"] = "September 27, 2025"
 
 def get_global_cache_status():
     try:
@@ -723,6 +723,7 @@ def calculate_next_send(frequency, start_date, send_time='09:00', last_sent=None
     
     if frequency == 'daily':
         next_date = base_date + timedelta(days=1)
+
     elif frequency == 'weekly':
         start_dt = datetime.fromisoformat(start_date)
         target_weekday = start_dt.weekday()
@@ -731,6 +732,37 @@ def calculate_next_send(frequency, start_date, send_time='09:00', last_sent=None
         if days_until_target == 0:
             days_until_target = 7
         next_date = base_date + timedelta(days=days_until_target)
+    
+    elif frequency == 'biweekly':
+        next_date = base_date + timedelta(days=14)
+
+    elif frequency == 'bimonthly':
+        start_dt = datetime.fromisoformat(start_date)
+
+        if start_dt.day <= 15:
+            target_days = [1, 15]
+        else:
+            target_days = [15, 1]
+        
+        current_month = base_date.month
+        current_year = base_date.year
+        current_day = base_date.day
+        
+        next_target_day = None
+        for day in target_days:
+            if day > current_day:
+                next_target_day = day
+                break
+        
+        if next_target_day:
+            next_date = datetime(current_year, current_month, next_target_day)
+        else:
+            next_month = current_month + 1
+            next_year = current_year
+            if next_month > 12:
+                next_month = 1
+                next_year += 1
+            next_date = datetime(next_year, next_month, target_days[0])
         
     elif frequency == 'monthly':
         start_dt = datetime.fromisoformat(start_date)
@@ -743,10 +775,70 @@ def calculate_next_send(frequency, start_date, send_time='09:00', last_sent=None
             next_year += 1
         
         last_day_of_month = calendar.monthrange(next_year, next_month)[1]
-        
         actual_day = min(target_day, last_day_of_month)
         
         next_date = datetime(next_year, next_month, actual_day)
+
+    elif frequency == 'bimonthly_interval':
+        start_dt = datetime.fromisoformat(start_date)
+        target_day = start_dt.day
+        
+        next_month = base_date.month + 2
+        next_year = base_date.year
+        while next_month > 12:
+            next_month -= 12
+            next_year += 1
+        
+        last_day_of_month = calendar.monthrange(next_year, next_month)[1]
+        actual_day = min(target_day, last_day_of_month)
+        
+        next_date = datetime(next_year, next_month, actual_day)
+        
+    elif frequency == 'quarterly':
+        start_dt = datetime.fromisoformat(start_date)
+        target_day = start_dt.day
+        
+        next_month = base_date.month + 3
+        next_year = base_date.year
+        while next_month > 12:
+            next_month -= 12
+            next_year += 1
+        
+        last_day_of_month = calendar.monthrange(next_year, next_month)[1]
+        actual_day = min(target_day, last_day_of_month)
+        
+        next_date = datetime(next_year, next_month, actual_day)
+        
+    elif frequency == 'biannually':
+        start_dt = datetime.fromisoformat(start_date)
+        target_day = start_dt.day
+        
+        next_month = base_date.month + 6
+        next_year = base_date.year
+        while next_month > 12:
+            next_month -= 12
+            next_year += 1
+        
+        last_day_of_month = calendar.monthrange(next_year, next_month)[1]
+        actual_day = min(target_day, last_day_of_month)
+        
+        next_date = datetime(next_year, next_month, actual_day)
+        
+    elif frequency == 'yearly':
+        start_dt = datetime.fromisoformat(start_date)
+        target_month = start_dt.month
+        target_day = start_dt.day
+        
+        next_year = base_date.year + 1
+        
+        if target_month == 2 and target_day == 29:
+            if not calendar.isleap(next_year):
+                target_day = 28
+        
+        last_day_of_month = calendar.monthrange(next_year, target_month)[1]
+        actual_day = min(target_day, last_day_of_month)
+        
+        next_date = datetime(next_year, target_month, actual_day)
         
     else:
         next_date = base_date + timedelta(days=1)
@@ -1222,7 +1314,6 @@ def _background_update_checker():
             time.sleep(app.config["UPDATE_CHECK_INTERVAL_SEC"])
 
 def get_stat_headers(title):
-    """Updated to match the exact logic from the dashboard template"""
     if title == "Most Watched Movies" or title == "Most Watched TV Shows":
         return ["Title", "Year", "Plays", "Hours Played", "Rating"]
     elif title == "Most Popular Movies" or title == "Most Popular TV Shows":
@@ -1360,15 +1451,19 @@ def convert_html_to_plain_text(html_content):
 
 def fetch_and_attach_image(image_url, msg_root, cid_name, base_url=""):
     try:
+        print(f"fetch_and_attach_image called with: {image_url}")
         if image_url.startswith('/'):
             full_url = urljoin(base_url or "http://127.0.0.1:6397", image_url)
         else:
             full_url = image_url
         
+        print(f"Final URL to fetch: {full_url}")
         response = requests.get(full_url, timeout=10)
+        print(f"Response status: {response.status_code}")
         response.raise_for_status()
         
         content_type = response.headers.get('Content-Type')
+        print(f"Content-Type: {content_type}")
         if not content_type or not content_type.startswith('image/'):
             content_type = mimetypes.guess_type(full_url)[0] or 'image/png'
         
@@ -1383,6 +1478,7 @@ def fetch_and_attach_image(image_url, msg_root, cid_name, base_url=""):
         img_part.add_header('Content-Disposition', 'inline', filename=f'{cid_name}.{subtype}')
         msg_root.attach(img_part)
         
+        print(f"Successfully attached image with CID: {cid}")
         return cid
         
     except Exception as e:
@@ -2061,6 +2157,362 @@ def build_recommendations_section_with_cids(available_items, unavailable_items, 
         </div>
     """
 
+def build_collections_html_with_cids(all_collections, msg_root, theme_colors, base_url=""):
+    if not all_collections:
+        return f"""
+        <div style="background-color: {theme_colors['card_bg']}; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid {theme_colors['border']}; font-family: 'IBM Plex Sans';">
+            <p style="text-align: center; color: {theme_colors['muted_text']}; padding: 20px; margin: 0; font-family: 'IBM Plex Sans';">No collections available.</p>
+        </div>
+        """
+    
+    items_html = ""
+    items_per_row = 5
+    
+    for i in range(0, len(all_collections), items_per_row):
+        row_items = all_collections[i:i + items_per_row]
+        
+        is_partial_row = len(row_items) < items_per_row
+        
+        if is_partial_row:
+            items_count = len(row_items)
+            
+            total_item_width = items_count * 140
+            
+            row_html = f'<tr><td colspan="{items_per_row}" style="text-align: center; padding: 8px;">'
+            row_html += '<table cellpadding="0" cellspacing="0" border="0" style="margin: 0 auto; border-collapse: separate;">'
+            row_html += '<tr>'
+            
+            for j, collection in enumerate(row_items):
+                if items_count == 1:
+                    cell_spacing = "0"
+                elif items_count == 2:
+                    cell_spacing = "60px" if j == 0 else "0"
+                elif items_count == 3:
+                    cell_spacing = "40px" if j < 2 else "0"
+                elif items_count == 4:
+                    cell_spacing = "20px" if j < 3 else "0"
+                else:
+                    cell_spacing = "8px" if j < items_count - 1 else "0"
+            
+                
+                print(f"Processing collection: {collection.get('title', 'Unknown')}")
+                print(f"Collection subtype: {collection.get('subtype', 'Unknown')}")
+                print(f"Collection thumb URL: {collection.get('thumb', 'No thumb')}")
+                print(f"Collection art URL: {collection.get('art', 'No art')}")
+                
+                poster_cid = None
+                poster_url = collection.get('thumb', '')
+                if poster_url:
+                    print(f"Attempting to fetch thumb image: {poster_url}")
+                    if poster_url.startswith('http'):
+                        poster_cid = fetch_and_attach_image(poster_url, msg_root, f"collection_{i}_{j}_thumb", base_url)
+                    else:
+                        full_poster_url = f"/proxy-art{poster_url if poster_url.startswith('/') else '/' + poster_url}"
+                        poster_cid = fetch_and_attach_image(full_poster_url, msg_root, f"collection_{i}_{j}_thumb", base_url)
+                    print(f"Thumb CID result: {poster_cid}")
+                
+                if not poster_cid:
+                    print("No thumb CID, trying art URL...")
+                    art_url = collection.get('art', '')
+                    if art_url:
+                        print(f"Attempting to fetch art image: {art_url}")
+                        if art_url.startswith('http'):
+                            poster_cid = fetch_and_attach_image(art_url, msg_root, f"collection_{i}_{j}_art", base_url)
+                        else:
+                            full_art_url = f"/proxy-art{art_url if art_url.startswith('/') else '/' + art_url}"
+                            poster_cid = fetch_and_attach_image(full_art_url, msg_root, f"collection_{i}_{j}_art", base_url)
+                        print(f"Art CID result: {poster_cid}")
+                
+                collection_title = collection.get('title', 'Unknown Collection')
+                count = collection.get('childCount', 0)
+                subtype = collection.get('subtype', 'unknown')
+                summary = collection.get('summary', '')
+                
+                type_icon = '🎬' if subtype == 'movie' else '📺'
+
+                if poster_cid:
+                    poster_bg_url = f"cid:{poster_cid}"
+                    print(f"Final poster src for {collection_title}: {poster_bg_url}")
+                    
+                    card_html = f"""
+                        <table cellpadding="0" cellspacing="0" border="0" style="
+                            background-color: {theme_colors['card_bg']};
+                            border-radius: 12px;
+                            width: 120px;
+                            margin: 0;
+                        ">
+                            <tr>
+                                <td style="
+                                    background-image: url('{poster_bg_url}');
+                                    background-size: cover;
+                                    background-position: center;
+                                    background-repeat: no-repeat;
+                                    height: 180px;
+                                    background-color: #f8f9fa;
+                                    border-radius: 12px;
+                                    position: relative;
+                                    vertical-align: top;
+                                ">
+                                    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+                                        <tr>
+                                            <td style="text-align: right;">
+                                                <div style="
+                                                    background-color: rgba(0, 0, 0, 0.8);
+                                                    color: white;
+                                                    padding: 4px 6px;
+                                                    border-radius: 4px;
+                                                    font-size: 10px;
+                                                    font-family: 'IBM Plex Sans';
+                                                    line-height: 1;
+                                                    display: inline-block;
+                                                    margin: 6px;
+                                                ">
+                                                    {type_icon} {count}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td style="height: 148px; vertical-align: bottom;">
+                                                <div style="
+                                                    background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent);
+                                                    border-radius: 0 0 11px 11px;
+                                                ">
+                                                    <div style="
+                                                        font-weight: bold;
+                                                        font-size: 12px;
+                                                        color: white;
+                                                        line-height: 1.2;
+                                                        font-family: 'IBM Plex Sans';
+                                                    ">{collection_title}</div>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                </td>
+                            </tr>
+                        </table>
+                    """
+                else:
+                    print(f"No valid image data for {collection_title}, using placeholder")
+                    card_html = f"""
+                        <table cellpadding="0" cellspacing="0" border="0" style="
+                            background-color: {theme_colors['card_bg']};
+                            border-radius: 12px;
+                            border: 1px solid {theme_colors['border']};
+                            width: 120px;
+                            height: 180px;
+                            margin: 0;
+                        ">
+                            <tr>
+                                <td style="
+                                    text-align: center;
+                                    vertical-align: middle;
+                                    padding: 12px;
+                                ">
+                                    <div style="
+                                        font-weight: bold;
+                                        font-size: 14px;
+                                        color: {theme_colors['text']};
+                                        margin-bottom: 8px;
+                                        font-family: 'IBM Plex Sans';
+                                        padding: 2px;
+                                    ">{collection_title}</div>
+                                    <div style="
+                                        font-size: 11px;
+                                        color: {theme_colors['muted_text']};
+                                        font-family: 'IBM Plex Sans';
+                                    ">{type_icon} {count} items</div>
+                                </td>
+                            </tr>
+                        </table>
+                    """
+                
+                row_html += f'<td style="vertical-align: top; padding-right: {cell_spacing};">{card_html}</td>'
+            
+            row_html += '</tr></table></td></tr>'
+            
+        else:
+            row_html = "<tr style='text-align: center;'>"
+            
+            for j, collection in enumerate(row_items):
+                print(f"Processing collection: {collection.get('title', 'Unknown')}")
+                print(f"Collection subtype: {collection.get('subtype', 'Unknown')}")
+                print(f"Collection thumb URL: {collection.get('thumb', 'No thumb')}")
+                print(f"Collection art URL: {collection.get('art', 'No art')}")
+                
+                poster_cid = None
+                poster_url = collection.get('thumb', '')
+                if poster_url:
+                    print(f"Attempting to fetch thumb image: {poster_url}")
+                    if poster_url.startswith('http'):
+                        poster_cid = fetch_and_attach_image(poster_url, msg_root, f"collection_{i}_{j}_thumb", base_url)
+                    else:
+                        full_poster_url = f"/proxy-art{poster_url if poster_url.startswith('/') else '/' + poster_url}"
+                        poster_cid = fetch_and_attach_image(full_poster_url, msg_root, f"collection_{i}_{j}_thumb", base_url)
+                    print(f"Thumb CID result: {poster_cid}")
+                
+                if not poster_cid:
+                    print("No thumb CID, trying art URL...")
+                    art_url = collection.get('art', '')
+                    if art_url:
+                        print(f"Attempting to fetch art image: {art_url}")
+                        if art_url.startswith('http'):
+                            poster_cid = fetch_and_attach_image(art_url, msg_root, f"collection_{i}_{j}_art", base_url)
+                        else:
+                            full_art_url = f"/proxy-art{art_url if art_url.startswith('/') else '/' + art_url}"
+                            poster_cid = fetch_and_attach_image(full_art_url, msg_root, f"collection_{i}_{j}_art", base_url)
+                        print(f"Art CID result: {poster_cid}")
+                
+                collection_title = collection.get('title', 'Unknown Collection')
+                count = collection.get('childCount', 0)
+                subtype = collection.get('subtype', 'unknown')
+                summary = collection.get('summary', '')
+                
+                type_icon = '🎬' if subtype == 'movie' else '📺'
+                
+                cell_style = f"""
+                    width: 20%;
+                    padding: 8px;
+                    vertical-align: top;
+                    font-family: 'IBM Plex Sans';
+                """
+
+                if poster_cid:
+                    poster_bg_url = f"cid:{poster_cid}"
+                    print(f"Final poster src for {collection_title}: {poster_bg_url}")
+                    
+                    card_html = f"""
+                        <table cellpadding="0" cellspacing="0" border="0" style="
+                            background-color: {theme_colors['card_bg']};
+                            border-radius: 12px;
+                            width: 120px;
+                            margin: 0 auto;
+                        ">
+                            <tr>
+                                <td style="
+                                    background-image: url('{poster_bg_url}');
+                                    background-size: cover;
+                                    background-position: center;
+                                    background-repeat: no-repeat;
+                                    height: 180px;
+                                    background-color: #f8f9fa;
+                                    border-radius: 12px;
+                                    position: relative;
+                                    vertical-align: top;
+                                ">
+                                    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+                                        <tr>
+                                            <td style="text-align: right;">
+                                                <div style="
+                                                    background-color: rgba(0, 0, 0, 0.8);
+                                                    color: white;
+                                                    padding: 4px 6px;
+                                                    border-radius: 4px;
+                                                    font-size: 10px;
+                                                    font-family: 'IBM Plex Sans';
+                                                    line-height: 1;
+                                                    display: inline-block;
+                                                    margin: 6px;
+                                                ">
+                                                    {type_icon} {count}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td style="height: 148px; vertical-align: bottom;">
+                                                <div style="
+                                                    background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent);
+                                                    border-radius: 0 0 11px 11px;
+                                                ">
+                                                    <div style="
+                                                        font-weight: bold;
+                                                        font-size: 12px;
+                                                        color: white;
+                                                        line-height: 1.2;
+                                                        font-family: 'IBM Plex Sans';
+                                                        padding: 2px;
+                                                    ">{collection_title}</div>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                </td>
+                            </tr>
+                        </table>
+                    """
+                else:
+                    print(f"No valid image data for {collection_title}, using placeholder")
+                    card_html = f"""
+                        <table cellpadding="0" cellspacing="0" border="0" style="
+                            background-color: {theme_colors['card_bg']};
+                            border-radius: 12px;
+                            border: 1px solid {theme_colors['border']};
+                            width: 120px;
+                            height: 180px;
+                            margin: 0 auto;
+                        ">
+                            <tr>
+                                <td style="
+                                    text-align: center;
+                                    vertical-align: middle;
+                                    padding: 12px;
+                                ">
+                                    <div style="
+                                        font-weight: bold;
+                                        font-size: 14px;
+                                        color: {theme_colors['text']};
+                                        margin-bottom: 8px;
+                                        font-family: 'IBM Plex Sans';
+                                    ">{collection_title}</div>
+                                    <div style="
+                                        font-size: 11px;
+                                        color: {theme_colors['muted_text']};
+                                        font-family: 'IBM Plex Sans';
+                                    ">{type_icon} {count} items</div>
+                                </td>
+                            </tr>
+                        </table>
+                    """
+                
+                row_html += f'<td style="{cell_style}">{card_html}</td>'
+            
+            row_html += "</tr>"
+        
+        items_html += row_html
+    
+    container_style = f"""
+        background-color: {theme_colors['card_bg']};
+        border-radius: 8px;
+        margin: 20px 0;
+        border: 1px solid {theme_colors['border']};
+        font-family: 'IBM Plex Sans';
+    """
+    
+    title_style = f"""
+        text-align: center;
+        color: {theme_colors['text']};
+        margin: 0 0 20px 0;
+        font-size: 24px;
+        font-weight: bold;
+        font-family: 'IBM Plex Sans';
+    """
+    
+    table_style = """
+        width: 100%;
+        border-collapse: collapse;
+        margin: 0;
+        padding: 0;
+    """
+    
+    return f"""
+        <div style="{container_style}">
+            <h2 style="{title_style}">Collections</h2>
+            <table cellpadding="0" cellspacing="0" border="0" style="{table_style}">
+                {items_html}
+            </table>
+        </div>
+    """
+
 def attach_logo_image(msg_root, logo_filename, base_url=""):
     logo_url = f"/static/img/{logo_filename}"
     return fetch_and_attach_image(logo_url, msg_root, "logo", base_url)
@@ -2083,6 +2535,7 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, recom
     if email_text.strip():
         content_html += build_text_block_html(email_text, 'textblock', theme_colors)
     
+    all_collections = []
     for item in selected_items:
         item_type = item.get('type', '')
         
@@ -2114,7 +2567,15 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, recom
                         content_html += build_recommendations_html_with_cids(filtered_recommendations, msg_root, theme_colors, filtered_user_dict, base_url)
                 else:
                     content_html += build_recommendations_html_with_cids(recommendations_data, msg_root, theme_colors, user_dict, base_url)
-    
+        
+        elif item_type == 'collection':
+            collection_data = item.get('collection', {})
+            if collection_data:
+                all_collections.append(collection_data)
+
+    if all_collections:
+        content_html += build_collections_html_with_cids(all_collections, msg_root, theme_colors, base_url)
+
     return build_complete_email_html_with_cid_logo(content_html, server_name, subject, logo_src, logo_width, is_scheduled)
 
 def build_complete_email_html_with_cid_logo(content_html, server_name, subject, logo_src, logo_width, is_scheduled=False):
@@ -3210,54 +3671,18 @@ def index():
     users = None
     user_dict = {}
     graph_commands = [
-        {
-            'command' : 'get_concurrent_streams_by_stream_type',
-            'name' : 'Stream Type'
-        },
-        {
-            'command' : 'get_plays_by_date',
-            'name' : 'Plays by Date'
-        },
-        {
-            'command' : 'get_plays_by_dayofweek',
-            'name' : 'Plays by Day'
-        },
-        {
-            'command' : 'get_plays_by_hourofday',
-            'name' : 'Plays by Hour'
-        },
-        {
-            'command' : 'get_plays_by_source_resolution',
-            'name' : 'Plays by Source Res'
-        },
-        {
-            'command' : 'get_plays_by_stream_resolution',
-            'name' : 'Plays by Stream Res'
-        },
-        {
-            'command' : 'get_plays_by_stream_type',
-            'name' : 'Plays by Stream Type'
-        },
-        {
-            'command' : 'get_plays_by_top_10_platforms',
-            'name' : 'Plays by Top Platforms'
-        },
-        {
-            'command' : 'get_plays_by_top_10_users',
-            'name' : 'Plays by Top Users'
-        },
-        {
-            'command' : 'get_plays_per_month',
-            'name' : 'Plays per Month'
-        },
-        {
-            'command' : 'get_stream_type_by_top_10_platforms',
-            'name' : 'Stream Type by Top Platforms'
-        },
-        {
-            'command' : 'get_stream_type_by_top_10_users',
-            'name' : 'Stream Type by Top Users'
-        }
+        { 'command' : 'get_concurrent_streams_by_stream_type', 'name' : 'Stream Type' },
+        { 'command' : 'get_plays_by_date', 'name' : 'Plays by Date' },
+        { 'command' : 'get_plays_by_dayofweek', 'name' : 'Plays by Day' },
+        { 'command' : 'get_plays_by_hourofday', 'name' : 'Plays by Hour' },
+        { 'command' : 'get_plays_by_source_resolution', 'name' : 'Plays by Source Res' },
+        { 'command' : 'get_plays_by_stream_resolution', 'name' : 'Plays by Stream Res' },
+        { 'command' : 'get_plays_by_stream_type', 'name' : 'Plays by Stream Type' },
+        { 'command' : 'get_plays_by_top_10_platforms', 'name' : 'Plays by Top Platforms' },
+        { 'command' : 'get_plays_by_top_10_users', 'name' : 'Plays by Top Users' },
+        { 'command' : 'get_plays_per_month', 'name' : 'Plays per Month' },
+        { 'command' : 'get_stream_type_by_top_10_platforms', 'name' : 'Stream Type by Top Platforms' },
+        { 'command' : 'get_stream_type_by_top_10_users', 'name' : 'Stream Type by Top Users' }
     ]
     recent_commands = [
         { 'command' : 'movie' },
@@ -3467,6 +3892,78 @@ def proxy_img():
     r = requests.get(url, timeout=15)
     ct = r.headers.get("Content-Type", "image/jpeg")
     return Response(r.content, headers={"Content-Type": ct, "Cache-Control": "public, max-age=86400"})
+
+@app.route('/fetch_collections/<collection_type>', methods=['GET'])
+def fetch_collections(collection_type):
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT plex_url, plex_token FROM settings WHERE id = 1")
+        row = cursor.fetchone()
+        conn.close()
+
+        if not row or not row[0] or not row[1]:
+            return jsonify({"status": "error", "message": "Plex connection not configured"})
+
+        plex_url = row[0].rstrip('/')
+        plex_token = row[1]
+
+        sections_url = f"{plex_url}/library/sections"
+        
+        sections_response = requests.get(
+            sections_url,
+            headers={"X-Plex-Token": decrypt(plex_token), "Accept": "application/json"},
+            timeout = 10
+        )
+        if sections_response.status_code != 200:
+            return jsonify({"status": "error", "message": "Failed to fetch library sections"})
+
+        sections_data = sections_response.json()
+        collections = []
+
+        target_type = "movie" if collection_type == "movies" else "show"  # test if this puts audio collections into show section
+        
+        for section in sections_data.get("MediaContainer", {}).get("Directory", []):
+            if section.get("type") == target_type:
+                section_id = section.get("key")
+                section_title = section.get("title", "Unknown Library")
+                
+                collections_url = f"{plex_url}/library/sections/{section_id}/collections"
+                collections_response = requests.get(collections_url, headers={"X-Plex-Token": decrypt(plex_token), "Accept": "application/json"}, timeout=10)
+                
+                if collections_response.status_code == 200:
+                    collections_data = collections_response.json()
+                    
+                    for collection in collections_data.get("MediaContainer", {}).get("Metadata", []):
+                        thumb = collection.get("thumb", "")
+                        if thumb and not thumb.startswith("http"):
+                            thumb = f"{plex_url}{thumb}?X-Plex-Token={decrypt(plex_token)}"
+                        
+                        art = collection.get("art", "")
+                        if art and not art.startswith("http"):
+                            art = f"{plex_url}{art}?X-Plex-Token={decrypt(plex_token)}"
+                        
+                        collections.append({
+                            "key": collection.get("ratingKey"),
+                            "title": collection.get("title", "Unknown Collection"),
+                            "summary": collection.get("summary", ""),
+                            "thumb": thumb,
+                            "art": art,
+                            "childCount": collection.get("childCount", 0),
+                            "subtype": collection.get("subtype", target_type),
+                            "sectionTitle": section_title,
+                            "sectionId": section_id
+                        })
+
+        return jsonify({
+            "status": "success", 
+            "collections": collections,
+            "type": collection_type
+        })
+
+    except Exception as e:
+        print(f"Error fetching collections: {e}")
+        return jsonify({"status": "error", "message": str(e)})
 
 @app.route('/pull_recommendations', methods=['POST'])
 def pull_recommendations():
@@ -4349,39 +4846,128 @@ def get_calendar_data():
             
             current_date = schedule_start
             
-            if frequency == 'weekly' and current_date < start_date:
-                weeks_to_skip = (start_date - current_date).days // 7
-                current_date += timedelta(weeks=weeks_to_skip)
-                
-                target_weekday = schedule_start.weekday()
-                days_ahead = (target_weekday - current_date.weekday()) % 7
-                current_date += timedelta(days=days_ahead)
-                
-                if current_date < start_date:
-                    current_date += timedelta(days=7)
-            
-            elif frequency == 'monthly' and current_date < start_date:
-                target_day = schedule_start.day
-                current_date = datetime(year, month, min(target_day, calendar.monthrange(year, month)[1]))
-            
-            while current_date <= end_date:
-                if current_date >= start_date and current_date >= schedule_start:
-                    date_key = current_date.strftime('%Y-%m-%d')
-                    if date_key not in calendar_data:
-                        calendar_data[date_key] = []
+            if current_date < start_date:
+                if frequency == 'weekly':
+                    weeks_to_skip = (start_date - current_date).days // 7
+                    current_date += timedelta(weeks=weeks_to_skip)
                     
-                    calendar_data[date_key].append({
-                        'id': schedule_id,
-                        'name': name,
-                        'time': send_time or '09:00',
-                        'frequency': frequency,
-                        'template_id': template_id
-                    })
+                    target_weekday = schedule_start.weekday()
+                    days_ahead = (target_weekday - current_date.weekday()) % 7
+                    current_date += timedelta(days=days_ahead)
+                    
+                    if current_date < start_date:
+                        current_date += timedelta(days=7)
+
+                elif frequency == 'biweekly':
+                    weeks_to_skip = ((start_date - current_date).days // 14) * 2
+                    current_date += timedelta(weeks=weeks_to_skip)
+                    
+                    target_weekday = schedule_start.weekday()
+                    days_ahead = (target_weekday - current_date.weekday()) % 7
+                    current_date += timedelta(days=days_ahead)
+                    
+                    if current_date < start_date:
+                        current_date += timedelta(days=14)
+                
+                elif frequency in ['monthly', 'bimonthly_interval', 'quarterly', 'biannually', 'yearly']:
+                    target_day = schedule_start.day
+                    target_month = schedule_start.month
+                    
+                    if frequency == 'monthly':
+                        current_date = datetime(year, month, min(target_day, calendar.monthrange(year, month)[1]))
+
+                    elif frequency == 'bimonthly_interval':
+                        months_diff = (year - schedule_start.year) * 12 + (month - target_month)
+                        cycle_position = months_diff % 2
+                        if cycle_position == 0:
+                            current_date = datetime(year, month, min(target_day, calendar.monthrange(year, month)[1]))
+                        else:
+                            continue
+
+                    elif frequency == 'quarterly':
+                        months_diff = (year - schedule_start.year) * 12 + (month - target_month)
+                        cycle_position = months_diff % 3
+                        if cycle_position == 0:
+                            current_date = datetime(year, month, min(target_day, calendar.monthrange(year, month)[1]))
+                        else:
+                            continue
+
+                    elif frequency == 'biannually':
+                        months_diff = (year - schedule_start.year) * 12 + (month - target_month)
+                        cycle_position = months_diff % 6
+                        if cycle_position == 0:
+                            current_date = datetime(year, month, min(target_day, calendar.monthrange(year, month)[1]))
+                        else:
+                            continue
+
+                    elif frequency == 'yearly':
+                        if month == target_month:
+                            if target_month == 2 and target_day == 29 and not calendar.isleap(year):
+                                actual_day = 28
+                            else:
+                                actual_day = min(target_day, calendar.monthrange(year, month)[1])
+                            current_date = datetime(year, month, actual_day)
+                        else:
+                            continue
+                            
+                elif frequency == 'bimonthly':
+                    if schedule_start.day <= 15:
+                        target_days = [1, 15]
+                    else:
+                        target_days = [15, 1]
+                    current_date = datetime(year, month, 1)
+            
+            iteration_count = 0
+            max_iterations = 50
+
+            while current_date <= end_date and iteration_count < max_iterations:
+                iteration_count += 1
+
+                if current_date >= start_date and current_date >= schedule_start:
+                    if frequency == 'bimonthly':
+                        if schedule_start.day <= 15:
+                            target_days = [1, 15]
+                        else:
+                            target_days = [15, 1]
+                        
+                        for target_day in target_days:
+                            if target_day >= current_date.day:
+                                target_date = current_date.replace(day=target_day)
+                                if start_date <= target_date <= end_date:
+                                    date_key = target_date.strftime('%Y-%m-%d')
+                                    if date_key not in calendar_data:
+                                        calendar_data[date_key] = []
+                                    
+                                    calendar_data[date_key].append({
+                                        'id': schedule_id,
+                                        'name': name,
+                                        'time': send_time or '09:00',
+                                        'frequency': frequency,
+                                        'template_id': template_id
+                                    })
+                        break
+                    else:
+                        date_key = current_date.strftime('%Y-%m-%d')
+                        if date_key not in calendar_data:
+                            calendar_data[date_key] = []
+                        
+                        calendar_data[date_key].append({
+                            'id': schedule_id,
+                            'name': name,
+                            'time': send_time or '09:00',
+                            'frequency': frequency,
+                            'template_id': template_id
+                        })
                 
                 if frequency == 'daily':
                     current_date += timedelta(days=1)
+
                 elif frequency == 'weekly':
                     current_date += timedelta(days=7)
+
+                elif frequency == 'biweekly':
+                    current_date += timedelta(days=14)
+
                 elif frequency == 'monthly':
                     target_day = schedule_start.day
                     if current_date.month == 12:
@@ -4394,6 +4980,59 @@ def get_calendar_data():
                     last_day_of_month = calendar.monthrange(next_year, next_month)[1]
                     actual_day = min(target_day, last_day_of_month)
                     current_date = current_date.replace(year=next_year, month=next_month, day=actual_day)
+
+                elif frequency == 'bimonthly_interval':
+                    target_day = schedule_start.day
+                    next_month = current_date.month + 2
+                    next_year = current_date.year
+                    while next_month > 12:
+                        next_month -= 12
+                        next_year += 1
+                    
+                    last_day_of_month = calendar.monthrange(next_year, next_month)[1]
+                    actual_day = min(target_day, last_day_of_month)
+                    current_date = current_date.replace(year=next_year, month=next_month, day=actual_day)
+
+                elif frequency == 'quarterly':
+                    target_day = schedule_start.day
+                    next_month = current_date.month + 3
+                    next_year = current_date.year
+                    while next_month > 12:
+                        next_month -= 12
+                        next_year += 1
+                    
+                    last_day_of_month = calendar.monthrange(next_year, next_month)[1]
+                    actual_day = min(target_day, last_day_of_month)
+                    current_date = current_date.replace(year=next_year, month=next_month, day=actual_day)
+
+                elif frequency == 'biannually':
+                    target_day = schedule_start.day
+                    next_month = current_date.month + 6
+                    next_year = current_date.year
+                    while next_month > 12:
+                        next_month -= 12
+                        next_year += 1
+                    
+                    last_day_of_month = calendar.monthrange(next_year, next_month)[1]
+                    actual_day = min(target_day, last_day_of_month)
+                    current_date = current_date.replace(year=next_year, month=next_month, day=actual_day)
+
+                elif frequency == 'yearly':
+                    target_day = schedule_start.day
+                    target_month = schedule_start.month
+                    next_year = current_date.year + 1
+                    
+                    if target_month == 2 and target_day == 29 and not calendar.isleap(next_year):
+                        actual_day = 28
+                    else:
+                        last_day_of_month = calendar.monthrange(next_year, target_month)[1]
+                        actual_day = min(target_day, last_day_of_month)
+                    
+                    current_date = datetime(next_year, target_month, actual_day)
+
+                elif frequency == 'bimonthly':
+                    break
+                
                 else:
                     break
         

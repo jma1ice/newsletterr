@@ -16,7 +16,7 @@ from urllib.parse import quote_plus, urljoin
 
 app = Flask(__name__)
 app.jinja_env.globals["version"] = "v0.9.17"
-app.jinja_env.globals["publish_date"] = "September 25, 2025"
+app.jinja_env.globals["publish_date"] = "September 27, 2025"
 
 def get_global_cache_status():
     try:
@@ -2157,147 +2157,358 @@ def build_recommendations_section_with_cids(available_items, unavailable_items, 
         </div>
     """
 
-def build_collections_html_with_cids(collections_data, title, msg_root, theme_colors, base_url=""):
-    if not collections_data:
-        return ""
+def build_collections_html_with_cids(all_collections, msg_root, theme_colors, base_url=""):
+    if not all_collections:
+        return f"""
+        <div style="background-color: {theme_colors['card_bg']}; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid {theme_colors['border']}; font-family: 'IBM Plex Sans';">
+            <p style="text-align: center; color: {theme_colors['muted_text']}; padding: 20px; margin: 0; font-family: 'IBM Plex Sans';">No collections available.</p>
+        </div>
+        """
     
-    section_title_style = f"""
-        color: {theme_colors['text_color']};
+    items_html = ""
+    items_per_row = 5
+    
+    for i in range(0, len(all_collections), items_per_row):
+        row_items = all_collections[i:i + items_per_row]
+        
+        is_partial_row = len(row_items) < items_per_row
+        
+        if is_partial_row:
+            items_count = len(row_items)
+            
+            total_item_width = items_count * 140
+            
+            row_html = f'<tr><td colspan="{items_per_row}" style="text-align: center; padding: 8px;">'
+            row_html += '<table cellpadding="0" cellspacing="0" border="0" style="margin: 0 auto; border-collapse: separate;">'
+            row_html += '<tr>'
+            
+            for j, collection in enumerate(row_items):
+                if items_count == 1:
+                    cell_spacing = "0"
+                elif items_count == 2:
+                    cell_spacing = "60px" if j == 0 else "0"
+                elif items_count == 3:
+                    cell_spacing = "40px" if j < 2 else "0"
+                elif items_count == 4:
+                    cell_spacing = "20px" if j < 3 else "0"
+                else:
+                    cell_spacing = "8px" if j < items_count - 1 else "0"
+            
+                
+                print(f"Processing collection: {collection.get('title', 'Unknown')}")
+                print(f"Collection subtype: {collection.get('subtype', 'Unknown')}")
+                print(f"Collection thumb URL: {collection.get('thumb', 'No thumb')}")
+                print(f"Collection art URL: {collection.get('art', 'No art')}")
+                
+                poster_cid = None
+                poster_url = collection.get('thumb', '')
+                if poster_url:
+                    print(f"Attempting to fetch thumb image: {poster_url}")
+                    if poster_url.startswith('http'):
+                        poster_cid = fetch_and_attach_image(poster_url, msg_root, f"collection_{i}_{j}_thumb", base_url)
+                    else:
+                        full_poster_url = f"/proxy-art{poster_url if poster_url.startswith('/') else '/' + poster_url}"
+                        poster_cid = fetch_and_attach_image(full_poster_url, msg_root, f"collection_{i}_{j}_thumb", base_url)
+                    print(f"Thumb CID result: {poster_cid}")
+                
+                if not poster_cid:
+                    print("No thumb CID, trying art URL...")
+                    art_url = collection.get('art', '')
+                    if art_url:
+                        print(f"Attempting to fetch art image: {art_url}")
+                        if art_url.startswith('http'):
+                            poster_cid = fetch_and_attach_image(art_url, msg_root, f"collection_{i}_{j}_art", base_url)
+                        else:
+                            full_art_url = f"/proxy-art{art_url if art_url.startswith('/') else '/' + art_url}"
+                            poster_cid = fetch_and_attach_image(full_art_url, msg_root, f"collection_{i}_{j}_art", base_url)
+                        print(f"Art CID result: {poster_cid}")
+                
+                collection_title = collection.get('title', 'Unknown Collection')
+                count = collection.get('childCount', 0)
+                subtype = collection.get('subtype', 'unknown')
+                summary = collection.get('summary', '')
+                
+                type_icon = '🎬' if subtype == 'movie' else '📺'
+
+                if poster_cid:
+                    poster_bg_url = f"cid:{poster_cid}"
+                    print(f"Final poster src for {collection_title}: {poster_bg_url}")
+                    
+                    card_html = f"""
+                        <table cellpadding="0" cellspacing="0" border="0" style="
+                            background-color: {theme_colors['card_bg']};
+                            border-radius: 12px;
+                            width: 120px;
+                            margin: 0;
+                        ">
+                            <tr>
+                                <td style="
+                                    background-image: url('{poster_bg_url}');
+                                    background-size: cover;
+                                    background-position: center;
+                                    background-repeat: no-repeat;
+                                    height: 180px;
+                                    background-color: #f8f9fa;
+                                    border-radius: 12px;
+                                    position: relative;
+                                    vertical-align: top;
+                                ">
+                                    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+                                        <tr>
+                                            <td style="text-align: right;">
+                                                <div style="
+                                                    background-color: rgba(0, 0, 0, 0.8);
+                                                    color: white;
+                                                    padding: 4px 6px;
+                                                    border-radius: 4px;
+                                                    font-size: 10px;
+                                                    font-family: 'IBM Plex Sans';
+                                                    line-height: 1;
+                                                    display: inline-block;
+                                                    margin: 6px;
+                                                ">
+                                                    {type_icon} {count}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td style="height: 148px; vertical-align: bottom;">
+                                                <div style="
+                                                    background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent);
+                                                    border-radius: 0 0 11px 11px;
+                                                ">
+                                                    <div style="
+                                                        font-weight: bold;
+                                                        font-size: 12px;
+                                                        color: white;
+                                                        line-height: 1.2;
+                                                        font-family: 'IBM Plex Sans';
+                                                    ">{collection_title}</div>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                </td>
+                            </tr>
+                        </table>
+                    """
+                else:
+                    print(f"No valid image data for {collection_title}, using placeholder")
+                    card_html = f"""
+                        <table cellpadding="0" cellspacing="0" border="0" style="
+                            background-color: {theme_colors['card_bg']};
+                            border-radius: 12px;
+                            border: 1px solid {theme_colors['border']};
+                            width: 120px;
+                            height: 180px;
+                            margin: 0;
+                        ">
+                            <tr>
+                                <td style="
+                                    text-align: center;
+                                    vertical-align: middle;
+                                    padding: 12px;
+                                ">
+                                    <div style="
+                                        font-weight: bold;
+                                        font-size: 14px;
+                                        color: {theme_colors['text']};
+                                        margin-bottom: 8px;
+                                        font-family: 'IBM Plex Sans';
+                                        padding: 2px;
+                                    ">{collection_title}</div>
+                                    <div style="
+                                        font-size: 11px;
+                                        color: {theme_colors['muted_text']};
+                                        font-family: 'IBM Plex Sans';
+                                    ">{type_icon} {count} items</div>
+                                </td>
+                            </tr>
+                        </table>
+                    """
+                
+                row_html += f'<td style="vertical-align: top; padding-right: {cell_spacing};">{card_html}</td>'
+            
+            row_html += '</tr></table></td></tr>'
+            
+        else:
+            row_html = "<tr style='text-align: center;'>"
+            
+            for j, collection in enumerate(row_items):
+                print(f"Processing collection: {collection.get('title', 'Unknown')}")
+                print(f"Collection subtype: {collection.get('subtype', 'Unknown')}")
+                print(f"Collection thumb URL: {collection.get('thumb', 'No thumb')}")
+                print(f"Collection art URL: {collection.get('art', 'No art')}")
+                
+                poster_cid = None
+                poster_url = collection.get('thumb', '')
+                if poster_url:
+                    print(f"Attempting to fetch thumb image: {poster_url}")
+                    if poster_url.startswith('http'):
+                        poster_cid = fetch_and_attach_image(poster_url, msg_root, f"collection_{i}_{j}_thumb", base_url)
+                    else:
+                        full_poster_url = f"/proxy-art{poster_url if poster_url.startswith('/') else '/' + poster_url}"
+                        poster_cid = fetch_and_attach_image(full_poster_url, msg_root, f"collection_{i}_{j}_thumb", base_url)
+                    print(f"Thumb CID result: {poster_cid}")
+                
+                if not poster_cid:
+                    print("No thumb CID, trying art URL...")
+                    art_url = collection.get('art', '')
+                    if art_url:
+                        print(f"Attempting to fetch art image: {art_url}")
+                        if art_url.startswith('http'):
+                            poster_cid = fetch_and_attach_image(art_url, msg_root, f"collection_{i}_{j}_art", base_url)
+                        else:
+                            full_art_url = f"/proxy-art{art_url if art_url.startswith('/') else '/' + art_url}"
+                            poster_cid = fetch_and_attach_image(full_art_url, msg_root, f"collection_{i}_{j}_art", base_url)
+                        print(f"Art CID result: {poster_cid}")
+                
+                collection_title = collection.get('title', 'Unknown Collection')
+                count = collection.get('childCount', 0)
+                subtype = collection.get('subtype', 'unknown')
+                summary = collection.get('summary', '')
+                
+                type_icon = '🎬' if subtype == 'movie' else '📺'
+                
+                cell_style = f"""
+                    width: 20%;
+                    padding: 8px;
+                    vertical-align: top;
+                    font-family: 'IBM Plex Sans';
+                """
+
+                if poster_cid:
+                    poster_bg_url = f"cid:{poster_cid}"
+                    print(f"Final poster src for {collection_title}: {poster_bg_url}")
+                    
+                    card_html = f"""
+                        <table cellpadding="0" cellspacing="0" border="0" style="
+                            background-color: {theme_colors['card_bg']};
+                            border-radius: 12px;
+                            width: 120px;
+                            margin: 0 auto;
+                        ">
+                            <tr>
+                                <td style="
+                                    background-image: url('{poster_bg_url}');
+                                    background-size: cover;
+                                    background-position: center;
+                                    background-repeat: no-repeat;
+                                    height: 180px;
+                                    background-color: #f8f9fa;
+                                    border-radius: 12px;
+                                    position: relative;
+                                    vertical-align: top;
+                                ">
+                                    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+                                        <tr>
+                                            <td style="text-align: right;">
+                                                <div style="
+                                                    background-color: rgba(0, 0, 0, 0.8);
+                                                    color: white;
+                                                    padding: 4px 6px;
+                                                    border-radius: 4px;
+                                                    font-size: 10px;
+                                                    font-family: 'IBM Plex Sans';
+                                                    line-height: 1;
+                                                    display: inline-block;
+                                                    margin: 6px;
+                                                ">
+                                                    {type_icon} {count}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td style="height: 148px; vertical-align: bottom;">
+                                                <div style="
+                                                    background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent);
+                                                    border-radius: 0 0 11px 11px;
+                                                ">
+                                                    <div style="
+                                                        font-weight: bold;
+                                                        font-size: 12px;
+                                                        color: white;
+                                                        line-height: 1.2;
+                                                        font-family: 'IBM Plex Sans';
+                                                        padding: 2px;
+                                                    ">{collection_title}</div>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                </td>
+                            </tr>
+                        </table>
+                    """
+                else:
+                    print(f"No valid image data for {collection_title}, using placeholder")
+                    card_html = f"""
+                        <table cellpadding="0" cellspacing="0" border="0" style="
+                            background-color: {theme_colors['card_bg']};
+                            border-radius: 12px;
+                            border: 1px solid {theme_colors['border']};
+                            width: 120px;
+                            height: 180px;
+                            margin: 0 auto;
+                        ">
+                            <tr>
+                                <td style="
+                                    text-align: center;
+                                    vertical-align: middle;
+                                    padding: 12px;
+                                ">
+                                    <div style="
+                                        font-weight: bold;
+                                        font-size: 14px;
+                                        color: {theme_colors['text']};
+                                        margin-bottom: 8px;
+                                        font-family: 'IBM Plex Sans';
+                                    ">{collection_title}</div>
+                                    <div style="
+                                        font-size: 11px;
+                                        color: {theme_colors['muted_text']};
+                                        font-family: 'IBM Plex Sans';
+                                    ">{type_icon} {count} items</div>
+                                </td>
+                            </tr>
+                        </table>
+                    """
+                
+                row_html += f'<td style="{cell_style}">{card_html}</td>'
+            
+            row_html += "</tr>"
+        
+        items_html += row_html
+    
+    container_style = f"""
+        background-color: {theme_colors['card_bg']};
+        border-radius: 8px;
+        margin: 20px 0;
+        border: 1px solid {theme_colors['border']};
         font-family: 'IBM Plex Sans';
-        font-size: 24px;
-        font-weight: 700;
-        margin: 30px 0 20px 0;
-        padding-bottom: 10px;
-        border-bottom: 2px solid {theme_colors['accent_color']};
-        text-align: center;
-        line-height: 1.2;
     """
     
-    collections_html = []
-    for collection in collections_data:
-        print(f"Processing collection: {collection.get('title', 'Unknown')}")
-        print(f"Collection subtype: {collection.get('subtype', 'Unknown')}")
-        print(f"Collection thumb URL: {collection.get('thumb', 'No thumb')}")
-        print(f"Collection art URL: {collection.get('art', 'No art')}")
-        
-        poster_url = collection.get('thumb', '')
-        collection_cid = None
-        if poster_url:
-            print(f"Attempting to fetch thumb image: {poster_url}")
-            if poster_url.startswith('http'):
-                collection_cid = fetch_and_attach_image(poster_url, msg_root, f"collection_{hash(poster_url)}", base_url)
-            else:
-                full_poster_url = f"/proxy-art{poster_url if poster_url.startswith('/') else '/' + poster_url}"
-                collection_cid = fetch_and_attach_image(full_poster_url, msg_root, f"collection_{hash(poster_url)}", base_url)
-            print(f"Thumb CID result: {collection_cid}")
-        
-        if not collection_cid:
-            print("No thumb CID, trying art URL...")
-            art_url = collection.get('art', '')
-            if art_url:
-                print(f"Attempting to fetch art image: {art_url}")
-                if art_url.startswith('http'):
-                    collection_cid = fetch_and_attach_image(art_url, msg_root, f"collection_{hash(art_url)}", base_url)
-                else:
-                    full_art_url = f"/proxy-art{art_url if art_url.startswith('/') else '/' + art_url}"
-                    collection_cid = fetch_and_attach_image(full_art_url, msg_root, f"collection_{hash(art_url)}", base_url)
-                print(f"Art CID result: {collection_cid}")
-        
-        poster_src = f"cid:{collection_cid}" if collection_cid else "/static/img/Asset_94x.png"
-        print(f"Final poster src for {collection.get('title')}: {poster_src}")
-        print("---")
-        
-        collection_title = collection.get('title', 'Unknown Collection')
-        count = collection.get('childCount', 0)
-        subtype = collection.get('subtype', 'unknown')
-        type_icon = '🎬' if subtype == 'movie' else '📺'
-        
-        collection_url = "#"
-        
-        collection_html = f"""
-            <td style="width: 33.33%; vertical-align: top; padding: 12px;">
-                <div style="
-                    position: relative;
-                    border-radius: 8px;
-                    overflow: hidden;
-                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-                    background: #1a1a1a;
-                    transition: transform 0.2s ease;
-                ">
-                    <img src="{poster_src}" 
-                         alt="{collection_title}"
-                         style="
-                             width: 100%;
-                             height: 400px;
-                             object-fit: cover;
-                             display: block;
-                             aspect-ratio: 2/3;
-                         ">
-                    <div style="
-                        position: absolute;
-                        top: 12px;
-                        right: 12px;
-                        background: rgba(0, 0, 0, 0.8);
-                        color: white;
-                        padding: 6px 12px;
-                        border-radius: 4px;
-                        font-size: 14px;
-                        font-weight: bold;
-                        font-family: 'IBM Plex Sans';
-                    ">
-                        {type_icon} {count}
-                    </div>
-                    <div style="
-                        position: absolute;
-                        bottom: 0;
-                        left: 0;
-                        right: 0;
-                        padding: 12px;
-                        background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent);
-                    ">
-                        <div style="
-                            font-weight: bold;
-                            font-size: 14px;
-                            color: white;
-                            line-height: 1.2;
-                            font-family: 'IBM Plex Sans';
-                            overflow: hidden;
-                            text-overflow: ellipsis;
-                            display: -webkit-box;
-                            -webkit-line-clamp: 2;
-                            -webkit-box-orient: vertical;
-                        ">
-                            {collection_title}
-                        </div>
-                    </div>
-                </div>
-            </td>
-        """
-        collections_html.append(collection_html)
+    title_style = f"""
+        text-align: center;
+        color: {theme_colors['text']};
+        margin: 0 0 20px 0;
+        font-size: 24px;
+        font-weight: bold;
+        font-family: 'IBM Plex Sans';
+    """
     
-    rows_html = []
-    for i in range(0, len(collections_html), 3):
-        row_collections = collections_html[i:i+3]
-        while len(row_collections) < 3:
-            row_collections.append('<td style="width: 33.33%; padding: 12px;"></td>')
-        
-        row_html = f"""
-            <tr>
-                {''.join(row_collections)}
-            </tr>
-        """
-        rows_html.append(row_html)
+    table_style = """
+        width: 100%;
+        border-collapse: collapse;
+        margin: 0;
+        padding: 0;
+    """
     
     return f"""
-        <div style="margin: 20px 0;">
-            <h3 style="{section_title_style}">{title}</h3>
-            <table style="
-                width: 100%;
-                border-collapse: collapse;
-                margin: 0;
-                padding: 0;
-            ">
-                {''.join(rows_html)}
+        <div style="{container_style}">
+            <h2 style="{title_style}">Collections</h2>
+            <table cellpadding="0" cellspacing="0" border="0" style="{table_style}">
+                {items_html}
             </table>
         </div>
     """
@@ -2324,6 +2535,7 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, recom
     if email_text.strip():
         content_html += build_text_block_html(email_text, 'textblock', theme_colors)
     
+    all_collections = []
     for item in selected_items:
         item_type = item.get('type', '')
         
@@ -2359,9 +2571,11 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, recom
         elif item_type == 'collection':
             collection_data = item.get('collection', {})
             if collection_data:
-                collection_title = f"{collection_data.get('title', 'Unknown')} Collection"
-                content_html += build_collections_html_with_cids([collection_data], collection_title, msg_root, theme_colors, base_url)
-    
+                all_collections.append(collection_data)
+
+    if all_collections:
+        content_html += build_collections_html_with_cids(all_collections, msg_root, theme_colors, base_url)
+
     return build_complete_email_html_with_cid_logo(content_html, server_name, subject, logo_src, logo_width, is_scheduled)
 
 def build_complete_email_html_with_cid_logo(content_html, server_name, subject, logo_src, logo_width, is_scheduled=False):
@@ -3457,54 +3671,18 @@ def index():
     users = None
     user_dict = {}
     graph_commands = [
-        {
-            'command' : 'get_concurrent_streams_by_stream_type',
-            'name' : 'Stream Type'
-        },
-        {
-            'command' : 'get_plays_by_date',
-            'name' : 'Plays by Date'
-        },
-        {
-            'command' : 'get_plays_by_dayofweek',
-            'name' : 'Plays by Day'
-        },
-        {
-            'command' : 'get_plays_by_hourofday',
-            'name' : 'Plays by Hour'
-        },
-        {
-            'command' : 'get_plays_by_source_resolution',
-            'name' : 'Plays by Source Res'
-        },
-        {
-            'command' : 'get_plays_by_stream_resolution',
-            'name' : 'Plays by Stream Res'
-        },
-        {
-            'command' : 'get_plays_by_stream_type',
-            'name' : 'Plays by Stream Type'
-        },
-        {
-            'command' : 'get_plays_by_top_10_platforms',
-            'name' : 'Plays by Top Platforms'
-        },
-        {
-            'command' : 'get_plays_by_top_10_users',
-            'name' : 'Plays by Top Users'
-        },
-        {
-            'command' : 'get_plays_per_month',
-            'name' : 'Plays per Month'
-        },
-        {
-            'command' : 'get_stream_type_by_top_10_platforms',
-            'name' : 'Stream Type by Top Platforms'
-        },
-        {
-            'command' : 'get_stream_type_by_top_10_users',
-            'name' : 'Stream Type by Top Users'
-        }
+        { 'command' : 'get_concurrent_streams_by_stream_type', 'name' : 'Stream Type' },
+        { 'command' : 'get_plays_by_date', 'name' : 'Plays by Date' },
+        { 'command' : 'get_plays_by_dayofweek', 'name' : 'Plays by Day' },
+        { 'command' : 'get_plays_by_hourofday', 'name' : 'Plays by Hour' },
+        { 'command' : 'get_plays_by_source_resolution', 'name' : 'Plays by Source Res' },
+        { 'command' : 'get_plays_by_stream_resolution', 'name' : 'Plays by Stream Res' },
+        { 'command' : 'get_plays_by_stream_type', 'name' : 'Plays by Stream Type' },
+        { 'command' : 'get_plays_by_top_10_platforms', 'name' : 'Plays by Top Platforms' },
+        { 'command' : 'get_plays_by_top_10_users', 'name' : 'Plays by Top Users' },
+        { 'command' : 'get_plays_per_month', 'name' : 'Plays per Month' },
+        { 'command' : 'get_stream_type_by_top_10_platforms', 'name' : 'Stream Type by Top Platforms' },
+        { 'command' : 'get_stream_type_by_top_10_users', 'name' : 'Stream Type by Top Users' }
     ]
     recent_commands = [
         { 'command' : 'movie' },

@@ -173,6 +173,8 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Graph titles need to specify the date range - or at least show what time range the data is for somewhere in the email
 * Rename 'ra' and 'recs' snap in block for clarity?
 * Keep settings details on error so user won't have to re-enter them
+* Nix the view buttons
+* No library name on recently added overlay | change date to days since added
 
 
 ### For the v2025.1 sprint, these items are feature requests:
@@ -228,10 +230,9 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Added more date range options in schedule builder to match dashboard
 * Added many more options for scheduled emails frequency
 * Added collections snap-in
- - - make sure this pulls audio - - 
- - - center collections in preview - - 
+ - - get this to pull audio - - 
  - - collections functionality in scheduler - - 
- - - sending collections email gives "SMTP send error: 'text_color'"
+
 
 ### v0.9.16
 

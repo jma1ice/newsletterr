@@ -16,7 +16,7 @@ from urllib.parse import quote_plus, urljoin
 
 app = Flask(__name__)
 app.jinja_env.globals["version"] = "v0.9.17"
-app.jinja_env.globals["publish_date"] = "September 27, 2025"
+app.jinja_env.globals["publish_date"] = "September 29, 2025"
 
 def get_global_cache_status():
     try:
@@ -379,6 +379,13 @@ def init_db(db_path):
         print("Adding from_name column to settings table...")
         cursor.execute("ALTER TABLE settings ADD COLUMN from_name TEXT")
         conn.commit()
+
+    cursor.execute("PRAGMA table_info(settings)")
+    columns = [column[1] for column in cursor.fetchall()]
+    if 'custom_logo_filename' not in columns:
+        print("Adding custom_logo_filename column to settings table...")
+        cursor.execute("ALTER TABLE settings ADD COLUMN custom_logo_filename TEXT")
+        conn.commit()
     
     conn.close()
 
@@ -427,7 +434,8 @@ def get_email_theme_colors():
         'accent': theme_settings['accent_color'],
         'card_bg': '#2d2d2d',
         'border': '#404040',
-        'muted_text': '#cccccc'
+        'muted_text': '#cccccc',
+        'email_theme': theme_settings['email_theme']
     }
 
 def build_email_css_from_theme(theme_colors, logo_width):
@@ -2228,7 +2236,7 @@ def build_collections_html_with_cids(all_collections, msg_root, theme_colors, ba
                 subtype = collection.get('subtype', 'unknown')
                 summary = collection.get('summary', '')
                 
-                type_icon = '🎬' if subtype == 'movie' else '📺'
+                type_icon = '📽️' if subtype == 'movie' else '📺' if subtype == 'show' else '🎧'
 
                 if poster_cid:
                     poster_bg_url = f"cid:{poster_cid}"
@@ -2368,7 +2376,7 @@ def build_collections_html_with_cids(all_collections, msg_root, theme_colors, ba
                 subtype = collection.get('subtype', 'unknown')
                 summary = collection.get('summary', '')
                 
-                type_icon = '🎬' if subtype == 'movie' else '📺'
+                type_icon = '📽️' if subtype == 'movie' else '📺' if subtype == 'show' else '🎧'
                 
                 cell_style = f"""
                     width: 20%;
@@ -2513,8 +2521,11 @@ def build_collections_html_with_cids(all_collections, msg_root, theme_colors, ba
         </div>
     """
 
-def attach_logo_image(msg_root, logo_filename, base_url=""):
-    logo_url = f"/static/img/{logo_filename}"
+def attach_logo_image(msg_root, logo_filename, custom_logo_filename, base_url=""):
+    if logo_filename == 'custom':
+        logo_url = f"/static/uploads/logos/{custom_logo_filename}"
+    else:
+        logo_url = f"/static/img/{logo_filename}"
     return fetch_and_attach_image(logo_url, msg_root, "logo", base_url)
 
 def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, recommendations_data=None, user_dict=None, base_url="", target_user_key=None, is_scheduled=False):
@@ -2522,13 +2533,31 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, recom
     email_text = template_data.get('email_text', '')
     subject = template_data.get('subject', '')
     server_name = tautulli_data.get('settings', {}).get('server_name', 'Plex Server')
-    logo_filename = tautulli_data.get('settings', {}).get('logo_filename', 'Asset_94x.png')
-    logo_width = tautulli_data.get('settings', {}).get('logo_width', 80)
+    logo_filename = tautulli_data.get('settings', {}).get('logo_filename')
+    custom_logo_filename = tautulli_data.get('settings', {}).get('custom_logo_filename')
+    logo_width = tautulli_data.get('settings', {}).get('logo_width')
     
     theme_colors = get_email_theme_colors()
+
+    if logo_filename == '' or logo_filename is None:
+        if theme_colors['email_theme'] == 'custom':
+            pass
+        else:
+            logo_filename = 'Asset_94x.png'
+
+    if logo_width == '' or logo_width is None:
+        if theme_colors['email_theme'] == 'custom':
+            pass
+        else:
+            logo_width = 80
     
-    logo_cid = attach_logo_image(msg_root, logo_filename, base_url)
-    logo_src = f"cid:{logo_cid}" if logo_cid else f"/static/img/{logo_filename}"
+    logo_src = ""
+    if logo_filename != '' and logo_filename is not None and logo_width != '' and logo_width is not None:
+        logo_cid = attach_logo_image(msg_root, logo_filename, custom_logo_filename, base_url)
+        if logo_filename == 'custom' and custom_logo_filename:
+            logo_src = f"cid:{logo_cid}" if logo_cid else f"/static/uploads/logos/{custom_logo_filename}"
+        else:
+            logo_src = f"cid:{logo_cid}" if logo_cid else f"/static/img/{logo_filename}"
     
     content_html = ""
     
@@ -2658,6 +2687,10 @@ def build_complete_email_html_with_cid_logo(content_html, server_name, subject, 
         color: {theme_colors['accent']};
         text-decoration: none;
     """
+
+    logo_html = ""
+    if logo_src != "" and logo_src is not None and logo_width != "" and logo_width is not None:
+        logo_html = f'<img src="{logo_src}" alt="{server_name}" class="email-logo" style="{logo_style}">'
     
     return f"""<!DOCTYPE html>
         <html lang="en" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
@@ -2688,7 +2721,7 @@ def build_complete_email_html_with_cid_logo(content_html, server_name, subject, 
                     <![endif]-->
                     <div class="email-container" style="{container_style}">
                         <div style="{header_style}">
-                            <img src="{logo_src}" alt="{server_name}" class="email-logo" style="{logo_style}">
+                            {logo_html}
                             <h1 style="{title_style}">{server_name} Newsletter</h1>
                         </div>
                         
@@ -3155,7 +3188,7 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
         
         settings_conn = sqlite3.connect(DB_PATH)
         settings_cursor = settings_conn.cursor()
-        settings_cursor.execute("SELECT from_email, alias_email, reply_to_email, password, smtp_server, smtp_port, smtp_protocol, server_name, tautulli_url, tautulli_api, logo_filename, logo_width, from_name FROM settings WHERE id = 1")
+        settings_cursor.execute("SELECT from_email, alias_email, reply_to_email, password, smtp_server, smtp_port, smtp_protocol, server_name, tautulli_url, tautulli_api, logo_filename, logo_width, custom_logo_filename, from_name FROM settings WHERE id = 1")
         settings_result = settings_cursor.fetchone()
         settings_conn.close()
         
@@ -3163,7 +3196,7 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
             print("SMTP settings not found in database")
             return False
         
-        from_email, alias_email, reply_to_email, encrypted_password, smtp_server, smtp_port, smtp_protocol, server_name, tautulli_base_url, tautulli_api_key, logo_filename, logo_width, from_name = settings_result
+        from_email, alias_email, reply_to_email, encrypted_password, smtp_server, smtp_port, smtp_protocol, server_name, tautulli_base_url, tautulli_api_key, logo_filename, logo_width, custom_logo_filename, from_name = settings_result
         
         public_base = os.environ.get("PUBLIC_BASE_URL", "http://127.0.0.1:6397")
         theme = 'dark'
@@ -3238,7 +3271,7 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
                     from_email, alias_email, reply_to_email, encrypted_password,
                     smtp_server, smtp_port, smtp_protocol, 
                     server_name, tautulli_base_url, tautulli_api_key, date_range, template_name,
-                    logo_filename, logo_width, from_name
+                    logo_filename, logo_width, custom_logo_filename, from_name
                 )
                 
                 if success:
@@ -3262,7 +3295,7 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
                 from_email, alias_email, reply_to_email, encrypted_password,
                 smtp_server, smtp_port, smtp_protocol,
                 server_name, tautulli_base_url, tautulli_api_key, date_range, template_name,
-                logo_filename, logo_width, from_name
+                logo_filename, logo_width, custom_logo_filename, from_name
             )
         
     except Exception as e:
@@ -3270,7 +3303,7 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
         traceback.print_exc()
         return False
 
-def send_scheduled_user_email_with_cids(recipients, subject, selected_items, user_key, recommendations_data, from_email, alias_email, reply_to_email, encrypted_password, smtp_server, smtp_port, smtp_protocol, server_name, tautulli_base_url, tautulli_api_key, date_range, template_name, logo_filename, logo_width, from_name):
+def send_scheduled_user_email_with_cids(recipients, subject, selected_items, user_key, recommendations_data, from_email, alias_email, reply_to_email, encrypted_password, smtp_server, smtp_port, smtp_protocol, server_name, tautulli_base_url, tautulli_api_key, date_range, template_name, logo_filename, logo_width, custom_logo_filename, from_name):
     try:
         print(f"SMTP Config: {smtp_server}:{smtp_port} using {smtp_protocol}")
 
@@ -3310,6 +3343,7 @@ def send_scheduled_user_email_with_cids(recipients, subject, selected_items, use
         tautulli_data = fetch_tautulli_data_for_email(tautulli_base_url, tautulli_api_key, date_range, server_name)
         tautulli_data["settings"]["logo_filename"] = logo_filename
         tautulli_data["settings"]["logo_width"] = logo_width
+        tautulli_data["settings"]["custom_logo_filename"] = custom_logo_filename
         
         template_data = {
             'selected_items': json.dumps(selected_items),
@@ -3396,7 +3430,7 @@ def send_scheduled_user_email_with_cids(recipients, subject, selected_items, use
         traceback.print_exc()
         return False
 
-def send_scheduled_single_email_with_cids(to_emails_list, subject, selected_items, from_email, alias_email, reply_to_email, encrypted_password, smtp_server, smtp_port, smtp_protocol, server_name, tautulli_base_url, tautulli_api_key, date_range, template_name, logo_filename, logo_width, from_name, email_text=""):
+def send_scheduled_single_email_with_cids(to_emails_list, subject, selected_items, from_email, alias_email, reply_to_email, encrypted_password, smtp_server, smtp_port, smtp_protocol, server_name, tautulli_base_url, tautulli_api_key, date_range, template_name, logo_filename, logo_width, custom_logo_filename, from_name, email_text=""):
     try:
         print(f"SMTP Config: {smtp_server}:{smtp_port} using {smtp_protocol}")
 
@@ -3436,6 +3470,7 @@ def send_scheduled_single_email_with_cids(to_emails_list, subject, selected_item
         tautulli_data = fetch_tautulli_data_for_email(tautulli_base_url, tautulli_api_key, date_range, server_name)
         tautulli_data["settings"]["logo_filename"] = logo_filename
         tautulli_data["settings"]["logo_width"] = logo_width
+        tautulli_data["settings"]["custom_logo_filename"] = custom_logo_filename
         
         template_data = {
             'selected_items': json.dumps(selected_items),
@@ -3706,6 +3741,8 @@ def index():
         tautulli_api = cursor.execute("SELECT tautulli_api FROM settings WHERE id = 1").fetchone()[0]
         logo_filename = cursor.execute("SELECT logo_filename FROM settings WHERE id = 1").fetchone()[0]
         logo_width = cursor.execute("SELECT logo_width FROM settings WHERE id = 1").fetchone()[0]
+        email_theme = cursor.execute("SELECT email_theme FROM settings WHERE id = 1").fetchone()[0]
+        custom_logo_filename = cursor.execute("SELECT custom_logo_filename FROM settings WHERE id = 1").fetchone()[0]
     except:
         from_email = cursor.execute("SELECT from_email FROM settings WHERE id = 1").fetchone()
         server_name = cursor.execute("SELECT server_name FROM settings WHERE id = 1").fetchone()
@@ -3713,31 +3750,42 @@ def index():
         tautulli_api = cursor.execute("SELECT tautulli_api FROM settings WHERE id = 1").fetchone()
         logo_filename = cursor.execute("SELECT logo_filename FROM settings WHERE id = 1").fetchone()
         logo_width = cursor.execute("SELECT logo_width FROM settings WHERE id = 1").fetchone()
+        email_theme = cursor.execute("SELECT email_theme FROM settings WHERE id = 1").fetchone()
+        custom_logo_filename = cursor.execute("SELECT custom_logo_filename FROM settings WHERE id = 1").fetchone()
 
     settings = {
         "from_email": from_email or "",
         "server_name": server_name or "",
         "tautulli_url": tautulli_url or "",
         "tautulli_api": decrypt(tautulli_api),
+        "email_theme": email_theme or "",
+        "custom_logo_filename": custom_logo_filename or ""
     }
     if logo_filename == '' or logo_filename is None:
-        settings['logo_filename'] = 'Asset_94x.png'
-        cursor.execute("""
-            INSERT INTO settings (id, logo_filename) VALUES (1, 'Asset_94x.png')
-            ON CONFLICT (id) DO UPDATE
-            SET logo_filename = excluded.logo_filename
-        """)
-        conn.commit()
+        if email_theme == 'custom':
+            settings['logo_filename'] = ''
+        else:
+            settings['logo_filename'] = 'Asset_94x.png'
+            cursor.execute("""
+                INSERT INTO settings (id, logo_filename) VALUES (1, 'Asset_94x.png')
+                ON CONFLICT (id) DO UPDATE
+                SET logo_filename = excluded.logo_filename
+            """)
+            conn.commit()
     else:
         settings['logo_filename'] = logo_filename
+
     if logo_width == '' or logo_width is None:
-        settings['logo_width'] = 80
-        cursor.execute("""
-            INSERT INTO settings (id, logo_width) VALUES (1, 80)
-            ON CONFLICT (id) DO UPDATE
-            SET logo_width = excluded.logo_width
-        """)
-        conn.commit()
+        if email_theme == 'custom':
+            settings['logo_width'] = 0
+        else:
+            settings['logo_width'] = 80
+            cursor.execute("""
+                INSERT INTO settings (id, logo_width) VALUES (1, 80)
+                ON CONFLICT (id) DO UPDATE
+                SET logo_width = excluded.logo_width
+            """)
+            conn.commit()
     else:
         settings['logo_width'] = int(logo_width)
 
@@ -3921,7 +3969,7 @@ def fetch_collections(collection_type):
         sections_data = sections_response.json()
         collections = []
 
-        target_type = "movie" if collection_type == "movies" else "show"  # test if this puts audio collections into show section
+        target_type = collection_type
         
         for section in sections_data.get("MediaContainer", {}).get("Directory", []):
             if section.get("type") == target_type:
@@ -3954,6 +4002,8 @@ def fetch_collections(collection_type):
                             "sectionTitle": section_title,
                             "sectionId": section_id
                         })
+            else:
+                print(f"{section.get('type')} : {section.get('title')}")
 
         return jsonify({
             "status": "success", 
@@ -4035,7 +4085,7 @@ def send_email():
     cursor = conn.cursor()
     cursor.execute("""
         SELECT
-        from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, logo_filename, logo_width, from_name
+        from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, logo_filename, logo_width, from_name, custom_logo_filename
         FROM settings WHERE id = 1
     """)
     row = cursor.fetchone()
@@ -4052,9 +4102,10 @@ def send_email():
             "smtp_port": int(row[6]) if row[6] is not None else 587,
             "smtp_protocol": row[7] or "TLS",
             "server_name": row[8] or "",
-            "logo_filename": row[9] or "Asset_94x.png",
-            "logo_width": row[10] or 80,
-            "from_name": row[11] or ""
+            "logo_filename": row[9],
+            "logo_width": row[10],
+            "from_name": row[11] or "",
+            "custom_logo_filename": row[12] or ""
         }
     else:
         return jsonify({"error": "Please enter email info on settings page"}), 500
@@ -4114,7 +4165,18 @@ def settings():
         }
     }
 
+    preset_logo_name_to_file = {
+        "newsletterr_blue_small": "Asset_54x.png",
+        "newsletterr_orange_small": "Asset_46x.png",
+        "newsletterr_blue_banner": "Asset_94x.png",
+        "newsletterr_orange_banner": "Asset_45x.png"
+    }
+
     if request.method == "POST":
+        cursor.execute("SELECT custom_logo_filename FROM settings WHERE id = 1")
+        db_custom_logo = cursor.fetchone()
+        existing_custom_logo = db_custom_logo[0] if db_custom_logo and db_custom_logo[0] else ""
+
         from_email = request.form.get("from_email")
         alias_email = request.form.get("alias_email")
         reply_to_email = request.form.get("reply_to_email")
@@ -4132,6 +4194,17 @@ def settings():
         logo_width = request.form.get("logo_width")
         email_theme = request.form.get("email_theme", "newsletterr_blue")
         from_name = request.form.get("from_name")
+        custom_logo_filename = request.form.get("custom_logo_filename", "")
+
+        if not custom_logo_filename and existing_custom_logo:
+            custom_logo_filename = existing_custom_logo
+
+        if logo_filename == 'custom':
+            pass
+        elif logo_filename in preset_logo_name_to_file:
+            logo_filename = preset_logo_name_to_file[logo_filename]
+        elif logo_filename == 'none':
+            logo_filename = ""
 
         if email_theme in theme_presets:
             preset = theme_presets[email_theme]
@@ -4152,17 +4225,17 @@ def settings():
             INSERT INTO settings
             (id, from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, plex_url, tautulli_url,
                 tautulli_api, conjurr_url, logo_filename, logo_width, email_theme, primary_color, secondary_color, accent_color, background_color,
-                text_color, from_name)
-            VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                text_color, from_name, custom_logo_filename)
+            VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (id) DO UPDATE
             SET from_email = excluded.from_email, alias_email = excluded.alias_email, reply_to_email = excluded.reply_to_email, password = excluded.password,
                 smtp_username = excluded.smtp_username, smtp_server = excluded.smtp_server, smtp_port = excluded.smtp_port, smtp_protocol = excluded.smtp_protocol,
                 server_name = excluded.server_name, plex_url = excluded.plex_url, tautulli_url = excluded.tautulli_url, tautulli_api = excluded.tautulli_api,
                 conjurr_url = excluded.conjurr_url, logo_filename = excluded.logo_filename, logo_width = excluded.logo_width, email_theme = excluded.email_theme,
                 primary_color = excluded.primary_color, secondary_color = excluded.secondary_color, accent_color = excluded.accent_color,
-                background_color = excluded.background_color, text_color = excluded.text_color, from_name = excluded.from_name
+                background_color = excluded.background_color, text_color = excluded.text_color, from_name = excluded.from_name, custom_logo_filename = excluded.custom_logo_filename
         """, (from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, plex_url, tautulli_url, tautulli_api,
-              conjurr_url, logo_filename, logo_width, email_theme, primary_color, secondary_color, accent_color, background_color, text_color, from_name))
+              conjurr_url, logo_filename, logo_width, email_theme, primary_color, secondary_color, accent_color, background_color, text_color, from_name, custom_logo_filename))
         conn.commit()
         cursor.execute("SELECT plex_token FROM settings WHERE id = 1")
         plex_token = cursor.fetchone()[0]
@@ -4192,6 +4265,7 @@ def settings():
             "background_color": background_color,
             "text_color": text_color,
             "from_name": from_name,
+            "custom_logo_filename": custom_logo_filename
         }
 
         return render_template('settings.html', alert="Settings saved successfully!", settings=settings)
@@ -4220,6 +4294,7 @@ def settings():
         background_color = cursor.execute("SELECT background_color FROM settings WHERE id = 1").fetchone()[0]
         text_color = cursor.execute("SELECT text_color FROM settings WHERE id = 1").fetchone()[0]
         from_name = cursor.execute("SELECT from_name FROM settings WHERE id = 1").fetchone()[0]
+        custom_logo_filename = cursor.execute("SELECT custom_logo_filename FROM settings WHERE id = 1").fetchone()[0]
     except:
         from_email = cursor.execute("SELECT from_email FROM settings WHERE id = 1").fetchone()
         alias_email = cursor.execute("SELECT alias_email FROM settings WHERE id = 1").fetchone()
@@ -4244,6 +4319,7 @@ def settings():
         background_color = cursor.execute("SELECT background_color FROM settings WHERE id = 1").fetchone()
         text_color = cursor.execute("SELECT text_color FROM settings WHERE id = 1").fetchone()
         from_name = cursor.execute("SELECT from_name FROM settings WHERE id = 1").fetchone()
+        custom_logo_filename = cursor.execute("SELECT custom_logo_filename FROM settings WHERE id = 1").fetchone()
 
     current_theme = email_theme or "newsletterr_blue"
     if current_theme in theme_presets and current_theme != "custom":
@@ -4273,7 +4349,8 @@ def settings():
         "accent_color": accent_color or "#62a1a4",
         "background_color": background_color or "#333333",
         "text_color": text_color or "#62a1a4",
-        "from_name": from_name or ""
+        "from_name": from_name or "",
+        "custom_logo_filename": custom_logo_filename or ""
     }
     if password == '' or password is None:
         settings["password"] = ""
@@ -4306,6 +4383,109 @@ def settings():
     
     conn.close()
     return render_template('settings.html', settings=settings)
+
+@app.route('/upload-logo', methods=['POST'])
+def upload_logo():
+    # if request.content_type and request.content_type.startswith('multipart/form-data'):
+    #     token = request.form.get('csrf_token')
+    #     if not token or token != session.get('csrf_token'):
+    #         abort(400)
+
+    try:
+        if 'logo' not in request.files:
+            return jsonify({"status": "error", "message": "No file uploaded"}), 400
+
+        file = request.files['logo']
+
+        if file.filename == '':
+            return jsonify({"status": "error", "message": "No file selected"}), 400
+
+        allowed_extensions = {'png', 'jpg', 'jpeg', 'webp'}
+        if not file.filename.lower().endswith(tuple('.' + ext for ext in allowed_extensions)):
+            return jsonify({"status": "error", "message": "Invalid file type. Only PNG, JPG, JPEG, and WebP are allowed"}), 400
+
+        file.seek(0, 2)
+        file_size = file.tell()
+        file.seek(0)
+
+        if file_size > 2 * 1024 * 1024:
+            return jsonify({"status": "error", "message": "File too large. Maximum size is 2MB"}), 400
+
+        timestamp = int(time.time())
+        file_extension = file.filename.rsplit('.', 1)[1].lower()
+        new_filename = f"logo_{timestamp}.{file_extension}"
+
+        upload_dir = os.path.join(app.static_folder, 'uploads', 'logos')
+        os.makedirs(upload_dir, exist_ok=True)
+
+        file_path = os.path.join(upload_dir, new_filename)
+        file.save(file_path)
+
+        with Image.open(file_path) as img:
+            width, height = img.size
+
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO settings (id, logo_filename, custom_logo_filename) 
+            VALUES (1, 'custom', ?) 
+            ON CONFLICT (id) DO UPDATE 
+            SET logo_filename = 'custom', custom_logo_filename = excluded.custom_logo_filename
+        """, (new_filename,))
+        conn.commit()
+        conn.close()
+
+        return jsonify({
+            "status": "success", 
+            "message": "Logo uploaded successfully",
+            "filename": new_filename,
+            "width": width,
+            "height": height
+        })
+
+    except Exception as e:
+        print(f"Error uploading logo: {e}")
+        return jsonify({"status": "error", "message": f"Upload failed: {str(e)}"}), 500
+
+@app.route('/delete-logo', methods=['POST'])
+def delete_logo():
+    # require_csrf_for_json()
+
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+
+        cursor.execute("SELECT custom_logo_filename FROM settings WHERE id = 1")
+        result = cursor.fetchone()
+        current_logo = result[0] if result else None
+
+        if current_logo:
+            logo_path = os.path.join(app.static_folder, 'uploads', 'logos', current_logo)
+            if os.path.exists(logo_path):
+                os.remove(logo_path)
+
+            cursor.execute("""
+                UPDATE settings 
+                SET logo_filename = 'none', logo_width = 80, custom_logo_filename = ''
+                WHERE id = 1
+            """)
+            conn.commit()
+            conn.close()
+
+            return jsonify({
+                "status": "success", 
+                "message": "Logo removed"
+            })
+        else:
+            conn.close()
+            return jsonify({
+                "status": "info", 
+                "message": "No logo set"
+            })
+
+    except Exception as e:
+        print(f"Error deleting logo: {e}")
+        return jsonify({"status": "error", "message": f"Delete failed: {str(e)}"}), 500
 
 @app.post('/api/plex/pin')
 def plex_create_pin():
@@ -4740,16 +4920,18 @@ def preview_schedule_page(schedule_id):
     except:
         date_range = 7
 
-    cursor.execute("SELECT logo_filename, logo_width, tautulli_url, tautulli_api FROM settings WHERE id = 1")
+    cursor.execute("SELECT logo_filename, logo_width, tautulli_url, tautulli_api, custom_logo_filename FROM settings WHERE id = 1")
     settings_row = cursor.fetchone()
     logo_filename = settings_row[0] if settings_row else 'Asset_94x.png'
     logo_width = settings_row[1] if settings_row else 80
     tautulli_url = settings_row[2] if settings_row else ''
     tautulli_api = settings_row[3] if settings_row else ''
+    custom_logo_filename = settings_row[4] if settings_row else ''
 
     settings = {
         "logo_filename": logo_filename,
-        "logo_width": logo_width
+        "logo_width": logo_width,
+        "custom_logo_filename": custom_logo_filename
     }
     conn.close()
 

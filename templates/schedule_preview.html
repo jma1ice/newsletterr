@@ -640,6 +640,7 @@
         const emailText = document.getElementById('email_text').value;
 
         let contentHTML = "";
+        const collectionItems = [];
         
         for (let item of selectedItems) {
             if (item.type === 'textblock') {
@@ -723,7 +724,14 @@
                 contentHTML += buildRecentlyAddedHTML(item.raLibrary);
             } else if (item.type === 'recs') {
                 contentHTML += buildRecommendationsHTML(item.userKey);
+            } else if (item.type === 'collection') {
+                collectionItems.push(item.collection);
+                continue;
             }
+        }
+
+        if (collectionItems.length > 0) {
+            contentHTML += buildCollectionPreviewHTMLForEmail("Collections", collectionItems);
         }
 
         return buildCompleteEmailHTML(contentHTML, serverName, subject);
@@ -1155,6 +1163,238 @@
         `;
     }
 
+    function buildCollectionCard(collection, themeColors) {
+        const collectionTitle = collection.title || 'Unknown Collection';
+        const count = collection.childCount || 0;
+        const subtype = collection.subtype || 'unknown';
+        const typeIcon = subtype === 'movie' ? '📽️' : subtype === 'show' ? '📺' : '🎧';
+        
+        let posterURL = null;
+        const thumbUrl = collection.thumb;
+        const artUrl = collection.art;
+        
+        if (thumbUrl) {
+            if (thumbUrl.startsWith('http')) {
+                try {
+                    const url = new URL(thumbUrl);
+                    posterURL = `/proxy-art${url.pathname}`;
+                } catch (e) {
+                    console.log('Failed to parse thumb URL:', thumbUrl);
+                }
+            } else {
+                posterURL = `/proxy-art${thumbUrl.startsWith('/') ? thumbUrl : '/' + thumbUrl}`;
+            }
+        } else if (artUrl) {
+            if (artUrl.startsWith('http')) {
+                try {
+                    const url = new URL(artUrl);
+                    posterURL = `/proxy-art${url.pathname}`;
+                } catch (e) {
+                    console.log('Failed to parse art URL:', artUrl);
+                }
+            } else {
+                posterURL = `/proxy-art${artUrl.startsWith('/') ? artUrl : '/' + artUrl}`;
+            }
+        }
+        
+        if (posterURL) {
+            return `
+                <table cellpadding="0" cellspacing="0" border="0" style="
+                    background-color: ${themeColors.card_bg};
+                    border-radius: 12px;
+                    width: 120px;
+                    margin: 0 auto;
+                ">
+                    <tr>
+                        <td style="
+                            background-image: url('${posterURL}');
+                            background-size: cover;
+                            background-position: center;
+                            background-repeat: no-repeat;
+                            height: 180px;
+                            background-color: #f8f9fa;
+                            border-radius: 12px;
+                            position: relative;
+                            vertical-align: top;
+                        ">
+                            <table cellpadding="0" cellspacing="0" border="0" width="100%">
+                                <tr>
+                                    <td style="text-align: right;">
+                                        <div style="
+                                            background-color: rgba(0, 0, 0, 0.8);
+                                            color: white;
+                                            padding: 4px 6px;
+                                            border-radius: 4px;
+                                            font-size: 10px;
+                                            font-family: 'IBM Plex Sans';
+                                            line-height: 1;
+                                            display: inline-block;
+                                            margin: 6px;
+                                        ">
+                                            ${typeIcon} ${count}
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="height: 150px; vertical-align: bottom;">
+                                        <div style="
+                                            background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent);
+                                            border-radius: 0 0 11px 11px;
+                                            padding: 6px;
+                                        ">
+                                            <div style="
+                                                font-weight: bold;
+                                                font-size: 12px;
+                                                color: white;
+                                                line-height: 1.2;
+                                                font-family: 'IBM Plex Sans';
+                                            ">${collectionTitle}</div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                </table>
+            `;
+        } else {
+            return `
+                <table cellpadding="0" cellspacing="0" border="0" style="
+                    background-color: ${themeColors.card_bg};
+                    border-radius: 12px;
+                    border: 1px solid ${themeColors.border};
+                    width: 120px;
+                    height: 180px;
+                    margin: 0 auto;
+                ">
+                    <tr>
+                        <td style="
+                            text-align: center;
+                            vertical-align: middle;
+                            padding: 12px;
+                        ">
+                            <div style="
+                                font-weight: bold;
+                                font-size: 14px;
+                                color: ${themeColors.text};
+                                margin-bottom: 8px;
+                                font-family: 'IBM Plex Sans';
+                                padding: 2px;
+                            ">${collectionTitle}</div>
+                            <div style="
+                                font-size: 11px;
+                                color: ${themeColors.muted_text};
+                                font-family: 'IBM Plex Sans';
+                            ">${typeIcon} ${count} items</div>
+                        </td>
+                    </tr>
+                </table>
+            `;
+        }
+    }
+
+    function buildCollectionPreviewHTMLForEmail(title, collections) {
+        const themeColors = {
+            card_bg: 'var(--email-card-bg)',
+            text: 'var(--email-text)', 
+            border: 'var(--email-border)',
+            muted_text: 'var(--email-muted)'
+        };
+        
+        if (!collections || collections.length === 0) {
+            return `
+                <div style="background-color: ${themeColors.card_bg}; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid ${themeColors.border}; font-family: 'IBM Plex Sans';">
+                    <p style="text-align: center; color: ${themeColors.muted_text}; padding: 20px; margin: 0; font-family: 'IBM Plex Sans';">No collections available.</p>
+                </div>
+            `;
+        }
+
+        const itemsPerRow = 5;
+        let itemsHTML = "";
+        
+        for (let i = 0; i < collections.length; i += itemsPerRow) {
+            const rowItems = collections.slice(i, i + itemsPerRow);
+            const isPartialRow = rowItems.length < itemsPerRow;
+            
+            if (isPartialRow) {
+                const itemsCount = rowItems.length;
+                
+                let rowHTML = `<tr><td colspan="${itemsPerRow}" style="text-align: center; padding: 8px;">`;
+                rowHTML += '<table cellpadding="0" cellspacing="0" border="0" style="margin: 0 auto; border-collapse: separate;">';
+                rowHTML += '<tr>';
+                
+                rowItems.forEach((collection, j) => {
+                    let cellSpacing = "0";
+                    if (itemsCount === 2) {
+                        cellSpacing = j === 0 ? "60px" : "0";
+                    } else if (itemsCount === 3) {
+                        cellSpacing = j < 2 ? "40px" : "0";
+                    } else if (itemsCount === 4) {
+                        cellSpacing = j < 3 ? "20px" : "0";
+                    } else if (itemsCount > 1) {
+                        cellSpacing = j < itemsCount - 1 ? "6px" : "0";
+                    }
+                    
+                    const cardHTML = buildCollectionCard(collection, themeColors);
+                    rowHTML += `<td style="vertical-align: top; padding-right: ${cellSpacing};">${cardHTML}</td>`;
+                });
+                
+                rowHTML += '</tr></table></td></tr>';
+                itemsHTML += rowHTML;
+            } else {
+                let rowHTML = "<tr style='text-align: center;'>";
+                
+                rowItems.forEach((collection) => {
+                    const cellStyle = `
+                        width: 20%;
+                        padding: 6px;
+                        vertical-align: top;
+                        font-family: 'IBM Plex Sans';
+                    `;
+                    
+                    const cardHTML = buildCollectionCard(collection, themeColors);
+                    rowHTML += `<td style="${cellStyle}">${cardHTML}</td>`;
+                });
+                
+                rowHTML += "</tr>";
+                itemsHTML += rowHTML;
+            }
+        }
+        
+        const containerStyle = `
+            background-color: ${themeColors.card_bg};
+            border-radius: 8px;
+            margin: 20px 0;
+            border: 1px solid ${themeColors.border};
+            font-family: 'IBM Plex Sans';
+        `;
+        
+        const titleStyle = `
+            text-align: center;
+            color: ${themeColors.text};
+            margin: 0 0 20px 0;
+            font-size: 24px;
+            font-weight: bold;
+            font-family: 'IBM Plex Sans';
+        `;
+        
+        const tableStyle = `
+            width: 100%;
+            border-collapse: collapse;
+            margin: 0;
+            padding: 0;
+        `;
+        
+        return `
+            <div style="${containerStyle}">
+                <h2 style="${titleStyle}">${title}</h2>
+                <table cellpadding="0" cellspacing="0" border="0" style="${tableStyle}">
+                    ${itemsHTML}
+                </table>
+            </div>
+        `;
+    }
+
     function getItemPosterURL(item) {
         const candidates = [item.thumb, item.art, item.parent_thumb, item.grandparent_thumb];
         for (const candidate of candidates) {
@@ -1168,7 +1408,17 @@
     function buildCompleteEmailHTML(contentHTML, serverName, subject) {
         const logoFilename = "{{ settings.logo_filename }}";
         const logoWidth = "{{ settings.logo_width }}";
+        const customLogoFilename = "{{ settings.custom_logo_filename }}"
         const themedCSS = getThemedEmailCSS();
+
+        let logoHTML = "";
+        if (logoFilename && logoWidth) {
+            if (logoFilename == 'custom') {
+                logoHTML = `<img src="/static/uploads/logos/${customLogoFilename}" alt="${serverName}" class="email-logo" style="max-width: ${logoWidth}px; width: auto; height: auto;">`;
+            } else {
+                logoHTML = `<img src="/static/img/${logoFilename}" alt="${serverName}" class="email-logo" style="max-width: ${logoWidth}px; width: auto; height: auto;">`;
+            }
+        }
         
         return `<!DOCTYPE html>
             <html lang="en">
@@ -1181,7 +1431,7 @@
                 <body>
                     <div class="email-container">
                         <div class="email-header">
-                            <img src="/static/img/${logoFilename}" alt="${serverName}" class="email-logo">
+                            ${logoHTML}
                             <h1 class="email-title">${serverName} Newsletter</h1>
                         </div>
                         

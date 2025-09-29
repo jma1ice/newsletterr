@@ -131,7 +131,7 @@ By default the app listens on **http://127.0.0.1:6397**.
    * **Tautulli URL (optional)** - e.g. `http://localhost:8181`  
    * **Tautulli API Key (optional)** - make sure 'Enable API' is checked, and copy the API key from your [Tautulli settings.](http://localhost:8181/settings#tabs_tabs-web_interface)  
    * **Conjurr URL (optional)** - e.g. `http://localhost:2665`  
-   * **Logo Filename (optional)** - this sets the logo at the top of the newsletter. To use a custom logo, place your logo file in /static/img/ and add the filename here  
+   * **Logo Filename (optional)** - this sets the logo at the top of the newsletter. There are some preset newsletterr options as well as custom and none. To use a custom logo, choose custom as your theme and custom here, then upload your image  
    * **Logo Width (optional)** - use this to adjust the size of your custom logo. A small logo should be ~20, medium ~40, and banner size ~80  
    * **Email Theme** - choose from one of our preset newsletterr blue or plex orange themes, or create your own custom theme! Preset themes use our newsletterr banners, so if you want a custom logo you must choose to use a custom theme  
 4. Click **Apply Settings**.  Settings are saved to `database/data.db`.
@@ -161,10 +161,12 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 
 ### For the v0.9.17 sprint, these items are to be addressed:
 * Fix everywhere days and # of items is hardcoded
-* Custom logo logic needs file select to work with docker | add in small/banner/custom dropdown - and possibly a 'no logo' option?
 * Plex 'Secure Connections' setting causing image 401
 * Make sure custom templates can't override defaults
 * RA cards can all show up as different heights in email
+* Don't have page reload on stats/users pull
+* Allow for multiple collections sections | collections get stuck to bottom of email
+* Switch TV Show recently added info out to just show the show name, not episode or season number | use artwork from the show not the episode/season
 
 #### And these items are feature requests:
 * Look into email formatting across email clients | mjml?
@@ -180,15 +182,14 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 ### For the v2025.1 sprint, these items are feature requests:
 * GitHub link should be the stylized logo
 * Compile EXE / ELF files
-* Switch TV Show recently added info out to just show the show name, not episode or season number | use artwork from the show not the episode/season
-* Get fonts showing on Gmail receive side
+* Get fonts showing on Gmail receive side?
 * Api/webhooks
 * Opt out support
 * Option for small cover art of each item in a stat table
 * IMDb ratings in stat tables
 * Auth page for hosted users
-* Snap-in for images/gifs
-* Functionality for custom HTML templates | ability to add embedded links to services, ie StatusCake, Uptime Robot
+* Snap-in for images/gifs/emojis
+* Functionality for full custom HTML templates | ability to add embedded links to services, ie StatusCake, Uptime Robot
 * Ombi integration
 * Setting to choose duration or play counts for stats/graphs
 * Setting to hide play counts in stats/graphs
@@ -229,9 +230,8 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 #### New Features:
 * Added more date range options in schedule builder to match dashboard
 * Added many more options for scheduled emails frequency
-* Added collections snap-in
- - - get this to pull audio - - 
- - - collections functionality in scheduler - - 
+* Added collections snap-in - thank you yungsnuzzy!
+* Custom logo logic in settings. Added in small/banner/custom/none dropdown - thanks dreondre!
 
 
 ### v0.9.16

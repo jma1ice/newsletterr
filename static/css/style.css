@@ -127,6 +127,27 @@ body {
     margin-right: 10px;
 }
 
+.logo-preview-small {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 5px 0;
+}
+
+.logo-preview-img-small {
+    max-width: 80px;
+    max-height: 30px;
+    object-fit: contain;
+    border: 1px solid #ddd;
+    border-radius: 2px;
+    padding: 2px;
+}
+
+.logo-filename-small {
+    color: #666;
+    font-size: 0.9em;
+}
+
 .button {
     display: inline-block;
     padding: 10px 15px;

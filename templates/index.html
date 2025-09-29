@@ -202,11 +202,11 @@
                             <div class="col-12">
                                 <h2>Plex Collections</h2>
                                 <div class="row">
-                                    <div class="col-md-6">
-                                        <h4>📽️ Movie Collections</h4>
+                                    <div class="col-md-4">
+                                        <h5>📽️ Movie Collections</h5>
                                         <div class="d-flex align-items-center gap-2 mb-3">
                                             <select id="movie-collections-dropdown" class="form-select" style="flex: 1;">
-                                                <option value="">Select a movie collection...</option>
+                                                <option value="">Pick collection...</option>
                                             </select>
                                             <button id="add-movie-collection-btn" class="btn button btn-sm" disabled>
                                                 Add
@@ -219,11 +219,11 @@
                                             <span class="ms-2">Loading movie collections...</span>
                                         </div>
                                     </div>
-                                    <div class="col-md-6">
-                                        <h4>📺 TV Show Collections</h4>
+                                    <div class="col-md-4">
+                                        <h5>📺 TV Show Collections</h5>
                                         <div class="d-flex align-items-center gap-2 mb-3">
                                             <select id="show-collections-dropdown" class="form-select" style="flex: 1;">
-                                                <option value="">Select a TV show collection...</option>
+                                                <option value="">Pick collection...</option>
                                             </select>
                                             <button id="add-show-collection-btn" class="btn button btn-sm" disabled>
                                                 Add
@@ -234,6 +234,23 @@
                                                 <span class="visually-hidden">Loading...</span>
                                             </div>
                                             <span class="ms-2">Loading TV collections...</span>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <h5>🎧 Audio Collections</h5>
+                                        <div class="d-flex align-items-center gap-2 mb-3">
+                                            <select id="audio-collections-dropdown" class="form-select" style="flex: 1;">
+                                                <option value="">Pick collection...</option>
+                                            </select>
+                                            <button id="add-audio-collection-btn" class="btn button btn-sm" disabled>
+                                                Add
+                                            </button>
+                                        </div>
+                                        <div id="audio-collections-loading" class="text-center d-none">
+                                            <div class="spinner-border spinner-border-sm" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                            <span class="ms-2">Loading audio collections...</span>
                                         </div>
                                     </div>
                                 </div>
@@ -874,6 +891,7 @@
                     const subject = document.getElementById('subject').value;
                     const logoFilename = "{{ settings.logo_filename }}";
                     const logoWidth = "{{ settings.logo_width }}";
+                    const customLogoFilename = "{{ settings.custom_logo_filename }}"
                     const themedCSS = getThemedEmailCSS();
 
                     let contentHTML = "";
@@ -916,7 +934,7 @@
                         contentHTML += buildCollectionPreviewHTMLForEmail("Collections", collectionItems);
                     }
 
-                    const completeHTML = buildPreviewEmailHTML(contentHTML, serverName, subject, logoFilename, logoWidth, themedCSS);
+                    const completeHTML = buildPreviewEmailHTML(contentHTML, serverName, subject, logoFilename, logoWidth, customLogoFilename, themedCSS);
                     
                     const frame = document.getElementById('preview');
                     if (!frame) {
@@ -1471,7 +1489,7 @@
                 const collectionTitle = collection.title || 'Unknown Collection';
                 const count = collection.childCount || 0;
                 const subtype = collection.subtype || 'unknown';
-                const typeIcon = subtype === 'movie' ? '🎬' : '📺';
+                const typeIcon = subtype === 'movie' ? '📽️' : subtype === 'show' ? '📺' : '🎧';
                 
                 let posterURL = null;
                 const thumbUrl = collection.thumb;
@@ -1699,9 +1717,18 @@
                 `;
             }
 
-            function buildPreviewEmailHTML(contentHTML, serverName, subject, logoFilename, logoWidth, themedCSS) {
-                const logoSrc = `/static/img/${logoFilename}`;
-                
+            function buildPreviewEmailHTML(contentHTML, serverName, subject, logoFilename, logoWidth, customLogoFilename, themedCSS) {
+                let logoHTML = "";
+                let logoSrc = "";
+                if (logoFilename && logoWidth) {
+                    if (logoFilename == 'custom') {
+                        logoSrc = `/static/uploads/logos/${customLogoFilename}`;
+                    } else {
+                        logoSrc = `/static/img/${logoFilename}`;
+                    }
+                    logoHTML = `<img src="${logoSrc}" alt="${serverName}" class="email-logo" style="max-width: ${logoWidth}px; width: auto; height: auto;">`;
+                }
+
                 return `<!DOCTYPE html>
                     <html lang="en">
                         <head>
@@ -1713,7 +1740,7 @@
                         <body>
                             <div class="email-container">
                                 <div class="email-header">
-                                    <img src="${logoSrc}" alt="${serverName}" class="email-logo">
+                                    ${logoHTML}
                                     <h1 class="email-title">${serverName} Newsletter</h1>
                                 </div>
                                 
@@ -3415,7 +3442,7 @@
             async function loadCollections() {
                 try {
                     document.getElementById('movie-collections-loading').classList.remove('d-none');
-                    const movieResponse = await fetch('/fetch_collections/movies');
+                    const movieResponse = await fetch('/fetch_collections/movie');
                     const movieData = await movieResponse.json();
                     
                     if (movieData.status === 'success') {
@@ -3427,7 +3454,7 @@
                     document.getElementById('movie-collections-loading').classList.add('d-none');
 
                     document.getElementById('show-collections-loading').classList.remove('d-none');
-                    const showResponse = await fetch('/fetch_collections/shows');
+                    const showResponse = await fetch('/fetch_collections/show');
                     const showData = await showResponse.json();
                     
                     if (showData.status === 'success') {
@@ -3438,10 +3465,23 @@
                     }
                     document.getElementById('show-collections-loading').classList.add('d-none');
 
+                    document.getElementById('audio-collections-loading').classList.remove('d-none');
+                    const audioResponse = await fetch('/fetch_collections/artist');
+                    const audioData = await audioResponse.json();
+                    
+                    if (audioData.status === 'success') {
+                        audioCollections = audioData.collections;
+                        populateCollectionsDropdown('audio-collections-dropdown', audioCollections);
+                    } else {
+                        console.error('Error loading audio collections:', audioData.message);
+                    }
+                    document.getElementById('audio-collections-loading').classList.add('d-none');
+
                 } catch (error) {
                     console.error('Error loading collections:', error);
                     document.getElementById('movie-collections-loading').classList.add('d-none');
                     document.getElementById('show-collections-loading').classList.add('d-none');
+                    document.getElementById('audio-collections-loading').classList.add('d-none');
                 }
             }
 
@@ -3462,7 +3502,7 @@
             }
 
             function buildCollectionPreviewHTML(collection) {
-                const typeIcon = collection.subtype === 'movie' ? '🎬' : '📺';
+                const typeIcon = collection.subtype === 'movie' ? '📽️' : collection.subtype === 'movie' ? '📺' : '🎧';
                 
                 return `
                     <div class="collection-preview card my-3">
@@ -3503,6 +3543,8 @@
                 
                 document.getElementById('show-collections-dropdown').value = '';
                 document.getElementById('add-show-collection-btn').disabled = true;
+                document.getElementById('audio-collections-dropdown').value = '';
+                document.getElementById('add-audio-collection-btn').disabled = true;
             });
 
             document.getElementById('show-collections-dropdown').addEventListener('change', function() {
@@ -3516,6 +3558,23 @@
                 
                 document.getElementById('movie-collections-dropdown').value = '';
                 document.getElementById('add-movie-collection-btn').disabled = true;
+                document.getElementById('audio-collections-dropdown').value = '';
+                document.getElementById('add-audio-collection-btn').disabled = true;
+            });
+
+            document.getElementById('audio-collections-dropdown').addEventListener('change', function() {
+                const button = document.getElementById('add-audio-collection-btn');
+                
+                if (this.value) {
+                    button.disabled = false;
+                } else {
+                    button.disabled = true;
+                }
+                
+                document.getElementById('movie-collections-dropdown').value = '';
+                document.getElementById('add-movie-collection-btn').disabled = true;
+                document.getElementById('show-collections-dropdown').value = '';
+                document.getElementById('add-show-collection-btn').disabled = true;
             });
 
             document.getElementById('add-movie-collection-btn').addEventListener('click', function() {
@@ -3528,6 +3587,14 @@
 
             document.getElementById('add-show-collection-btn').addEventListener('click', function() {
                 const dropdown = document.getElementById('show-collections-dropdown');
+                if (dropdown.value) {
+                    const collection = JSON.parse(dropdown.selectedOptions[0].dataset.collection);
+                    addCollectionItem(collection);
+                }
+            });
+
+            document.getElementById('add-audio-collection-btn').addEventListener('click', function() {
+                const dropdown = document.getElementById('audio-collections-dropdown');
                 if (dropdown.value) {
                     const collection = JSON.parse(dropdown.selectedOptions[0].dataset.collection);
                     addCollectionItem(collection);
@@ -3556,8 +3623,10 @@
                 
                 document.getElementById('movie-collections-dropdown').value = '';
                 document.getElementById('show-collections-dropdown').value = '';
+                document.getElementById('audio-collections-dropdown').value = '';
                 document.getElementById('add-movie-collection-btn').disabled = true;
                 document.getElementById('add-show-collection-btn').disabled = true;
+                ment.getElementById('add-audio-collection-btn').disabled = true;
                 
                 console.log('Added collection:', name);
             }

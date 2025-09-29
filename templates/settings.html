@@ -98,17 +98,59 @@
                     {% if settings.conjurr_url != "" %}value="{{ settings.conjurr_url }}"{% endif %}
                     placeholder="http://localhost:2665"><br><br>
 
-                <label for="logo_filename">Logo Filename (Optional - used for custom logos at the top of emails):</label><br>
-                <input type="text" id="logo_filename" name="logo_filename"
-                    {% if settings.logo_filename != "" %}value="{{ settings.logo_filename }}"{% endif %}
-                    placeholder="Asset_45x.png"><br><br>
+                <label for="logo_filename">Logo File (Optional - used for custom logos at the top of emails. Email Theme must be custom to change!):</label><br>
+                <select id="logo_filename" name="logo_filename">
+                    <option value="newsletterr_blue_small"
+                        {% if settings.logo_filename == 'Asset_54x.png' %}selected{% endif %}
+                    >Newsletterr Square Blue</option>
+                    <option value="newsletterr_orange_small"
+                        {% if settings.logo_filename == 'Asset_46x.png' %}selected{% endif %}
+                    >Newsletterr Square Orange</option>
+                    <option value="newsletterr_blue_banner"
+                        {% if settings.email_theme == 'newsletterr_blue' or settings.logo_filename == 'Asset_94x.png' %}selected{% endif %}
+                    >Newsletterr Banner Blue</option>
+                    <option value="newsletterr_orange_banner"
+                        {% if settings.email_theme == 'plex_orange' or settings.logo_filename == 'Asset_45x.png' %}selected{% endif %}
+                    >Newsletterr Banner Orange</option>
+                    <option value="custom"
+                        {% if settings.logo_filename == 'custom' %}selected{% endif %}
+                    >Custom</option>
+                    <option value="none"
+                        {% if settings.logo_filename == '' %}selected{% endif %}
+                    >No Logo</option>
+                </select><br>
+
+                <div class="logo-preview-small">
+                    {% if settings.logo_filename %}
+                        {% if settings.logo_filename == 'custom' %}
+                            <img src="/static/uploads/logos/{{ settings.logo_filename }}" alt="Current Logo" class="logo-preview-img-small" />
+                        {% else %}
+                            <img src="/static/img/{{ settings.logo_filename }}" alt="Current Logo" class="logo-preview-img-small" />
+                        {% endif %}
+                        <span class="logo-filename-small">{{ settings.logo_filename }}</span>
+                    {% endif %}
+                </div><br>
+
+                <div id="upload_logo_div" style="display: {% if settings.logo_filename == 'custom' %}block{% else %}none{% endif %};">
+                    <label for="logo_file">Upload Custom Logo:</label><br>
+                    <input type="file" id="logo_file" name="logo_file" accept="image/png,image/jpg,image/jpeg,image/webp" />
+                    <button type="button" id="upload_logo" class="btn button btn-sm" disabled>Upload</button>
+                    {% if settings.logo_filename == 'custom' and settings.custom_logo_filename %}
+                        <button type="button" id="delete_logo" class="btn button btn-sm" style="display: inline-block;">Delete</button>
+                    {% else %}
+                        <button type="button" id="delete_logo" class="btn button btn-sm" style="display: none;">Delete</button>
+                    {% endif %}
+
+                    <input type="hidden" id="custom_logo_filename" name="custom_logo_filename" 
+                        {% if settings.custom_logo_filename %}value="{{ settings.custom_logo_filename }}"{% endif %} /><br><br>
+                </div>
 
                 <label for="logo_width">Logo Width (Optional - used to size custom logos):</label><br>
                 <input type="number" id="logo_width" name="logo_width"
                     {% if settings.logo_width != "" %}value="{{ settings.logo_width }}"{% endif %}
                     placeholder="80"><br><br>
 
-                <label for="email_theme">Email Theme:</label><br>
+                <label for="email_theme">Email Theme (must choose custom to change the logo file):</label><br>
                 <select id="email_theme" name="email_theme">
                     <option value="newsletterr_blue" {% if settings.email_theme == 'newsletterr_blue' %}selected{% endif %}>Newsletterr Blue</option>
                     <option value="plex_orange" {% if settings.email_theme == 'plex_orange' %}selected{% endif %}>Plex Orange</option>
@@ -339,6 +381,216 @@
                         showSpinner('Applying settings...');
                         settingsForm.submit();
                     }
+                }
+            });
+        </script>
+        <script>
+            const logoFileInput = document.getElementById('logo_file');
+            const logoFilenameSelect = document.getElementById('logo_filename');
+            const customLogoFilenameHidden = document.getElementById('custom_logo_filename');
+            const uploadLogoBtn = document.getElementById('upload_logo');
+            const deleteLogoBtn = document.getElementById('delete_logo');
+            const uploadLogoDiv = document.getElementById('upload_logo_div');
+
+            const preset_logo_name_to_file = {
+                "newsletterr_blue_small": "Asset_54x.png",
+                "newsletterr_orange_small": "Asset_46x.png",
+                "newsletterr_blue_banner": "Asset_94x.png",
+                "newsletterr_orange_banner": "Asset_45x.png"
+            }
+
+            const serverCustomLogoFilename = "{{ settings.custom_logo_filename if settings.custom_logo_filename else '' }}";
+
+            logoFilenameSelect?.addEventListener('change', function() {
+                const isCustomSelected = this.value === 'custom';
+                const isNoneSelected = this.value === 'none' || this.value === '';
+                
+                uploadLogoDiv.style.display = isCustomSelected ? 'block' : 'none';
+                
+                if (!isCustomSelected) {
+                    customLogoFilenameHidden.value = '';
+                } else {
+                    if (serverCustomLogoFilename && !customLogoFilenameHidden.value) {
+                        customLogoFilenameHidden.value = serverCustomLogoFilename;
+                    }
+                }
+                
+                if (isCustomSelected) {
+                    const customFilename = customLogoFilenameHidden.value || serverCustomLogoFilename;
+                    if (customFilename) {
+                        updateLogoPreview(customFilename, true);
+                    } else {
+                        updateLogoPreview('');
+                    }
+                } else if (isNoneSelected) {
+                    updateLogoPreview('');
+                } else {
+                    updateLogoPreview(this.value, false);
+                }
+            });
+
+            function updateLogoPreview(filename, isCustom = false) {
+                const previewImg = document.querySelector('.logo-preview-img-small');
+                const filenameSpan = document.querySelector('.logo-filename-small');
+                const previewContainer = document.querySelector('.logo-preview-small');
+
+                if (previewImg) previewImg.remove();
+                if (filenameSpan) filenameSpan.remove();
+
+                if (!filename || filename === 'none') {
+                    const noLogoSpan = document.createElement('span');
+                    noLogoSpan.className = 'logo-filename-small';
+                    noLogoSpan.textContent = 'No logo';
+                    previewContainer.appendChild(noLogoSpan);
+                    return;
+                }
+
+                const imgEl = document.createElement('img');
+                imgEl.className = 'logo-preview-img-small';
+
+                let displayFilename = filename;
+                
+                if (isCustom) {
+                    imgEl.src = `/static/uploads/logos/${filename}`;
+                    imgEl.alt = 'Custom logo';
+                    displayFilename = 'Custom logo';
+                } else if (preset_logo_name_to_file[filename]) {
+                    const actualFilename = preset_logo_name_to_file[filename];
+                    imgEl.src = `/static/img/${actualFilename}`;
+                    imgEl.alt = filename;
+                    displayFilename = filename.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                } else {
+                    imgEl.src = `/static/img/${filename}`;
+                    imgEl.alt = filename;
+                }
+                
+                const newFilenameSpan = document.createElement('span');
+                newFilenameSpan.className = 'logo-filename-small';
+                newFilenameSpan.textContent = isCustom ? 'Custom logo' : filename;
+                
+                previewContainer.appendChild(imgEl);
+                previewContainer.appendChild(newFilenameSpan);
+            }
+
+            logoFileInput?.addEventListener('change', function() {
+                const file = this.files[0];
+                if (file) {
+                    uploadLogoBtn.disabled = false;
+                    uploadLogoBtn.textContent = `Upload ${file.name}`;
+                } else {
+                    uploadLogoBtn.disabled = true;
+                    uploadLogoBtn.textContent = 'Upload';
+                }
+            });
+
+            uploadLogoBtn?.addEventListener('click', async function() {
+                const file = logoFileInput.files[0];
+                if (!file) return;
+
+                showSpinner('Uploading logo...');
+                uploadLogoBtn.disabled = true;
+
+                try {
+                    const formData = new FormData();
+                    formData.append('logo', file);
+
+                    const response = await fetch('/upload-logo', {
+                        method: 'POST',
+                        body: (() => {
+                            // formData.append('csrf_token', '{{ csrf_token }}');
+                            return formData;
+                        })()
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+
+                    const result = await response.json();
+
+                    if (result.status === 'success') {
+                        hideSpinner();
+                        logoFilenameSelect.value = 'custom';
+                        customLogoFilenameHidden.value = result.filename;
+                        updateLogoPreview(result.filename, true);
+                        uploadLogoBtn.disabled = true;
+                        uploadLogoBtn.textContent = 'Upload';
+                        logoFileInput.value = '';
+                        if (deleteLogoBtn) {
+                            deleteLogoBtn.style.display = 'inline-block';
+                        }
+                        alert('Logo uploaded successfully!');
+                    } else {
+                        hideSpinner();
+                        alert(`Upload failed: ${result.message}`);
+                        uploadLogoBtn.disabled = false;
+                    }
+                } catch (error) {
+                    hideSpinner();
+                    alert(`Upload error: ${error.message || error.toString()}`);
+                    uploadLogoBtn.disabled = false;
+                }
+            });
+
+            deleteLogoBtn?.addEventListener('click', async function() {
+                if (!confirm('Are you sure you want to delete the current custom logo?')) return;
+
+                showSpinner('Deleting logo...');
+                deleteLogoBtn.disabled = true;
+
+                try {
+                    const response = await fetch('/delete-logo', {
+                        method: 'POST'
+                        // headers: { 'X-CSRF-Token': '{{ csrf_token }}' }
+                    });
+
+                    const result = await response.json();
+
+                    if (result.status === 'success') {
+                        hideSpinner();
+                        logoFilenameSelect.value = 'none';
+                        customLogoFilenameHidden.value = '';
+                        updateLogoPreview('');
+                        uploadLogoDiv.style.display = 'none';
+                        deleteLogoBtn.style.display = 'none';
+                        alert('Custom logo deleted successfully!');
+                    } else {
+                        hideSpinner();
+                        alert(`Delete failed: ${result.message}`);
+                        deleteLogoBtn.disabled = false;
+                    }
+                } catch (error) {
+                    hideSpinner();
+                    alert(`Delete error: ${error.message || error.toString()}`);
+                    deleteLogoBtn.disabled = false;
+                }
+            });
+
+            document.addEventListener('DOMContentLoaded', function() {
+                const currentLogoSelection = logoFilenameSelect.value;
+                const currentCustomFilename = customLogoFilenameHidden.value;
+                
+                if (currentLogoSelection === 'custom') {
+                    uploadLogoDiv.style.display = 'block';
+                    if (currentCustomFilename) {
+                        updateLogoPreview(currentCustomFilename, true);
+                        if (deleteLogoBtn) {
+                            deleteLogoBtn.style.display = 'inline-block';
+                        }
+                    }
+                } else {
+                    uploadLogoDiv.style.display = 'none';
+                    if (deleteLogoBtn) {
+                        deleteLogoBtn.style.display = 'none';
+                    }
+                }
+                
+                if (currentLogoSelection === 'custom' && currentCustomFilename) {
+                    updateLogoPreview(currentCustomFilename, true);
+                } else if (currentLogoSelection && currentLogoSelection !== 'none') {
+                    updateLogoPreview(currentLogoSelection, false);
+                } else {
+                    updateLogoPreview('');
                 }
             });
         </script>

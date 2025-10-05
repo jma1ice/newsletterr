@@ -3737,10 +3737,6 @@ def build_text_block_html(content, block_type='textblock', theme_colors=None):
     
     return f'<div style="{style}">{formatted_content}</div>'
 
-@app.before_request
-def _boot_workers():
-    start_background_workers()
-
 @app.context_processor
 def inject_update_info():
     _ensure_recent_check()
@@ -5456,4 +5452,7 @@ if __name__ == '__main__':
     init_db(DB_PATH)
     migrate_schema("logo_filename TEXT")
     migrate_schema("logo_width INTEGER")
+
+    start_background_workers()
+
     app.run(host="0.0.0.0", port=6397, debug=True)

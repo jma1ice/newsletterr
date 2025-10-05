@@ -228,6 +228,7 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Allow for multiple named collections sections
 * Collections no longer get stuck to bottom of email
 * If no collections art it now shows plexs 2x2 'composite' image
+* Moved background workers start call to app start instead of webpage visit
 
 #### New Features:
 * Added more date range options in schedule builder to match dashboard

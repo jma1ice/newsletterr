@@ -100,6 +100,7 @@ docker run -d --name newsletterr \
   -e PUBLIC_BASE_URL=http://127.0.0.1:6397 \
   -v newsletterr-db:/app/database \
   -v newsletterr-env:/app/env \
+  -v newsletterr-uploads:/app/static/uploads \
   jma1ice/newsletterr:latest
 ```
 
@@ -165,13 +166,12 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Make sure custom templates can't override defaults
 * RA cards can all show up as different heights in email
 * Don't have page reload on stats/users pull
-* Allow for multiple collections sections | collections get stuck to bottom of email
 * Switch TV Show recently added info out to just show the show name, not episode or season number | use artwork from the show not the episode/season
 
 #### And these items are feature requests:
 * Look into email formatting across email clients | mjml?
 * Reduce image size to better fall within size regulations
-* Make clickable posters for available recommendations to take users to Plex to watch
+* Make clickable posters for available recommendations and recently added to take users to Plex to watch
 * Graph titles need to specify the date range - or at least show what time range the data is for somewhere in the email
 * Rename 'ra' and 'recs' snap in block for clarity?
 * Keep settings details on error so user won't have to re-enter them
@@ -225,7 +225,10 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 ### v0.9.17
 
 #### Fixed:
-*
+* Allow for multiple named collections sections
+* Collections no longer get stuck to bottom of email
+* If no collections art it now shows plexs 2x2 'composite' image
+* Moved background workers start call to app start instead of webpage visit
 
 #### New Features:
 * Added more date range options in schedule builder to match dashboard

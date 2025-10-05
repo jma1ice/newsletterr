@@ -11,7 +11,7 @@ Newsletterr is a lightweight Flask application that talks to **[Tautulli](https:
 ### Data & Content
 * **One‑click stats pull** - pick a time range (quick buttons: 7 / 30 / 90 / … days) and "recently added" count; Newsletterr queries Tautulli for most watched movies/shows, active users, platforms, libraries, artists and more.
 * **User Recommendations** - integrate with **conjurr** to show personalized watch suggestions (per BCC list at fetch time).
-* **Snap‑ins (drag/add workflow)** - add Stats, Graphs, Recently Added (library selection supported), Recommendations, and Text Blocks (Title, Header, Intro, Body, Outro) in any order (Title sticks to the top) to compose a tailored newsletter body.
+* **Snap‑ins (drag/add workflow)** - add Stats, Graphs, Recently Added (library selection supported), Recommendations, Collections, and Text Blocks (Title, Header, Intro, Body, Outro) in any order (Title sticks to the top) to compose a tailored newsletter body.
 
 ### Visualization
 * **Interactive charts** - Highcharts rendered in‑app; suitable images captured for reliable e‑mail client display.
@@ -145,7 +145,7 @@ By default the app listens on **http://127.0.0.1:6397**.
 2. Wait for the spinner to disappear, then the BCC, charts, and tables will populate.  
 3. Alter the BCC field to specify the recipient e‑mails (comma‑separated) if needed.  
 4. After altering, if you have connected conjurr, you can click **Get Recommendations** to pull conjurr recommendations for the users currently listed in the BCC field.  
-5. Draft the body, use the stats, graphs, recently added, and recommendations snap-ins on the right to include these in your email. 
+5. Draft the body, use the stats, graphs, recently added, collections, and recommendations snap-ins on the right to include these in your email. 
 6. Hit **Send Email**. Success and error messages will show after running.  
 
 ---
@@ -161,12 +161,11 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 ## Planned Changes
 
 ### For the v0.9.17 sprint, these items are to be addressed:
-* Fix everywhere days and # of items is hardcoded
 * Plex 'Secure Connections' setting causing image 401
 * Make sure custom templates can't override defaults
 * RA cards can all show up as different heights in email
 * Don't have page reload on stats/users pull
-* Switch TV Show recently added info out to just show the show name, not episode or season number | use artwork from the show not the episode/season
+* Switch TV Show recently added info out to just show the show name, not episode or season number | ra currently uses episode synopsis - update backend to pull gp/parent metadata
 
 #### And these items are feature requests:
 * Look into email formatting across email clients | mjml?
@@ -176,7 +175,7 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Rename 'ra' and 'recs' snap in block for clarity?
 * Keep settings details on error so user won't have to re-enter them
 * Nix the view buttons
-* No library name on recently added overlay | change date to days since added
+* Change date on recently added to days since added
 
 
 ### For the v2025.1 sprint, these items are feature requests:
@@ -229,12 +228,16 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Collections no longer get stuck to bottom of email
 * If no collections art it now shows plexs 2x2 'composite' image
 * Moved background workers start call to app start instead of webpage visit
+* Recently added now uses artwork from the show not the episode/season
+* Recently added now filters for when episodes of a show are found and only adds one instance of that show
+* Fixed everywhere days and # of items is hardcoded
 
 #### New Features:
 * Added more date range options in schedule builder to match dashboard
 * Added many more options for scheduled emails frequency
 * Added collections snap-in - thank you yungsnuzzy!
 * Custom logo logic in settings. Added in small/banner/custom/none dropdown - thanks dreondre!
+* Got rid of library name on recently added overlay
 
 
 ### v0.9.16

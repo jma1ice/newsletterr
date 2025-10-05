@@ -171,7 +171,7 @@
                 }
                 
                 .email-content {
-                    padding: 30px 20px;
+                    padding: 10px 15px;
                     color: var(--email-text);
                     background: var(--email-card-bg);
                 }
@@ -255,10 +255,10 @@
                     color: #333;
                     border-bottom: 1px solid rgba(222, 226, 230, 0.8);
                 }
-                
+
                 .recently-added {
                     background: var(--email-card-bg);
-                    padding: 20px;
+                    padding-bottom: 10px;
                     border-radius: 8px;
                     margin: 20px 0;
                     border: 1px solid var(--email-border);
@@ -267,7 +267,8 @@
                 .recently-added h2 {
                     text-align: center;
                     color: var(--email-text);
-                    margin-bottom: 20px;
+                    margin-bottom: 10px;
+                    margin-top: 0;
                 }
                 
                 .recommendations-block {
@@ -475,6 +476,7 @@
                 recent: recentData.length,
                 recos: Object.keys(recsPayload).length,
                 dateRange: data.date_range,
+                itemsCount: data.items_count,
                 graphCommands: graphCommands.length
             });
             
@@ -924,7 +926,29 @@
             );
         }
         
-        allItems = allItems.slice(0, 10);
+        const seenShows = new Set();
+        const deduplicated = [];
+        
+        for (const item of allItems) {
+            const itemType = (item.media_type || item.type || '').toLowerCase();
+            
+            if (itemType === 'episode' || itemType === 'season') {
+                const showId = item.grandparent_rating_key || item.grandparent_title;
+                
+                if (showId && !seenShows.has(showId)) {
+                    seenShows.add(showId);
+                    const displayItem = { ...item };
+                    displayItem.original_title = item.title;
+                    displayItem.title = item.grandparent_title || item.title;
+                    deduplicated.push(displayItem);
+                }
+            } else {
+                deduplicated.push(item);
+            }
+        }
+
+        const maxItems = templateData.items_count ? parseInt(templateData.items_count) : 10;
+        allItems = deduplicated.slice(0, maxItems);
         
         if (allItems.length === 0) {
             return `<div class="recently-added"><p style="text-align: center; color: var(--email-muted); padding: 20px;">No recently added items found${libraryFilter ? ` for ${libraryFilter}` : ''}</p></div>`;
@@ -937,11 +961,19 @@
             const duration = msToHMS(item.duration);
             const added = formatDate(item.added_at || item.originally_available_at);
             const library = item.library_name || item.section_name || '';
+
+            const item_type = (item.media_type || item.type || '').toLowerCase();
+            let summary = '';
+            if (item_type === 'episode' || item_type === 'season') {
+                summary = item.grandparent_tagline || item.grandparent_summary || item.parent_summary || item.tagline || item.summary || '';
+            } else {
+                summary = item.tagline || item.summary || '';
+            }
             
             return {
                 title,
                 sub,
-                summary: item.tagline || item.summary || '',
+                summary: summary,
                 duration,
                 added,
                 thumb: thumbPath,
@@ -966,24 +998,11 @@
                 ">
                     <div style="position: relative; aspect-ratio: 2/3; background: #f8f9fa;">
                         <img src="${imgURL}" style="width: 100%; height: 100%; object-fit: cover; display: block;" alt="${item.title}">
-                        ${item.library ? `
-                            <div style="
-                                position: absolute;
-                                top: 4px;
-                                right: 4px;
-                                background: rgba(0, 0, 0, 0.7);
-                                color: white;
-                                padding: 2px 8px;
-                                border-radius: 12px;
-                                font-size: 10px;
-                                line-height: 1;
-                            ">${item.library}</div>
-                        ` : ''}
                         ${item.added ? `
                             <div style="
                                 position: absolute;
-                                bottom: 4px;
-                                right: 4px;
+                                bottom: 1px;
+                                right: 1px;
                                 background: rgba(0, 0, 0, 0.6);
                                 color: rgba(255, 255, 255, 0.9);
                                 padding: 2px 6px;

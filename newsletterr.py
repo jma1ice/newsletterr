@@ -16,7 +16,7 @@ from urllib.parse import quote_plus, urljoin, urlparse, parse_qs, urlencode, quo
 
 app = Flask(__name__)
 app.jinja_env.globals["version"] = "v0.9.17"
-app.jinja_env.globals["publish_date"] = "September 29, 2025"
+app.jinja_env.globals["publish_date"] = "October 05, 2025"
 
 def get_global_cache_status():
     try:
@@ -5453,6 +5453,7 @@ if __name__ == '__main__':
     migrate_schema("logo_filename TEXT")
     migrate_schema("logo_width INTEGER")
 
-    start_background_workers()
+    if os.environ.get("WERKZEUG_RUN_MAIN") == "true" and not app.debug:
+        start_background_workers()
 
     app.run(host="0.0.0.0", port=6397, debug=True)

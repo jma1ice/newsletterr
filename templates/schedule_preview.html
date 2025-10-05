@@ -640,7 +640,6 @@
         const emailText = document.getElementById('email_text').value;
 
         let contentHTML = "";
-        const collectionItems = [];
         
         for (let item of selectedItems) {
             if (item.type === 'textblock') {
@@ -724,14 +723,13 @@
                 contentHTML += buildRecentlyAddedHTML(item.raLibrary);
             } else if (item.type === 'recs') {
                 contentHTML += buildRecommendationsHTML(item.userKey);
-            } else if (item.type === 'collection') {
-                collectionItems.push(item.collection);
-                continue;
+            } else if (item.type === 'collection_group') {
+                const groupTitle = item.title || 'Collections';
+                const groupCollections = item.collections || [];
+                if (groupCollections.length > 0) {
+                    contentHTML += buildCollectionPreviewHTMLForEmail(groupTitle, groupCollections);
+                }
             }
-        }
-
-        if (collectionItems.length > 0) {
-            contentHTML += buildCollectionPreviewHTMLForEmail("Collections", collectionItems);
         }
 
         return buildCompleteEmailHTML(contentHTML, serverName, subject);

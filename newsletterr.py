@@ -1460,19 +1460,79 @@ def convert_html_to_plain_text(html_content):
 def fetch_and_attach_image(image_url, msg_root, cid_name, base_url=""):
     try:
         print(f"fetch_and_attach_image called with: {image_url}")
-        if image_url.startswith('/'):
+        
+        # Check if this is a local static file (logo) or a Plex image
+        is_local_static = (
+            image_url.startswith('/static/') or 
+            image_url.startswith('/static\\') or
+            'static/img/' in image_url or
+            'static/uploads/' in image_url
+        )
+        
+        if is_local_static:
+            # Local static file - fetch directly
             full_url = urljoin(base_url or "http://127.0.0.1:6397", image_url)
+            print(f"Local static file, fetching directly: {full_url}")
+        elif image_url.startswith('/library/') or image_url.startswith('/photo/'):
+            # Plex image - use our proxy endpoint
+            full_url = urljoin(base_url or "http://127.0.0.1:6397", f"/proxy-art{image_url}")
+            print(f"Plex image, using proxy: {full_url}")
+        elif image_url.startswith('http'):
+            # Full URL - check if it's Plex or external
+            from urllib.parse import urlparse, parse_qs
+            parsed = urlparse(image_url)
+            
+            # If it contains Plex-specific paths, route through proxy
+            if '/library/' in parsed.path or '/photo/' in parsed.path or '/composite/' in parsed.path:
+                path = parsed.path
+                query = parsed.query
+                
+                # Remove X-Plex-Token from query if present
+                if query:
+                    params = parse_qs(query)
+                    if 'X-Plex-Token' in params:
+                        del params['X-Plex-Token']
+                    
+                    # Rebuild query string
+                    if params:
+                        from urllib.parse import urlencode
+                        query_str = urlencode(params, doseq=True)
+                        path = f"{path}?{query_str}"
+                
+                full_url = urljoin(base_url or "http://127.0.0.1:6397", f"/proxy-art{path}")
+                print(f"Full Plex URL, using proxy: {full_url}")
+            else:
+                # External URL - fetch directly
+                full_url = image_url
+                print(f"External URL, fetching directly: {full_url}")
         else:
-            full_url = image_url
+            # Default case
+            full_url = urljoin(base_url or "http://127.0.0.1:6397", image_url)
+            print(f"Default case, fetching: {full_url}")
         
         print(f"Final URL to fetch: {full_url}")
-        response = requests.get(full_url, timeout=10)
+        
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8'
+        }
+        
+        response = requests.get(full_url, timeout=15, headers=headers)
         print(f"Response status: {response.status_code}")
+        print(f"Response content length: {len(response.content)}")
+        
         response.raise_for_status()
+        
+        # Check if we actually got image data
+        if len(response.content) < 100:
+            print(f"Warning: Response content too small ({len(response.content)} bytes), likely not a valid image")
+            return None
         
         content_type = response.headers.get('Content-Type')
         print(f"Content-Type: {content_type}")
+        
         if not content_type or not content_type.startswith('image/'):
+            print(f"Warning: Invalid content type: {content_type}")
             content_type = mimetypes.guess_type(full_url)[0] or 'image/png'
         
         subtype = content_type.split('/')[-1]
@@ -1489,8 +1549,15 @@ def fetch_and_attach_image(image_url, msg_root, cid_name, base_url=""):
         print(f"Successfully attached image with CID: {cid}")
         return cid
         
+    except requests.exceptions.Timeout as e:
+        print(f"Timeout fetching image {image_url}: {e}")
+        return None
+    except requests.exceptions.RequestException as e:
+        print(f"Request error fetching image {image_url}: {e}")
+        return None
     except Exception as e:
         print(f"Error processing image {image_url}: {e}")
+        traceback.print_exc()
         return None
 
 def fetch_and_attach_blurred_image(image_url, msg_root, cid_name, base_url=""):
@@ -2165,7 +2232,7 @@ def build_recommendations_section_with_cids(available_items, unavailable_items, 
         </div>
     """
 
-def build_collections_html_with_cids(all_collections, msg_root, theme_colors, base_url=""):
+def build_collections_html_with_cids(all_collections, msg_root, theme_colors, base_url="", custom_title=None):
     if not all_collections:
         return f"""
         <div style="background-color: {theme_colors['card_bg']}; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid {theme_colors['border']}; font-family: 'IBM Plex Sans';">
@@ -2511,10 +2578,12 @@ def build_collections_html_with_cids(all_collections, msg_root, theme_colors, ba
         margin: 0;
         padding: 0;
     """
+
+    display_title = custom_title if custom_title else "Collections"
     
     return f"""
         <div style="{container_style}">
-            <h2 style="{title_style}">Collections</h2>
+            <h2 style="{title_style}">{display_title}</h2>
             <table cellpadding="0" cellspacing="0" border="0" style="{table_style}">
                 {items_html}
             </table>
@@ -2564,7 +2633,6 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, recom
     if email_text.strip():
         content_html += build_text_block_html(email_text, 'textblock', theme_colors)
     
-    all_collections = []
     for item in selected_items:
         item_type = item.get('type', '')
         
@@ -2597,13 +2665,11 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, recom
                 else:
                     content_html += build_recommendations_html_with_cids(recommendations_data, msg_root, theme_colors, user_dict, base_url)
         
-        elif item_type == 'collection':
-            collection_data = item.get('collection', {})
-            if collection_data:
-                all_collections.append(collection_data)
-
-    if all_collections:
-        content_html += build_collections_html_with_cids(all_collections, msg_root, theme_colors, base_url)
+        elif item_type == 'collection_group':
+            group_title = item.get('title', 'Collections')
+            group_collections = item.get('collections', [])
+            if group_collections:
+                content_html += build_collections_html_with_cids(group_collections, msg_root, theme_colors, base_url, group_title)
 
     return build_complete_email_html_with_cid_logo(content_html, server_name, subject, logo_src, logo_width, is_scheduled)
 
@@ -3928,9 +3994,55 @@ def proxy_art(art_path):
     plex_token = settings['plex_token']
     plex_url = settings['plex_url'].rstrip('/')
 
-    full_url = f"{plex_url}/{art_path}?X-Plex-Token={decrypt(plex_token)}"
-    r = requests.get(full_url, stream=True)
-    return Response(r.content, content_type=r.headers['Content-Type'])
+    # Check if this is a composite image
+    if '/composite/' in art_path:
+        print(f"proxy-art: Detected composite image: {art_path}")
+        
+        # Build the composite URL with token
+        composite_url = f"/{art_path}"
+        if '?' in composite_url:
+            composite_url += f"&X-Plex-Token={decrypt(plex_token)}"
+        else:
+            composite_url += f"?X-Plex-Token={decrypt(plex_token)}"
+        
+        # URL encode the composite URL for the transcode parameter
+        from urllib.parse import quote
+        encoded_composite_url = quote(composite_url, safe='')
+        
+        # Build the transcode request
+        full_url = (
+            f"{plex_url}/photo/:/transcode"
+            f"?width=360&height=540&minSize=1&upscale=1"
+            f"&url={encoded_composite_url}"
+            f"&X-Plex-Token={decrypt(plex_token)}"
+        )
+    else:
+        # Regular image - direct URL
+        full_url = f"{plex_url}/{art_path}"
+        if '?' in full_url:
+            full_url += f"&X-Plex-Token={decrypt(plex_token)}"
+        else:
+            full_url += f"?X-Plex-Token={decrypt(plex_token)}"
+    
+    print(f"proxy-art: Fetching {full_url}")
+    
+    try:
+        headers = {
+            'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8'
+        }
+        
+        r = requests.get(full_url, stream=True, timeout=15, headers=headers)
+        r.raise_for_status()
+        
+        content_type = r.headers.get('Content-Type', 'image/jpeg')
+        print(f"proxy-art: Success - Content-Type: {content_type}, Size: {r.headers.get('Content-Length', 'unknown')}")
+        
+        return Response(r.content, content_type=content_type, headers={
+            'Cache-Control': 'public, max-age=86400'
+        })
+    except Exception as e:
+        print(f"proxy-art: Error fetching {full_url}: {e}")
+        return Response("Image not found", status=404)
 
 @app.get("/proxy-img")
 def proxy_img():
@@ -4002,8 +4114,6 @@ def fetch_collections(collection_type):
                             "sectionTitle": section_title,
                             "sectionId": section_id
                         })
-            else:
-                print(f"{section.get('type')} : {section.get('title')}")
 
         return jsonify({
             "status": "success", 

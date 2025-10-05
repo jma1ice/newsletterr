@@ -201,6 +201,9 @@
                         <div class="row mt-4">
                             <div class="col-12">
                                 <h2>Plex Collections</h2>
+                                <button type="button" class="btn button btn-sm mb-2" id="add-collection-group-btn">
+                                    + Collection Group
+                                </button>
                                 <div class="row">
                                     <div class="col-md-4">
                                         <h5>📽️ Movie Collections</h5>
@@ -895,7 +898,6 @@
                     const themedCSS = getThemedEmailCSS();
 
                     let contentHTML = "";
-                    const collectionItems = [];
                     
                     for (let item of selectedItems) {
                         if (item.type === 'textblock') {
@@ -924,14 +926,14 @@
                             contentHTML += buildRecentlyAddedPreviewHTML(item.raLibrary);
                         } else if (item.type === 'recs') {
                             contentHTML += buildRecommendationsPreviewHTML(item.userKey);
-                        } else if (item.type === 'collection') {
-                            collectionItems.push(item.collection);
-                            continue;
+                        } else if (item.type === 'collection_group') {
+                            if (item.collections && item.collections.length > 0) {
+                                contentHTML += buildCollectionPreviewHTMLForEmail(
+                                    item.title || 'Collections', 
+                                    item.collections
+                                );
+                            }
                         }
-                    }
-
-                    if (collectionItems.length > 0) {
-                        contentHTML += buildCollectionPreviewHTMLForEmail("Collections", collectionItems);
                     }
 
                     const completeHTML = buildPreviewEmailHTML(contentHTML, serverName, subject, logoFilename, logoWidth, customLogoFilename, themedCSS);
@@ -2016,6 +2018,40 @@
                                         oninput="updateTextBlockName('${item.id}', ${index})">${currentContent}</textarea>
                                 </div>
                             `;
+                        } else if (item.type === 'collection_group') {
+                            const currentTitle = item.title || 'Unnamed Collection Group';
+                            const collectionCount = item.collections ? item.collections.length : 0;
+                            
+                            htmlContent += `
+                                <div class="selected-item d-flex flex-column p-2 mb-2 border rounded" 
+                                    data-index="${index}" draggable="true">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <input type="text" 
+                                            class="form-control form-control-sm collection-group-title" 
+                                            data-index="${index}"
+                                            value="${currentTitle}" 
+                                            placeholder="Enter group name..."
+                                            style="max-width: 300px;">
+                                        <div>
+                                            <span class="badge badge-info me-2">${collectionCount} collection(s)</span>
+                                            <span class="badge badge-secondary me-2">collection group</span>
+                                            <button type="button" class="btn btn-sm btn-outline-danger remove-item-btn" data-index="${index}">x</button>
+                                        </div>
+                                    </div>
+                                    <div class="collection-group-items text-[#333] dark:text-[#8acbd4]" style="font-size: 0.85rem;">
+                                        ${item.collections && item.collections.length > 0 
+                                            ? item.collections.map((col, i) => `
+                                                <div class="d-flex justify-content-between align-items-center py-1 border-bottom">
+                                                    <span>${col.title} (${col.childCount} items)</span>
+                                                    <button type="button" class="btn btn-sm btn-outline-danger remove-collection-btn" 
+                                                            data-group-index="${index}" data-collection-index="${i}">x</button>
+                                                </div>
+                                            `).join('')
+                                            : '<em class="text-[#333] dark:text-[#8acbd4]">No collections added yet</em>'
+                                        }
+                                    </div>
+                                </div>
+                            `;
                         } else {
                             htmlContent += `
                                 <div class="selected-item d-flex justify-content-between align-items-center p-2 mb-2 border rounded bg-light" 
@@ -2031,6 +2067,28 @@
                     });
                     
                     container.innerHTML = htmlContent;
+
+                    document.querySelectorAll('.collection-group-title').forEach(input => {
+                        input.addEventListener('input', (e) => {
+                            const index = parseInt(e.target.dataset.index);
+                            if (selectedItems[index] && selectedItems[index].type === 'collection_group') {
+                                selectedItems[index].title = e.target.value;
+                                debouncedUpdatePreview();
+                            }
+                        });
+                    });
+                    
+                    document.querySelectorAll('.remove-collection-btn').forEach(btn => {
+                        btn.addEventListener('click', (e) => {
+                            const groupIndex = parseInt(e.target.dataset.groupIndex);
+                            const collectionIndex = parseInt(e.target.dataset.collectionIndex);
+                            
+                            if (selectedItems[groupIndex] && selectedItems[groupIndex].collections) {
+                                selectedItems[groupIndex].collections.splice(collectionIndex, 1);
+                                updateSelectedItemsDisplay();
+                            }
+                        });
+                    });
                     
                     setupDragAndDrop();
                 }
@@ -3601,24 +3659,52 @@
                 }
             });
 
-            function addCollectionItem(collection) {
-                const id = `collection-${collection.key}`;
-                const name = `${collection.title} Collection`;
-                const type = 'collection';
-                
-                if (selectedItems.some(item => item.id === id && item.type === type)) {
-                    console.log('Collection already added:', name);
-                    return;
-                }
+            let collectionGroupCounter = 0;
 
-                const item = { 
-                    id, 
-                    name, 
-                    type, 
-                    collection: collection
+            document.getElementById('add-collection-group-btn').addEventListener('click', function() {
+                collectionGroupCounter++;
+                const groupId = `collection-group-${collectionGroupCounter}`;
+                
+                const newGroup = {
+                    id: groupId,
+                    name: 'Collection Group',
+                    type: 'collection_group',
+                    title: 'New Collection Group',
+                    collections: []
                 };
                 
-                selectedItems.push(item);
+                selectedItems.push(newGroup);
+                updateSelectedItemsDisplay();
+            });
+
+            function addCollectionItem(collection) {
+                let targetGroup = null;
+                for (let i = selectedItems.length - 1; i >= 0; i--) {
+                    if (selectedItems[i].type === 'collection_group') {
+                        targetGroup = selectedItems[i];
+                        break;
+                    }
+                }
+                
+                if (!targetGroup) {
+                    collectionGroupCounter++;
+                    targetGroup = {
+                        id: `collection-group-${collectionGroupCounter}`,
+                        name: 'Collection Group',
+                        type: 'collection_group',
+                        title: 'New Collection Group',
+                        collections: []
+                    };
+                    selectedItems.push(targetGroup);
+                }
+                
+                const exists = targetGroup.collections.some(c => c.key === collection.key);
+                if (exists) {
+                    console.log('Collection already in this group:', collection.title);
+                    return;
+                }
+                
+                targetGroup.collections.push(collection);
                 updateSelectedItemsDisplay();
                 
                 document.getElementById('movie-collections-dropdown').value = '';
@@ -3628,7 +3714,7 @@
                 document.getElementById('add-show-collection-btn').disabled = true;
                 ment.getElementById('add-audio-collection-btn').disabled = true;
                 
-                console.log('Added collection:', name);
+                console.log('Added collection to group:', collection.title);
             }
 
             document.addEventListener('DOMContentLoaded', loadCollections);

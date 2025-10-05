@@ -81,6 +81,7 @@
                                             data-start-date="{{ schedule.start_date }}"
                                             data-send-time="{{ schedule.send_time or '09:00' }}"
                                             data-date-range="{{ schedule.date_range or 7 }}"
+                                            data-items-count="{{ schedule.items_count or 10 }}"
                                             data-bs-toggle="modal" 
                                             data-bs-target="#scheduleModal">
                                         ✏️ Edit
@@ -222,7 +223,21 @@
                             <option value="270">270 days (3 quarters)</option>
                             <option value="365">365 days (1 year)</option>
                         </select>
-                        <div class="form-text">How many days of Tautulli data to include in stats and graphs</div>
+                        <div class="form-text text-info">How many days of Tautulli data to include in stats and graphs</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="items-count-select" class="form-label">Recently Added Items Count</label>
+                        <select class="form-select theme-input" id="items-count-select" required>
+                            <option value="">Select item count...</option>
+                            <option value="5">5 items</option>
+                            <option value="10" selected>10 items</option>
+                            <option value="15">15 items</option>
+                            <option value="20">20 items</option>
+                            <option value="25">25 items</option>
+                            <option value="30">30 items</option>
+                        </select>
+                        <div class="form-text text-info">How many recently added items to show (after deduplication)</div>
                     </div>
                     
                     <div class="row mb-3">
@@ -914,6 +929,7 @@
             document.getElementById('start-date').value = new Date().toISOString().split('T')[0];
             document.getElementById('send-time').value = '09:00';
             document.getElementById('date-range-select').value = '7';
+            document.getElementById('items-count-select').value = '10';
         }
         
         function populateEditModal(scheduleData) {
@@ -927,6 +943,7 @@
             document.getElementById('start-date').value = scheduleData.startDate;
             document.getElementById('send-time').value = scheduleData.sendTime;
             document.getElementById('date-range-select').value = scheduleData.dateRange || '7';
+            document.getElementById('items-count-select').value = scheduleData.itemsCount || '10';
         }
         
         document.getElementById('add-schedule-btn').addEventListener('click', function() {
@@ -943,7 +960,8 @@
                     frequency: this.dataset.frequency,
                     startDate: this.dataset.startDate,
                     sendTime: this.dataset.sendTime,
-                    dateRange: this.dataset.dateRange
+                    dateRange: this.dataset.dateRange,
+                    itemsCount: this.dataset.itemsCount
                 };
                 populateEditModal(scheduleData);
             });
@@ -958,8 +976,9 @@
             const startDate = document.getElementById('start-date').value;
             const sendTime = document.getElementById('send-time').value;
             const dateRange = document.getElementById('date-range-select').value;
+            const itemsCount = document.getElementById('items-count-select').value;
             
-            if (!name || !emailListId || !templateId || !frequency || !startDate || !sendTime || !dateRange) {
+            if (!name || !emailListId || !templateId || !frequency || !startDate || !sendTime || !dateRange || !itemsCount) {
                 alert('Please fill in all fields');
                 return;
             }
@@ -981,7 +1000,8 @@
                         frequency: frequency,
                         start_date: startDate,
                         send_time: sendTime,
-                        date_range: parseInt(dateRange)
+                        date_range: parseInt(dateRange),
+                        items_count: parseInt(itemsCount)
                     })
                 });
                 

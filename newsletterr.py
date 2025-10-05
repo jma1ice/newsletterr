@@ -319,6 +319,7 @@ def init_db(db_path):
             start_date TEXT NOT NULL,
             send_time TEXT DEFAULT '09:00', -- Time of day to send (HH:MM format)
             date_range INTEGER DEFAULT 7, -- Number of days of data to include
+            items_count INTEGER DEFAULT 10,
             last_sent TIMESTAMP,
             next_send TIMESTAMP NOT NULL,
             is_active BOOLEAN DEFAULT 1,
@@ -340,6 +341,11 @@ def init_db(db_path):
     if 'date_range' not in columns:
         print("Adding date_range column to email_schedules table...")
         cursor.execute("ALTER TABLE email_schedules ADD COLUMN date_range INTEGER DEFAULT 7")
+        conn.commit()
+
+    if 'items_count' not in columns:
+        print("Adding items_count column to email_schedules table...")
+        cursor.execute("ALTER TABLE email_schedules ADD COLUMN items_count INTEGER DEFAULT 10")
         conn.commit()
     
     cursor.execute("PRAGMA table_info(settings)")
@@ -662,6 +668,7 @@ def get_email_schedules():
         SELECT 
             es.id, es.name, es.email_list_id, es.template_id, es.frequency, es.start_date, 
             es.send_time, es.last_sent, es.next_send, es.is_active, es.created_at, es.date_range,
+            es.items_count,
             el.name as email_list_name,
             et.name as template_name
         FROM email_schedules es
@@ -716,8 +723,9 @@ def get_email_schedules():
             'is_active': bool(schedule[9]),
             'created_at': schedule[10],
             'date_range': schedule[11] or 7,
-            'email_list_name': schedule[12],
-            'template_name': schedule[13]
+            'items_count': schedule[12] or 10,
+            'email_list_name': schedule[13],
+            'template_name': schedule[14]
         })
     return result
 
@@ -854,7 +862,7 @@ def calculate_next_send(frequency, start_date, send_time='09:00', last_sent=None
     next_date = next_date.replace(hour=hour, minute=minute, second=0, microsecond=0)
     return next_date
 
-def create_email_schedule(name, email_list_id, template_id, frequency, start_date, send_time='09:00', date_range=7):
+def create_email_schedule(name, email_list_id, template_id, frequency, start_date, send_time='09:00', date_range=7, items_count=10):
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
@@ -862,9 +870,9 @@ def create_email_schedule(name, email_list_id, template_id, frequency, start_dat
     
     try:
         cursor.execute("""
-            INSERT INTO email_schedules (name, email_list_id, template_id, frequency, start_date, send_time, next_send, date_range)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (name, email_list_id, template_id, frequency, start_date, send_time, next_send.isoformat(), date_range))
+            INSERT INTO email_schedules (name, email_list_id, template_id, frequency, start_date, send_time, next_send, date_range, items_count)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (name, email_list_id, template_id, frequency, start_date, send_time, next_send.isoformat(), date_range, items_count))
         conn.commit()
         return True
     except sqlite3.Error as e:
@@ -873,7 +881,7 @@ def create_email_schedule(name, email_list_id, template_id, frequency, start_dat
     finally:
         conn.close()
 
-def update_email_schedule(schedule_id, name, email_list_id, template_id, frequency, start_date, send_time='09:00', date_range=7):
+def update_email_schedule(schedule_id, name, email_list_id, template_id, frequency, start_date, send_time='09:00', date_range=7, items_count=10):
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
@@ -883,9 +891,10 @@ def update_email_schedule(schedule_id, name, email_list_id, template_id, frequen
         cursor.execute("""
             UPDATE email_schedules 
             SET name = ?, email_list_id = ?, template_id = ?, frequency = ?, 
-                start_date = ?, send_time = ?, next_send = ?, date_range = ?
+                start_date = ?, send_time = ?, next_send = ?, date_range = ?,
+                items_count = ?
             WHERE id = ?
-        """, (name, email_list_id, template_id, frequency, start_date, send_time, next_send.isoformat(), date_range, schedule_id))
+        """, (name, email_list_id, template_id, frequency, start_date, send_time, next_send.isoformat(), date_range, items_count, schedule_id))
         conn.commit()
         return True
     except sqlite3.Error as e:
@@ -1380,7 +1389,7 @@ def get_stat_cells(title, row):
     
     return cells
 
-def fetch_tautulli_data_for_email(tautulli_base_url, tautulli_api_key, date_range, server_name):
+def fetch_tautulli_data_for_email(tautulli_base_url, tautulli_api_key, date_range, server_name, items_count=10):
     data = {
         'settings': {'server_name': server_name},
         'stats': [],
@@ -1427,11 +1436,36 @@ def fetch_tautulli_data_for_email(tautulli_base_url, tautulli_api_key, date_rang
             library_section_ids[f"{library['section_id']}"] = library["section_name"]
         
         for section_id in library_section_ids.keys():
-            recent, _ = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_recently_added', section_id, None, "10")
-            if recent:
-                for item in recent['recently_added']:
-                    item['library_name'] = library_section_ids[section_id]
-                data['recent_data'].append(recent)
+            try:
+                fetch_count = str(items_count * 25)
+                recent, _ = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_recently_added', section_id, None, fetch_count)
+                
+                if recent and recent.get('recently_added'):
+                    for item in recent['recently_added']:
+                        item['library_name'] = library_section_ids[section_id]
+                    
+                    seen_shows = {}
+                    deduplicated = []
+                    
+                    for item in recent['recently_added']:
+                        item_type = (item.get('media_type') or item.get('type') or '').lower()
+                        
+                        if item_type in ['episode', 'season']:
+                            show_id = item.get('grandparent_rating_key') or item.get('grandparent_title')
+                            
+                            if show_id and show_id not in seen_shows:
+                                seen_shows[show_id] = True
+                                item['original_title'] = item.get('title')
+                                item['title'] = item.get('grandparent_title') or item.get('title')
+                                deduplicated.append(item)
+                        else:
+                            deduplicated.append(item)
+                    
+                    limit = int(items_count)
+                    recent['recently_added'] = deduplicated[:limit]
+                    data['recent_data'].append(recent)
+            except Exception as e:
+                print(f"Error fetching recent data for section {section_id}: {e}")
                 
         print(f"Fetched Tautulli data: {len(data['stats'])} stats, {len(data['graph_data'])} graphs, {len(data['recent_data'])} recent sections")
         
@@ -1684,7 +1718,7 @@ def build_stats_html_with_cid_background(stat_data, msg_root, theme_colors, base
         </div>
     """
 
-def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, library_filter=None, base_url=""):
+def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, library_filter=None, base_url="", max_items=None):
     if not recent_data:
         return f"""
         <div style="background-color: {theme_colors['card_bg']}; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid {theme_colors['border']}; font-family: 'IBM Plex Sans';">
@@ -1702,6 +1736,9 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
     
     if library_filter:
         items = [item for item in items if library_filter.lower() in item.get('library_name', '').lower()]
+
+    if max_items and len(items) > max_items:
+        items = items[:max_items]
     
     if not items:
         return f"""
@@ -1721,12 +1758,37 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
             title = item.get('title', 'Unknown')
             year = item.get('year', '')
             library = item.get('library_name', '')
-            summary = item.get('tagline') or item.get('summary', '')
             added_date = ""
             duration = ""
+
+            item_type = (item.get('media_type') or item.get('type') or '').lower()
+            if item_type in ['episode', 'season']:
+                summary = (
+                    item.get('grandparent_tagline') or 
+                    item.get('grandparent_summary') or 
+                    item.get('parent_summary') or 
+                    item.get('tagline') or 
+                    item.get('summary', '')
+                )
+            else:
+                summary = item.get('tagline') or item.get('summary', '')
             
             poster_cid = None
-            poster_candidates = [item.get('thumb'), item.get('art'), item.get('parent_thumb'), item.get('grandparent_thumb')]
+            if item_type in ['episode', 'season']:
+                poster_candidates = [
+                    item.get('grandparent_thumb'),
+                    item.get('parent_thumb'), 
+                    item.get('thumb'),
+                    item.get('art')
+                ]
+            else:
+                poster_candidates = [
+                    item.get('thumb'),
+                    item.get('art'),
+                    item.get('parent_thumb'),
+                    item.get('grandparent_thumb')
+                ]
+
             for candidate in poster_candidates:
                 if candidate:
                     poster_url = f"/proxy-art{candidate}" if not candidate.startswith('/proxy-art') else candidate
@@ -1736,7 +1798,8 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
                         f"recent-{i}-{j}", 
                         base_url
                     )
-                    break
+                    if poster_cid:
+                        break
                         
             if item.get('added_at'):
                 try:
@@ -1808,27 +1871,13 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
                             {f'''
                             <div style="
                                 float: right;
-                                background-color: rgba(0, 0, 0, 0.7);
-                                color: white;
-                                padding: 2px 8px;
-                                border-radius: 12px;
-                                font-size: 10px;
-                                margin: 2px;
-                                font-family: 'IBM Plex Sans';
-                                line-height: 1;
-                            ">{library}</div>
-                            ''' if library else ''}
-                            
-                            {f'''
-                            <div style="
-                                float: right;
                                 clear: right;
                                 background-color: rgba(0, 0, 0, 0.6);
                                 color: rgba(255, 255, 255, 0.9);
                                 padding: 2px 6px;
                                 border-radius: 4px;
                                 font-size: 9px;
-                                margin: 153px 2px 2px 2px;
+                                margin: 171px 1px 1px 1px;
                                 font-family: 'IBM Plex Sans';
                                 line-height: 1;
                             ">{added_date}</div>
@@ -1918,7 +1967,7 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
     
     container_style = f"""
         background-color: {theme_colors['card_bg']};
-        padding: 20px;
+        padding-bottom: 10px;
         border-radius: 8px;
         margin: 20px 0;
         border: 1px solid {theme_colors['border']};
@@ -1928,7 +1977,7 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
     title_style = f"""
         text-align: center;
         color: {theme_colors['text']};
-        margin: 0 0 20px 0;
+        margin: 0 0 10px 0;
         font-size: 24px;
         font-weight: bold;
         font-family: 'IBM Plex Sans';
@@ -2585,7 +2634,7 @@ def attach_logo_image(msg_root, logo_filename, custom_logo_filename, base_url=""
         logo_url = f"/static/img/{logo_filename}"
     return fetch_and_attach_image(logo_url, msg_root, "logo", base_url)
 
-def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, recommendations_data=None, user_dict=None, base_url="", target_user_key=None, is_scheduled=False):
+def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, recommendations_data=None, user_dict=None, base_url="", target_user_key=None, is_scheduled=False, items_count=None):
     selected_items = json.loads(template_data.get('selected_items', '[]'))
     email_text = template_data.get('email_text', '')
     subject = template_data.get('subject', '')
@@ -2641,7 +2690,17 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, recom
         elif item_type == 'ra':
             library_filter = item.get('raLibrary')
             recent_data = tautulli_data.get('recent_data', [])
-            content_html += build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, library_filter, base_url)
+
+            max_items = items_count
+            if max_items is None:
+                cache_info = get_cache_info('recent_data')
+                if cache_info.get('params'):
+                    try:
+                        max_items = int(cache_info['params'].get('count', 10))
+                    except (TypeError, ValueError):
+                        max_items = 10
+
+            content_html += build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, library_filter, base_url, max_items)
         
         elif item_type == 'recs':
             if recommendations_data:
@@ -2692,7 +2751,7 @@ def build_complete_email_html_with_cid_logo(content_html, server_name, subject, 
     header_style = f"""
         background: linear-gradient(135deg, {theme_colors['accent']} 0%, {theme_colors['primary']} 100%);
         color: white;
-        padding: 30px 20px;
+        padding: 10px 20px;
         text-align: center;
         font-family: 'IBM Plex Sans';
     """
@@ -2721,7 +2780,7 @@ def build_complete_email_html_with_cid_logo(content_html, server_name, subject, 
     """
     
     content_style = f"""
-        padding: 20px 15px;
+        padding: 10px 15px;
         color: {theme_colors['text']};
         background-color: {theme_colors['card_bg']};
         font-family: 'IBM Plex Sans';
@@ -3208,11 +3267,12 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
     try:
         schedule_conn = sqlite3.connect(DB_PATH)
         schedule_cursor = schedule_conn.cursor()
-        schedule_cursor.execute("SELECT date_range FROM email_schedules WHERE id = ?", (schedule_id,))
+        schedule_cursor.execute("SELECT date_range, items_count FROM email_schedules WHERE id = ?", (schedule_id,))
         schedule_result = schedule_cursor.fetchone()
         schedule_conn.close()
         
         date_range = schedule_result[0] if schedule_result else 7
+        items_count = schedule_result[1] if schedule_result else 10
         
         email_lists_conn = sqlite3.connect(DB_PATH)
         email_lists_cursor = email_lists_conn.cursor()
@@ -3324,7 +3384,7 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
                     recipients, subject, selected_items, user_key, recommendations_data,
                     from_email, alias_email, reply_to_email, encrypted_password,
                     smtp_server, smtp_port, smtp_protocol, 
-                    server_name, tautulli_base_url, tautulli_api_key, date_range, template_name,
+                    server_name, tautulli_base_url, tautulli_api_key, date_range, items_count, template_name,
                     logo_filename, logo_width, custom_logo_filename, from_name
                 )
                 
@@ -3348,7 +3408,7 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
                 to_emails_list, subject, selected_items,
                 from_email, alias_email, reply_to_email, encrypted_password,
                 smtp_server, smtp_port, smtp_protocol,
-                server_name, tautulli_base_url, tautulli_api_key, date_range, template_name,
+                server_name, tautulli_base_url, tautulli_api_key, date_range, items_count, template_name,
                 logo_filename, logo_width, custom_logo_filename, from_name
             )
         
@@ -3357,7 +3417,7 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
         traceback.print_exc()
         return False
 
-def send_scheduled_user_email_with_cids(recipients, subject, selected_items, user_key, recommendations_data, from_email, alias_email, reply_to_email, encrypted_password, smtp_server, smtp_port, smtp_protocol, server_name, tautulli_base_url, tautulli_api_key, date_range, template_name, logo_filename, logo_width, custom_logo_filename, from_name):
+def send_scheduled_user_email_with_cids(recipients, subject, selected_items, user_key, recommendations_data, from_email, alias_email, reply_to_email, encrypted_password, smtp_server, smtp_port, smtp_protocol, server_name, tautulli_base_url, tautulli_api_key, date_range, items_count, template_name, logo_filename, logo_width, custom_logo_filename, from_name):
     try:
         print(f"SMTP Config: {smtp_server}:{smtp_port} using {smtp_protocol}")
 
@@ -3394,7 +3454,7 @@ def send_scheduled_user_email_with_cids(recipients, subject, selected_items, use
         msg_root.attach(msg_alternative)
 
         print("Building email content...")
-        tautulli_data = fetch_tautulli_data_for_email(tautulli_base_url, tautulli_api_key, date_range, server_name)
+        tautulli_data = fetch_tautulli_data_for_email(tautulli_base_url, tautulli_api_key, date_range, server_name, items_count)
         tautulli_data["settings"]["logo_filename"] = logo_filename
         tautulli_data["settings"]["logo_width"] = logo_width
         tautulli_data["settings"]["custom_logo_filename"] = custom_logo_filename
@@ -3417,7 +3477,8 @@ def send_scheduled_user_email_with_cids(recipients, subject, selected_items, use
             user_dict,
             base_url,
             target_user_key=user_key,
-            is_scheduled=True
+            is_scheduled=True,
+            items_count=items_count
         )
 
         plain_text = convert_html_to_plain_text(email_html)
@@ -3484,7 +3545,7 @@ def send_scheduled_user_email_with_cids(recipients, subject, selected_items, use
         traceback.print_exc()
         return False
 
-def send_scheduled_single_email_with_cids(to_emails_list, subject, selected_items, from_email, alias_email, reply_to_email, encrypted_password, smtp_server, smtp_port, smtp_protocol, server_name, tautulli_base_url, tautulli_api_key, date_range, template_name, logo_filename, logo_width, custom_logo_filename, from_name, email_text=""):
+def send_scheduled_single_email_with_cids(to_emails_list, subject, selected_items, from_email, alias_email, reply_to_email, encrypted_password, smtp_server, smtp_port, smtp_protocol, server_name, tautulli_base_url, tautulli_api_key, date_range, items_count, template_name, logo_filename, logo_width, custom_logo_filename, from_name, email_text=""):
     try:
         print(f"SMTP Config: {smtp_server}:{smtp_port} using {smtp_protocol}")
 
@@ -3521,7 +3582,7 @@ def send_scheduled_single_email_with_cids(to_emails_list, subject, selected_item
         msg_root.attach(msg_alternative)
 
         print("Building email content...")
-        tautulli_data = fetch_tautulli_data_for_email(tautulli_base_url, tautulli_api_key, date_range, server_name)
+        tautulli_data = fetch_tautulli_data_for_email(tautulli_base_url, tautulli_api_key, date_range, server_name, items_count)
         tautulli_data["settings"]["logo_filename"] = logo_filename
         tautulli_data["settings"]["logo_width"] = logo_width
         tautulli_data["settings"]["custom_logo_filename"] = custom_logo_filename
@@ -3542,7 +3603,8 @@ def send_scheduled_single_email_with_cids(to_emails_list, subject, selected_item
             None,
             base_url,
             None,
-            True
+            True,
+            items_count
         )
 
         plain_text = convert_html_to_plain_text(email_html)
@@ -3902,10 +3964,31 @@ def index():
             recent_data = []
             for section_id in library_section_ids.keys():
                 try:
-                    rd, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_recently_added', section_id, error, count)
-                    for item in rd['recently_added']:
-                        item['library_name'] = library_section_ids[section_id]
-                    recent_data.append(rd if rd is not None else {})
+                    fetch_count = str(int(count) * 25)
+                    rd, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_recently_added', section_id, error, fetch_count)
+                    if rd and rd.get('recently_added'):
+                        for item in rd['recently_added']:
+                            item['library_name'] = library_section_ids[section_id]
+                        
+                        seen_shows = {}
+                        deduplicated = []
+                        
+                        for item in rd['recently_added']:
+                            item_type = (item.get('media_type') or item.get('type') or '').lower()
+                            
+                            if item_type in ['episode', 'season']:
+                                show_id = item.get('grandparent_rating_key') or item.get('grandparent_title')
+                                
+                                if show_id and show_id not in seen_shows:
+                                    seen_shows[show_id] = True
+                                    item['original_title'] = item.get('title')
+                                    item['title'] = item.get('grandparent_title') or item.get('title')
+                                    deduplicated.append(item)
+                            else:
+                                deduplicated.append(item)
+                        
+                        rd['recently_added'] = deduplicated[:int(count)]
+                        recent_data.append(rd)
                 except Exception as e:
                     recent_data.append({})
                     if error is None:
@@ -4760,11 +4843,12 @@ def create_schedule():
         start_date = data.get('start_date')
         send_time = data.get('send_time', '09:00')
         date_range = int(data.get('date_range', 7))
+        items_count = int(data.get('items_count', 10))
         
         if not all([name, email_list_id, template_id, frequency, start_date]):
             return jsonify({"status": "error", "message": "All fields are required"}), 400
         
-        success = create_email_schedule(name, email_list_id, template_id, frequency, start_date, send_time, date_range)
+        success = create_email_schedule(name, email_list_id, template_id, frequency, start_date, send_time, date_range, items_count)
         if success:
             return jsonify({"status": "success", "message": f"Schedule '{name}' created successfully"})
         else:
@@ -4784,11 +4868,12 @@ def update_schedule(schedule_id):
         start_date = data.get('start_date')
         send_time = data.get('send_time', '09:00')
         date_range = int(data.get('date_range', 7))
+        items_count = int(data.get('items_count', 10))
         
         if not all([name, email_list_id, template_id, frequency, start_date]):
             return jsonify({"status": "error", "message": "All fields are required"}), 400
         
-        success = update_email_schedule(schedule_id, name, email_list_id, template_id, frequency, start_date, send_time, date_range)
+        success = update_email_schedule(schedule_id, name, email_list_id, template_id, frequency, start_date, send_time, date_range, items_count)
         if success:
             return jsonify({"status": "success", "message": f"Schedule '{name}' updated successfully"})
         else:
@@ -4867,7 +4952,7 @@ def preview_schedule(schedule_id):
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         cursor.execute("""
-            SELECT template_id, date_range, email_list_id
+            SELECT template_id, date_range, email_list_id, items_count
             FROM email_schedules 
             WHERE id = ?
         """, (schedule_id,))
@@ -4877,8 +4962,9 @@ def preview_schedule(schedule_id):
         if not schedule_result:
             return jsonify({"status": "error", "message": "Schedule not found"}), 404
         
-        template_id, date_range, email_list_id = schedule_result
+        template_id, date_range, email_list_id, items_count = schedule_result
         date_range = date_range or 7
+        items_count = items_count or 10
         
         templates_conn = sqlite3.connect(DB_PATH)
         templates_cursor = templates_conn.cursor()
@@ -4942,7 +5028,8 @@ def preview_schedule(schedule_id):
             settings['tautulli_url'].rstrip('/'), 
             settings['tautulli_api'], 
             date_range, 
-            settings['server_name']
+            settings['server_name'],
+            items_count
         ) if settings.get('tautulli_url') and settings.get('tautulli_api') else {
             'settings': settings,
             'stats': [],
@@ -4981,6 +5068,7 @@ def preview_schedule(schedule_id):
             "email_text": email_text,
             "selected_items": selected_items,
             "date_range": date_range,
+            "items_count": items_count,
             "settings": settings,
             "stats": tautulli_data.get('stats', []),
             "graph_data": tautulli_data.get('graph_data', []),

@@ -21,6 +21,7 @@
                         <th>Template</th>
                         <th>Frequency</th>
                         <th>Data Range</th>
+                        <th>Items Count</th>
                         <th>Start Date</th>
                         <th>Send Time</th>
                         <th>Next Send</th>
@@ -51,6 +52,9 @@
                             <td>{{ schedule.frequency.title() }}</td>
                             <td>
                                 <span class="badge bg-secondary">{{ schedule.date_range or 7 }} days</span>
+                            </td>
+                            <td>
+                                <span class="badge bg-dark">{{ schedule.items_count or 10 }} items</span>
                             </td>
                             <td>
                                 <span class="text-muted" title="{{ schedule.start_date }}">{{ schedule.start_date_formatted or schedule.start_date }}</span>
@@ -175,6 +179,7 @@
                         <label for="email-list-select" class="form-label">Email List</label>
                         <select class="form-select theme-input" id="email-list-select" required>
                             <option value="">Select an email list...</option>
+                            <option value="ALL">ALL (All active users)</option>
                             {% for email_list in email_lists %}
                                 <option value="{{ email_list.id }}">{{ email_list.name }}</option>
                             {% endfor %}
@@ -937,7 +942,16 @@
             document.getElementById('save-schedule-btn').textContent = 'Update Schedule';
             document.getElementById('schedule-id').value = scheduleData.scheduleId;
             document.getElementById('schedule-name').value = scheduleData.scheduleName;
-            document.getElementById('email-list-select').value = scheduleData.emailListId;
+
+            const emailListSelect = document.getElementById('email-list-select');
+            const emailListValue = scheduleData.emailListId;
+            
+            emailListSelect.value = String(emailListValue);
+            
+            if (emailListSelect.value === '') {
+                console.warn('Email list option not found for value:', emailListValue);
+            }
+
             document.getElementById('template-select').value = scheduleData.templateId;
             document.getElementById('frequency-select').value = scheduleData.frequency;
             document.getElementById('start-date').value = scheduleData.startDate;
@@ -995,7 +1009,7 @@
                     },
                     body: JSON.stringify({
                         name: name,
-                        email_list_id: parseInt(emailListId),
+                        email_list_id: emailListId == 'ALL' ? 'ALL' : parseInt(emailListId),
                         template_id: parseInt(templateId),
                         frequency: frequency,
                         start_date: startDate,

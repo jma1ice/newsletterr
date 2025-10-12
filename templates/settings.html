@@ -98,6 +98,13 @@
                     {% if settings.conjurr_url != "" %}value="{{ settings.conjurr_url }}"{% endif %}
                     placeholder="http://localhost:2665"><br><br>
 
+                <label for="recipient_display_name">Recipient Display Name (used in recommendation emails):</label><br>
+                <select id="recipient_display_name" name="recipient_display_name">
+                    <option value="email" {% if settings.recipient_display_name == 'email' %}selected{% endif %}>Email Address</option>
+                    <option value="username" {% if settings.recipient_display_name == 'username' %}selected{% endif %}>Username</option>
+                    <option value="friendly_name" {% if settings.recipient_display_name == 'friendly_name' %}selected{% endif %}>Friendly Name</option>
+                </select><br><br>
+
                 <label for="logo_filename">Logo File (Optional - used for custom logos at the top of emails. Email Theme must be custom to change!):</label><br>
                 <select id="logo_filename" name="logo_filename">
                     <option value="newsletterr_blue_small"

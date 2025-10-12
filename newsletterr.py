@@ -16,7 +16,7 @@ from urllib.parse import quote_plus, urljoin, urlparse, parse_qs, urlencode, quo
 
 app = Flask(__name__)
 app.jinja_env.globals["version"] = "v0.9.17"
-app.jinja_env.globals["publish_date"] = "October 05, 2025"
+app.jinja_env.globals["publish_date"] = "October 11, 2025"
 
 def get_global_cache_status():
     try:
@@ -709,10 +709,19 @@ def get_email_schedules():
         except Exception:
             pass
 
+        email_list_id = schedule[2]
+        email_list_name = schedule[13]
+        
+        if email_list_id == 0:
+            email_list_id = 'ALL'
+            email_list_name = 'ALL (All active users)'
+        elif email_list_name is None:
+            email_list_name = 'Unknown'
+
         result.append({
             'id': schedule[0],
             'name': schedule[1],
-            'email_list_id': schedule[2],
+            'email_list_id': email_list_id,
             'template_id': schedule[3],
             'frequency': schedule[4],
             'start_date': start_date_raw,
@@ -724,7 +733,7 @@ def get_email_schedules():
             'created_at': schedule[10],
             'date_range': schedule[11] or 7,
             'items_count': schedule[12] or 10,
-            'email_list_name': schedule[13],
+            'email_list_name': email_list_name,
             'template_name': schedule[14]
         })
     return result
@@ -869,10 +878,12 @@ def create_email_schedule(name, email_list_id, template_id, frequency, start_dat
     next_send = calculate_next_send(frequency, start_date, send_time)
     
     try:
+        list_id_value = 0 if email_list_id == 'ALL' else int(email_list_id)
+
         cursor.execute("""
             INSERT INTO email_schedules (name, email_list_id, template_id, frequency, start_date, send_time, next_send, date_range, items_count)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (name, email_list_id, template_id, frequency, start_date, send_time, next_send.isoformat(), date_range, items_count))
+        """, (name, list_id_value, template_id, frequency, start_date, send_time, next_send.isoformat(), date_range, items_count))
         conn.commit()
         return True
     except sqlite3.Error as e:
@@ -886,15 +897,17 @@ def update_email_schedule(schedule_id, name, email_list_id, template_id, frequen
     cursor = conn.cursor()
     
     next_send = calculate_next_send(frequency, start_date, send_time)
-    
+
     try:
+        list_id_value = 0 if email_list_id == 'ALL' else int(email_list_id)
+
         cursor.execute("""
             UPDATE email_schedules 
             SET name = ?, email_list_id = ?, template_id = ?, frequency = ?, 
                 start_date = ?, send_time = ?, next_send = ?, date_range = ?,
                 items_count = ?
             WHERE id = ?
-        """, (name, email_list_id, template_id, frequency, start_date, send_time, next_send.isoformat(), date_range, items_count, schedule_id))
+        """, (name, list_id_value, template_id, frequency, start_date, send_time, next_send.isoformat(), date_range, items_count, schedule_id))
         conn.commit()
         return True
     except sqlite3.Error as e:
@@ -1211,13 +1224,397 @@ def group_recipients_by_user(to_emails_list, user_dict):
 def send_scheduled_email(schedule_id, email_list_id, template_id):
     return send_scheduled_email_with_cids(schedule_id, email_list_id, template_id)
 
-def run_tautulli_command(base_url, api_key, command, section_id, error, time_range='30'):
+def get_plex_machine_id():
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT plex_url, plex_token FROM settings WHERE id = 1")
+        plex_settings = cursor.fetchone()
+        conn.close()
+        
+        if not plex_settings or not plex_settings[0] or not plex_settings[1]:
+            return None
+        
+        plex_url = plex_settings[0].rstrip('/')
+        plex_token = decrypt(plex_settings[1])
+        
+        with PlexAPI(
+            access_token=plex_token,
+            server_url=plex_url
+        ) as plex_api:
+            res = plex_api.server.get_server_identity()
+            if res.object:
+                return res.object.media_container.machine_identifier
+        
+        return None
+    except Exception as e:
+        print(f"Error getting Plex machine ID: {e}")
+        return None
+
+def build_plex_web_link(rating_key, machine_id):
+    if not machine_id or not rating_key:
+        return ""
+    
+    return f"https://app.plex.tv/web/app#!/server/{machine_id}/details?key=/library/metadata/{rating_key}"
+
+def search_plex_for_rating_key(title, year, media_type, plex_url, plex_token, tmdb_id=None):
+    try:
+        decrypted_token = decrypt(plex_token)
+        
+        if tmdb_id:
+            guid = f"tmdb://{tmdb_id}"
+            search_query = quote_plus(title)
+            api_url = f"{plex_url}/search?query={search_query}&X-Plex-Token={decrypted_token}"
+            
+            headers = {
+                'Accept': 'application/json',
+                'X-Plex-Client-Identifier': str(uuid.uuid4())
+            }
+            
+            response = requests.get(api_url, headers=headers, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+            
+            for provider in data.get('MediaContainer', {}).get('Metadata', []):
+                item_type = provider.get('type', '')
+                
+                if (media_type == 'movie' and item_type == 'movie') or \
+                   (media_type == 'show' and item_type == 'show'):
+                    
+                    guids = provider.get('Guid', [])
+                    if isinstance(guids, list):
+                        for guid_obj in guids:
+                            if isinstance(guid_obj, dict):
+                                guid_id = guid_obj.get('id', '')
+                                if f"tmdb://{tmdb_id}" in guid_id or f"themoviedb://{tmdb_id}" in guid_id:
+                                    print(f"Found exact TMDB match for {title} (tmdb:{tmdb_id})")
+                                    return provider.get('ratingKey')
+                    
+                    single_guid = provider.get('guid', '')
+                    if f"tmdb://{tmdb_id}" in single_guid or f"themoviedb://{tmdb_id}" in single_guid:
+                        print(f"Found exact TMDB match for {title} (tmdb:{tmdb_id})")
+                        return provider.get('ratingKey')
+        
+        search_query = quote_plus(title)
+        api_url = f"{plex_url}/search?query={search_query}&X-Plex-Token={decrypted_token}"
+        
+        headers = {
+            'Accept': 'application/json',
+            'X-Plex-Client-Identifier': str(uuid.uuid4())
+        }
+        
+        response = requests.get(api_url, headers=headers, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+        
+        best_match = None
+        for provider in data.get('MediaContainer', {}).get('Metadata', []):
+            item_title = provider.get('title', '').lower()
+            item_year = str(provider.get('year', ''))
+            item_type = provider.get('type', '')
+            
+            if not ((media_type == 'movie' and item_type == 'movie') or \
+                    (media_type == 'show' and item_type == 'show')):
+                continue
+            
+            if tmdb_id:
+                guids = provider.get('Guid', [])
+                guid_match = False
+                
+                if isinstance(guids, list):
+                    for guid_obj in guids:
+                        if isinstance(guid_obj, dict):
+                            guid_id = guid_obj.get('id', '')
+                            if f"tmdb://{tmdb_id}" in guid_id or f"themoviedb://{tmdb_id}" in guid_id:
+                                guid_match = True
+                                break
+                
+                single_guid = provider.get('guid', '')
+                if f"tmdb://{tmdb_id}" in single_guid or f"themoviedb://{tmdb_id}" in single_guid:
+                    guid_match = True
+                
+                if guid_match:
+                    print(f"Found TMDB match for {title} via fallback search (tmdb:{tmdb_id})")
+                    return provider.get('ratingKey')
+            
+            title_match = title.lower() in item_title or item_title in title.lower()
+            year_match = not year or str(year) == item_year
+            
+            if title_match and year_match:
+                if item_title == title.lower():
+                    print(f"Found exact title match for {title}")
+                    return provider.get('ratingKey')
+                elif not best_match:
+                    best_match = provider.get('ratingKey')
+        
+        if best_match:
+            print(f"Found approximate match for {title}")
+            return best_match
+        
+        print(f"No match found in Plex for {title} ({year})" + (f" [tmdb:{tmdb_id}]" if tmdb_id else ""))
+        return None
+        
+    except Exception as e:
+        print(f"Error searching Plex for {title}: {e}")
+        traceback.print_exc()
+        return None
+
+def fetch_tv_shows_from_plex_sdk(section_id, limit=10, machine_id=None):
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT plex_url, plex_token FROM settings WHERE id = 1")
+        plex_settings = cursor.fetchone()
+        conn.close()
+        
+        if not plex_settings or not plex_settings[0] or not plex_settings[1]:
+            print("Plex not configured")
+            return []
+        
+        plex_url = plex_settings[0].rstrip('/')
+        plex_token = decrypt(plex_settings[1])
+        
+        api_url = (
+            f"{plex_url}/library/sections/{section_id}/all"
+            f"?type=2"
+            f"&sort=episode.addedAt:desc"
+            f"&X-Plex-Container-Start=0"
+            f"&X-Plex-Container-Size={limit}"
+            f"&X-Plex-Token={plex_token}"
+        )
+        
+        headers = {
+            'Accept': 'application/json',
+            'X-Plex-Client-Identifier': str(uuid.uuid4())
+        }
+        
+        response = requests.get(api_url, headers=headers, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+        
+        shows = []
+        media_container = data.get('MediaContainer', {})
+        library_name = media_container.get('librarySectionTitle', '')
+        
+        for directory in media_container.get('Metadata', []):
+            rating_key = str(directory.get('ratingKey', ''))
+            
+            show = {
+                'title': directory.get('title', 'Unknown'),
+                'rating_key': rating_key,
+                'year': str(directory.get('year', '')),
+                'thumb': directory.get('thumb', ''),
+                'art': directory.get('art', ''),
+                'summary': directory.get('summary', ''),
+                'added_at': str(directory.get('addedAt', '')),
+                'content_rating': directory.get('contentRating', ''),
+                'guid': directory.get('guid', ''),
+                'key': directory.get('key', ''),
+                'media_type': 'show',
+                'type': 'show',
+                'library_name': library_name,
+                'plex_url': build_plex_web_link(rating_key, machine_id) if rating_key else ''
+            }
+            shows.append(show)
+        
+        print(f"Fetched {len(shows)} TV shows from Plex API (sorted by recent episode)")
+        return shows
+            
+    except Exception as e:
+        print(f"Error fetching TV shows from Plex API: {e}")
+        traceback.print_exc()
+        return []
+
+def fetch_movies_from_plex_sdk(section_id, limit=10, machine_id=None):
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT plex_url, plex_token FROM settings WHERE id = 1")
+        plex_settings = cursor.fetchone()
+        conn.close()
+        
+        if not plex_settings or not plex_settings[0] or not plex_settings[1]:
+            print("Plex not configured")
+            return []
+        
+        plex_url = plex_settings[0].rstrip('/')
+        plex_token = decrypt(plex_settings[1])
+        
+        api_url = (
+            f"{plex_url}/library/sections/{section_id}/all"
+            f"?type=1"
+            f"&sort=addedAt:desc"
+            f"&X-Plex-Container-Start=0"
+            f"&X-Plex-Container-Size={limit}"
+            f"&X-Plex-Token={plex_token}"
+        )
+        
+        headers = {
+            'Accept': 'application/json',
+            'X-Plex-Client-Identifier': str(uuid.uuid4())
+        }
+        
+        response = requests.get(api_url, headers=headers, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+        
+        movies = []
+        media_container = data.get('MediaContainer', {})
+        library_name = media_container.get('librarySectionTitle', '')
+        
+        for video in media_container.get('Metadata', []):
+            rating_key = str(video.get('ratingKey', ''))
+            
+            movie = {
+                'title': video.get('title', 'Unknown'),
+                'rating_key': rating_key,
+                'year': str(video.get('year', '')),
+                'thumb': video.get('thumb', ''),
+                'art': video.get('art', ''),
+                'summary': video.get('summary', ''),
+                'added_at': str(video.get('addedAt', '')),
+                'content_rating': video.get('contentRating', ''),
+                'duration': str(video.get('duration', '')),
+                'guid': video.get('guid', ''),
+                'key': video.get('key', ''),
+                'media_type': 'movie',
+                'type': 'movie',
+                'library_name': library_name,
+                'plex_url': build_plex_web_link(rating_key, machine_id) if rating_key else ''
+            }
+            movies.append(movie)
+        
+        print(f"Fetched {len(movies)} movies from Plex API")
+        return movies
+            
+    except Exception as e:
+        print(f"Error fetching movies from Plex API: {e}")
+        traceback.print_exc()
+        return []
+
+def fetch_albums_from_plex_sdk(section_id, limit=10, machine_id=None):
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT plex_url, plex_token FROM settings WHERE id = 1")
+        plex_settings = cursor.fetchone()
+        conn.close()
+        
+        if not plex_settings or not plex_settings[0] or not plex_settings[1]:
+            print("Plex not configured")
+            return []
+        
+        plex_url = plex_settings[0].rstrip('/')
+        plex_token = decrypt(plex_settings[1])
+        
+        api_url = (
+            f"{plex_url}/library/sections/{section_id}/all"
+            f"?type=9"
+            f"&sort=addedAt:desc"
+            f"&X-Plex-Container-Start=0"
+            f"&X-Plex-Container-Size={limit}"
+            f"&X-Plex-Token={plex_token}"
+        )
+        
+        headers = {
+            'Accept': 'application/json',
+            'X-Plex-Client-Identifier': str(uuid.uuid4())
+        }
+        
+        response = requests.get(api_url, headers=headers, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+        
+        albums = []
+        media_container = data.get('MediaContainer', {})
+        library_name = media_container.get('librarySectionTitle', '')
+        
+        for album in media_container.get('Metadata', []):
+            rating_key = str(album.get('ratingKey', ''))
+            
+            album_data = {
+                'title': album.get('title', 'Unknown'),
+                'rating_key': rating_key,
+                'year': str(album.get('year', '')),
+                'thumb': album.get('thumb', ''),
+                'art': album.get('art', ''),
+                'summary': album.get('summary', ''),
+                'added_at': str(album.get('addedAt', '')),
+                'guid': album.get('guid', ''),
+                'key': album.get('key', ''),
+                'parent_title': album.get('parentTitle', ''),
+                'parent_thumb': album.get('parentThumb', ''),
+                'leaf_count': album.get('leafCount', 0),
+                'media_type': 'album',
+                'type': 'album',
+                'library_name': library_name,
+                'plex_url': build_plex_web_link(rating_key, machine_id) if rating_key else ''
+            }
+            albums.append(album_data)
+        
+        print(f"Fetched {len(albums)} albums from Plex API")
+        return albums
+            
+    except Exception as e:
+        print(f"Error fetching albums from Plex API: {e}")
+        traceback.print_exc()
+        return []
+
+def fetch_recently_added_using_plex_sdk(tautulli_base_url, tautulli_api_key, items_count=10):
+    recent_data = []
+    
+    machine_id = get_plex_machine_id()
+    if machine_id:
+        print(f"Plex machine ID: {machine_id}")
+    else:
+        print("Warning: Could not get Plex machine ID, links may not work")
+    
+    libraries, _ = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_library_names', None, None, "10")
+    
+    if not libraries:
+        print("No libraries found")
+        return recent_data
+    
+    for library in libraries:
+        section_id = library['section_id']
+        section_type = library['section_type']
+        library_name = library['section_name']
+        
+        print(f"\nFetching recently added for library: {library_name} (type: {section_type})")
+        
+        items = []
+        
+        if section_type == 'show':
+            items = fetch_tv_shows_from_plex_sdk(section_id, items_count, machine_id)
+        elif section_type == 'movie':
+            items = fetch_movies_from_plex_sdk(section_id, items_count, machine_id)
+        elif section_type == 'artist':
+            items = fetch_albums_from_plex_sdk(section_id, items_count, machine_id)
+        else:
+            print(f"Using Tautulli fallback for library type: {section_type}")
+            rd, _ = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_recently_added', section_id, None, str(items_count), 0)
+            if rd and rd.get('recently_added'):
+                items = rd['recently_added']
+                for item in items:
+                    item['library_name'] = library_name
+                    if 'rating_key' in item and machine_id:
+                        item['plex_url'] = build_plex_web_link(item['rating_key'], machine_id)
+        
+        if items:
+            recent_data.append({
+                'recently_added': items
+            })
+    
+    return recent_data
+
+def run_tautulli_command(base_url, api_key, command, section_id, error, time_range='30', start='0'):
     out_data = None
     
     if command == 'get_users' or command == 'get_library_names':
         api_url = f"{base_url}/api/v2?apikey={decrypt(api_key)}&cmd={command}"
     elif command == 'get_recently_added':
-        api_url = f"{base_url}/api/v2?apikey={decrypt(api_key)}&cmd={command}&count={time_range}&section_id={section_id}"
+        api_url = f"{base_url}/api/v2?apikey={decrypt(api_key)}&cmd={command}&count={time_range}&section_id={section_id}&start={start}"
+        print(f"Tautulli API call: get_recently_added with count={time_range}, start={start}")
     else:
         if command == 'get_plays_per_month':
             month_range = str(math.ceil(int(time_range) / 30))
@@ -1256,6 +1653,16 @@ def run_conjurr_command(base_url, user_dict, error):
         else:
             error += ", Conjurr Error: No Base URL provided"
 
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("SELECT plex_url, plex_token FROM settings WHERE id = 1")
+    plex_settings = cursor.fetchone()
+    conn.close()
+    
+    plex_url = plex_settings[0].rstrip('/') if plex_settings and plex_settings[0] else None
+    plex_token = plex_settings[1] if plex_settings and plex_settings[1] else None
+    machine_id = get_plex_machine_id() if plex_url and plex_token else None
+
     api_base_url = f"{base_url}/recommendations?user_id="
     recommendations_dict = {}
 
@@ -1265,6 +1672,39 @@ def run_conjurr_command(base_url, user_dict, error):
             response = requests.get(api_url)
             response.raise_for_status()
             data = response.json()
+
+            if plex_url and plex_token and machine_id:
+                if 'movie_posters' in data:
+                    for item in data['movie_posters']:
+                        title = item.get('title', '')
+                        year = item.get('year', '')
+                        tmdb_id = item.get('tmdbId') or item.get('tmdb_id')
+                        
+                        rating_key = search_plex_for_rating_key(title, year, 'movie', plex_url, plex_token, tmdb_id=tmdb_id)
+                        
+                        if rating_key:
+                            item['rating_key'] = rating_key
+                            item['machine_id'] = machine_id
+                            item['plex_url'] = build_plex_web_link(rating_key, machine_id)
+                            print(f"Linked movie: {title} (tmdb:{tmdb_id}) -> ratingKey:{rating_key}")
+                        else:
+                            print(f"Could not find movie in Plex: {title} (tmdb:{tmdb_id})")
+                
+                if 'show_posters' in data:
+                    for item in data['show_posters']:
+                        title = item.get('title', '')
+                        year = item.get('year', '')
+                        tmdb_id = item.get('tmdbId') or item.get('tmdb_id')
+                        
+                        rating_key = search_plex_for_rating_key(title, year, 'show', plex_url, plex_token, tmdb_id=tmdb_id)
+                        
+                        if rating_key:
+                            item['rating_key'] = rating_key
+                            item['machine_id'] = machine_id
+                            item['plex_url'] = build_plex_web_link(rating_key, machine_id)
+                            print(f"Linked show: {title} (tmdb:{tmdb_id}) -> ratingKey:{rating_key}")
+                        else:
+                            print(f"Could not find show in Plex: {title} (tmdb:{tmdb_id})")
 
             recommendations_dict[user] = data
         except requests.exceptions.RequestException as e:
@@ -1329,6 +1769,35 @@ def _background_update_checker():
             _check_github_latest()
         finally:
             time.sleep(app.config["UPDATE_CHECK_INTERVAL_SEC"])
+
+def get_user_display_name(user_id, users_data, display_preference='email'):
+    if not users_data:
+        return str(user_id)
+    
+    user = next((u for u in users_data if str(u.get('user_id')) == str(user_id)), None)
+    
+    if not user:
+        return str(user_id)
+    
+    if display_preference == 'username':
+        return user.get('username') or user.get('email') or str(user_id)
+    elif display_preference == 'friendly_name':
+        return user.get('friendly_name') or user.get('username') or user.get('email') or str(user_id)
+    else:
+        return user.get('email') or user.get('username') or str(user_id)
+
+def build_enhanced_user_dict(users_data):
+    user_dict = {}
+    if users_data:
+        for user in users_data:
+            if user.get('is_active'):
+                user_dict[str(user['user_id'])] = {
+                    'email': user.get('email', ''),
+                    'username': user.get('username', ''),
+                    'friendly_name': user.get('friendly_name', ''),
+                    'user_id': user.get('user_id')
+                }
+    return user_dict
 
 def get_stat_headers(title):
     if title == "Most Watched Movies" or title == "Most Watched TV Shows":
@@ -1430,49 +1899,19 @@ def fetch_tautulli_data_for_email(tautulli_base_url, tautulli_api_key, date_rang
         data['graph_data'] = graph_data
         data['graph_commands'] = graph_commands
 
-        libraries, _ = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_library_names', None, None, "10")
-        library_section_ids = {}
-        for library in libraries:
-            library_section_ids[f"{library['section_id']}"] = library["section_name"]
-        
-        for section_id in library_section_ids.keys():
-            try:
-                fetch_count = str(items_count * 25)
-                recent, _ = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_recently_added', section_id, None, fetch_count)
-                
-                if recent and recent.get('recently_added'):
-                    for item in recent['recently_added']:
-                        item['library_name'] = library_section_ids[section_id]
-                    
-                    seen_shows = {}
-                    deduplicated = []
-                    
-                    for item in recent['recently_added']:
-                        item_type = (item.get('media_type') or item.get('type') or '').lower()
-                        
-                        if item_type in ['episode', 'season']:
-                            show_id = item.get('grandparent_rating_key') or item.get('grandparent_title')
-                            
-                            if show_id and show_id not in seen_shows:
-                                seen_shows[show_id] = True
-                                item['original_title'] = item.get('title')
-                                item['title'] = item.get('grandparent_title') or item.get('title')
-                                deduplicated.append(item)
-                        else:
-                            deduplicated.append(item)
-                    
-                    limit = int(items_count)
-                    recent['recently_added'] = deduplicated[:limit]
-                    data['recent_data'].append(recent)
-            except Exception as e:
-                print(f"Error fetching recent data for section {section_id}: {e}")
+        recent_data = fetch_recently_added_using_plex_sdk(tautulli_base_url, tautulli_api_key, items_count)
+        data['recent_data'] = recent_data
                 
         print(f"Fetched Tautulli data: {len(data['stats'])} stats, {len(data['graph_data'])} graphs, {len(data['recent_data'])} recent sections")
         
     except Exception as e:
         print(f"Error fetching Tautulli data: {e}")
+        traceback.print_exc()
     
     return data
+
+def fetch_recent_data_for_index(tautulli_base_url, tautulli_api_key, count):
+    return fetch_recently_added_using_plex_sdk(tautulli_base_url, tautulli_api_key, int(count))
 
 def convert_html_to_plain_text(html_content):
     html_content = re.sub(r'<script.*?</script>', '', html_content, flags=re.DOTALL)
@@ -1846,6 +2285,8 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
                 font-family: 'IBM Plex Sans';
             """
 
+            plex_url = item.get('plex_url', '')
+
             if poster_cid:
                 poster_bg_url = f"cid:{poster_cid}"
                 
@@ -1917,6 +2358,18 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
                         </div>
                     </div>
                 """
+
+                if plex_url:
+                    card_html = f'''
+                        <a href="{plex_url}" 
+                        style="text-decoration: none; color: inherit; display: block;" 
+                        target="_blank"
+                        title="Open in Plex">
+                            {card_html}
+                        </a>
+                    '''
+                else:
+                    card_html = card_html
             else:
                 card_html = f"""
                     <div style="
@@ -1955,6 +2408,18 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
                         </div>
                     </div>
                 """
+
+                if plex_url:
+                    card_html = f'''
+                        <a href="{plex_url}" 
+                        style="text-decoration: none; color: inherit; display: block;" 
+                        target="_blank"
+                        title="Open in Plex">
+                            {card_html}
+                        </a>
+                    '''
+                else:
+                    card_html = card_html
             
             row_html += f'<td style="{cell_style}">{card_html}</td>'
         
@@ -1999,17 +2464,23 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
         </div>
     """
 
-def build_recommendations_html_with_cids(recs_data, msg_root, theme_colors, user_emails=None, base_url=""):
+def build_recommendations_html_with_cids(recs_data, msg_root, theme_colors, user_emails=None, base_url="", display_preference='email', users_full_data=None):
     if not recs_data:
         return ""
     
     html_sections = []
     
     for user_id, user_recs in recs_data.items():
-        if user_emails and user_id not in user_emails:
+        if user_emails and str(user_id) not in [str(k) for k in user_emails.keys()]:
             continue
-            
-        user_email = user_emails.get(user_id, user_id) if user_emails else user_id
+
+        if users_full_data:
+            display_name = get_user_display_name(user_id, users_full_data, display_preference)
+        elif user_emails:
+            user_email_value = user_emails.get(str(user_id), str(user_id))
+            display_name = user_email_value
+        else:
+            display_name = str(user_id)
         
         movies_html = build_recommendations_section_with_cids(
             user_recs.get('movie_posters', []),
@@ -2052,7 +2523,7 @@ def build_recommendations_html_with_cids(recs_data, msg_root, theme_colors, user
             
             user_section = f"""
                 <div style="{container_style}" data-recs-user="{user_id}">
-                    <h2 style="{user_title_style}">Recommendations for {user_email}</h2>
+                    <h2 style="{user_title_style}">Recommendations for {display_name}</h2>
                     {movies_html}
                     {shows_html}
                 </div>
@@ -2088,9 +2559,23 @@ def build_recommendations_section_with_cids(available_items, unavailable_items, 
             title_text = item.get('title', 'Unknown')
             year = item.get('year', '')
             vote = item.get('vote', '')
-            href = item.get('href', '#')
             overview = item.get('overview', '')[:100] + "..." if item.get('overview') else ""
             runtime = item.get('runtime', '')
+
+            if is_unavailable:
+                href = item.get('href', '#')
+                link_title = "Request on Overseerr"
+            else:
+                if item.get('plex_url'):
+                    href = item['plex_url']
+                    link_title = "Open in Plex"
+                elif item.get('rating_key') and item.get('machine_id'):
+                    href = build_plex_web_link(item['rating_key'], item['machine_id'])
+                    link_title = "Open in Plex"
+                else:
+                    search_query = quote_plus(title_text)
+                    href = f"https://app.plex.tv/desktop#!/search?query={search_query}"
+                    link_title = "Search in Plex"
             
             vote_text = f"★ {vote:.1f}" if isinstance(vote, (int, float)) and vote > 0 else ""
             
@@ -2191,11 +2676,7 @@ def build_recommendations_section_with_cids(available_items, unavailable_items, 
                     </div>
                 """
                 
-                if href != '#':
-                    card_html = f'<a href="{href}" style="text-decoration: none; color: inherit; display: block;" target="_blank">{card_content}</a>'
-                else:
-                    card_html = card_content
-                    
+                card_html = f'<a href="{href}" style="text-decoration: none; color: inherit; display: block;" target="_blank" title="{link_title}">{card_content}</a>'
             else:
                 card_html = f"""
                     <div style="
@@ -2634,7 +3115,7 @@ def attach_logo_image(msg_root, logo_filename, custom_logo_filename, base_url=""
         logo_url = f"/static/img/{logo_filename}"
     return fetch_and_attach_image(logo_url, msg_root, "logo", base_url)
 
-def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, recommendations_data=None, user_dict=None, base_url="", target_user_key=None, is_scheduled=False, items_count=None):
+def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, display_preference, users_data, recommendations_data=None, user_dict=None, base_url="", target_user_key=None, is_scheduled=False, items_count=None):
     selected_items = json.loads(template_data.get('selected_items', '[]'))
     email_text = template_data.get('email_text', '')
     subject = template_data.get('subject', '')
@@ -2708,9 +3189,9 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, recom
                     if item.get('userKey') == str(target_user_key):
                         filtered_recommendations = {target_user_key: recommendations_data.get(target_user_key, {})}
                         filtered_user_dict = {target_user_key: user_dict.get(target_user_key, target_user_key)} if user_dict else {target_user_key: target_user_key}
-                        content_html += build_recommendations_html_with_cids(filtered_recommendations, msg_root, theme_colors, filtered_user_dict, base_url)
+                        content_html += build_recommendations_html_with_cids(filtered_recommendations, msg_root, theme_colors, filtered_user_dict, base_url, display_preference, users_data)
                 else:
-                    content_html += build_recommendations_html_with_cids(recommendations_data, msg_root, theme_colors, user_dict, base_url)
+                    content_html += build_recommendations_html_with_cids(recommendations_data, msg_root, theme_colors, user_dict, base_url, display_preference, users_data)
         
         elif item_type == 'collection_group':
             group_title = item.get('title', 'Collections')
@@ -3052,6 +3533,22 @@ def send_single_user_email_with_cids(recipients, subject, selected_items, user_k
             print("WARNING: Port 587 with SSL protocol detected!")
             print("Port 587 typically uses TLS (STARTTLS)")
 
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT recipient_display_name, tautulli_url, tautulli_api FROM settings WHERE id = 1")
+        settings_row = cursor.fetchone()
+        conn.close()
+        
+        display_preference = settings_row[0] if settings_row and settings_row[0] else 'email'
+        tautulli_url = settings_row[1] if settings_row else None
+        tautulli_api = settings_row[2] if settings_row else None
+        
+        users_full_data = None
+        if tautulli_url and tautulli_api:
+            users_data, _ = run_tautulli_command(tautulli_url.rstrip('/'), tautulli_api, 'get_users', 'Users', None)
+            if users_data:
+                users_full_data = users_data
+
         msg_root = MIMEMultipart('related')
         msg_root['Subject'] = subject
         
@@ -3091,6 +3588,8 @@ def send_single_user_email_with_cids(recipients, subject, selected_items, user_k
             template_data, 
             tautulli_data, 
             msg_root,
+            display_preference,
+            users_full_data,
             recommendations_data,
             user_dict,
             base_url,
@@ -3270,22 +3769,53 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
         schedule_cursor.execute("SELECT date_range, items_count FROM email_schedules WHERE id = ?", (schedule_id,))
         schedule_result = schedule_cursor.fetchone()
         schedule_conn.close()
+
+        display_name_conn = sqlite3.connect(DB_PATH)
+        display_name_cursor = display_name_conn.cursor()
+        display_name_cursor.execute("SELECT recipient_display_name FROM settings WHERE id = 1")
+        display_pref_row = display_name_cursor.fetchone()
+        display_preference = display_pref_row[0] if display_pref_row else 'email'
+        display_name_conn.close()
         
         date_range = schedule_result[0] if schedule_result else 7
         items_count = schedule_result[1] if schedule_result else 10
-        
-        email_lists_conn = sqlite3.connect(DB_PATH)
-        email_lists_cursor = email_lists_conn.cursor()
-        email_lists_cursor.execute("SELECT emails FROM email_lists WHERE id = ?", (email_list_id,))
-        email_list_result = email_lists_cursor.fetchone()
-        email_lists_conn.close()
-        
-        if not email_list_result:
-            print(f"Email list {email_list_id} not found")
-            return False
-        
-        to_emails = email_list_result[0]
-        to_emails_list = [email.strip() for email in to_emails.split(",")]
+
+        if email_list_id == 0 or email_list_id == 'ALL':
+            settings_conn = sqlite3.connect(DB_PATH)
+            settings_cursor = settings_conn.cursor()
+            settings_cursor.execute("SELECT tautulli_url, tautulli_api FROM settings WHERE id = 1")
+            settings_row = settings_cursor.fetchone()
+            settings_conn.close()
+            
+            if settings_row and settings_row[0] and settings_row[1]:
+                tautulli_url = settings_row[0].rstrip('/')
+                tautulli_api = settings_row[1]
+                users_data, _ = run_tautulli_command(tautulli_url, tautulli_api, 'get_users', 'Users', None)
+                
+                if users_data:
+                    to_emails_list = [
+                        u['email'] for u in users_data
+                        if u.get('email') and u.get('email').strip() and u.get('is_active')
+                    ]
+                else:
+                    print("No users found for ALL list")
+                    return False
+            else:
+                print("Tautulli not configured for ALL list")
+                return False
+        else:
+            email_lists_conn = sqlite3.connect(DB_PATH)
+            email_lists_cursor = email_lists_conn.cursor()
+            email_lists_cursor.execute("SELECT emails FROM email_lists WHERE id = ?", (email_list_id,))
+            email_list_result = email_lists_cursor.fetchone()
+            email_lists_conn.close()
+            
+            if not email_list_result:
+                print(f"Email list {email_list_id} not found")
+                return False
+            
+            to_emails = email_list_result[0]
+            to_emails_list = [email.strip() for email in to_emails.split(",")]
         
         templates_conn = sqlite3.connect(DB_PATH)
         templates_cursor = templates_conn.cursor()
@@ -3326,18 +3856,18 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
                 item['chartSVG'] = chart_data.get('svg', '')
 
         has_recs = any(item.get('type') == 'recs' for item in selected_items)
+
+        users_data, _ = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_users', 'Users', None)
+        user_dict = {}
+        if users_data:
+            user_dict = {
+                u['user_id']: u['email']
+                for u in users_data
+                if u.get('email') != None and u.get('email') != '' and u.get('is_active')
+            }
         
         if has_recs:
             print("Template contains recommendations, splitting emails by user...")
-            
-            users_data, _ = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_users', 'Users', None)
-            user_dict = {}
-            if users_data:
-                user_dict = {
-                    u['user_id']: u['email']
-                    for u in users_data
-                    if u.get('email') != None and u.get('email') != '' and u.get('is_active')
-                }
             
             rec_user_keys = set()
             for item in selected_items:
@@ -3385,7 +3915,7 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
                     from_email, alias_email, reply_to_email, encrypted_password,
                     smtp_server, smtp_port, smtp_protocol, 
                     server_name, tautulli_base_url, tautulli_api_key, date_range, items_count, template_name,
-                    logo_filename, logo_width, custom_logo_filename, from_name
+                    logo_filename, logo_width, custom_logo_filename, from_name, display_preference, users_data
                 )
                 
                 if success:
@@ -3409,7 +3939,7 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
                 from_email, alias_email, reply_to_email, encrypted_password,
                 smtp_server, smtp_port, smtp_protocol,
                 server_name, tautulli_base_url, tautulli_api_key, date_range, items_count, template_name,
-                logo_filename, logo_width, custom_logo_filename, from_name
+                logo_filename, logo_width, custom_logo_filename, from_name, display_preference, users_data
             )
         
     except Exception as e:
@@ -3417,7 +3947,7 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
         traceback.print_exc()
         return False
 
-def send_scheduled_user_email_with_cids(recipients, subject, selected_items, user_key, recommendations_data, from_email, alias_email, reply_to_email, encrypted_password, smtp_server, smtp_port, smtp_protocol, server_name, tautulli_base_url, tautulli_api_key, date_range, items_count, template_name, logo_filename, logo_width, custom_logo_filename, from_name):
+def send_scheduled_user_email_with_cids(recipients, subject, selected_items, user_key, recommendations_data, from_email, alias_email, reply_to_email, encrypted_password, smtp_server, smtp_port, smtp_protocol, server_name, tautulli_base_url, tautulli_api_key, date_range, items_count, template_name, logo_filename, logo_width, custom_logo_filename, from_name, display_preference, users_data):
     try:
         print(f"SMTP Config: {smtp_server}:{smtp_port} using {smtp_protocol}")
 
@@ -3473,6 +4003,8 @@ def send_scheduled_user_email_with_cids(recipients, subject, selected_items, use
             template_data, 
             tautulli_data, 
             msg_root,
+            display_preference,
+            users_data,
             recommendations_data,
             user_dict,
             base_url,
@@ -3545,7 +4077,7 @@ def send_scheduled_user_email_with_cids(recipients, subject, selected_items, use
         traceback.print_exc()
         return False
 
-def send_scheduled_single_email_with_cids(to_emails_list, subject, selected_items, from_email, alias_email, reply_to_email, encrypted_password, smtp_server, smtp_port, smtp_protocol, server_name, tautulli_base_url, tautulli_api_key, date_range, items_count, template_name, logo_filename, logo_width, custom_logo_filename, from_name, email_text=""):
+def send_scheduled_single_email_with_cids(to_emails_list, subject, selected_items, from_email, alias_email, reply_to_email, encrypted_password, smtp_server, smtp_port, smtp_protocol, server_name, tautulli_base_url, tautulli_api_key, date_range, items_count, template_name, logo_filename, logo_width, custom_logo_filename, from_name, display_preference, users_data, email_text=""):
     try:
         print(f"SMTP Config: {smtp_server}:{smtp_port} using {smtp_protocol}")
 
@@ -3599,6 +4131,8 @@ def send_scheduled_single_email_with_cids(to_emails_list, subject, selected_item
             template_data, 
             tautulli_data, 
             msg_root,
+            display_preference,
+            users_data,
             None,
             None,
             base_url,
@@ -3817,6 +4351,7 @@ def index():
     stats = None
     users = None
     user_dict = {}
+    users_full_data = None
     graph_commands = [
         { 'command' : 'get_concurrent_streams_by_stream_type', 'name' : 'Stream Type' },
         { 'command' : 'get_plays_by_date', 'name' : 'Plays by Date' },
@@ -3855,6 +4390,7 @@ def index():
         logo_width = cursor.execute("SELECT logo_width FROM settings WHERE id = 1").fetchone()[0]
         email_theme = cursor.execute("SELECT email_theme FROM settings WHERE id = 1").fetchone()[0]
         custom_logo_filename = cursor.execute("SELECT custom_logo_filename FROM settings WHERE id = 1").fetchone()[0]
+        recipient_display_name = cursor.execute("SELECT recipient_display_name FROM settings WHERE id = 1").fetchone()[0]
     except:
         from_email = cursor.execute("SELECT from_email FROM settings WHERE id = 1").fetchone()
         server_name = cursor.execute("SELECT server_name FROM settings WHERE id = 1").fetchone()
@@ -3864,6 +4400,7 @@ def index():
         logo_width = cursor.execute("SELECT logo_width FROM settings WHERE id = 1").fetchone()
         email_theme = cursor.execute("SELECT email_theme FROM settings WHERE id = 1").fetchone()
         custom_logo_filename = cursor.execute("SELECT custom_logo_filename FROM settings WHERE id = 1").fetchone()
+        recipient_display_name = cursor.execute("SELECT recipient_display_name FROM settings WHERE id = 1").fetchone()
 
     settings = {
         "from_email": from_email or "",
@@ -3871,7 +4408,8 @@ def index():
         "tautulli_url": tautulli_url or "",
         "tautulli_api": decrypt(tautulli_api),
         "email_theme": email_theme or "",
-        "custom_logo_filename": custom_logo_filename or ""
+        "custom_logo_filename": custom_logo_filename or "",
+        "recipient_display_name": recipient_display_name or "email"
     }
     if logo_filename == '' or logo_filename is None:
         if email_theme == 'custom':
@@ -3915,6 +4453,7 @@ def index():
         filtered_users = get_cached_data('filtered_users', strict=True) or get_cached_data('filtered_users', strict=False) or {}
         
         if users:
+            users_full_data = users
             for user in users:
                 if user['email'] != None and user['is_active']:
                     user_dict[user['user_id']] = user['email']
@@ -3961,46 +4500,15 @@ def index():
             for library in libraries:
                 library_section_ids[f"{library['section_id']}"] = library["section_name"]
             
-            recent_data = []
-            for section_id in library_section_ids.keys():
-                try:
-                    fetch_count = str(int(count) * 25)
-                    rd, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_recently_added', section_id, error, fetch_count)
-                    if rd and rd.get('recently_added'):
-                        for item in rd['recently_added']:
-                            item['library_name'] = library_section_ids[section_id]
-                        
-                        seen_shows = {}
-                        deduplicated = []
-                        
-                        for item in rd['recently_added']:
-                            item_type = (item.get('media_type') or item.get('type') or '').lower()
-                            
-                            if item_type in ['episode', 'season']:
-                                show_id = item.get('grandparent_rating_key') or item.get('grandparent_title')
-                                
-                                if show_id and show_id not in seen_shows:
-                                    seen_shows[show_id] = True
-                                    item['original_title'] = item.get('title')
-                                    item['title'] = item.get('grandparent_title') or item.get('title')
-                                    deduplicated.append(item)
-                            else:
-                                deduplicated.append(item)
-                        
-                        rd['recently_added'] = deduplicated[:int(count)]
-                        recent_data.append(rd)
-                except Exception as e:
-                    recent_data.append({})
-                    if error is None:
-                        error = f"Recent Data Error: {str(e)}"
-                    else:
-                        error += f", Recent Data Error: {str(e)}"
+            recent_data = fetch_recent_data_for_index(tautulli_base_url, tautulli_api_key, count)
             set_cached_data('recent_data', recent_data, cache_params)
             
             user_dict = {}
+            users_full_data = None
             if users:
+                users_full_data = users
                 for user in users:
-                    if user['email'] != None and user['email'] != '' and user['is_active']:
+                    if user['email'] != None and user['is_active']:
                         user_dict[user['user_id']] = user['email']
             
             alert = f"Fresh data loaded! Stats/graphs for {time_range} days, and {count} recently added items."
@@ -4027,7 +4535,7 @@ def index():
     theme_settings = get_theme_settings()
         
     return render_template('index.html',
-                           stats=stats, user_dict=user_dict,
+                           stats=stats, user_dict=user_dict, users_full_data=users_full_data,
                            graph_data=graph_data, graph_commands=graph_commands,
                            recent_data=recent_data, libs=libs,
                            error=error, alert=alert, settings=settings,
@@ -4361,6 +4869,7 @@ def settings():
         tautulli_url = request.form.get("tautulli_url")
         tautulli_api = encrypt(request.form.get("tautulli_api"))
         conjurr_url = request.form.get("conjurr_url")
+        recipient_display_name = request.form.get("recipient_display_name", "email")
         logo_filename = request.form.get("logo_filename")
         logo_width = request.form.get("logo_width")
         email_theme = request.form.get("email_theme", "newsletterr_blue")
@@ -4395,18 +4904,18 @@ def settings():
         cursor.execute("""
             INSERT INTO settings
             (id, from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, plex_url, tautulli_url,
-                tautulli_api, conjurr_url, logo_filename, logo_width, email_theme, primary_color, secondary_color, accent_color, background_color,
+                tautulli_api, conjurr_url, recipient_display_name, logo_filename, logo_width, email_theme, primary_color, secondary_color, accent_color, background_color,
                 text_color, from_name, custom_logo_filename)
-            VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (id) DO UPDATE
             SET from_email = excluded.from_email, alias_email = excluded.alias_email, reply_to_email = excluded.reply_to_email, password = excluded.password,
                 smtp_username = excluded.smtp_username, smtp_server = excluded.smtp_server, smtp_port = excluded.smtp_port, smtp_protocol = excluded.smtp_protocol,
                 server_name = excluded.server_name, plex_url = excluded.plex_url, tautulli_url = excluded.tautulli_url, tautulli_api = excluded.tautulli_api,
-                conjurr_url = excluded.conjurr_url, logo_filename = excluded.logo_filename, logo_width = excluded.logo_width, email_theme = excluded.email_theme,
+                conjurr_url = excluded.conjurr_url, recipient_display_name = excluded.recipient_display_name, logo_filename = excluded.logo_filename, logo_width = excluded.logo_width, email_theme = excluded.email_theme,
                 primary_color = excluded.primary_color, secondary_color = excluded.secondary_color, accent_color = excluded.accent_color,
                 background_color = excluded.background_color, text_color = excluded.text_color, from_name = excluded.from_name, custom_logo_filename = excluded.custom_logo_filename
         """, (from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, plex_url, tautulli_url, tautulli_api,
-              conjurr_url, logo_filename, logo_width, email_theme, primary_color, secondary_color, accent_color, background_color, text_color, from_name, custom_logo_filename))
+              conjurr_url, recipient_display_name, logo_filename, logo_width, email_theme, primary_color, secondary_color, accent_color, background_color, text_color, from_name, custom_logo_filename))
         conn.commit()
         cursor.execute("SELECT plex_token FROM settings WHERE id = 1")
         plex_token = cursor.fetchone()[0]
@@ -4427,6 +4936,7 @@ def settings():
             "tautulli_url": tautulli_url,
             "tautulli_api": decrypt(tautulli_api),
             "conjurr_url": conjurr_url,
+            "recipient_display_name": recipient_display_name,
             "logo_filename": logo_filename,
             "logo_width": logo_width,
             "email_theme": email_theme,
@@ -4456,6 +4966,7 @@ def settings():
         tautulli_url = cursor.execute("SELECT tautulli_url FROM settings WHERE id = 1").fetchone()[0]
         tautulli_api = cursor.execute("SELECT tautulli_api FROM settings WHERE id = 1").fetchone()[0]
         conjurr_url = cursor.execute("SELECT conjurr_url FROM settings WHERE id = 1").fetchone()[0]
+        recipient_display_name = cursor.execute("SELECT recipient_display_name FROM settings WHERE id = 1").fetchone()[0]
         logo_filename = cursor.execute("SELECT logo_filename FROM settings WHERE id = 1").fetchone()[0]
         logo_width = cursor.execute("SELECT logo_width FROM settings WHERE id = 1").fetchone()[0]
         email_theme = cursor.execute("SELECT email_theme FROM settings WHERE id = 1").fetchone()[0]
@@ -4481,6 +4992,7 @@ def settings():
         tautulli_url = cursor.execute("SELECT tautulli_url FROM settings WHERE id = 1").fetchone()
         tautulli_api = cursor.execute("SELECT tautulli_api FROM settings WHERE id = 1").fetchone()
         conjurr_url = cursor.execute("SELECT conjurr_url FROM settings WHERE id = 1").fetchone()
+        recipient_display_name = cursor.execute("SELECT recipient_display_name FROM settings WHERE id = 1").fetchone()
         logo_filename = cursor.execute("SELECT logo_filename FROM settings WHERE id = 1").fetchone()
         logo_width = cursor.execute("SELECT logo_width FROM settings WHERE id = 1").fetchone()
         email_theme = cursor.execute("SELECT email_theme FROM settings WHERE id = 1").fetchone()
@@ -4513,6 +5025,7 @@ def settings():
         "plex_token": plex_token or "",
         "tautulli_url": tautulli_url or "",
         "conjurr_url": conjurr_url or "",
+        "recipient_display_name": recipient_display_name or "email",
         "logo_filename": logo_filename or "",
         "email_theme": email_theme or "newsletterr_blue",
         "primary_color": primary_color or "#8acbd4",
@@ -4837,7 +5350,7 @@ def create_schedule():
     try:
         data = request.get_json()
         name = data.get('name', '').strip()
-        email_list_id = int(data.get('email_list_id'))
+        email_list_id = data.get('email_list_id')
         template_id = int(data.get('template_id'))
         frequency = data.get('frequency')
         start_date = data.get('start_date')
@@ -4848,7 +5361,15 @@ def create_schedule():
         if not all([name, email_list_id, template_id, frequency, start_date]):
             return jsonify({"status": "error", "message": "All fields are required"}), 400
         
-        success = create_email_schedule(name, email_list_id, template_id, frequency, start_date, send_time, date_range, items_count)
+        if email_list_id == 'ALL':
+            list_id = 'ALL'
+        else:
+            try:
+                list_id = int(email_list_id)
+            except (ValueError, TypeError):
+                return jsonify({"status": "error", "message": "Invalid email list ID"}), 400
+        
+        success = create_email_schedule(name, list_id, template_id, frequency, start_date, send_time, date_range, items_count)
         if success:
             return jsonify({"status": "success", "message": f"Schedule '{name}' created successfully"})
         else:
@@ -4862,7 +5383,7 @@ def update_schedule(schedule_id):
     try:
         data = request.get_json()
         name = data.get('name', '').strip()
-        email_list_id = int(data.get('email_list_id'))
+        email_list_id = data.get('email_list_id')
         template_id = int(data.get('template_id'))
         frequency = data.get('frequency')
         start_date = data.get('start_date')
@@ -4873,7 +5394,15 @@ def update_schedule(schedule_id):
         if not all([name, email_list_id, template_id, frequency, start_date]):
             return jsonify({"status": "error", "message": "All fields are required"}), 400
         
-        success = update_email_schedule(schedule_id, name, email_list_id, template_id, frequency, start_date, send_time, date_range, items_count)
+        if email_list_id == 'ALL':
+            list_id = 'ALL'
+        else:
+            try:
+                list_id = int(email_list_id)
+            except (ValueError, TypeError):
+                return jsonify({"status": "error", "message": "Invalid email list ID"}), 400
+        
+        success = update_email_schedule(schedule_id, name, list_id, template_id, frequency, start_date, send_time, date_range, items_count)
         if success:
             return jsonify({"status": "success", "message": f"Schedule '{name}' updated successfully"})
         else:
@@ -5012,9 +5541,11 @@ def preview_schedule(schedule_id):
             settings = {"server_name": ""}
 
         user_dict = {}
+        users_full_data = None
         if settings.get('tautulli_url') and settings.get('tautulli_api'):
             try:
                 users_data, _ = run_tautulli_command(settings['tautulli_url'].rstrip('/'), settings['tautulli_api'], 'get_users', 'Users', None)
+                users_full_data = users_data
                 if users_data:
                     user_dict = {
                         str(u['user_id']): u['email']
@@ -5076,7 +5607,8 @@ def preview_schedule(schedule_id):
             "graph_commands": tautulli_data.get('graph_commands', []),
             "recent_commands": [{'command': 'movie'}, {'command': 'show'}],
             "recommendations": recommendations_data or {},
-            "user_dict": user_dict
+            "user_dict": user_dict,
+            "users_full_data": users_full_data
         })
         
     except Exception as e:
@@ -5096,18 +5628,20 @@ def preview_schedule_page(schedule_id):
     except:
         date_range = 7
 
-    cursor.execute("SELECT logo_filename, logo_width, tautulli_url, tautulli_api, custom_logo_filename FROM settings WHERE id = 1")
+    cursor.execute("SELECT logo_filename, logo_width, tautulli_url, tautulli_api, custom_logo_filename, recipient_display_name FROM settings WHERE id = 1")
     settings_row = cursor.fetchone()
     logo_filename = settings_row[0] if settings_row else 'Asset_94x.png'
     logo_width = settings_row[1] if settings_row else 80
     tautulli_url = settings_row[2] if settings_row else ''
     tautulli_api = settings_row[3] if settings_row else ''
     custom_logo_filename = settings_row[4] if settings_row else ''
+    recipient_display_name = settings_row[5] if settings_row else 'email'
 
     settings = {
         "logo_filename": logo_filename,
         "logo_width": logo_width,
-        "custom_logo_filename": custom_logo_filename
+        "custom_logo_filename": custom_logo_filename,
+        "recipient_display_name": recipient_display_name
     }
     conn.close()
 
@@ -5540,6 +6074,7 @@ if __name__ == '__main__':
     init_db(DB_PATH)
     migrate_schema("logo_filename TEXT")
     migrate_schema("logo_width INTEGER")
+    migrate_schema("recipient_display_name TEXT DEFAULT 'email'")
 
     if os.environ.get("WERKZEUG_RUN_MAIN") == "true" and not app.debug:
         start_background_workers()

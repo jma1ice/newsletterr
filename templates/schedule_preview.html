@@ -58,6 +58,7 @@
     const urlParams = new URLSearchParams(window.location.search);
     const scheduleId = urlParams.get('schedule_id');
     const themeSettings = {{ theme_settings | tojson }};
+    const displayPreference = "{{ settings.recipient_display_name }}";
 
     let templateData = {};
     let stats = [];
@@ -68,6 +69,7 @@
     let graphCommands = [];
     let recentCommands = [];
     let userDict = {};
+    let usersFullData = {};
 
     async function blurImageElement(imgElement) {
         const tempImg = new Image();
@@ -322,6 +324,25 @@
         return candidates.find(Boolean) || '';
     }
 
+    function getUserDisplayName(userKey) {
+        if (!usersFullData || !Array.isArray(usersFullData)) {
+            return userDict[userKey] || userKey;
+        }
+        const user = usersFullData.find(u => String(u.user_id) === String(userKey));
+        
+        if (!user) {
+            return userDict[userKey] || userKey;
+        }
+
+        if (displayPreference === 'username') {
+            return user.username || user.email || userKey;
+        } else if (displayPreference === 'friendly_name') {
+            return user.friendly_name || user.username || user.email || userKey;
+        } else {
+            return user.email || user.username || userKey;
+        }
+    }
+
     function statTheadHTML(title='') {
         if (title === "Most Watched Movies" || title === "Most Watched TV Shows") {
             return `<thead class="table-dark"><tr>
@@ -469,6 +490,7 @@
             graphCommands = data.graph_commands || [];
             recentCommands = data.recent_commands || [];
             userDict = data.user_dict || {};
+            usersFullData = data.users_full_data || {};
 
             console.log('Loaded fresh data:', { 
                 stats: stats.length, 
@@ -977,14 +999,15 @@
                 duration,
                 added,
                 thumb: thumbPath,
-                library
+                library,
+                plex_url: item.plex_url || ''
             };
         });
         
         const itemsHTML = gridItems.map(item => {
             const imgURL = item.thumb ? `/proxy-art${item.thumb.startsWith('/') ? item.thumb : '/' + item.thumb}` : '/static/img/no-poster.png';
             
-            return `
+            const cardContent = `
                 <div style="
                     position: relative;
                     background: var(--email-card-bg);
@@ -1027,6 +1050,20 @@
                     </div>
                 </div>
             `;
+
+            if (item.plex_url) {
+                return `
+                    <a href="${item.plex_url}" 
+                    class="plex-link"
+                    style="text-decoration: none; color: inherit; display: block;" 
+                    target="_blank"
+                    title="Open in Plex">
+                        ${cardContent}
+                    </a>
+                `;
+            }
+            
+            return cardContent;
         }).join('');
         
         return `
@@ -1052,7 +1089,7 @@
         }
         
         const userRecs = recsPayload[userKey];
-        const userEmail = userDict[userKey];
+        const userEmail = getUserDisplayName(userKey);
         
         let sectionsHTML = '';
         
@@ -1093,9 +1130,28 @@
             const titleText = item.title || 'Unknown';
             const year = item.year || '';
             const vote = item.vote ? `★ ${item.vote.toFixed(1)}` : '';
-            const href = item.href || '#';
             const overview = item.overview || '';
             const runtime = item.runtime || '';
+
+            let href;
+            let linkTitle;
+            if (isUnavailable) {
+                href = item.href || '#';
+                linkTitle = 'Request on Overseerr';
+            } else {
+                if (item.plex_url) {
+                    href = item.plex_url;
+                    linkTitle = 'Open in Plex';
+                } else if (item.rating_key && item.machine_id) {
+                    const metadataKey = encodeURIComponent(`/library/metadata/${item.rating_key}`);
+                    href = `plex://preplay?metadataKey=${metadataKey}&server=${item.machine_id}`;
+                    linkTitle = 'Open in Plex';
+                } else {
+                    const searchQuery = encodeURIComponent(titleText);
+                    href = `https://app.plex.tv/desktop#!/search?query=${searchQuery}`;
+                    linkTitle = 'Search in Plex';
+                }
+            }
             
             const unavailableStyle = isUnavailable ? 'opacity: 0.7; filter: grayscale(30%);' : '';
             
@@ -1112,7 +1168,7 @@
                     max-width: 200px;
                     margin: 0 auto;
                 ">
-                    <a href="${href}" style="text-decoration: none; color: inherit; display: block;" target="_blank">
+                    <a href="${href}" style="text-decoration: none; color: inherit; display: block;" target="_blank" title="${linkTitle}">
                         <div style="position: relative; aspect-ratio: 2/3; background: #f8f9fa;">
                             <img src="${posterURL}" style="width: 100%; height: 100%; object-fit: cover; display: block;" alt="${titleText}">
                             

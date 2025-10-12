@@ -165,12 +165,11 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Make sure custom templates can't override defaults
 * RA cards can all show up as different heights in email
 * Don't have page reload on stats/users pull
-* Switch TV Show recently added info out to just show the show name, not episode or season number | ra currently uses episode synopsis - update backend to pull gp/parent metadata
+* Add in To: vs BCC: option
 
 #### And these items are feature requests:
 * Look into email formatting across email clients | mjml?
 * Reduce image size to better fall within size regulations
-* Make clickable posters for available recommendations and recently added to take users to Plex to watch
 * Graph titles need to specify the date range - or at least show what time range the data is for somewhere in the email
 * Rename 'ra' and 'recs' snap in block for clarity?
 * Keep settings details on error so user won't have to re-enter them
@@ -186,7 +185,7 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Opt out support
 * Option for small cover art of each item in a stat table
 * IMDb ratings in stat tables
-* Auth page for hosted users
+* Auth page for hosted users | when this is in, add a hosted 'most recent newsletter' webpage
 * Snap-in for images/gifs/emojis
 * Functionality for full custom HTML templates | ability to add embedded links to services, ie StatusCake, Uptime Robot
 * Ombi integration
@@ -231,6 +230,10 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Recently added now uses artwork from the show not the episode/season
 * Recently added now filters for when episodes of a show are found and only adds one instance of that show
 * Fixed everywhere days and # of items is hardcoded
+* Recently added pulls show info over episode info when available
+* Switched recently added pull from Tautulli to direct Plex API call. This fixes 100 item limit
+* Added 'ALL' BCC list to scheduler options
+* Now shows # of items in scheduler table
 
 #### New Features:
 * Added more date range options in schedule builder to match dashboard
@@ -238,6 +241,8 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Added collections snap-in - thank you yungsnuzzy!
 * Custom logo logic in settings. Added in small/banner/custom/none dropdown - thanks dreondre!
 * Got rid of library name on recently added overlay
+* Made posters clickable for available recommendations and recently added items to take users to Plex to watch
+* Added option for recs to show email/username/friendly name
 
 
 ### v0.9.16

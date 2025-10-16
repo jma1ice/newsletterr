@@ -164,22 +164,24 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Plex 'Secure Connections' setting causing image 401
 * Make sure custom templates can't override defaults
 * RA cards can all show up as different heights in email
-* Don't have page reload on stats/users pull
-* Add in To: vs BCC: option
+
+#### And these items are feature requests:
+* Graph titles need to specify the date range - or at least show what time range the data is for somewhere in the email
+
+
+### For the v2025.1 sprint, these items are feature requests:
+* Compile EXE / ELF files
+
+
+### For the v2025.2 sprint, these items are to be addressed:
+* Email click for recently added/available recommendations is going to chrome on mobile instead of app
 
 #### And these items are feature requests:
 * Look into email formatting across email clients | mjml?
 * Reduce image size to better fall within size regulations
-* Graph titles need to specify the date range - or at least show what time range the data is for somewhere in the email
-* Rename 'ra' and 'recs' snap in block for clarity?
+* Don't have page reload on stats/users pull
 * Keep settings details on error so user won't have to re-enter them
-* Nix the view buttons
-* Change date on recently added to days since added
-
-
-### For the v2025.1 sprint, these items are feature requests:
 * GitHub link should be the stylized logo
-* Compile EXE / ELF files
 * Get fonts showing on Gmail receive side?
 * Api/webhooks
 * Opt out support
@@ -205,6 +207,8 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Ko-fi -> Discord integration for contributor role
 * Logo positioning setting
 * Test api button
+* Add in To: vs BCC: option
+* Make collections clickable
 * Mobile optimizations, i.e.:
 ```
 <style>
@@ -234,6 +238,7 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Switched recently added pull from Tautulli to direct Plex API call. This fixes 100 item limit
 * Added 'ALL' BCC list to scheduler options
 * Now shows # of items in scheduler table
+* Fixed 0m for shows and audio changed to genre
 
 #### New Features:
 * Added more date range options in schedule builder to match dashboard
@@ -243,6 +248,9 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Got rid of library name on recently added overlay
 * Made posters clickable for available recommendations and recently added items to take users to Plex to watch
 * Added option for recs to show email/username/friendly name
+* Nixed the view buttons
+* Renamed 'ra' and 'recs' snap in block for clarity
+* Changed date on recently added to days since added
 
 
 ### v0.9.16

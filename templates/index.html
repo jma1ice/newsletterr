@@ -270,7 +270,7 @@
                                                 <div class="d-flex justify-content-between align-items-center p-2 border rounded">
                                                     <span style="font-size: 0.9rem;">{{ stat.stat_title }}</span>
                                                     <div>
-                                                        <button type="button" class="btn button-outline btn-sm me-1 view-stat-btn" 
+                                                        <button hidden type="button" class="btn button-outline btn-sm me-1 view-stat-btn" 
                                                                 data-target="stat-{{ loop.index0 }}" style="font-size: 0.8rem; padding: 0.25rem 0.5rem;">
                                                             View
                                                         </button>
@@ -297,7 +297,7 @@
                                                 <div class="d-flex justify-content-between align-items-center p-2 border rounded">
                                                     <span style="font-size: 0.9rem;">{{ graph_commands[loop.index0].name }}</span>
                                                     <div>
-                                                        <button type="button" class="btn button-outline btn-sm me-1 view-graph-btn" 
+                                                        <button hidden type="button" class="btn button-outline btn-sm me-1 view-graph-btn" 
                                                                 data-target="graph-{{ loop.index0 }}" style="font-size: 0.8rem; padding: 0.25rem 0.5rem;">
                                                             View
                                                         </button>
@@ -524,10 +524,32 @@
                 const h = Math.floor(s/3600), m = Math.floor((s%3600)/60);
                 return h ? `${h}h ${m}m` : `${m}m`;
             };
+
             const formatDate = (d) => {
                 if (!d) return '';
-                if (/^\d+$/.test(String(d))) return new Date(parseInt(d,10)*1000).toLocaleDateString();
-                const dt = new Date(d); return isNaN(dt) ? '' : dt.toLocaleDateString();
+                
+                let targetDate;
+                if (/^\d+$/.test(String(d))) {
+                    targetDate = new Date(parseInt(d, 10) * 1000);
+                } else {
+                    targetDate = new Date(d);
+                }
+                
+                if (isNaN(targetDate)) return '';
+                
+                const now = new Date();
+                const diffMs = now - targetDate;
+                const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+                
+                if (diffDays < 0) {
+                    return `in ${Math.abs(diffDays)} days`;
+                } else if (diffDays === 0) {
+                    return 'today';
+                } else if (diffDays === 1) {
+                    return 'yesterday';
+                } else {
+                    return `${diffDays} days ago`;
+                }
             };
 
             const items = flatten(recentPayload).map(it => {
@@ -549,7 +571,7 @@
                     sub,
                     summary: summary,
                     duration: msToHMS(it.duration),
-                    added: formatDate(it.added_at || it.originally_available_at),
+                    added: formatDate(it.updated_at || it.originally_available_at),
                     thumb: thumbPath
                 };
             });
@@ -591,12 +613,12 @@
                         <div class="d-flex justify-content-between align-items-center p-2 border rounded">
                             <span style="font-size: .9rem;">${lib}</span>
                             <div>
-                                <button type="button" class="btn button-outline btn-sm me-1 ra-view-btn" 
+                                <button hidden type="button" class="btn button-outline btn-sm me-1 ra-view-btn" 
                                         data-lib="${lib}" data-target="${id}" style="font-size: .8rem; padding: .25rem .5rem;">
                                 View
                                 </button>
                                 <button type="button" class="btn button btn-sm ra-add-btn" 
-                                        data-type="ra" data-lib="${lib}" data-id="${id}" data-name="Recently Added: ${lib}"
+                                        data-type="recently added" data-lib="${lib}" data-id="${id}" data-name="Recently Added: ${lib}"
                                         style="font-size: .8rem; padding: .25rem .5rem;">
                                 Add
                                 </button>
@@ -932,9 +954,9 @@
                             contentHTML += buildStatPreviewHTML(item.id);
                         } else if (item.type === 'graph') {
                             contentHTML += buildGraphPreviewHTML(item.id);
-                        } else if (item.type === 'ra') {
+                        } else if (item.type === 'recently added') {
                             contentHTML += buildRecentlyAddedPreviewHTML(item.raLibrary);
-                        } else if (item.type === 'recs') {
+                        } else if (item.type === 'recommendations') {
                             contentHTML += buildRecommendationsPreviewHTML(item.userKey);
                         } else if (item.type === 'collection_group') {
                             if (item.collections && item.collections.length > 0) {
@@ -1257,14 +1279,19 @@
                 }
                 
                 const gridItems = allItems.map(item => {
+                    const item_type = (item.media_type || item.type || '').toLowerCase();
                     const title = item.title || item.full_title || item.parent_title || item.grandparent_title || '(untitled)';
                     const sub = item.year || item.grandparent_title || item.parent_title || '';
                     const thumbPath = pickThumb(item);
-                    const duration = msToHMS(item.duration);
-                    const added = formatDate(item.added_at || item.originally_available_at);
+                    let duration = '';
+                    if (item_type === 'album') {
+                        duration = item.duration || item.grandparent_title || item.parent_title || 'Audio';
+                    } else {
+                        duration = msToHMS(item.duration);
+                    }
+                    const added = formatDate(item.updated_at || item.originally_available_at);
                     const library = item.library_name || item.section_name || '';
 
-                    const item_type = (item.media_type || item.type || '').toLowerCase();
                     let summary = '';
                     if (item_type === 'episode' || item_type === 'season') {
                         summary = item.grandparent_tagline || item.grandparent_summary || item.parent_summary || item.tagline || item.summary || '';
@@ -1319,7 +1346,7 @@
                                 <div style="font-weight: bold; font-size: 14px; color: var(--email-text); margin-bottom: 4px; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
                                     ${item.title}
                                 </div>
-                                <div style="font-size: 11px; color: var(--email-muted); margin-bottom: 8px;">
+                                <div style="font-size: 11px; color: var(--email-muted); margin-bottom: 8px; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
                                     ${item.sub ? item.sub + ' • ' : ''}${item.duration}
                                 </div>
                                 ${item.summary ? `
@@ -1390,12 +1417,12 @@
                 }
                 
                 if (!sectionsHTML) {
-                    return `<div class="recommendations-block"><p style="text-align: center; color: var(--email-muted); padding: 20px;">No recommendations for ${userEmail}</p></div>`;
+                    return `<div class="recommendations-block"><p style="text-align: center; color: var(--email-muted); padding: 0;">No recommendations for ${userEmail}</p></div>`;
                 }
                 
                 return `
-                    <div class="recommendations-block" data-recs-user="${userKey}">
-                        <h2>Recommendations for ${userEmail}</h2>
+                    <div class="recommendations-block" style="padding: 0;" data-recs-user="${userKey}">
+                        <h2 style="text-align: center; margin-top: 0; margin-bottom: 10px;">Recommendations for ${userEmail}</h2>
                         ${sectionsHTML}
                     </div>
                 `;
@@ -1523,8 +1550,8 @@
                 }).join('');
                 
                 return `
-                    <div style="margin: 20px 0;">
-                        <h3 style="color: var(--email-text); margin-bottom: 15px; padding-bottom: 16px;">${title}</h3>
+                    <div style="margin: 20px 5px;">
+                        <h3 style="color: var(--email-text); margin-bottom: 5px; padding-bottom: 0;">${title}</h3>
                         <div style="
                             display: grid;
                             grid-template-columns: repeat(5, 1fr);
@@ -2546,10 +2573,10 @@
                 console.log('Current selectedItems before:', selectedItems);
 
                 const extra = {};
-                if (type === 'ra' && btn.dataset.lib) {
+                if (type === 'recently added' && btn.dataset.lib) {
                     extra.raLibrary = btn.dataset.lib;
                 }
-                if (type === 'recs') {
+                if (type === 'recommendations') {
                     if (btn.dataset.userKey) extra.userKey = btn.dataset.userKey;
                 }
                 if (type === 'graph') {
@@ -2801,13 +2828,13 @@
                         <div class="d-flex justify-content-between align-items-center p-2 border rounded">
                             <span style="font-size: .9rem;">${display}</span>
                             <div>
-                                <button type="button"
+                                <button hidden type="button"
                                         class="btn button-outline btn-sm me-1 recs-view-btn"
                                         data-user-key="${userKey}" data-target="${id}"
                                         style="font-size: .8rem; padding: .25rem .5rem;">View</button>
                                 <button type="button"
                                         class="btn button btn-sm recs-add-btn"
-                                        data-type="recs" data-id="${id}"
+                                        data-type="recommendations" data-id="${id}"
                                         data-name="Recommendations: ${display}"
                                         data-user-key="${userKey}"
                                         style="font-size: .8rem; padding: .25rem .5rem;">Add</button>

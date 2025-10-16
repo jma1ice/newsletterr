@@ -16,7 +16,7 @@ from urllib.parse import quote_plus, urljoin, urlparse, parse_qs, urlencode, quo
 
 app = Flask(__name__)
 app.jinja_env.globals["version"] = "v0.9.17"
-app.jinja_env.globals["publish_date"] = "October 11, 2025"
+app.jinja_env.globals["publish_date"] = "October 16, 2025"
 
 def get_global_cache_status():
     try:
@@ -961,7 +961,7 @@ def background_scheduler():
             now = datetime.now()
             current_time = time.time()
             
-            if current_time - last_cache_refresh > 86400:
+            if current_time - last_cache_refresh > CACHE_DURATION:
                 print(f"Daily cache refresh triggered at {now.isoformat()}")
                 refresh_daily_cache()
                 last_cache_refresh = current_time
@@ -1099,14 +1099,8 @@ def refresh_daily_cache():
         library_section_ids = {}
         for library in libraries:
             library_section_ids[f"{library['section_id']}"] = library["section_name"]
-
-        recent_data = []
-        for section_id in library_section_ids.keys():
-            rd, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_recently_added', section_id, error, count)
-            if rd:
-                for item in rd['recently_added']:
-                    item['library_name'] = library_section_ids[section_id]
-                recent_data.append(rd)
+        
+        recent_data = fetch_recent_data_for_index(tautulli_base_url, tautulli_api_key, count)
         
         if recent_data:
             set_cached_data('recent_data', recent_data, cache_params)
@@ -1398,7 +1392,7 @@ def fetch_tv_shows_from_plex_sdk(section_id, limit=10, machine_id=None):
         
         for directory in media_container.get('Metadata', []):
             rating_key = str(directory.get('ratingKey', ''))
-            
+
             show = {
                 'title': directory.get('title', 'Unknown'),
                 'rating_key': rating_key,
@@ -1407,7 +1401,9 @@ def fetch_tv_shows_from_plex_sdk(section_id, limit=10, machine_id=None):
                 'art': directory.get('art', ''),
                 'summary': directory.get('summary', ''),
                 'added_at': str(directory.get('addedAt', '')),
+                'updated_at': str(directory.get('updatedAt', '')),
                 'content_rating': directory.get('contentRating', ''),
+                'duration': str(directory.get('duration', '')),
                 'guid': directory.get('guid', ''),
                 'key': directory.get('key', ''),
                 'media_type': 'show',
@@ -1473,6 +1469,7 @@ def fetch_movies_from_plex_sdk(section_id, limit=10, machine_id=None):
                 'art': video.get('art', ''),
                 'summary': video.get('summary', ''),
                 'added_at': str(video.get('addedAt', '')),
+                'updated_at': str(video.get('updatedAt', '')),
                 'content_rating': video.get('contentRating', ''),
                 'duration': str(video.get('duration', '')),
                 'guid': video.get('guid', ''),
@@ -1531,7 +1528,7 @@ def fetch_albums_from_plex_sdk(section_id, limit=10, machine_id=None):
         
         for album in media_container.get('Metadata', []):
             rating_key = str(album.get('ratingKey', ''))
-            
+
             album_data = {
                 'title': album.get('title', 'Unknown'),
                 'rating_key': rating_key,
@@ -1540,6 +1537,8 @@ def fetch_albums_from_plex_sdk(section_id, limit=10, machine_id=None):
                 'art': album.get('art', ''),
                 'summary': album.get('summary', ''),
                 'added_at': str(album.get('addedAt', '')),
+                'updated_at': str(album.get('updatedAt', '')),
+                'duration': str(album.get('Genre', '')[0]['tag']) if album.get('Genre', '') else '',
                 'guid': album.get('guid', ''),
                 'key': album.get('key', ''),
                 'parent_title': album.get('parentTitle', ''),
@@ -2058,6 +2057,11 @@ def fetch_and_attach_blurred_image(image_url, msg_root, cid_name, base_url=""):
         print(f"Error processing blurred image {image_url}: {e}")
         return fetch_and_attach_image(image_url, msg_root, cid_name, base_url)
 
+def truncate_text(text, max_chars=28):
+    if len(text) <= max_chars:
+        return text
+    return text[:max_chars-3] + '...'
+
 def build_stats_html_with_cid_background(stat_data, msg_root, theme_colors, base_url=""):
     if not stat_data or not stat_data.get('rows'):
         return ""
@@ -2194,8 +2198,11 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
         row_html = "<tr>"
         
         for j, item in enumerate(row_items):
-            title = item.get('title', 'Unknown')
+            full_title = item.get('title', 'Unknown')
+            title = truncate_text(full_title, 26)
             year = item.get('year', '')
+            if not year and (item.get('media_type') or item.get('type', '')).lower() == 'album':
+                year = item.get('grandparent_title') or item.get('parent_title') or ''
             library = item.get('library_name', '')
             added_date = ""
             duration = ""
@@ -2240,18 +2247,33 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
                     if poster_cid:
                         break
                         
-            if item.get('added_at'):
+            if item.get('updated_at'):
                 try:
-                    timestamp = item['added_at']
+                    timestamp = item['updated_at']
                     if isinstance(timestamp, str) and timestamp.isdigit():
                         timestamp = int(timestamp)
                     
                     if isinstance(timestamp, (int, float)):
                         dt = datetime.fromtimestamp(timestamp)
-                        added_date = dt.strftime('%m/%d/%Y')
                     else:
                         dt = datetime.fromisoformat(str(timestamp))
-                        added_date = dt.strftime('%m/%d/%Y')
+
+                    now = datetime.now()
+                    if dt.tzinfo:
+                        now = datetime.now(timezone.utc)
+                        dt = dt.replace(tzinfo=timezone.utc)
+                    
+                    diff_days = (now - dt).days
+                    
+                    if diff_days < 0:
+                        added_date = f"in {abs(diff_days)} days"
+                    elif diff_days == 0:
+                        added_date = "today"
+                    elif diff_days == 1:
+                        added_date = "yesterday"
+                    else:
+                        added_date = f"{diff_days} days ago"
+
                 except Exception as e:
                     if item.get('originally_available_at'):
                         try:
@@ -2261,22 +2283,40 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
                             
                             if isinstance(timestamp, (int, float)):
                                 dt = datetime.fromtimestamp(timestamp)
-                                added_date = dt.strftime('%m/%d/%Y')
                             else:
                                 dt = datetime.fromisoformat(str(timestamp))
-                                added_date = dt.strftime('%m/%d/%Y')
+
+                            now = datetime.now()
+                            if dt.tzinfo:
+                                now = datetime.now(timezone.utc)
+                                dt = dt.replace(tzinfo=timezone.utc)
+                            
+                            diff_days = (now - dt).days
+                            
+                            if diff_days < 0:
+                                added_date = f"in {abs(diff_days)} days"
+                            elif diff_days == 0:
+                                added_date = "today"
+                            elif diff_days == 1:
+                                added_date = "yesterday"
+                            else:
+                                added_date = f"{diff_days} days ago"
+
                         except Exception as e2:
                             added_date = ""
             
-            if item.get('duration'):
-                try:
-                    ms = int(item['duration'])
-                    s = ms // 1000
-                    h = s // 3600
-                    m = (s % 3600) // 60
-                    duration = f"{h}h {m}m" if h else f"{m}m"
-                except:
-                    pass
+            if item_type == 'album':
+                duration = item.get('duration') or item.get('grandparent_title') or item.get('parent_title') or 'Audio'
+            else:
+                if item.get('duration'):
+                    try:
+                        ms = int(item['duration'])
+                        s = ms // 1000
+                        h = s // 3600
+                        m = (s % 3600) // 60
+                        duration = f"{h}h {m}m" if h else f"{m}m"
+                    except:
+                        pass
             
             cell_style = f"""
                 width: 20%;
@@ -2344,7 +2384,7 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
                                 color: {theme_colors['muted_text']};
                                 margin-bottom: 8px;
                                 font-family: 'IBM Plex Sans';
-                            ">{' • '.join(filter(None, [str(year) if year else '', duration]))}</div>
+                            ">{truncate_text(' • '.join(filter(None, [str(year) if year else '', duration])), 36)}</div>
                             
                             {f'''
                             <div style="
@@ -2353,7 +2393,7 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
                                 opacity: 0.8;
                                 line-height: 1.3;
                                 font-family: 'IBM Plex Sans';
-                            ">{summary[:100]}{'...' if len(summary) > 100 else ''}</div>
+                            ">{summary[:79]}{'...' if len(summary) > 79 else ''}</div>
                             ''' if summary else ''}
                         </div>
                     </div>
@@ -3168,7 +3208,7 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, displ
         elif item_type == 'graph':
             content_html += build_graph_html_with_frontend_image(item, msg_root)
         
-        elif item_type == 'ra':
+        elif item_type == 'recently added':
             library_filter = item.get('raLibrary')
             recent_data = tautulli_data.get('recent_data', [])
 
@@ -3183,7 +3223,7 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, displ
 
             content_html += build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, library_filter, base_url, max_items)
         
-        elif item_type == 'recs':
+        elif item_type == 'recommendations':
             if recommendations_data:
                 if target_user_key:
                     if item.get('userKey') == str(target_user_key):

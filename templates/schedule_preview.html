@@ -763,9 +763,9 @@
                             <p style="color: #ccc; font-size: 14px;">Chart will be generated when email is sent with fresh data</p>
                         </div>`;
                 }
-            } else if (item.type === 'ra') {
+            } else if (item.type === 'recently added') {
                 contentHTML += buildRecentlyAddedHTML(item.raLibrary);
-            } else if (item.type === 'recs') {
+            } else if (item.type === 'recommendations') {
                 contentHTML += buildRecommendationsHTML(item.userKey);
             } else if (item.type === 'collection_group') {
                 const groupTitle = item.title || 'Collections';

@@ -632,6 +632,42 @@ def migrate_schema(column_def):
     finally:
         conn.close()
 
+def migrate_ra_recs_to_recently_added_recommendations():
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT id, selected_items FROM email_templates")
+    rows = cursor.fetchall()
+
+    updated = 0
+    for template_id, selected_json in rows:
+        if not selected_json:
+            continue
+        try:
+            items = json.loads(selected_json)
+        except json.JSONDecodeError:
+            continue
+
+        changed = False
+        for item in items:
+            if isinstance(item, dict) and "type" in item:
+                if item["type"] == "ra":
+                    item["type"] = "recently added"
+                    changed = True
+                elif item["type"] == "recs":
+                    item["type"] = "recommendations"
+                    changed = True
+
+        if changed:
+            new_json = json.dumps(items, ensure_ascii=False)
+            cursor.execute("UPDATE email_templates SET selected_items = ? WHERE id = ?", (new_json, template_id))
+            updated += 1
+
+    conn.commit()
+    conn.close()
+
+    print(f"Updated {updated} templates successfully.")
+
 def get_saved_email_lists():
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
@@ -3516,7 +3552,7 @@ def send_recommendations_email_with_cids(to_emails, subject, user_dict, selected
     try:
         rec_user_keys = set()
         for item in selected_items:
-            if item.get('type') == 'recs' and item.get('userKey'):
+            if item.get('type') == 'recommendations' and item.get('userKey'):
                 rec_user_keys.add(item['userKey'])
         
         if not rec_user_keys:
@@ -3895,7 +3931,7 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
                 item['chartImage'] = chart_data.get('dataUrl', '')
                 item['chartSVG'] = chart_data.get('svg', '')
 
-        has_recs = any(item.get('type') == 'recs' for item in selected_items)
+        has_recs = any(item.get('type') == 'recommendations' for item in selected_items)
 
         users_data, _ = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_users', 'Users', None)
         user_dict = {}
@@ -3911,7 +3947,7 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
             
             rec_user_keys = set()
             for item in selected_items:
-                if item.get('type') == 'recs' and item.get('userKey'):
+                if item.get('type') == 'recommendations' and item.get('userKey'):
                     rec_user_keys.add(item['userKey'])
             
             if not rec_user_keys:
@@ -4845,7 +4881,7 @@ def send_email():
     selected_items = data.get('selected_items', [])
     from_name = settings['from_name']
 
-    has_recommendations = any(item.get('type') == 'recs' for item in selected_items)
+    has_recommendations = any(item.get('type') == 'recommendations' for item in selected_items)
 
     if has_recommendations and user_dict:
         return send_recommendations_email_with_cids(
@@ -6115,6 +6151,7 @@ if __name__ == '__main__':
     migrate_schema("logo_filename TEXT")
     migrate_schema("logo_width INTEGER")
     migrate_schema("recipient_display_name TEXT DEFAULT 'email'")
+    migrate_ra_recs_to_recently_added_recommendations()
 
     if os.environ.get("WERKZEUG_RUN_MAIN") == "true" and not app.debug:
         start_background_workers()

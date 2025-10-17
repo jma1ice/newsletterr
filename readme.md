@@ -163,7 +163,6 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 ### For the v0.9.17 sprint, these items are to be addressed:
 * Plex 'Secure Connections' setting causing image 401
 * Make sure custom templates can't override defaults
-* RA cards can all show up as different heights in email
 
 #### And these items are feature requests:
 * Graph titles need to specify the date range - or at least show what time range the data is for somewhere in the email
@@ -239,6 +238,7 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Added 'ALL' BCC list to scheduler options
 * Now shows # of items in scheduler table
 * Fixed 0m for shows and audio changed to genre
+* Fixed the issue with RA cards showing up as different heights in different email clients
 
 #### New Features:
 * Added more date range options in schedule builder to match dashboard

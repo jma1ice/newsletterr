@@ -16,7 +16,7 @@ from urllib.parse import quote_plus, urljoin, urlparse, parse_qs, urlencode, quo
 
 app = Flask(__name__)
 app.jinja_env.globals["version"] = "v0.9.17"
-app.jinja_env.globals["publish_date"] = "October 16, 2025"
+app.jinja_env.globals["publish_date"] = "October 17, 2025"
 
 def get_global_cache_status():
     try:
@@ -479,7 +479,49 @@ def build_email_css_from_theme(theme_colors, logo_width):
             .ExternalClass {{ width: 100% !important; }}
             .ExternalClass * {{ line-height: 100% !important; }}
 
-            @media only screen and (max-width: 8) {{
+            .email-container {{
+                max-width: 800px !important;
+                width: 100% !important;
+                margin: 0 auto !important;
+            }}
+            
+            .email-logo {{
+                max-width: {logo_width}px !important;
+                width: auto !important;
+                height: auto !important;
+            }}
+
+            .card-poster-wrapper {{
+                position: relative !important;
+                display: block !important;
+            }}
+
+            .card-poster {{
+                background-size: cover !important;
+                background-position: center !important;
+                background-repeat: no-repeat !important;
+                width: 100% !important;
+                padding-top: 135%;
+                position: relative !important;
+                background-color: #f8f9fa !important;
+                border-radius: 10px 10px 0 0 !important;
+            }}
+
+            .card-poster-badge {{
+                position: absolute !important;
+                bottom: 1px !important;
+                right: 1px !important;
+                background-color: rgba(0, 0, 0, 0.6);
+                color: rgba(255, 255, 255, 0.9);
+                padding: 2px 6px;
+                border-radius: 4px;
+                font-size: 9px;
+                font-family: 'IBM Plex Sans';
+                line-height: 1;
+                max-width: fit-content;
+            }}
+
+            @media only screen and (max-width: 600px) {{
                 .email-container {{
                     width: 100% !important;
                     max-width: 100% !important;
@@ -490,39 +532,44 @@ def build_email_css_from_theme(theme_colors, logo_width):
                     max-width: 60px !important;
                     width: 60px !important;
                 }}
-                
-                .grid-table {{
+
+                .recently-added-table {{
+                    display: block !important;
                     width: 100% !important;
+                    text-align: center !important;
+                }}
+
+                .recently-added-row {{
+                    display: inline !important;
                 }}
                 
-                .grid-cell {{
-                    width: 50% !important;
+                .recently-added-table td {{
+                    width: 30% !important;
+                    padding: 6px !important;
                     display: inline-block !important;
                     vertical-align: top !important;
+                    box-sizing: border-box !important;
                 }}
                 
-                .card-container {{
+                .recently-added-card {{
+                    width: 100% !important;
                     max-width: 150px !important;
                     margin: 0 auto 10px auto !important;
-                }}
-            }}
-            
-            @media only screen and (max-device-width: 8) {{
-                .email-logo {{
-                    max-width: 60px !important;
                     height: auto !important;
+                    overflow: hidden !important;
+                    border-radius: 10px !important;
                 }}
-            }}
-            
-            .email-container {{
-                max-width: 800px !important;
-                width: 100% !important;
-            }}
-            
-            .email-logo {{
-                max-width: {logo_width}px !important;
-                width: auto !important;
-                height: auto !important;
+
+                .card-poster {{
+                    padding-top: 125% !important;
+                    min-height: 25px;
+                }}
+                
+                .card-content {{
+                    height: auto !important;
+                    min-height: 150px !important;
+                    text-align: left !important;
+                }}
             }}
         </style>
     """
@@ -2231,11 +2278,11 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
     
     for i in range(0, len(items), items_per_row):
         row_items = items[i:i + items_per_row]
-        row_html = "<tr>"
+        row_html = '<tr class="recently-added-row">'
         
         for j, item in enumerate(row_items):
             full_title = item.get('title', 'Unknown')
-            title = truncate_text(full_title, 26)
+            title = truncate_text(full_title, 23)
             year = item.get('year', '')
             if not year and (item.get('media_type') or item.get('type', '')).lower() == 'album':
                 year = item.get('grandparent_title') or item.get('parent_title') or ''
@@ -2367,58 +2414,50 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
                 poster_bg_url = f"cid:{poster_cid}"
                 
                 card_html = f"""
-                    <div style="
+                    <div class="recently-added-card" style="
                         background-color: {theme_colors['card_bg']};
                         border-radius: 12px;
                         overflow: hidden;
                         border: 1px solid {theme_colors['border']};
-                        width: 124px;
+                        width: 100%;
+                        max-width: 124px;
                         margin: 0 auto;
                         box-shadow: 0 6px 18px rgba(0, 0, 0, 0.6);
                     ">
-                        <div style="
-                            background-image: url('{poster_bg_url}');
-                            background-size: cover;
-                            background-position: center;
-                            background-repeat: no-repeat;
-                            height: 185px;
-                            position: relative;
-                            background-color: #f8f9fa;
-                        ">
-                            {f'''
-                            <div style="
-                                float: right;
-                                clear: right;
-                                background-color: rgba(0, 0, 0, 0.6);
-                                color: rgba(255, 255, 255, 0.9);
-                                padding: 2px 6px;
-                                border-radius: 4px;
-                                font-size: 9px;
-                                margin: 171px 1px 1px 1px;
-                                font-family: 'IBM Plex Sans';
-                                line-height: 1;
-                            ">{added_date}</div>
-                            ''' if added_date else ''}
+                        <div class="card-poster-wrapper" style="position: relative; display: block; text-align: right;">
+                            <div class="card-poster" style="
+                                background-image: url('{poster_bg_url}');
+                            ">
+                                {f'''
+                                <div class="card-poster-badge"
+                                    style="position: absolute; display: inline-block; bottom: 1px; right: 1px; max-width: fit-content; text-align: right; margin-left: auto;">
+                                    {added_date}
+                                </div>
+                                ''' if added_date else ''}
+                            </div>
                         </div>
                         
-                        <div style="
-                            padding: 12px;
+                        <div class="card-content" style="
+                            padding: 6px;
                             background-color: {theme_colors['card_bg']};
                             color: {theme_colors['text']};
+                            min-height: 135px;
                         ">
                             <div style="
                                 font-weight: bold;
                                 font-size: 14px;
                                 color: {theme_colors['text']};
-                                margin-bottom: 4px;
+                                margin-bottom: 1px;
                                 line-height: 1.2;
                                 font-family: 'IBM Plex Sans';
+                                word-wrap: break-word;
+                                overflow-wrap: break-word;
                             ">{title}</div>
                             
                             <div style="
                                 font-size: 11px;
                                 color: {theme_colors['muted_text']};
-                                margin-bottom: 8px;
+                                margin-bottom: 2px;
                                 font-family: 'IBM Plex Sans';
                             ">{truncate_text(' • '.join(filter(None, [str(year) if year else '', duration])), 36)}</div>
                             
@@ -2429,7 +2468,9 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
                                 opacity: 0.8;
                                 line-height: 1.3;
                                 font-family: 'IBM Plex Sans';
-                            ">{summary[:79]}{'...' if len(summary) > 79 else ''}</div>
+                                word-wrap: break-word;
+                                overflow-wrap: break-word;
+                            ">{summary[:84]}{'...' if len(summary) > 84 else ''}</div>
                             ''' if summary else ''}
                         </div>
                     </div>
@@ -2456,8 +2497,7 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
                         text-align: center;
                         max-width: 200px;
                         margin: 0 auto;
-                        height: 300px;
-                        display: table;
+                        height: 320px;
                     ">
                         <div style="display: table-cell; vertical-align: middle;">
                             <div style="
@@ -2497,10 +2537,10 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
                 else:
                     card_html = card_html
             
-            row_html += f'<td style="{cell_style}">{card_html}</td>'
+            row_html += f'<td class="recently-added-cell" style="{cell_style}">{card_html}</td>'
         
         while len(row_items) < items_per_row:
-            row_html += f'<td style="width: 20%; padding: 8px;"></td>'
+            row_html += f'<td class="recently-added-cell" style="width: 20%; padding: 8px;"></td>'
             row_items.append(None)
         
         row_html += "</tr>"
@@ -2513,6 +2553,8 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
         margin: 20px 0;
         border: 1px solid {theme_colors['border']};
         font-family: 'IBM Plex Sans';
+        overflow: hidden;
+        max-width: 100%;
     """
     
     title_style = f"""
@@ -2529,12 +2571,13 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
         border-collapse: collapse;
         margin: 0;
         padding: 0;
+        table-layout: fixed;
     """
     
     return f"""
         <div style="{container_style}">
             <h2 style="{title_style}">Recently Added{f' - {library_filter}' if library_filter else ''}</h2>
-            <table style="{table_style}">
+            <table class="recently-added-table" style="{table_style}">
                 {items_html}
             </table>
         </div>

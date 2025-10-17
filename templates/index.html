@@ -1325,6 +1325,9 @@
                             width: 100%;
                             max-width: 200px;
                             margin: 0 auto;
+                            height: 310px;
+                            display: flex;
+                            flex-direction: column;
                         ">
                             <div style="position: relative; aspect-ratio: 2/3; background: #f8f9fa;">
                                 <img src="${imgURL}" style="width: 100%; height: 100%; object-fit: cover; display: block;" alt="${item.title}">
@@ -1342,7 +1345,7 @@
                                     ">${item.added}</div>
                                 ` : ''}
                             </div>
-                            <div style="padding: 12px;">
+                            <div style="padding: 6px;">
                                 <div style="font-weight: bold; font-size: 14px; color: var(--email-text); margin-bottom: 4px; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
                                     ${item.title}
                                 </div>

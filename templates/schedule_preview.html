@@ -311,9 +311,29 @@
 
     function formatDate(d) {
         if (!d) return '';
-        if (/^\d+$/.test(String(d))) return new Date(parseInt(d,10)*1000).toLocaleDateString();
-        const dt = new Date(d);
-        return isNaN(dt) ? '' : dt.toLocaleDateString();
+        
+        let targetDate;
+        if (/^\d+$/.test(String(d))) {
+            targetDate = new Date(parseInt(d, 10) * 1000);
+        } else {
+            targetDate = new Date(d);
+        }
+        
+        if (isNaN(targetDate)) return '';
+        
+        const now = new Date();
+        const diffMs = now - targetDate;
+        const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+        
+        if (diffDays < 0) {
+            return `in ${Math.abs(diffDays)} days`;
+        } else if (diffDays === 0) {
+            return 'today';
+        } else if (diffDays === 1) {
+            return 'yesterday';
+        } else {
+            return `${diffDays} days ago`;
+        }
     }
 
     function pickThumb(it) {
@@ -418,7 +438,7 @@
         return `<tr>${tds}</tr>`;
     }
 
-    function buildStatCardHTML(stat) {
+    function buildStatCardHTML(stat, dateRange) {
         const title = stat.stat_title || 'Stats';
         const rows = Array.isArray(stat.rows) ? stat.rows : [];
         const bg = rows[0]?.art || rows[0]?.grandparent_thumb || '';
@@ -491,13 +511,14 @@
             recentCommands = data.recent_commands || [];
             userDict = data.user_dict || {};
             usersFullData = data.users_full_data || {};
+            dateRange = data.date_range || '';
 
             console.log('Loaded fresh data:', { 
                 stats: stats.length, 
                 graphs: graphData.length, 
                 recent: recentData.length,
                 recos: Object.keys(recsPayload).length,
-                dateRange: data.date_range,
+                dateRange: dateRange,
                 itemsCount: data.items_count,
                 graphCommands: graphCommands.length
             });
@@ -508,7 +529,7 @@
             document.getElementById('email_text').value = data.email_text || '';
             document.getElementById('layout').value = data.layout || 'standard';
             
-            await generateStatsAndGraphs();
+            await generateStatsAndGraphs(dateRange);
 
             await new Promise(resolve => setTimeout(resolve, 5000));
             
@@ -527,7 +548,7 @@
         }
     }
 
-    async function generateStatsAndGraphs() {
+    async function generateStatsAndGraphs(dateRange) {
         console.log('generateStatsAndGraphs: Starting with graphData:', graphData);
         
         const statsContainer = document.getElementById('stats-container');
@@ -541,7 +562,7 @@
                 const wrap = document.createElement('div');
                 wrap.id = `stat-${i}`;
                 wrap.className = 'stat-table d-none';
-                wrap.innerHTML = buildStatCardHTML(stat);
+                wrap.innerHTML = buildStatCardHTML(stat, dateRange);
                 const bg = wrap.querySelector('.bg-blur');
                 if (bg) { blurImageElement(bg).catch(()=>{}); }
                 statsContainer.appendChild(wrap);
@@ -556,8 +577,8 @@
                 const div = document.createElement('div');
                 div.id = id;
                 div.className = 'graph-table d-none';
-                div.style.width = '100%';
-                div.style.minHeight = '360px';
+                div.style.width = '600px';
+                div.style.height = '400px';
                 graphsContainer.appendChild(div);
             });
 
@@ -577,8 +598,8 @@
                 
                 try {
                     const cfg = {
-                        chart: { type: 'line', style: { fontFamily: 'IBM Plex Sans' } },
-                        title: { text: cmd.name },
+                        chart: { type: 'line', style: { fontFamily: 'IBM Plex Sans, Segoe UI, Helvetica, Arial, sans-serif' } },
+                        title: { text: cmd.name + ' - Last ' + `${dateRange}` + ' days' },
                         exporting: { enabled: true },
                         xAxis: { categories: g.categories || [] },
                         yAxis: { title: { text: 'Plays' } },
@@ -685,7 +706,7 @@
                     contentHTML += `<div style="margin-bottom: 20px; font-size: 2em; font-weight: bold; text-align: center;">${formattedContent}</div>`;
                 }
             } else if (item.type === 'stat') {
-                contentHTML += buildStatHTML(item.id);
+                contentHTML += buildStatHTML(item.id, dateRange);
             } else if (item.type === 'graph') {
                 console.log('Processing graph item:', item.id);
                 
@@ -743,9 +764,9 @@
                             <p style="color: #ccc; font-size: 14px;">Chart will be generated when email is sent with fresh data</p>
                         </div>`;
                 }
-            } else if (item.type === 'ra') {
+            } else if (item.type === 'recently added') {
                 contentHTML += buildRecentlyAddedHTML(item.raLibrary);
-            } else if (item.type === 'recs') {
+            } else if (item.type === 'recommendations') {
                 contentHTML += buildRecommendationsHTML(item.userKey);
             } else if (item.type === 'collection_group') {
                 const groupTitle = item.title || 'Collections';
@@ -759,7 +780,7 @@
         return buildCompleteEmailHTML(contentHTML, serverName, subject);
     }
 
-    function buildStatHTML(statId) {
+    function buildStatHTML(statId, dateRange) {
         const statIndex = parseInt(statId.split('-')[1]);
         if (statIndex >= stats.length) return '';
         
@@ -916,7 +937,7 @@
             <div class="stats-card" style="${containerStyle}">
                 ${backgroundElements}
                 <div class="stats-content" style="position: relative; z-index: 2;">
-                    <div class="stats-header" style="${headerStyle}">${title}</div>
+                    <div class="stats-header" style="${headerStyle}">${title} - Last ${dateRange} days</div>
                     <table class="stats-table" style="${tableStyle}">
                         <thead>
                             <tr>${headerHTML}</tr>
@@ -977,14 +998,19 @@
         }
         
         const gridItems = allItems.map(item => {
+            const item_type = (item.media_type || item.type || '').toLowerCase();
             const title = item.title || item.full_title || item.parent_title || item.grandparent_title || '(untitled)';
             const sub = item.year || item.grandparent_title || item.parent_title || '';
             const thumbPath = pickThumb(item);
-            const duration = msToHMS(item.duration);
-            const added = formatDate(item.added_at || item.originally_available_at);
+            let duration = '';
+            if (item_type === 'album') {
+                duration = item.duration || item.grandparent_title || item.parent_title || 'Audio';
+            } else {
+                duration = msToHMS(item.duration);
+            }
+            const added = formatDate(item.updated_at || item.originally_available_at);
             const library = item.library_name || item.section_name || '';
 
-            const item_type = (item.media_type || item.type || '').toLowerCase();
             let summary = '';
             if (item_type === 'episode' || item_type === 'season') {
                 summary = item.grandparent_tagline || item.grandparent_summary || item.parent_summary || item.tagline || item.summary || '';
@@ -1018,6 +1044,9 @@
                     width: 100%;
                     max-width: 200px;
                     margin: 0 auto;
+                    height: 310px;
+                    display: flex;
+                    flex-direction: column;
                 ">
                     <div style="position: relative; aspect-ratio: 2/3; background: #f8f9fa;">
                         <img src="${imgURL}" style="width: 100%; height: 100%; object-fit: cover; display: block;" alt="${item.title}">
@@ -1035,11 +1064,11 @@
                             ">${item.added}</div>
                         ` : ''}
                     </div>
-                    <div style="padding: 12px;">
+                    <div style="padding: 6px;">
                         <div style="font-weight: bold; font-size: 14px; color: var(--email-text); margin-bottom: 4px; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
                             ${item.title}
                         </div>
-                        <div style="font-size: 11px; color: var(--email-muted); margin-bottom: 8px;">
+                        <div style="font-size: 11px; color: var(--email-muted); margin-bottom: 8px; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
                             ${item.sub ? item.sub + ' • ' : ''}${item.duration}
                         </div>
                         ${item.summary ? `

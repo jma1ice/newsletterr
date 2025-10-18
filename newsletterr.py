@@ -16,7 +16,7 @@ from urllib.parse import quote_plus, urljoin, urlparse, parse_qs, urlencode, quo
 
 app = Flask(__name__)
 app.jinja_env.globals["version"] = "v0.9.17"
-app.jinja_env.globals["publish_date"] = "October 11, 2025"
+app.jinja_env.globals["publish_date"] = "October 18, 2025"
 
 def get_global_cache_status():
     try:
@@ -452,7 +452,7 @@ def build_email_css_from_theme(theme_colors, logo_width):
             body {{
                 margin: 0 !important;
                 padding: 0 !important;
-                font-family: 'IBM Plex Sans' !important;
+                font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif !important;
                 background-color: {theme_colors['background']} !important;
                 line-height: 1.6 !important;
                 color: {theme_colors['text']} !important;
@@ -479,7 +479,49 @@ def build_email_css_from_theme(theme_colors, logo_width):
             .ExternalClass {{ width: 100% !important; }}
             .ExternalClass * {{ line-height: 100% !important; }}
 
-            @media only screen and (max-width: 8) {{
+            .email-container {{
+                max-width: 800px !important;
+                width: 100% !important;
+                margin: 0 auto !important;
+            }}
+            
+            .email-logo {{
+                max-width: {logo_width}px !important;
+                width: auto !important;
+                height: auto !important;
+            }}
+
+            .card-poster-wrapper {{
+                position: relative !important;
+                display: block !important;
+            }}
+
+            .card-poster {{
+                background-size: cover !important;
+                background-position: center !important;
+                background-repeat: no-repeat !important;
+                width: 100% !important;
+                padding-top: 135%;
+                position: relative !important;
+                background-color: #f8f9fa !important;
+                border-radius: 10px 10px 0 0 !important;
+            }}
+
+            .card-poster-badge {{
+                position: absolute !important;
+                bottom: 1px !important;
+                right: 1px !important;
+                background-color: rgba(0, 0, 0, 0.6);
+                color: rgba(255, 255, 255, 0.9);
+                padding: 2px 6px;
+                border-radius: 4px;
+                font-size: 9px;
+                font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
+                line-height: 1;
+                max-width: fit-content;
+            }}
+
+            @media only screen and (max-width: 600px) {{
                 .email-container {{
                     width: 100% !important;
                     max-width: 100% !important;
@@ -490,39 +532,44 @@ def build_email_css_from_theme(theme_colors, logo_width):
                     max-width: 60px !important;
                     width: 60px !important;
                 }}
-                
-                .grid-table {{
+
+                .recently-added-table {{
+                    display: block !important;
                     width: 100% !important;
+                    text-align: center !important;
+                }}
+
+                .recently-added-row {{
+                    display: inline !important;
                 }}
                 
-                .grid-cell {{
-                    width: 50% !important;
+                .recently-added-table td {{
+                    width: 30% !important;
+                    padding: 6px !important;
                     display: inline-block !important;
                     vertical-align: top !important;
+                    box-sizing: border-box !important;
                 }}
                 
-                .card-container {{
+                .recently-added-card {{
+                    width: 100% !important;
                     max-width: 150px !important;
                     margin: 0 auto 10px auto !important;
-                }}
-            }}
-            
-            @media only screen and (max-device-width: 8) {{
-                .email-logo {{
-                    max-width: 60px !important;
                     height: auto !important;
+                    overflow: hidden !important;
+                    border-radius: 10px !important;
                 }}
-            }}
-            
-            .email-container {{
-                max-width: 800px !important;
-                width: 100% !important;
-            }}
-            
-            .email-logo {{
-                max-width: {logo_width}px !important;
-                width: auto !important;
-                height: auto !important;
+
+                .card-poster {{
+                    padding-top: 125% !important;
+                    min-height: 25px;
+                }}
+                
+                .card-content {{
+                    height: auto !important;
+                    min-height: 150px !important;
+                    text-align: left !important;
+                }}
             }}
         </style>
     """
@@ -632,6 +679,42 @@ def migrate_schema(column_def):
     finally:
         conn.close()
 
+def migrate_ra_recs_to_recently_added_recommendations():
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT id, selected_items FROM email_templates")
+    rows = cursor.fetchall()
+
+    updated = 0
+    for template_id, selected_json in rows:
+        if not selected_json:
+            continue
+        try:
+            items = json.loads(selected_json)
+        except json.JSONDecodeError:
+            continue
+
+        changed = False
+        for item in items:
+            if isinstance(item, dict) and "type" in item:
+                if item["type"] == "ra":
+                    item["type"] = "recently added"
+                    changed = True
+                elif item["type"] == "recs":
+                    item["type"] = "recommendations"
+                    changed = True
+
+        if changed:
+            new_json = json.dumps(items, ensure_ascii=False)
+            cursor.execute("UPDATE email_templates SET selected_items = ? WHERE id = ?", (new_json, template_id))
+            updated += 1
+
+    conn.commit()
+    conn.close()
+
+    print(f"Updated {updated} templates successfully.")
+
 def get_saved_email_lists():
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
@@ -644,10 +727,16 @@ def save_email_list(name, emails):
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     try:
-        cursor.execute("INSERT INTO email_lists (name, emails) VALUES (?, ?)", (name, emails))
+        cursor.execute("""
+            INSERT INTO email_lists
+            (name, emails)
+            VALUES (?, ?)
+            ON CONFLICT (name) DO UPDATE
+            SET emails = excluded.emails
+        """, (name, emails))
         conn.commit()
         return True
-    except sqlite3.IntegrityError:
+    except:
         return False
     finally:
         conn.close()
@@ -961,7 +1050,7 @@ def background_scheduler():
             now = datetime.now()
             current_time = time.time()
             
-            if current_time - last_cache_refresh > 86400:
+            if current_time - last_cache_refresh > CACHE_DURATION:
                 print(f"Daily cache refresh triggered at {now.isoformat()}")
                 refresh_daily_cache()
                 last_cache_refresh = current_time
@@ -1099,14 +1188,8 @@ def refresh_daily_cache():
         library_section_ids = {}
         for library in libraries:
             library_section_ids[f"{library['section_id']}"] = library["section_name"]
-
-        recent_data = []
-        for section_id in library_section_ids.keys():
-            rd, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_recently_added', section_id, error, count)
-            if rd:
-                for item in rd['recently_added']:
-                    item['library_name'] = library_section_ids[section_id]
-                recent_data.append(rd)
+        
+        recent_data = fetch_recent_data_for_index(tautulli_base_url, tautulli_api_key, count)
         
         if recent_data:
             set_cached_data('recent_data', recent_data, cache_params)
@@ -1398,7 +1481,7 @@ def fetch_tv_shows_from_plex_sdk(section_id, limit=10, machine_id=None):
         
         for directory in media_container.get('Metadata', []):
             rating_key = str(directory.get('ratingKey', ''))
-            
+
             show = {
                 'title': directory.get('title', 'Unknown'),
                 'rating_key': rating_key,
@@ -1407,7 +1490,9 @@ def fetch_tv_shows_from_plex_sdk(section_id, limit=10, machine_id=None):
                 'art': directory.get('art', ''),
                 'summary': directory.get('summary', ''),
                 'added_at': str(directory.get('addedAt', '')),
+                'updated_at': str(directory.get('updatedAt', '')),
                 'content_rating': directory.get('contentRating', ''),
+                'duration': str(directory.get('duration', '')),
                 'guid': directory.get('guid', ''),
                 'key': directory.get('key', ''),
                 'media_type': 'show',
@@ -1473,6 +1558,7 @@ def fetch_movies_from_plex_sdk(section_id, limit=10, machine_id=None):
                 'art': video.get('art', ''),
                 'summary': video.get('summary', ''),
                 'added_at': str(video.get('addedAt', '')),
+                'updated_at': str(video.get('updatedAt', '')),
                 'content_rating': video.get('contentRating', ''),
                 'duration': str(video.get('duration', '')),
                 'guid': video.get('guid', ''),
@@ -1531,7 +1617,7 @@ def fetch_albums_from_plex_sdk(section_id, limit=10, machine_id=None):
         
         for album in media_container.get('Metadata', []):
             rating_key = str(album.get('ratingKey', ''))
-            
+
             album_data = {
                 'title': album.get('title', 'Unknown'),
                 'rating_key': rating_key,
@@ -1540,6 +1626,8 @@ def fetch_albums_from_plex_sdk(section_id, limit=10, machine_id=None):
                 'art': album.get('art', ''),
                 'summary': album.get('summary', ''),
                 'added_at': str(album.get('addedAt', '')),
+                'updated_at': str(album.get('updatedAt', '')),
+                'duration': str(album.get('Genre', '')[0]['tag']) if album.get('Genre', '') else '',
                 'guid': album.get('guid', ''),
                 'key': album.get('key', ''),
                 'parent_title': album.get('parentTitle', ''),
@@ -2058,7 +2146,12 @@ def fetch_and_attach_blurred_image(image_url, msg_root, cid_name, base_url=""):
         print(f"Error processing blurred image {image_url}: {e}")
         return fetch_and_attach_image(image_url, msg_root, cid_name, base_url)
 
-def build_stats_html_with_cid_background(stat_data, msg_root, theme_colors, base_url=""):
+def truncate_text(text, max_chars=28):
+    if len(text) <= max_chars:
+        return text
+    return text[:max_chars-3] + '...'
+
+def build_stats_html_with_cid_background(stat_data, msg_root, theme_colors, base_url="", date_range=""):
     if not stat_data or not stat_data.get('rows'):
         return ""
     
@@ -2079,7 +2172,7 @@ def build_stats_html_with_cid_background(stat_data, msg_root, theme_colors, base
     
     headers = get_stat_headers(title)
     header_cells = "".join([
-        f'<th style="padding: 12px; background-color: rgba(52, 58, 64, 0.9); color: white; font-weight: bold; border: none; font-family: \'IBM Plex Sans\'; font-size: 14px; text-align: left;">{h}</th>' 
+        f'<th style="padding: 12px; background-color: rgba(52, 58, 64, 0.9); color: white; font-weight: bold; border: none; font-family: \'IBM Plex Sans\', \'Segoe UI\', Helvetica, Arial, sans-serif; font-size: 14px; text-align: left;">{h}</th>' 
         for h in headers
     ])
     
@@ -2087,7 +2180,7 @@ def build_stats_html_with_cid_background(stat_data, msg_root, theme_colors, base
     for row in rows:
         cells = get_stat_cells(title, row)
         cells_html = "".join([
-            f'<td style="padding: 12px; background-color: rgba(255, 255, 255, 0.5); color: #333; border-bottom: 1px solid rgba(222, 226, 230, 0.8); font-family: \'IBM Plex Sans\'; font-size: 14px;">{cell}</td>' 
+            f'<td style="padding: 12px; background-color: rgba(255, 255, 255, 0.5); color: #333; border-bottom: 1px solid rgba(222, 226, 230, 0.8); font-family: \'IBM Plex Sans\', \'Segoe UI\', Helvetica, Arial, sans-serif; font-size: 14px;">{cell}</td>' 
             for cell in cells
         ])
         rows_html += f'<tr>{cells_html}</tr>'
@@ -2099,7 +2192,7 @@ def build_stats_html_with_cid_background(stat_data, msg_root, theme_colors, base
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
         border: 1px solid {theme_colors['border']};
         position: relative;
-        font-family: 'IBM Plex Sans';
+        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
     """
     
     if background_cid:
@@ -2126,7 +2219,7 @@ def build_stats_html_with_cid_background(stat_data, msg_root, theme_colors, base
         text-align: center;
         font-weight: bold;
         font-size: 18px;
-        font-family: 'IBM Plex Sans';
+        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
         margin: 0;
         position: relative;
         z-index: 2;
@@ -2137,14 +2230,17 @@ def build_stats_html_with_cid_background(stat_data, msg_root, theme_colors, base
         border-collapse: collapse;
         position: relative;
         z-index: 2;
-        font-family: 'IBM Plex Sans';
+        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
     """
+
+    if date_range == "":
+        date_range = get_cache_info('stats')['params']['time_range']
     
     return f"""
         <div style="{container_style}">
             {overlay}
             <div style="position: relative; z-index: 1;">
-                <div style="{header_style}">{title}</div>
+                <div style="{header_style}">{title} - Last {date_range} days</div>
                 <table style="{table_style}">
                     <thead>
                         <tr>{header_cells}</tr>
@@ -2160,8 +2256,8 @@ def build_stats_html_with_cid_background(stat_data, msg_root, theme_colors, base
 def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, library_filter=None, base_url="", max_items=None):
     if not recent_data:
         return f"""
-        <div style="background-color: {theme_colors['card_bg']}; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid {theme_colors['border']}; font-family: 'IBM Plex Sans';">
-            <p style="text-align: center; color: {theme_colors['muted_text']}; padding: 20px; margin: 0; font-family: 'IBM Plex Sans';">No recently added items available.</p>
+        <div style="background-color: {theme_colors['card_bg']}; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid {theme_colors['border']}; font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;">
+            <p style="text-align: center; color: {theme_colors['muted_text']}; padding: 20px; margin: 0; font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;">No recently added items available.</p>
         </div>
         """
     
@@ -2181,8 +2277,8 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
     
     if not items:
         return f"""
-        <div style="background-color: {theme_colors['card_bg']}; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid {theme_colors['border']}; font-family: 'IBM Plex Sans';">
-            <p style="text-align: center; color: {theme_colors['muted_text']}; padding: 20px; margin: 0; font-family: 'IBM Plex Sans';">No recently added items found{f' for {library_filter}' if library_filter else ''}.</p>
+        <div style="background-color: {theme_colors['card_bg']}; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid {theme_colors['border']}; font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;">
+            <p style="text-align: center; color: {theme_colors['muted_text']}; padding: 20px; margin: 0; font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;">No recently added items found{f' for {library_filter}' if library_filter else ''}.</p>
         </div>
         """
     
@@ -2191,11 +2287,14 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
     
     for i in range(0, len(items), items_per_row):
         row_items = items[i:i + items_per_row]
-        row_html = "<tr>"
+        row_html = '<tr class="recently-added-row">'
         
         for j, item in enumerate(row_items):
-            title = item.get('title', 'Unknown')
+            full_title = item.get('title', 'Unknown')
+            title = truncate_text(full_title, 23)
             year = item.get('year', '')
+            if not year and (item.get('media_type') or item.get('type', '')).lower() == 'album':
+                year = item.get('grandparent_title') or item.get('parent_title') or ''
             library = item.get('library_name', '')
             added_date = ""
             duration = ""
@@ -2240,18 +2339,33 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
                     if poster_cid:
                         break
                         
-            if item.get('added_at'):
+            if item.get('updated_at'):
                 try:
-                    timestamp = item['added_at']
+                    timestamp = item['updated_at']
                     if isinstance(timestamp, str) and timestamp.isdigit():
                         timestamp = int(timestamp)
                     
                     if isinstance(timestamp, (int, float)):
                         dt = datetime.fromtimestamp(timestamp)
-                        added_date = dt.strftime('%m/%d/%Y')
                     else:
                         dt = datetime.fromisoformat(str(timestamp))
-                        added_date = dt.strftime('%m/%d/%Y')
+
+                    now = datetime.now()
+                    if dt.tzinfo:
+                        now = datetime.now(timezone.utc)
+                        dt = dt.replace(tzinfo=timezone.utc)
+                    
+                    diff_days = (now - dt).days
+                    
+                    if diff_days < 0:
+                        added_date = f"in {abs(diff_days)} days"
+                    elif diff_days == 0:
+                        added_date = "today"
+                    elif diff_days == 1:
+                        added_date = "yesterday"
+                    else:
+                        added_date = f"{diff_days} days ago"
+
                 except Exception as e:
                     if item.get('originally_available_at'):
                         try:
@@ -2261,28 +2375,46 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
                             
                             if isinstance(timestamp, (int, float)):
                                 dt = datetime.fromtimestamp(timestamp)
-                                added_date = dt.strftime('%m/%d/%Y')
                             else:
                                 dt = datetime.fromisoformat(str(timestamp))
-                                added_date = dt.strftime('%m/%d/%Y')
+
+                            now = datetime.now()
+                            if dt.tzinfo:
+                                now = datetime.now(timezone.utc)
+                                dt = dt.replace(tzinfo=timezone.utc)
+                            
+                            diff_days = (now - dt).days
+                            
+                            if diff_days < 0:
+                                added_date = f"in {abs(diff_days)} days"
+                            elif diff_days == 0:
+                                added_date = "today"
+                            elif diff_days == 1:
+                                added_date = "yesterday"
+                            else:
+                                added_date = f"{diff_days} days ago"
+
                         except Exception as e2:
                             added_date = ""
             
-            if item.get('duration'):
-                try:
-                    ms = int(item['duration'])
-                    s = ms // 1000
-                    h = s // 3600
-                    m = (s % 3600) // 60
-                    duration = f"{h}h {m}m" if h else f"{m}m"
-                except:
-                    pass
+            if item_type == 'album':
+                duration = item.get('duration') or item.get('grandparent_title') or item.get('parent_title') or 'Audio'
+            else:
+                if item.get('duration'):
+                    try:
+                        ms = int(item['duration'])
+                        s = ms // 1000
+                        h = s // 3600
+                        m = (s % 3600) // 60
+                        duration = f"{h}h {m}m" if h else f"{m}m"
+                    except:
+                        pass
             
             cell_style = f"""
                 width: 20%;
                 padding: 8px;
                 vertical-align: top;
-                font-family: 'IBM Plex Sans';
+                font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
             """
 
             plex_url = item.get('plex_url', '')
@@ -2291,60 +2423,52 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
                 poster_bg_url = f"cid:{poster_cid}"
                 
                 card_html = f"""
-                    <div style="
+                    <div class="recently-added-card" style="
                         background-color: {theme_colors['card_bg']};
                         border-radius: 12px;
                         overflow: hidden;
                         border: 1px solid {theme_colors['border']};
-                        width: 124px;
+                        width: 100%;
+                        max-width: 124px;
                         margin: 0 auto;
                         box-shadow: 0 6px 18px rgba(0, 0, 0, 0.6);
                     ">
-                        <div style="
-                            background-image: url('{poster_bg_url}');
-                            background-size: cover;
-                            background-position: center;
-                            background-repeat: no-repeat;
-                            height: 185px;
-                            position: relative;
-                            background-color: #f8f9fa;
-                        ">
-                            {f'''
-                            <div style="
-                                float: right;
-                                clear: right;
-                                background-color: rgba(0, 0, 0, 0.6);
-                                color: rgba(255, 255, 255, 0.9);
-                                padding: 2px 6px;
-                                border-radius: 4px;
-                                font-size: 9px;
-                                margin: 171px 1px 1px 1px;
-                                font-family: 'IBM Plex Sans';
-                                line-height: 1;
-                            ">{added_date}</div>
-                            ''' if added_date else ''}
+                        <div class="card-poster-wrapper" style="position: relative; display: block; text-align: right;">
+                            <div class="card-poster" style="
+                                background-image: url('{poster_bg_url}');
+                            ">
+                                {f'''
+                                <div class="card-poster-badge"
+                                    style="position: absolute; display: inline-block; bottom: 1px; right: 1px; max-width: fit-content; text-align: right; margin-left: auto;">
+                                    {added_date}
+                                </div>
+                                ''' if added_date else ''}
+                            </div>
                         </div>
                         
-                        <div style="
-                            padding: 12px;
+                        <div class="card-content" style="
+                            padding: 6px;
                             background-color: {theme_colors['card_bg']};
                             color: {theme_colors['text']};
+                            min-height: 135px;
                         ">
                             <div style="
                                 font-weight: bold;
                                 font-size: 14px;
                                 color: {theme_colors['text']};
-                                margin-bottom: 4px;
+                                margin-bottom: 1px;
                                 line-height: 1.2;
-                                font-family: 'IBM Plex Sans';
+                                font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
+                                word-wrap: break-word;
+                                overflow-wrap: break-word;
                             ">{title}</div>
                             
                             <div style="
                                 font-size: 11px;
                                 color: {theme_colors['muted_text']};
-                                margin-bottom: 8px;
-                                font-family: 'IBM Plex Sans';
-                            ">{' • '.join(filter(None, [str(year) if year else '', duration]))}</div>
+                                margin-bottom: 2px;
+                                font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
+                            ">{truncate_text(' • '.join(filter(None, [str(year) if year else '', duration])), 36)}</div>
                             
                             {f'''
                             <div style="
@@ -2352,8 +2476,10 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
                                 color: {theme_colors['text']};
                                 opacity: 0.8;
                                 line-height: 1.3;
-                                font-family: 'IBM Plex Sans';
-                            ">{summary[:100]}{'...' if len(summary) > 100 else ''}</div>
+                                font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
+                                word-wrap: break-word;
+                                overflow-wrap: break-word;
+                            ">{summary[:84]}{'...' if len(summary) > 84 else ''}</div>
                             ''' if summary else ''}
                         </div>
                     </div>
@@ -2380,8 +2506,7 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
                         text-align: center;
                         max-width: 200px;
                         margin: 0 auto;
-                        height: 300px;
-                        display: table;
+                        height: 320px;
                     ">
                         <div style="display: table-cell; vertical-align: middle;">
                             <div style="
@@ -2389,20 +2514,20 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
                                 font-size: 14px;
                                 color: {theme_colors['text']};
                                 margin-bottom: 8px;
-                                font-family: 'IBM Plex Sans';
+                                font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
                             ">{title}</div>
                             <div style="
                                 font-size: 11px;
                                 color: {theme_colors['muted_text']};
                                 margin-bottom: 8px;
-                                font-family: 'IBM Plex Sans';
+                                font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
                             ">{' • '.join(filter(None, [str(year) if year else '', duration, library, f'Added {added_date}' if added_date else '']))}</div>
                             {f'''
                             <div style="
                                 font-size: 11px;
                                 color: {theme_colors['text']};
                                 opacity: 0.8;
-                                font-family: 'IBM Plex Sans';
+                                font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
                             ">{summary[:100]}{'...' if len(summary) > 100 else ''}</div>
                             ''' if summary else ''}
                         </div>
@@ -2421,10 +2546,10 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
                 else:
                     card_html = card_html
             
-            row_html += f'<td style="{cell_style}">{card_html}</td>'
+            row_html += f'<td class="recently-added-cell" style="{cell_style}">{card_html}</td>'
         
         while len(row_items) < items_per_row:
-            row_html += f'<td style="width: 20%; padding: 8px;"></td>'
+            row_html += f'<td class="recently-added-cell" style="width: 20%; padding: 8px;"></td>'
             row_items.append(None)
         
         row_html += "</tr>"
@@ -2436,7 +2561,9 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
         border-radius: 8px;
         margin: 20px 0;
         border: 1px solid {theme_colors['border']};
-        font-family: 'IBM Plex Sans';
+        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
+        overflow: hidden;
+        max-width: 100%;
     """
     
     title_style = f"""
@@ -2445,7 +2572,7 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
         margin: 0 0 10px 0;
         font-size: 24px;
         font-weight: bold;
-        font-family: 'IBM Plex Sans';
+        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
     """
     
     table_style = """
@@ -2453,12 +2580,13 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
         border-collapse: collapse;
         margin: 0;
         padding: 0;
+        table-layout: fixed;
     """
     
     return f"""
         <div style="{container_style}">
             <h2 style="{title_style}">Recently Added{f' - {library_filter}' if library_filter else ''}</h2>
-            <table style="{table_style}">
+            <table class="recently-added-table" style="{table_style}">
                 {items_html}
             </table>
         </div>
@@ -2509,7 +2637,7 @@ def build_recommendations_html_with_cids(recs_data, msg_root, theme_colors, user
                 background-color: {theme_colors['card_bg']};
                 border-radius: 8px;
                 border: 1px solid {theme_colors['border']};
-                font-family: 'IBM Plex Sans';
+                font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
             """
             
             user_title_style = f"""
@@ -2518,7 +2646,7 @@ def build_recommendations_html_with_cids(recs_data, msg_root, theme_colors, user
                 margin: 0 0 20px 0;
                 font-size: 24px;
                 font-weight: bold;
-                font-family: 'IBM Plex Sans';
+                font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
             """
             
             user_section = f"""
@@ -2583,7 +2711,7 @@ def build_recommendations_section_with_cids(available_items, unavailable_items, 
                 width: 20%;
                 padding: 6px;
                 vertical-align: top;
-                font-family: 'IBM Plex Sans';
+                font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
                 {'opacity: 0.7; filter: grayscale(30%);' if is_unavailable else ''}
             """
 
@@ -2618,7 +2746,7 @@ def build_recommendations_section_with_cids(available_items, unavailable_items, 
                                 border-radius: 4px;
                                 font-size: 9px;
                                 margin: 4px;
-                                font-family: 'IBM Plex Sans';
+                                font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
                                 line-height: 1;
                             ">{year} {vote_text}</div>
                             ''' if year or vote_text else ''}
@@ -2632,7 +2760,7 @@ def build_recommendations_section_with_cids(available_items, unavailable_items, 
                                 border-radius: 4px;
                                 font-size: 9px;
                                 margin: 0px 10px 0px 4px;
-                                font-family: 'IBM Plex Sans';
+                                font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
                                 line-height: 1;
                             ">Unavailable</div>
                             ''' if is_unavailable else ''}
@@ -2646,7 +2774,7 @@ def build_recommendations_section_with_cids(available_items, unavailable_items, 
                                     font-size: 12px;
                                     color: white;
                                     line-height: 1.2;
-                                    font-family: 'IBM Plex Sans';
+                                    font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
                                     margin-top: 132px;
                                 ">{title_text}</div>
                                 {f'''
@@ -2654,7 +2782,7 @@ def build_recommendations_section_with_cids(available_items, unavailable_items, 
                                     font-size: 10px;
                                     color: rgba(255, 255, 255, 0.8);
                                     margin-top: 2px;
-                                    font-family: 'IBM Plex Sans';
+                                    font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
                                 ">{runtime}</div>
                                 ''' if runtime else ''}
                             </div>
@@ -2667,7 +2795,7 @@ def build_recommendations_section_with_cids(available_items, unavailable_items, 
                             color: {theme_colors['text']};
                             font-size: 10px;
                             line-height: 1.3;
-                            font-family: 'IBM Plex Sans';
+                            font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
                             border-top: 1px solid {theme_colors['border']};
                         ">
                             {overview[:80]}{'...' if len(overview) > 80 else ''}
@@ -2696,20 +2824,20 @@ def build_recommendations_section_with_cids(available_items, unavailable_items, 
                                 font-size: 12px;
                                 color: {theme_colors['text']};
                                 margin-bottom: 8px;
-                                font-family: 'IBM Plex Sans';
+                                font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
                             ">{title_text}</div>
                             <div style="
                                 font-size: 10px;
                                 color: {theme_colors['muted_text']};
                                 margin-bottom: 8px;
-                                font-family: 'IBM Plex Sans';
+                                font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
                             ">{' • '.join(filter(None, [str(year) if year else '', vote_text, runtime, 'Unavailable' if is_unavailable else '']))}</div>
                             {f'''
                             <div style="
                                 font-size: 10px;
                                 color: {theme_colors['text']};
                                 opacity: 0.8;
-                                font-family: 'IBM Plex Sans';
+                                font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
                                 line-height: 1.3;
                             ">{overview[:100]}{'...' if len(overview) > 100 else ''}</div>
                             ''' if overview else ''}
@@ -2731,7 +2859,7 @@ def build_recommendations_section_with_cids(available_items, unavailable_items, 
         margin: 0 0 15px 0;
         font-size: 20px;
         font-weight: bold;
-        font-family: 'IBM Plex Sans';
+        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
     """
     
     table_style = """
@@ -2753,8 +2881,8 @@ def build_recommendations_section_with_cids(available_items, unavailable_items, 
 def build_collections_html_with_cids(all_collections, msg_root, theme_colors, base_url="", custom_title=None):
     if not all_collections:
         return f"""
-        <div style="background-color: {theme_colors['card_bg']}; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid {theme_colors['border']}; font-family: 'IBM Plex Sans';">
-            <p style="text-align: center; color: {theme_colors['muted_text']}; padding: 20px; margin: 0; font-family: 'IBM Plex Sans';">No collections available.</p>
+        <div style="background-color: {theme_colors['card_bg']}; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid {theme_colors['border']}; font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;">
+            <p style="text-align: center; color: {theme_colors['muted_text']}; padding: 20px; margin: 0; font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;">No collections available.</p>
         </div>
         """
     
@@ -2855,7 +2983,7 @@ def build_collections_html_with_cids(all_collections, msg_root, theme_colors, ba
                                                     padding: 4px 6px;
                                                     border-radius: 4px;
                                                     font-size: 10px;
-                                                    font-family: 'IBM Plex Sans';
+                                                    font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
                                                     line-height: 1;
                                                     display: inline-block;
                                                     margin: 6px;
@@ -2875,7 +3003,7 @@ def build_collections_html_with_cids(all_collections, msg_root, theme_colors, ba
                                                         font-size: 12px;
                                                         color: white;
                                                         line-height: 1.2;
-                                                        font-family: 'IBM Plex Sans';
+                                                        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
                                                     ">{collection_title}</div>
                                                 </div>
                                             </td>
@@ -2907,13 +3035,13 @@ def build_collections_html_with_cids(all_collections, msg_root, theme_colors, ba
                                         font-size: 14px;
                                         color: {theme_colors['text']};
                                         margin-bottom: 8px;
-                                        font-family: 'IBM Plex Sans';
+                                        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
                                         padding: 2px;
                                     ">{collection_title}</div>
                                     <div style="
                                         font-size: 11px;
                                         color: {theme_colors['muted_text']};
-                                        font-family: 'IBM Plex Sans';
+                                        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
                                     ">{type_icon} {count} items</div>
                                 </td>
                             </tr>
@@ -2967,7 +3095,7 @@ def build_collections_html_with_cids(all_collections, msg_root, theme_colors, ba
                     width: 20%;
                     padding: 8px;
                     vertical-align: top;
-                    font-family: 'IBM Plex Sans';
+                    font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
                 """
 
                 if poster_cid:
@@ -3002,7 +3130,7 @@ def build_collections_html_with_cids(all_collections, msg_root, theme_colors, ba
                                                     padding: 4px 6px;
                                                     border-radius: 4px;
                                                     font-size: 10px;
-                                                    font-family: 'IBM Plex Sans';
+                                                    font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
                                                     line-height: 1;
                                                     display: inline-block;
                                                     margin: 6px;
@@ -3022,7 +3150,7 @@ def build_collections_html_with_cids(all_collections, msg_root, theme_colors, ba
                                                         font-size: 12px;
                                                         color: white;
                                                         line-height: 1.2;
-                                                        font-family: 'IBM Plex Sans';
+                                                        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
                                                         padding: 2px;
                                                     ">{collection_title}</div>
                                                 </div>
@@ -3055,12 +3183,12 @@ def build_collections_html_with_cids(all_collections, msg_root, theme_colors, ba
                                         font-size: 14px;
                                         color: {theme_colors['text']};
                                         margin-bottom: 8px;
-                                        font-family: 'IBM Plex Sans';
+                                        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
                                     ">{collection_title}</div>
                                     <div style="
                                         font-size: 11px;
                                         color: {theme_colors['muted_text']};
-                                        font-family: 'IBM Plex Sans';
+                                        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
                                     ">{type_icon} {count} items</div>
                                 </td>
                             </tr>
@@ -3078,7 +3206,7 @@ def build_collections_html_with_cids(all_collections, msg_root, theme_colors, ba
         border-radius: 8px;
         margin: 20px 0;
         border: 1px solid {theme_colors['border']};
-        font-family: 'IBM Plex Sans';
+        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
     """
     
     title_style = f"""
@@ -3087,7 +3215,7 @@ def build_collections_html_with_cids(all_collections, msg_root, theme_colors, ba
         margin: 0 0 20px 0;
         font-size: 24px;
         font-weight: bold;
-        font-family: 'IBM Plex Sans';
+        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
     """
     
     table_style = """
@@ -3115,7 +3243,7 @@ def attach_logo_image(msg_root, logo_filename, custom_logo_filename, base_url=""
         logo_url = f"/static/img/{logo_filename}"
     return fetch_and_attach_image(logo_url, msg_root, "logo", base_url)
 
-def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, display_preference, users_data, recommendations_data=None, user_dict=None, base_url="", target_user_key=None, is_scheduled=False, items_count=None):
+def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, display_preference, users_data, recommendations_data=None, user_dict=None, base_url="", target_user_key=None, is_scheduled=False, items_count=None, date_range=""):
     selected_items = json.loads(template_data.get('selected_items', '[]'))
     email_text = template_data.get('email_text', '')
     subject = template_data.get('subject', '')
@@ -3163,12 +3291,12 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, displ
             stat_index = int(item['id'].split('-')[1])
             if stat_index < len(tautulli_data.get('stats', [])):
                 stat_data = tautulli_data['stats'][stat_index]
-                content_html += build_stats_html_with_cid_background(stat_data, msg_root, theme_colors, base_url)
+                content_html += build_stats_html_with_cid_background(stat_data, msg_root, theme_colors, base_url, date_range)
         
         elif item_type == 'graph':
             content_html += build_graph_html_with_frontend_image(item, msg_root)
         
-        elif item_type == 'ra':
+        elif item_type == 'recently added':
             library_filter = item.get('raLibrary')
             recent_data = tautulli_data.get('recent_data', [])
 
@@ -3183,7 +3311,7 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, displ
 
             content_html += build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, library_filter, base_url, max_items)
         
-        elif item_type == 'recs':
+        elif item_type == 'recommendations':
             if recommendations_data:
                 if target_user_key:
                     if item.get('userKey') == str(target_user_key):
@@ -3209,7 +3337,7 @@ def build_complete_email_html_with_cid_logo(content_html, server_name, subject, 
     body_style = f"""
         margin: 0;
         padding: 0;
-        font-family: 'IBM Plex Sans';
+        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
         background-color: {theme_colors['background']};
         line-height: 1.6;
         color: {theme_colors['text']};
@@ -3226,7 +3354,7 @@ def build_complete_email_html_with_cid_logo(content_html, server_name, subject, 
         overflow: hidden;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
         border: 1px solid {theme_colors['border']};
-        font-family: 'IBM Plex Sans', Arial;
+        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
     """
     
     header_style = f"""
@@ -3234,7 +3362,7 @@ def build_complete_email_html_with_cid_logo(content_html, server_name, subject, 
         color: white;
         padding: 10px 20px;
         text-align: center;
-        font-family: 'IBM Plex Sans';
+        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
     """
     
     logo_style = f"""
@@ -3256,7 +3384,7 @@ def build_complete_email_html_with_cid_logo(content_html, server_name, subject, 
         font-weight: bold;
         margin: 0;
         text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-        font-family: 'IBM Plex Sans';
+        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
         color: white;
     """
     
@@ -3264,7 +3392,7 @@ def build_complete_email_html_with_cid_logo(content_html, server_name, subject, 
         padding: 10px 15px;
         color: {theme_colors['text']};
         background-color: {theme_colors['card_bg']};
-        font-family: 'IBM Plex Sans';
+        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
     """
     
     footer_style = f"""
@@ -3274,7 +3402,7 @@ def build_complete_email_html_with_cid_logo(content_html, server_name, subject, 
         border-top: 3px solid {theme_colors['primary']};
         color: {theme_colors['muted_text']};
         font-size: 12px;
-        font-family: 'IBM Plex Sans';
+        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
     """
     
     footer_link_style = f"""
@@ -3476,7 +3604,7 @@ def send_recommendations_email_with_cids(to_emails, subject, user_dict, selected
     try:
         rec_user_keys = set()
         for item in selected_items:
-            if item.get('type') == 'recs' and item.get('userKey'):
+            if item.get('type') == 'recommendations' and item.get('userKey'):
                 rec_user_keys.add(item['userKey'])
         
         if not rec_user_keys:
@@ -3855,7 +3983,7 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
                 item['chartImage'] = chart_data.get('dataUrl', '')
                 item['chartSVG'] = chart_data.get('svg', '')
 
-        has_recs = any(item.get('type') == 'recs' for item in selected_items)
+        has_recs = any(item.get('type') == 'recommendations' for item in selected_items)
 
         users_data, _ = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_users', 'Users', None)
         user_dict = {}
@@ -3871,7 +3999,7 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
             
             rec_user_keys = set()
             for item in selected_items:
-                if item.get('type') == 'recs' and item.get('userKey'):
+                if item.get('type') == 'recommendations' and item.get('userKey'):
                     rec_user_keys.add(item['userKey'])
             
             if not rec_user_keys:
@@ -4010,7 +4138,8 @@ def send_scheduled_user_email_with_cids(recipients, subject, selected_items, use
             base_url,
             target_user_key=user_key,
             is_scheduled=True,
-            items_count=items_count
+            items_count=items_count,
+            date_range=date_range
         )
 
         plain_text = convert_html_to_plain_text(email_html)
@@ -4138,7 +4267,8 @@ def send_scheduled_single_email_with_cids(to_emails_list, subject, selected_item
             base_url,
             None,
             True,
-            items_count
+            items_count,
+            date_range
         )
 
         plain_text = convert_html_to_plain_text(email_html)
@@ -4229,7 +4359,7 @@ def build_graph_html_with_frontend_image(item, msg_root):
             container_style = """
                 border-radius: 8px;
                 text-align: center;
-                font-family: 'IBM Plex Sans';
+                font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
             """
             
             image_style = """
@@ -4262,7 +4392,7 @@ def build_graph_html_with_frontend_image(item, msg_root):
         border: 2px dashed #dee2e6;
         border-radius: 8px;
         text-align: center;
-        font-family: 'IBM Plex Sans';
+        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
     """
     
     placeholder_title_style = """
@@ -4270,14 +4400,14 @@ def build_graph_html_with_frontend_image(item, msg_root):
         margin: 0 0 10px 0;
         font-size: 18px;
         font-weight: bold;
-        font-family: 'IBM Plex Sans';
+        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
     """
     
     placeholder_text_style = """
         color: #6c757d;
         margin: 0;
         font-size: 14px;
-        font-family: 'IBM Plex Sans';
+        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
     """
     
     placeholder_subtext_style = """
@@ -4285,7 +4415,7 @@ def build_graph_html_with_frontend_image(item, msg_root):
         margin: 5px 0 0;
         font-size: 12px;
         font-style: italic;
-        font-family: 'IBM Plex Sans';
+        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
     """
     
     return f"""
@@ -4310,7 +4440,7 @@ def build_text_block_html(content, block_type='textblock', theme_colors=None):
         margin-bottom: 20px;
         line-height: 1.6;
         color: {theme_colors['text']};
-        font-family: 'IBM Plex Sans';
+        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
     """
     
     if block_type == 'titleblock':
@@ -4805,7 +4935,7 @@ def send_email():
     selected_items = data.get('selected_items', [])
     from_name = settings['from_name']
 
-    has_recommendations = any(item.get('type') == 'recs' for item in selected_items)
+    has_recommendations = any(item.get('type') == 'recommendations' for item in selected_items)
 
     if has_recommendations and user_dict:
         return send_recommendations_email_with_cids(
@@ -5234,15 +5364,36 @@ def plex_get_info():
         "X-Plex-Client-Identifier": plex_headers['X-Plex-Client-Identifier'],
         "X-Plex-Token": decrypt(token)
     }
+    params = {
+        "includeHttps": "1"
+    }
     
-    response = requests.get(url, headers=headers)
+    response = requests.get(url, headers=headers, params=params)
     data = response.json()
+    
+    def select_best_connection(connections):
+        https_connections = [connection for connection in connections if connection.get('protocol') == 'https']
+        
+        if https_connections:
+            local_https = [connection for connection in https_connections if connection.get('local')]
+            if local_https:
+                return local_https[0]['uri']
+            
+            return https_connections[0]['uri']
+        
+        return connections[0]['uri'] if connections else None
+
+    server = data[0]
+    best_url = select_best_connection(server['connections'])
+    
+    if not best_url:
+        return jsonify({"connected": False, "error": "No suitable connection found"})
 
     cursor.execute("""
         INSERT INTO settings (id, server_name, plex_url)
         VALUES (1, ?, ?)
         ON CONFLICT(id) DO UPDATE SET server_name = excluded.server_name, plex_url = excluded.plex_url
-    """, (data[0]['name'], data[0]['connections'][0]['uri']))
+    """, (server['name'], best_url))
     conn.commit()
     conn.close()
 
@@ -5978,7 +6129,7 @@ def save_email_list_route():
         if success:
             return jsonify({"status": "success", "message": f"List '{name}' saved successfully"})
         else:
-            return jsonify({"status": "error", "message": f"List name '{name}' already exists"}), 400
+            return jsonify({"status": "error", "message": f"Error saving '{name}'"}), 400
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
@@ -6075,6 +6226,7 @@ if __name__ == '__main__':
     migrate_schema("logo_filename TEXT")
     migrate_schema("logo_width INTEGER")
     migrate_schema("recipient_display_name TEXT DEFAULT 'email'")
+    migrate_ra_recs_to_recently_added_recommendations()
 
     if os.environ.get("WERKZEUG_RUN_MAIN") == "true" and not app.debug:
         start_background_workers()

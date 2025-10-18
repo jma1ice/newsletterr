@@ -160,34 +160,25 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 
 ## Planned Changes
 
-### For the v0.9.17 sprint, these items are to be addressed:
-* Plex 'Secure Connections' setting causing image 401
-* Make sure custom templates can't override defaults
-* RA cards can all show up as different heights in email
-* Don't have page reload on stats/users pull
-* Add in To: vs BCC: option
+### For the v2025.1 sprint, these items are feature requests:
+* Compile EXE / ELF files
+
+
+### For the v2025.2 sprint, these items are to be addressed:
+* Email click for recently added/available recommendations is going to chrome on mobile instead of app
+* Sometimes Apple Mail has uneven recently added text content sections
 
 #### And these items are feature requests:
-* Look into email formatting across email clients | mjml?
-* Reduce image size to better fall within size regulations
-* Graph titles need to specify the date range - or at least show what time range the data is for somewhere in the email
-* Rename 'ra' and 'recs' snap in block for clarity?
+* Reduce image size to better fall within size regulations?
+* Don't have page reload on stats/users pull
 * Keep settings details on error so user won't have to re-enter them
-* Nix the view buttons
-* Change date on recently added to days since added
-
-
-### For the v2025.1 sprint, these items are feature requests:
 * GitHub link should be the stylized logo
-* Compile EXE / ELF files
-* Get fonts showing on Gmail receive side?
-* Api/webhooks
-* Opt out support
+* Api/webhooks?
 * Option for small cover art of each item in a stat table
 * IMDb ratings in stat tables
-* Auth page for hosted users | when this is in, add a hosted 'most recent newsletter' webpage
+* Auth page for hosted users | when this is in, add a hosted 'most recent newsletter' webpage | also when this is in, add opt out support
 * Snap-in for images/gifs/emojis
-* Functionality for full custom HTML templates | ability to add embedded links to services, ie StatusCake, Uptime Robot
+* Functionality for full custom HTML templates
 * Ombi integration
 * Setting to choose duration or play counts for stats/graphs
 * Setting to hide play counts in stats/graphs
@@ -201,10 +192,11 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Export email HTML button
 * Export logs button | link to discord
 * Option in settings for width of RA/Recs grids
-* Improved BCC list editing
 * Ko-fi -> Discord integration for contributor role
 * Logo positioning setting
 * Test api button
+* Add in To: vs BCC: option
+* Make collections clickable - is this possible?
 * Mobile optimizations, i.e.:
 ```
 <style>
@@ -234,6 +226,12 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Switched recently added pull from Tautulli to direct Plex API call. This fixes 100 item limit
 * Added 'ALL' BCC list to scheduler options
 * Now shows # of items in scheduler table
+* Fixed 0m for shows and audio changed to genre
+* Fixed the issue with RA cards showing up as different heights in different email clients
+* Added a font fallback stack
+* Now gets https direct connect plex url by default, fixing issue where Plex 'Secure Connections > Required' setting was causing image 401
+* Made BCC lists editable
+* Stat titles now include the date range they were pulled for
 
 #### New Features:
 * Added more date range options in schedule builder to match dashboard
@@ -243,6 +241,11 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Got rid of library name on recently added overlay
 * Made posters clickable for available recommendations and recently added items to take users to Plex to watch
 * Added option for recs to show email/username/friendly name
+* Nixed the view buttons
+* Renamed 'ra' and 'recs' snap in block for clarity
+* Changed date on recently added to days since added
+* Added an HTML Block to text blocks for easy link adding
+* Graph overhaul - fixed fonts, sizing, and added date range graph is for to title
 
 
 ### v0.9.16

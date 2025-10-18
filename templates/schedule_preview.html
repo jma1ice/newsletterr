@@ -438,7 +438,7 @@
         return `<tr>${tds}</tr>`;
     }
 
-    function buildStatCardHTML(stat) {
+    function buildStatCardHTML(stat, dateRange) {
         const title = stat.stat_title || 'Stats';
         const rows = Array.isArray(stat.rows) ? stat.rows : [];
         const bg = rows[0]?.art || rows[0]?.grandparent_thumb || '';
@@ -511,13 +511,14 @@
             recentCommands = data.recent_commands || [];
             userDict = data.user_dict || {};
             usersFullData = data.users_full_data || {};
+            dateRange = data.date_range || '';
 
             console.log('Loaded fresh data:', { 
                 stats: stats.length, 
                 graphs: graphData.length, 
                 recent: recentData.length,
                 recos: Object.keys(recsPayload).length,
-                dateRange: data.date_range,
+                dateRange: dateRange,
                 itemsCount: data.items_count,
                 graphCommands: graphCommands.length
             });
@@ -528,7 +529,7 @@
             document.getElementById('email_text').value = data.email_text || '';
             document.getElementById('layout').value = data.layout || 'standard';
             
-            await generateStatsAndGraphs();
+            await generateStatsAndGraphs(dateRange);
 
             await new Promise(resolve => setTimeout(resolve, 5000));
             
@@ -547,7 +548,7 @@
         }
     }
 
-    async function generateStatsAndGraphs() {
+    async function generateStatsAndGraphs(dateRange) {
         console.log('generateStatsAndGraphs: Starting with graphData:', graphData);
         
         const statsContainer = document.getElementById('stats-container');
@@ -561,7 +562,7 @@
                 const wrap = document.createElement('div');
                 wrap.id = `stat-${i}`;
                 wrap.className = 'stat-table d-none';
-                wrap.innerHTML = buildStatCardHTML(stat);
+                wrap.innerHTML = buildStatCardHTML(stat, dateRange);
                 const bg = wrap.querySelector('.bg-blur');
                 if (bg) { blurImageElement(bg).catch(()=>{}); }
                 statsContainer.appendChild(wrap);
@@ -576,8 +577,8 @@
                 const div = document.createElement('div');
                 div.id = id;
                 div.className = 'graph-table d-none';
-                div.style.width = '100%';
-                div.style.minHeight = '360px';
+                div.style.width = '600px';
+                div.style.height = '400px';
                 graphsContainer.appendChild(div);
             });
 
@@ -597,8 +598,8 @@
                 
                 try {
                     const cfg = {
-                        chart: { type: 'line', style: { fontFamily: 'IBM Plex Sans' } },
-                        title: { text: cmd.name },
+                        chart: { type: 'line', style: { fontFamily: 'IBM Plex Sans, Segoe UI, Helvetica, Arial, sans-serif' } },
+                        title: { text: cmd.name + ' - Last ' + `${dateRange}` + ' days' },
                         exporting: { enabled: true },
                         xAxis: { categories: g.categories || [] },
                         yAxis: { title: { text: 'Plays' } },
@@ -705,7 +706,7 @@
                     contentHTML += `<div style="margin-bottom: 20px; font-size: 2em; font-weight: bold; text-align: center;">${formattedContent}</div>`;
                 }
             } else if (item.type === 'stat') {
-                contentHTML += buildStatHTML(item.id);
+                contentHTML += buildStatHTML(item.id, dateRange);
             } else if (item.type === 'graph') {
                 console.log('Processing graph item:', item.id);
                 
@@ -779,7 +780,7 @@
         return buildCompleteEmailHTML(contentHTML, serverName, subject);
     }
 
-    function buildStatHTML(statId) {
+    function buildStatHTML(statId, dateRange) {
         const statIndex = parseInt(statId.split('-')[1]);
         if (statIndex >= stats.length) return '';
         
@@ -936,7 +937,7 @@
             <div class="stats-card" style="${containerStyle}">
                 ${backgroundElements}
                 <div class="stats-content" style="position: relative; z-index: 2;">
-                    <div class="stats-header" style="${headerStyle}">${title}</div>
+                    <div class="stats-header" style="${headerStyle}">${title} - Last ${dateRange} days</div>
                     <table class="stats-table" style="${tableStyle}">
                         <thead>
                             <tr>${headerHTML}</tr>

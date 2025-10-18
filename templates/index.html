@@ -81,7 +81,7 @@
                                         <label class="form-label">Email Lists:</label>
                                         <div class="d-flex gap-2 align-items-center">
                                             <select id="email_list_selector" class="form-select" style="flex: 1;">
-                                                <option value="(Save new list)">(Save new list)</option>
+                                                <option value="(Save new list)">(Save list)</option>
                                                 <option value="ALL">ALL</option>
                                                 <option value="Custom" selected>Custom</option>
                                                 {% for list in email_lists|sort(attribute='name') %}
@@ -175,6 +175,9 @@
                                     </button>
                                     <button type="button" class="btn button btn-sm" id="add-text-block-btn">
                                         + Text Block
+                                    </button>
+                                    <button type="button" class="btn button btn-sm" id="add-html-text-block-btn">
+                                        + HTML Block
                                     </button>
                                     <button type="button" class="btn btn-outline-secondary btn-sm" id="add-outro-btn" title="Add closing thank you message">
                                         + Outro
@@ -1108,7 +1111,7 @@
                     <div class="stats-card">
                         ${backgroundElements}
                         <div class="stats-content">
-                            <div class="stats-header">${title}</div>
+                            <div class="stats-header">${title} - Last {{ cache_info.graph_data.params.time_range }} days</div>
                             <table class="stats-table">
                                 <thead><tr>${headerHTML}</tr></thead>
                                 <tbody>${rowsHTML}</tbody>
@@ -1119,6 +1122,8 @@
             }
 
             function buildGraphPreviewHTML(graphId) {
+                loadIBMPlexSans();
+
                 const graphIndex = parseInt(graphId.split('-')[1]);
                 
                 if (graphIndex >= graphCommands.length || graphIndex >= graphDataList.length) {
@@ -1136,7 +1141,7 @@
                 if (!graphData || (!graphData.categories && !graphData.series)) {
                     return `
                         <div style="margin: 20px 0; padding: 30px; background: #f8f9fa; border: 2px dashed #dee2e6; border-radius: 8px; text-align: center;">
-                            <h3 style="color: #6c757d; margin-bottom: 10px;">${commandInfo.name}</h3>
+                            <h3 style="color: #6c757d; margin-bottom: 10px; font-family: 'IBM Plex Sans';">${commandInfo.name}</h3>
                             <p style="color: #6c757d; margin: 0; font-size: 14px;">No chart data available</p>
                             <p style="color: #6c757d; margin: 5px 0 0; font-size: 12px; font-style: italic;">Interactive charts available in dashboard</p>
                         </div>
@@ -1170,8 +1175,13 @@
                     
                     try {
                         chart = Highcharts.chart(tempContainer.id, {
-                            chart: { type: 'line' },
-                            title: { text: commandInfo.name },
+                            chart: { 
+                                type: 'line',
+                                style: {
+                                    fontFamily: 'IBM Plex Sans, Segoe UI, Helvetica, Arial, sans-serif'
+                                }
+                            },
+                            title: { text: commandInfo.name + ' - Last ' + '{{ cache_info.graph_data.params.time_range }}' + ' days' },
                             exporting: { enabled: true },
                             xAxis: { categories: graphData.categories },
                             yAxis: { title: { text: 'Plays' } },
@@ -2230,6 +2240,15 @@
                 }
             }
 
+            function loadIBMPlexSans() {
+                if (!document.querySelector('link[href*="IBM+Plex+Sans"]')) {
+                    const link = document.createElement('link');
+                    link.rel = 'stylesheet';
+                    link.href = 'https://fonts.googleapis.com/css?family=IBM+Plex+Sans:400,700&display=swap';
+                    document.head.appendChild(link);
+                }
+            }
+
             async function addItemWithChartCapture(id, name, type, extra = {}) {
                 if (!id || !type) {
                     console.warn('addItem aborted: missing id/type', { id, type, name, extra });
@@ -2248,12 +2267,19 @@
                     
                     if (!renderedCharts.has(id)) {
                         try {
+                            loadIBMPlexSans();
+
                             const index = parseInt(id.split('-')[1], 10);
                             const graphData = graphDataList[index];
 
                             Highcharts.chart(id, {
-                                chart: { type: 'line' },
-                                title: { text: graphCommands[index].name },
+                                chart: { 
+                                    type: 'line',
+                                    style: {
+                                        fontFamily: 'IBM Plex Sans, Segoe UI, Helvetica, Arial, sans-serif'
+                                    }
+                                },
+                                title: { text: graphCommands[index].name + ' - Last ' + '{{ cache_info.graph_data.params.time_range }}' + ' days' },
                                 exporting: { enabled: true },
                                 xAxis: { categories: graphData.categories },
                                 yAxis: { title: { text: 'Plays' } },
@@ -2419,13 +2445,22 @@
             let titleBlockCounter = 0;
             let headerBlockCounter = 0;
             
-            function createTextBlock() {
+            function createTextBlock(blockType = 'text') {
                 textBlockCounter++;
                 const textBlockId = `text-block-${textBlockCounter}`;
-                const textContent = '';
-                const displayName = 'New text block';
+                let displayName = 'New text block';
+
+                let textContent = '';
+                if (blockType === 'html-link') {
+                    textContent = `<a href="https://www.google.com" target="_blank">Click to go to Google</a>`;
+                    displayName = 'HTML Link';
+                }
                 
                 if (addItem(textBlockId, displayName, 'textblock')) {
+                    setTimeout(() => {
+                        setTextBlockContent(textBlockId, textContent);
+                        debouncedUpdatePreview();
+                    }, 100);
                     return textBlockId;
                 }
                 return null;
@@ -2454,6 +2489,8 @@
             function getTextBlockDisplayName(content) {
                 const firstLine = content.split('\n')[0].trim();
                 if (firstLine.length === 0) return 'Empty text block';
+                if (firstLine.substring(0, 1) === '<') return 'HTML block';
+                console.log('firstChar: ' + firstLine.substring(0, 1))
                 return firstLine.length > 30 ? firstLine.substring(0, 30) + '...' : firstLine;
             }
             
@@ -2548,6 +2585,7 @@
                 if (!btn) return;
 
                 if (btn.id === 'add-text-block-btn') { createTextBlock(); return; }
+                if (btn.id === 'add-html-text-block-btn') { createTextBlock(blockType = 'html-link'); return; }
                 if (btn.id === 'add-intro-btn') { createIntroBlock(); return; }
                 if (btn.id === 'add-outro-btn') { createOutroBlock(); return; }
                 if (btn.id === 'add-title-btn') { createTitleBlock(); return; }

@@ -16,7 +16,7 @@ from urllib.parse import quote_plus, urljoin, urlparse, parse_qs, urlencode, quo
 
 app = Flask(__name__)
 app.jinja_env.globals["version"] = "v0.9.17"
-app.jinja_env.globals["publish_date"] = "October 17, 2025"
+app.jinja_env.globals["publish_date"] = "October 18, 2025"
 
 def get_global_cache_status():
     try:
@@ -452,7 +452,7 @@ def build_email_css_from_theme(theme_colors, logo_width):
             body {{
                 margin: 0 !important;
                 padding: 0 !important;
-                font-family: 'IBM Plex Sans' !important;
+                font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif !important;
                 background-color: {theme_colors['background']} !important;
                 line-height: 1.6 !important;
                 color: {theme_colors['text']} !important;
@@ -516,7 +516,7 @@ def build_email_css_from_theme(theme_colors, logo_width):
                 padding: 2px 6px;
                 border-radius: 4px;
                 font-size: 9px;
-                font-family: 'IBM Plex Sans';
+                font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
                 line-height: 1;
                 max-width: fit-content;
             }}
@@ -727,10 +727,16 @@ def save_email_list(name, emails):
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     try:
-        cursor.execute("INSERT INTO email_lists (name, emails) VALUES (?, ?)", (name, emails))
+        cursor.execute("""
+            INSERT INTO email_lists
+            (name, emails)
+            VALUES (?, ?)
+            ON CONFLICT (name) DO UPDATE
+            SET emails = excluded.emails
+        """, (name, emails))
         conn.commit()
         return True
-    except sqlite3.IntegrityError:
+    except:
         return False
     finally:
         conn.close()
@@ -2145,7 +2151,7 @@ def truncate_text(text, max_chars=28):
         return text
     return text[:max_chars-3] + '...'
 
-def build_stats_html_with_cid_background(stat_data, msg_root, theme_colors, base_url=""):
+def build_stats_html_with_cid_background(stat_data, msg_root, theme_colors, base_url="", date_range=""):
     if not stat_data or not stat_data.get('rows'):
         return ""
     
@@ -2166,7 +2172,7 @@ def build_stats_html_with_cid_background(stat_data, msg_root, theme_colors, base
     
     headers = get_stat_headers(title)
     header_cells = "".join([
-        f'<th style="padding: 12px; background-color: rgba(52, 58, 64, 0.9); color: white; font-weight: bold; border: none; font-family: \'IBM Plex Sans\'; font-size: 14px; text-align: left;">{h}</th>' 
+        f'<th style="padding: 12px; background-color: rgba(52, 58, 64, 0.9); color: white; font-weight: bold; border: none; font-family: \'IBM Plex Sans\', \'Segoe UI\', Helvetica, Arial, sans-serif; font-size: 14px; text-align: left;">{h}</th>' 
         for h in headers
     ])
     
@@ -2174,7 +2180,7 @@ def build_stats_html_with_cid_background(stat_data, msg_root, theme_colors, base
     for row in rows:
         cells = get_stat_cells(title, row)
         cells_html = "".join([
-            f'<td style="padding: 12px; background-color: rgba(255, 255, 255, 0.5); color: #333; border-bottom: 1px solid rgba(222, 226, 230, 0.8); font-family: \'IBM Plex Sans\'; font-size: 14px;">{cell}</td>' 
+            f'<td style="padding: 12px; background-color: rgba(255, 255, 255, 0.5); color: #333; border-bottom: 1px solid rgba(222, 226, 230, 0.8); font-family: \'IBM Plex Sans\', \'Segoe UI\', Helvetica, Arial, sans-serif; font-size: 14px;">{cell}</td>' 
             for cell in cells
         ])
         rows_html += f'<tr>{cells_html}</tr>'
@@ -2186,7 +2192,7 @@ def build_stats_html_with_cid_background(stat_data, msg_root, theme_colors, base
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
         border: 1px solid {theme_colors['border']};
         position: relative;
-        font-family: 'IBM Plex Sans';
+        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
     """
     
     if background_cid:
@@ -2213,7 +2219,7 @@ def build_stats_html_with_cid_background(stat_data, msg_root, theme_colors, base
         text-align: center;
         font-weight: bold;
         font-size: 18px;
-        font-family: 'IBM Plex Sans';
+        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
         margin: 0;
         position: relative;
         z-index: 2;
@@ -2224,14 +2230,17 @@ def build_stats_html_with_cid_background(stat_data, msg_root, theme_colors, base
         border-collapse: collapse;
         position: relative;
         z-index: 2;
-        font-family: 'IBM Plex Sans';
+        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
     """
+
+    if date_range == "":
+        date_range = get_cache_info('stats')['params']['time_range']
     
     return f"""
         <div style="{container_style}">
             {overlay}
             <div style="position: relative; z-index: 1;">
-                <div style="{header_style}">{title}</div>
+                <div style="{header_style}">{title} - Last {date_range} days</div>
                 <table style="{table_style}">
                     <thead>
                         <tr>{header_cells}</tr>
@@ -2247,8 +2256,8 @@ def build_stats_html_with_cid_background(stat_data, msg_root, theme_colors, base
 def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, library_filter=None, base_url="", max_items=None):
     if not recent_data:
         return f"""
-        <div style="background-color: {theme_colors['card_bg']}; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid {theme_colors['border']}; font-family: 'IBM Plex Sans';">
-            <p style="text-align: center; color: {theme_colors['muted_text']}; padding: 20px; margin: 0; font-family: 'IBM Plex Sans';">No recently added items available.</p>
+        <div style="background-color: {theme_colors['card_bg']}; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid {theme_colors['border']}; font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;">
+            <p style="text-align: center; color: {theme_colors['muted_text']}; padding: 20px; margin: 0; font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;">No recently added items available.</p>
         </div>
         """
     
@@ -2268,8 +2277,8 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
     
     if not items:
         return f"""
-        <div style="background-color: {theme_colors['card_bg']}; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid {theme_colors['border']}; font-family: 'IBM Plex Sans';">
-            <p style="text-align: center; color: {theme_colors['muted_text']}; padding: 20px; margin: 0; font-family: 'IBM Plex Sans';">No recently added items found{f' for {library_filter}' if library_filter else ''}.</p>
+        <div style="background-color: {theme_colors['card_bg']}; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid {theme_colors['border']}; font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;">
+            <p style="text-align: center; color: {theme_colors['muted_text']}; padding: 20px; margin: 0; font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;">No recently added items found{f' for {library_filter}' if library_filter else ''}.</p>
         </div>
         """
     
@@ -2405,7 +2414,7 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
                 width: 20%;
                 padding: 8px;
                 vertical-align: top;
-                font-family: 'IBM Plex Sans';
+                font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
             """
 
             plex_url = item.get('plex_url', '')
@@ -2449,7 +2458,7 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
                                 color: {theme_colors['text']};
                                 margin-bottom: 1px;
                                 line-height: 1.2;
-                                font-family: 'IBM Plex Sans';
+                                font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
                                 word-wrap: break-word;
                                 overflow-wrap: break-word;
                             ">{title}</div>
@@ -2458,7 +2467,7 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
                                 font-size: 11px;
                                 color: {theme_colors['muted_text']};
                                 margin-bottom: 2px;
-                                font-family: 'IBM Plex Sans';
+                                font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
                             ">{truncate_text(' • '.join(filter(None, [str(year) if year else '', duration])), 36)}</div>
                             
                             {f'''
@@ -2467,7 +2476,7 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
                                 color: {theme_colors['text']};
                                 opacity: 0.8;
                                 line-height: 1.3;
-                                font-family: 'IBM Plex Sans';
+                                font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
                                 word-wrap: break-word;
                                 overflow-wrap: break-word;
                             ">{summary[:84]}{'...' if len(summary) > 84 else ''}</div>
@@ -2505,20 +2514,20 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
                                 font-size: 14px;
                                 color: {theme_colors['text']};
                                 margin-bottom: 8px;
-                                font-family: 'IBM Plex Sans';
+                                font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
                             ">{title}</div>
                             <div style="
                                 font-size: 11px;
                                 color: {theme_colors['muted_text']};
                                 margin-bottom: 8px;
-                                font-family: 'IBM Plex Sans';
+                                font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
                             ">{' • '.join(filter(None, [str(year) if year else '', duration, library, f'Added {added_date}' if added_date else '']))}</div>
                             {f'''
                             <div style="
                                 font-size: 11px;
                                 color: {theme_colors['text']};
                                 opacity: 0.8;
-                                font-family: 'IBM Plex Sans';
+                                font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
                             ">{summary[:100]}{'...' if len(summary) > 100 else ''}</div>
                             ''' if summary else ''}
                         </div>
@@ -2552,7 +2561,7 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
         border-radius: 8px;
         margin: 20px 0;
         border: 1px solid {theme_colors['border']};
-        font-family: 'IBM Plex Sans';
+        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
         overflow: hidden;
         max-width: 100%;
     """
@@ -2563,7 +2572,7 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
         margin: 0 0 10px 0;
         font-size: 24px;
         font-weight: bold;
-        font-family: 'IBM Plex Sans';
+        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
     """
     
     table_style = """
@@ -2628,7 +2637,7 @@ def build_recommendations_html_with_cids(recs_data, msg_root, theme_colors, user
                 background-color: {theme_colors['card_bg']};
                 border-radius: 8px;
                 border: 1px solid {theme_colors['border']};
-                font-family: 'IBM Plex Sans';
+                font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
             """
             
             user_title_style = f"""
@@ -2637,7 +2646,7 @@ def build_recommendations_html_with_cids(recs_data, msg_root, theme_colors, user
                 margin: 0 0 20px 0;
                 font-size: 24px;
                 font-weight: bold;
-                font-family: 'IBM Plex Sans';
+                font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
             """
             
             user_section = f"""
@@ -2702,7 +2711,7 @@ def build_recommendations_section_with_cids(available_items, unavailable_items, 
                 width: 20%;
                 padding: 6px;
                 vertical-align: top;
-                font-family: 'IBM Plex Sans';
+                font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
                 {'opacity: 0.7; filter: grayscale(30%);' if is_unavailable else ''}
             """
 
@@ -2737,7 +2746,7 @@ def build_recommendations_section_with_cids(available_items, unavailable_items, 
                                 border-radius: 4px;
                                 font-size: 9px;
                                 margin: 4px;
-                                font-family: 'IBM Plex Sans';
+                                font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
                                 line-height: 1;
                             ">{year} {vote_text}</div>
                             ''' if year or vote_text else ''}
@@ -2751,7 +2760,7 @@ def build_recommendations_section_with_cids(available_items, unavailable_items, 
                                 border-radius: 4px;
                                 font-size: 9px;
                                 margin: 0px 10px 0px 4px;
-                                font-family: 'IBM Plex Sans';
+                                font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
                                 line-height: 1;
                             ">Unavailable</div>
                             ''' if is_unavailable else ''}
@@ -2765,7 +2774,7 @@ def build_recommendations_section_with_cids(available_items, unavailable_items, 
                                     font-size: 12px;
                                     color: white;
                                     line-height: 1.2;
-                                    font-family: 'IBM Plex Sans';
+                                    font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
                                     margin-top: 132px;
                                 ">{title_text}</div>
                                 {f'''
@@ -2773,7 +2782,7 @@ def build_recommendations_section_with_cids(available_items, unavailable_items, 
                                     font-size: 10px;
                                     color: rgba(255, 255, 255, 0.8);
                                     margin-top: 2px;
-                                    font-family: 'IBM Plex Sans';
+                                    font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
                                 ">{runtime}</div>
                                 ''' if runtime else ''}
                             </div>
@@ -2786,7 +2795,7 @@ def build_recommendations_section_with_cids(available_items, unavailable_items, 
                             color: {theme_colors['text']};
                             font-size: 10px;
                             line-height: 1.3;
-                            font-family: 'IBM Plex Sans';
+                            font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
                             border-top: 1px solid {theme_colors['border']};
                         ">
                             {overview[:80]}{'...' if len(overview) > 80 else ''}
@@ -2815,20 +2824,20 @@ def build_recommendations_section_with_cids(available_items, unavailable_items, 
                                 font-size: 12px;
                                 color: {theme_colors['text']};
                                 margin-bottom: 8px;
-                                font-family: 'IBM Plex Sans';
+                                font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
                             ">{title_text}</div>
                             <div style="
                                 font-size: 10px;
                                 color: {theme_colors['muted_text']};
                                 margin-bottom: 8px;
-                                font-family: 'IBM Plex Sans';
+                                font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
                             ">{' • '.join(filter(None, [str(year) if year else '', vote_text, runtime, 'Unavailable' if is_unavailable else '']))}</div>
                             {f'''
                             <div style="
                                 font-size: 10px;
                                 color: {theme_colors['text']};
                                 opacity: 0.8;
-                                font-family: 'IBM Plex Sans';
+                                font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
                                 line-height: 1.3;
                             ">{overview[:100]}{'...' if len(overview) > 100 else ''}</div>
                             ''' if overview else ''}
@@ -2850,7 +2859,7 @@ def build_recommendations_section_with_cids(available_items, unavailable_items, 
         margin: 0 0 15px 0;
         font-size: 20px;
         font-weight: bold;
-        font-family: 'IBM Plex Sans';
+        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
     """
     
     table_style = """
@@ -2872,8 +2881,8 @@ def build_recommendations_section_with_cids(available_items, unavailable_items, 
 def build_collections_html_with_cids(all_collections, msg_root, theme_colors, base_url="", custom_title=None):
     if not all_collections:
         return f"""
-        <div style="background-color: {theme_colors['card_bg']}; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid {theme_colors['border']}; font-family: 'IBM Plex Sans';">
-            <p style="text-align: center; color: {theme_colors['muted_text']}; padding: 20px; margin: 0; font-family: 'IBM Plex Sans';">No collections available.</p>
+        <div style="background-color: {theme_colors['card_bg']}; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid {theme_colors['border']}; font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;">
+            <p style="text-align: center; color: {theme_colors['muted_text']}; padding: 20px; margin: 0; font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;">No collections available.</p>
         </div>
         """
     
@@ -2974,7 +2983,7 @@ def build_collections_html_with_cids(all_collections, msg_root, theme_colors, ba
                                                     padding: 4px 6px;
                                                     border-radius: 4px;
                                                     font-size: 10px;
-                                                    font-family: 'IBM Plex Sans';
+                                                    font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
                                                     line-height: 1;
                                                     display: inline-block;
                                                     margin: 6px;
@@ -2994,7 +3003,7 @@ def build_collections_html_with_cids(all_collections, msg_root, theme_colors, ba
                                                         font-size: 12px;
                                                         color: white;
                                                         line-height: 1.2;
-                                                        font-family: 'IBM Plex Sans';
+                                                        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
                                                     ">{collection_title}</div>
                                                 </div>
                                             </td>
@@ -3026,13 +3035,13 @@ def build_collections_html_with_cids(all_collections, msg_root, theme_colors, ba
                                         font-size: 14px;
                                         color: {theme_colors['text']};
                                         margin-bottom: 8px;
-                                        font-family: 'IBM Plex Sans';
+                                        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
                                         padding: 2px;
                                     ">{collection_title}</div>
                                     <div style="
                                         font-size: 11px;
                                         color: {theme_colors['muted_text']};
-                                        font-family: 'IBM Plex Sans';
+                                        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
                                     ">{type_icon} {count} items</div>
                                 </td>
                             </tr>
@@ -3086,7 +3095,7 @@ def build_collections_html_with_cids(all_collections, msg_root, theme_colors, ba
                     width: 20%;
                     padding: 8px;
                     vertical-align: top;
-                    font-family: 'IBM Plex Sans';
+                    font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
                 """
 
                 if poster_cid:
@@ -3121,7 +3130,7 @@ def build_collections_html_with_cids(all_collections, msg_root, theme_colors, ba
                                                     padding: 4px 6px;
                                                     border-radius: 4px;
                                                     font-size: 10px;
-                                                    font-family: 'IBM Plex Sans';
+                                                    font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
                                                     line-height: 1;
                                                     display: inline-block;
                                                     margin: 6px;
@@ -3141,7 +3150,7 @@ def build_collections_html_with_cids(all_collections, msg_root, theme_colors, ba
                                                         font-size: 12px;
                                                         color: white;
                                                         line-height: 1.2;
-                                                        font-family: 'IBM Plex Sans';
+                                                        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
                                                         padding: 2px;
                                                     ">{collection_title}</div>
                                                 </div>
@@ -3174,12 +3183,12 @@ def build_collections_html_with_cids(all_collections, msg_root, theme_colors, ba
                                         font-size: 14px;
                                         color: {theme_colors['text']};
                                         margin-bottom: 8px;
-                                        font-family: 'IBM Plex Sans';
+                                        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
                                     ">{collection_title}</div>
                                     <div style="
                                         font-size: 11px;
                                         color: {theme_colors['muted_text']};
-                                        font-family: 'IBM Plex Sans';
+                                        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
                                     ">{type_icon} {count} items</div>
                                 </td>
                             </tr>
@@ -3197,7 +3206,7 @@ def build_collections_html_with_cids(all_collections, msg_root, theme_colors, ba
         border-radius: 8px;
         margin: 20px 0;
         border: 1px solid {theme_colors['border']};
-        font-family: 'IBM Plex Sans';
+        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
     """
     
     title_style = f"""
@@ -3206,7 +3215,7 @@ def build_collections_html_with_cids(all_collections, msg_root, theme_colors, ba
         margin: 0 0 20px 0;
         font-size: 24px;
         font-weight: bold;
-        font-family: 'IBM Plex Sans';
+        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
     """
     
     table_style = """
@@ -3234,7 +3243,7 @@ def attach_logo_image(msg_root, logo_filename, custom_logo_filename, base_url=""
         logo_url = f"/static/img/{logo_filename}"
     return fetch_and_attach_image(logo_url, msg_root, "logo", base_url)
 
-def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, display_preference, users_data, recommendations_data=None, user_dict=None, base_url="", target_user_key=None, is_scheduled=False, items_count=None):
+def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, display_preference, users_data, recommendations_data=None, user_dict=None, base_url="", target_user_key=None, is_scheduled=False, items_count=None, date_range=""):
     selected_items = json.loads(template_data.get('selected_items', '[]'))
     email_text = template_data.get('email_text', '')
     subject = template_data.get('subject', '')
@@ -3282,7 +3291,7 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, displ
             stat_index = int(item['id'].split('-')[1])
             if stat_index < len(tautulli_data.get('stats', [])):
                 stat_data = tautulli_data['stats'][stat_index]
-                content_html += build_stats_html_with_cid_background(stat_data, msg_root, theme_colors, base_url)
+                content_html += build_stats_html_with_cid_background(stat_data, msg_root, theme_colors, base_url, date_range)
         
         elif item_type == 'graph':
             content_html += build_graph_html_with_frontend_image(item, msg_root)
@@ -3328,7 +3337,7 @@ def build_complete_email_html_with_cid_logo(content_html, server_name, subject, 
     body_style = f"""
         margin: 0;
         padding: 0;
-        font-family: 'IBM Plex Sans';
+        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
         background-color: {theme_colors['background']};
         line-height: 1.6;
         color: {theme_colors['text']};
@@ -3345,7 +3354,7 @@ def build_complete_email_html_with_cid_logo(content_html, server_name, subject, 
         overflow: hidden;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
         border: 1px solid {theme_colors['border']};
-        font-family: 'IBM Plex Sans', Arial;
+        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
     """
     
     header_style = f"""
@@ -3353,7 +3362,7 @@ def build_complete_email_html_with_cid_logo(content_html, server_name, subject, 
         color: white;
         padding: 10px 20px;
         text-align: center;
-        font-family: 'IBM Plex Sans';
+        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
     """
     
     logo_style = f"""
@@ -3375,7 +3384,7 @@ def build_complete_email_html_with_cid_logo(content_html, server_name, subject, 
         font-weight: bold;
         margin: 0;
         text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-        font-family: 'IBM Plex Sans';
+        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
         color: white;
     """
     
@@ -3383,7 +3392,7 @@ def build_complete_email_html_with_cid_logo(content_html, server_name, subject, 
         padding: 10px 15px;
         color: {theme_colors['text']};
         background-color: {theme_colors['card_bg']};
-        font-family: 'IBM Plex Sans';
+        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
     """
     
     footer_style = f"""
@@ -3393,7 +3402,7 @@ def build_complete_email_html_with_cid_logo(content_html, server_name, subject, 
         border-top: 3px solid {theme_colors['primary']};
         color: {theme_colors['muted_text']};
         font-size: 12px;
-        font-family: 'IBM Plex Sans';
+        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
     """
     
     footer_link_style = f"""
@@ -4129,7 +4138,8 @@ def send_scheduled_user_email_with_cids(recipients, subject, selected_items, use
             base_url,
             target_user_key=user_key,
             is_scheduled=True,
-            items_count=items_count
+            items_count=items_count,
+            date_range=date_range
         )
 
         plain_text = convert_html_to_plain_text(email_html)
@@ -4257,7 +4267,8 @@ def send_scheduled_single_email_with_cids(to_emails_list, subject, selected_item
             base_url,
             None,
             True,
-            items_count
+            items_count,
+            date_range
         )
 
         plain_text = convert_html_to_plain_text(email_html)
@@ -4348,7 +4359,7 @@ def build_graph_html_with_frontend_image(item, msg_root):
             container_style = """
                 border-radius: 8px;
                 text-align: center;
-                font-family: 'IBM Plex Sans';
+                font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
             """
             
             image_style = """
@@ -4381,7 +4392,7 @@ def build_graph_html_with_frontend_image(item, msg_root):
         border: 2px dashed #dee2e6;
         border-radius: 8px;
         text-align: center;
-        font-family: 'IBM Plex Sans';
+        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
     """
     
     placeholder_title_style = """
@@ -4389,14 +4400,14 @@ def build_graph_html_with_frontend_image(item, msg_root):
         margin: 0 0 10px 0;
         font-size: 18px;
         font-weight: bold;
-        font-family: 'IBM Plex Sans';
+        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
     """
     
     placeholder_text_style = """
         color: #6c757d;
         margin: 0;
         font-size: 14px;
-        font-family: 'IBM Plex Sans';
+        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
     """
     
     placeholder_subtext_style = """
@@ -4404,7 +4415,7 @@ def build_graph_html_with_frontend_image(item, msg_root):
         margin: 5px 0 0;
         font-size: 12px;
         font-style: italic;
-        font-family: 'IBM Plex Sans';
+        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
     """
     
     return f"""
@@ -4429,7 +4440,7 @@ def build_text_block_html(content, block_type='textblock', theme_colors=None):
         margin-bottom: 20px;
         line-height: 1.6;
         color: {theme_colors['text']};
-        font-family: 'IBM Plex Sans';
+        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
     """
     
     if block_type == 'titleblock':
@@ -5353,15 +5364,36 @@ def plex_get_info():
         "X-Plex-Client-Identifier": plex_headers['X-Plex-Client-Identifier'],
         "X-Plex-Token": decrypt(token)
     }
+    params = {
+        "includeHttps": "1"
+    }
     
-    response = requests.get(url, headers=headers)
+    response = requests.get(url, headers=headers, params=params)
     data = response.json()
+    
+    def select_best_connection(connections):
+        https_connections = [connection for connection in connections if connection.get('protocol') == 'https']
+        
+        if https_connections:
+            local_https = [connection for connection in https_connections if connection.get('local')]
+            if local_https:
+                return local_https[0]['uri']
+            
+            return https_connections[0]['uri']
+        
+        return connections[0]['uri'] if connections else None
+
+    server = data[0]
+    best_url = select_best_connection(server['connections'])
+    
+    if not best_url:
+        return jsonify({"connected": False, "error": "No suitable connection found"})
 
     cursor.execute("""
         INSERT INTO settings (id, server_name, plex_url)
         VALUES (1, ?, ?)
         ON CONFLICT(id) DO UPDATE SET server_name = excluded.server_name, plex_url = excluded.plex_url
-    """, (data[0]['name'], data[0]['connections'][0]['uri']))
+    """, (server['name'], best_url))
     conn.commit()
     conn.close()
 
@@ -6097,7 +6129,7 @@ def save_email_list_route():
         if success:
             return jsonify({"status": "success", "message": f"List '{name}' saved successfully"})
         else:
-            return jsonify({"status": "error", "message": f"List name '{name}' already exists"}), 400
+            return jsonify({"status": "error", "message": f"Error saving '{name}'"}), 400
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 

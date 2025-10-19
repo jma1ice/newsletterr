@@ -4662,6 +4662,13 @@ def index():
         'filtered_users': get_cache_info('filtered_users')
     }
 
+    if not cache_info['graph_data'] or 'params' not in cache_info['graph_data']:
+        if not cache_info['graph_data']:
+            cache_info['graph_data'] = {}
+        cache_info['graph_data']['params'] = {
+            'time_range': 30
+        }
+
     theme_settings = get_theme_settings()
         
     return render_template('index.html',

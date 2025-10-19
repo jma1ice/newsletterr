@@ -501,6 +501,7 @@ def build_email_css_from_theme(theme_colors, logo_width):
                 background-position: center !important;
                 background-repeat: no-repeat !important;
                 width: 100% !important;
+                height: auto;
                 padding-top: 135%;
                 position: relative !important;
                 background-color: #f8f9fa !important;
@@ -567,7 +568,7 @@ def build_email_css_from_theme(theme_colors, logo_width):
                 
                 .card-content {{
                     height: auto !important;
-                    min-height: 150px !important;
+                    min-height: 165px !important;
                     text-align: left !important;
                 }}
             }}

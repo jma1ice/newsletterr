@@ -160,23 +160,22 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 
 ## Planned Changes
 
-### For the v2025.1 sprint, these items are feature requests:
-* Compile EXE / ELF files
-
-
 ### For the v2025.2 sprint, these items are to be addressed:
 * Email click for recently added/available recommendations is going to chrome on mobile instead of app
-* Sometimes Apple Mail has uneven recently added text content sections
+* Some clients show posters as small slivers instead of whole poster
+* Why is this generating 'New Device Connected' notifications for some?
+* Are libraries capped to 5 for some reason?
 
 #### And these items are feature requests:
-* Reduce image size to better fall within size regulations?
+* Make top title into a text block so it is editable/removable
+* Have 'Expand' option on collections to switch to showing items in collection
 * Don't have page reload on stats/users pull
 * Keep settings details on error so user won't have to re-enter them
 * GitHub link should be the stylized logo
 * Api/webhooks?
 * Option for small cover art of each item in a stat table
 * IMDb ratings in stat tables
-* Auth page for hosted users | when this is in, add a hosted 'most recent newsletter' webpage | also when this is in, add opt out support
+* Auth page for hosted users | when this is in, add a hosted 'most recent newsletter' webpage | also when this is in, add opt out support | also hosted images to reduce email size
 * Snap-in for images/gifs/emojis
 * Functionality for full custom HTML templates
 * Ombi integration
@@ -212,6 +211,16 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 
 ## Recent Changes
 
+### v2025.1
+
+#### Fixed:
+* Added a wait for certain variables in schedule sender that was affecting some users
+* A lot of logic moved into if/main to prep for exe release
+
+#### New Features:
+* Compiled EXE and ELF files
+
+
 ### v0.9.17
 
 #### Fixed:
@@ -246,95 +255,6 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Changed date on recently added to days since added
 * Added an HTML Block to text blocks for easy link adding
 * Graph overhaul - fixed fonts, sizing, and added date range graph is for to title
-
-
-### v0.9.16
-
-#### Fixed:
-* Readme updated to reflect recent changes
-* Inner quote fix that was breaking systems running on Python versions under 3.13
-* Fixed issue where schedule calendar would show template number instead of name when that template was paused
-* Fixed issue where preview was limited to 10 recently added items regardless of # pulled
-* Added pop up block detection in settings, some error messaging, and a manual authorization link to ensure users can connect Plex
-
-
-### v0.9.15
-* Managed users no longer show when pulling recommendations
-* Added warning message when email content is over 25mb
-* Added more debug messaging when sending emails
-* Pre-releases push to discord release channel
-* Contributions section added to about
-* Tautulli recently added pull get libraries first to ensure all are captured
-* Tautulli recently added pulls music libraries
-* Fixed recipients text in view recipients modal in Email History so it is readable in dark mode
-* Fixed missing text from emails on dashboard
-* Added email option in setting for From Name
-
-### v0.9.14
-* If recommendations are in email, email is sent to each user separately
-* Logo updated in scheduled send and centered everywhere for now
-* Fixed issue when sending a second scheduled email
-* Switched from one big image to HTML based for stats/recommendations/recently added
-* The recommendations in email have clickable posters to the admins overseerr for requesting unavailable items
-* Fixed issue where /env was not creating on first start for new users
-* Recently added and recommendations snap-ins integrated into scheduled sending
-* Added settings for email coloring - plex orange, newsletterr blue, custom
-
-### v0.9.13
-* Adjusted tautulli API error reporting
-* Fixed app crash when Tautulli settings are missing - thank you dreondre!
-* Reply-To field in settings
-
-### v0.9.12
-* Fixed error when using 587 to send email - thank you dreondre!
-* SMTP username does not require `@`, falls back to from email if SMTP username is not set - thank you dreondre!
-* Split SMTP protocol from port and offer both as options in settings
-
-### v0.9.11
-* Moved .env file to a folder to assist with docker persistence
-* New docker build and docker run instructions to persist .env file
-
-### v0.9.10
-* Added use case info for optional settings
-* Fixed issue with blank settings causing app crash
-* First use messaging in settings page
-* Extra padding on top bar
-
-### v0.9.9
-* Cache recommendations/filtered users
-* Snap-ins UI for adding recommendations to email
-* Replaced Plex logo with yellow newsletterr logo, also added a disclaimer at the end of the email
-* Added setting so users can use their own logo
-* Included Plex url in the settings page so it can be changed if it pulls incorrectly
-* Fixed issue where dashboard preview was initially stuck on light mode
-* Fixed cache status text color on dark mode
-* Redirect empty settings to the settings page
-* Fixed issue where sometimes BCC placeholder was missing
-* Unlinked subject from newsletter title, replaced with title snap-in and created headers snap-in for smaller section headers
-
-### v0.9.8
-* Plex image un-squished
-* PUBLIC_BASE_URL remade into an env var in case docker user changes port
-* Scheduled send now grabs recently added / recommendations
-* Replaced scheduled recommendation API call with selected users instead of all users
-* Set to only pull schedule recommendations if \[RECOMMENDATIONS\] is present
-* Fixed issue where on dash graph wouldn't show in 'view' until a stat was 'viewed'
-* UI added for recently added in snap-ins
-
-### v0.9.7
-* Dockerized!
-
-### v0.9.6
-* Fixed scheduled send images to match preview
-* Fixed muted text not showing in dark mode
-* Light mode dashboard fixes
-* Fixed threading issue
-
-### v0.9.5
-* Changed some buttons (btn-primary) to match rest of style
-* Some UI refresh
-* Donate button in about and footer
-* Link to conjurr in about
 
 ---
 

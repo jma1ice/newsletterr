@@ -1,4 +1,4 @@
-import os, math, uuid, base64, smtplib, sqlite3, requests, time, threading, re, json, mimetypes, shutil, calendar, traceback, io
+import os, math, uuid, base64, smtplib, sqlite3, requests, time, threading, re, json, mimetypes, shutil, calendar, traceback, io, sys
 from collections import defaultdict
 from cryptography.fernet import Fernet, InvalidToken
 from datetime import datetime, timezone, timedelta
@@ -14,9 +14,7 @@ from playwright.sync_api import sync_playwright
 from plex_api_client import PlexAPI
 from urllib.parse import quote_plus, urljoin, urlparse, parse_qs, urlencode, quote
 
-app = Flask(__name__)
-app.jinja_env.globals["version"] = "v0.9.17"
-app.jinja_env.globals["publish_date"] = "October 18, 2025"
+app = Flask(__name__, template_folder = 'templates', static_folder = 'static')
 
 def get_global_cache_status():
     try:
@@ -83,8 +81,6 @@ def get_global_cache_status():
     except:
         return {'has_data': False, 'status': 'Cache error', 'age_display': 'error', 'class': 'cache-badge-muted'}
 
-app.jinja_env.globals["get_cache_status"] = get_global_cache_status
-
 def can_use_cached_data_for_preview(required_days):
     try:
         stats_info = get_cache_info('stats')
@@ -109,47 +105,6 @@ def can_use_cached_data_for_preview(required_days):
         return False, f"No cached range metadata (need {required_days} days)"
     except Exception as e:
         return False, f"Error checking cache: {str(e)}"
-
-CACHE_DURATION = 86400
-CACHE_EXTENDED_DURATION = 86400 * 7
-cache_storage = {
-    'stats': {'data': None, 'timestamp': 0, 'params': None},
-    'users': {'data': None, 'timestamp': 0, 'params': None},
-    'graph_data': {'data': None, 'timestamp': 0, 'params': None},
-    'recent_data': {'data': None, 'timestamp': 0, 'params': None}
-}
-
-app.config["GITHUB_OWNER"] = "jma1ice"
-app.config["GITHUB_REPO"] = "newsletterr"
-app.config["UPDATE_CHECK_INTERVAL_SEC"] = 60 * 60
-
-_update_cache = {
-    "latest": None,
-    "is_newer": False,
-    "release_url": None,
-    "notes": None,
-    "checked_at": 0.0,
-    "etag": None,
-}
-
-DB_PATH = os.path.join("database", "data.db")
-plex_headers = {
-    "X-Plex-Client-Identifier": str(uuid.uuid4())
-}
-ROOT = Path(__file__).resolve().parent
-os.makedirs(ROOT / "env", exist_ok = True)
-if os.path.exists(ROOT / ".env"):
-    shutil.move(ROOT / ".env", ROOT / "env" / ".env")
-ENV_PATH = find_dotenv(usecwd=True) or str(ROOT / "env" / ".env")
-DATA_IMG_RE = re.compile(
-    r'^data:(image/(png|jpeg|jpg|gif|webp));base64,([A-Za-z0-9+/=]+)$',
-    re.IGNORECASE
-)
-_WORKERS_STARTED = False
-_WORKERS_LOCK = threading.Lock()
-_RENDER_LOCK = threading.Lock()
-
-load_dotenv(ENV_PATH)
 
 def start_background_workers():
     global _WORKERS_STARTED
@@ -207,20 +162,8 @@ def ensure_data_key() -> str:
         return key
 
     new_key = Fernet.generate_key().decode()
-
-    env_file = Path(ENV_PATH)
-    if not env_file.exists():
-        env_file.touch()
-        try:
-            env_file.chmod(0o600)
-        except Exception:
-            pass
-
-    set_key(str(env_file), "DATA_ENC_KEY", new_key)
+    set_key(str(ENV_FILE), "DATA_ENC_KEY", new_key)
     return new_key
-
-DATA_KEY = ensure_data_key()
-fernet = Fernet(DATA_KEY)
 
 def encrypt(token: str) -> str:
     return fernet.encrypt(token.encode()).decode()
@@ -1212,7 +1155,9 @@ def capture_chart_images_via_headless(schedule_id: int, base: str, theme: str) -
                 color_scheme="dark" if theme == "dark" else "light"
             )
             page = context.new_page()
+            page.on("console", lambda msg: print(f"PAGE LOG: {msg.text}"))
             page.goto(url, wait_until="load")
+            print(f"Loaded URL (before waiting): {page.url}")
             
             try:
                 page.wait_for_function("typeof loadPreview === 'function'", timeout=30_000)
@@ -1222,7 +1167,13 @@ def capture_chart_images_via_headless(schedule_id: int, base: str, theme: str) -
             except Exception as e:
                 print(f"Error waiting for charts to load: {e}")
 
-            selected_items = page.evaluate("selectedItems || []")
+            try:
+                page.wait_for_function("typeof selectedItems !== 'undefined'", timeout=10_000)
+                selected_items = page.evaluate("selectedItems || []")
+            except Exception as e:
+                print(f"selectedItems never defined or timeout: {e}")
+                selected_items = []
+
             chart_images = {}
             
             for item in selected_items:
@@ -6228,7 +6179,71 @@ def delete_email_template(template_id):
         return jsonify({"status": "error", "message": str(e)}), 500
 
 if __name__ == '__main__':
+    app.jinja_env.globals["version"] = "v2025.1"
+    app.jinja_env.globals["publish_date"] = "October 29, 2025"
+
+    app.jinja_env.globals["get_cache_status"] = get_global_cache_status
+
+    CACHE_DURATION = 86400
+    CACHE_EXTENDED_DURATION = 86400 * 7
+    cache_storage = {
+        'stats': {'data': None, 'timestamp': 0, 'params': None},
+        'users': {'data': None, 'timestamp': 0, 'params': None},
+        'graph_data': {'data': None, 'timestamp': 0, 'params': None},
+        'recent_data': {'data': None, 'timestamp': 0, 'params': None}
+    }
+
+    app.config["GITHUB_OWNER"] = "jma1ice"
+    app.config["GITHUB_REPO"] = "newsletterr"
+    app.config["UPDATE_CHECK_INTERVAL_SEC"] = 60 * 60
+
+    _update_cache = {
+        "latest": None,
+        "is_newer": False,
+        "release_url": None,
+        "notes": None,
+        "checked_at": 0.0,
+        "etag": None,
+    }
+
+    DB_PATH = os.path.join("database", "data.db")
+    plex_headers = {
+        "X-Plex-Client-Identifier": str(uuid.uuid4())
+    }
+    
+    if getattr(sys, 'frozen', False):
+        ROOT = Path(sys.executable).parent
+    else:
+        ROOT = Path(__file__).resolve().parent
+
+    ENV_DIR = ROOT / "env"
+    ENV_FILE = ENV_DIR / ".env"
+    os.makedirs(ENV_DIR, exist_ok = True)
+    if os.path.exists(ROOT / ".env"):
+        shutil.move(ROOT / ".env", ROOT / "env" / ".env")
+    
+    if not ENV_FILE.exists():
+        ENV_FILE.touch()
+        try:
+            ENV_FILE.chmod(0o600)
+        except Exception:
+            pass
+
+    load_dotenv(ENV_FILE)
+    
+    DATA_IMG_RE = re.compile(
+        r'^data:(image/(png|jpeg|jpg|gif|webp));base64,([A-Za-z0-9+/=]+)$',
+        re.IGNORECASE
+    )
+    _WORKERS_STARTED = False
+    _WORKERS_LOCK = threading.Lock()
+    _RENDER_LOCK = threading.Lock()
+
+    DATA_KEY = ensure_data_key()
+    fernet = Fernet(DATA_KEY)
+
     os.makedirs("database", exist_ok=True)
+    
     migrate_data_from_separate_dbs()
     init_db(DB_PATH)
     migrate_schema("logo_filename TEXT")

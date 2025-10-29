@@ -83,38 +83,12 @@
     <h2 class="text-2xl font-bold mb-2">Recent Changes</h2>
     <dt class="font-semibold dark:border-gray-300">Fixes:</dt>
     <ul class="list-disc list-inside space-y-2 text-sm mb-2">
-        <li>Allow for multiple named collections sections</li>
-        <li>Collections no longer get stuck to bottom of email</li>
-        <li>If no collections art it now shows plexs 2x2 'composite' image</li>
-        <li>Moved background workers start call to app start instead of webpage visit</li>
-        <li>Recently added now uses artwork from the show not the episode/season</li>
-        <li>Recently added now filters for when episodes of a show are found and only adds one instance of that show</li>
-        <li>Recently added pulls show info over episode info when available</li>
-        <li>Fixed everywhere days and # of items is hardcoded</li>
-        <li>Switched recently added pull from Tautulli to direct Plex API call. This fixes 100 item limit</li>
-        <li>Added 'ALL' BCC list to scheduler options</li>
-        <li>Now shows # of items in scheduler table</li>
-        <li>Fixed 0m for shows and audio changed to genre</li>
-        <li>Fixed the issue with RA cards showing up as different heights in different email clients</li>
-        <li>Added a font fallback stack</li>
-        <li>Now gets https direct connect plex url by default, fixing issue where Plex 'Secure Connections > Required' setting was causing image 401</li>
-        <li>Made BCC lists editable</li>
-        <li>Stat titles now include the date range they were pulled for</li>
+        <li>Added a wait for certain variables in schedule sender that was affecting some users</li>
+        <li>A lot of logic moved into if/main to prep for exe release</li>
     </ul>
     <dt class="font-semibold dark:border-gray-300">New Features:</dt>
     <ul class="list-disc list-inside space-y-2 text-sm mb-2">
-        <li>Added more date range options in schedule builder to match dashboard</li>
-        <li>Added many more options for scheduled emails frequency</li>
-        <li>Added collections snap-in - thank you yungsnuzzy!</li>
-        <li>Custom logo logic in settings. Added in small/banner/custom/none dropdown - thanks dreondre!</li>
-        <li>Got rid of library name on recently added overlay</li>
-        <li>Made posters clickable for available recommendations and recently added items to take users to Plex to watch</li>
-        <li>Added option for recs to show email/username/friendly name</li>
-        <li>Nixed the view buttons</li>
-        <li>Renamed 'ra' and 'recs' snap in block for clarity</li>
-        <li>Changed date on recently added to days since added</li>
-        <li>Added an HTML Block to text blocks for easy link adding</li>
-        <li>Graph overhaul - fixed fonts, sizing, and added date range graph is for to title</li>
+        <li>Compiled EXE and ELF files</li>
     </ul>
 </div>
 {% endblock %}

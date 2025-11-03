@@ -165,6 +165,7 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Some clients show posters as small slivers instead of whole poster
 * Why is this generating 'New Device Connected' notifications for some?
 * Are libraries capped to 5 for some reason?
+* Update Plex authentication for PlexAPI v0.31.1 (plexapi.plex no longer supported)
 
 #### And these items are feature requests:
 * Make top title into a text block so it is editable/removable

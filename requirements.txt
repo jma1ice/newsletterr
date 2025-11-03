@@ -1,6 +1,6 @@
 Flask
 requests
-plex-api-client
+plex-api-client==0.29.1
 python-dotenv
 cryptography
 playwright

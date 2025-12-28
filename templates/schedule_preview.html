@@ -70,6 +70,7 @@
     let recentCommands = [];
     let userDict = {};
     let usersFullData = {};
+    let expandedCollections = {};
 
     async function blurImageElement(imgElement) {
         const tempImg = new Image();
@@ -502,6 +503,7 @@
             
             templateData = data;
             selectedItems = data.selected_items || [];
+            expandedCollections = data.expanded_collections || {};
             
             stats = data.stats || [];
             graphData = data.graph_data || [];
@@ -686,7 +688,7 @@
 
         let contentHTML = "";
         
-        for (let item of selectedItems) {
+        for (let [itemIndex, item] of selectedItems.entries()) {
             if (item.type === 'textblock') {
                 const content = item.content || '';
                 if (content && content.trim().length > 0) {
@@ -772,7 +774,7 @@
                 const groupTitle = item.title || 'Collections';
                 const groupCollections = item.collections || [];
                 if (groupCollections.length > 0) {
-                    contentHTML += buildCollectionPreviewHTMLForEmail(groupTitle, groupCollections);
+                    contentHTML += buildCollectionPreviewHTMLForEmail(groupTitle, groupCollections, itemIndex);
                 }
             }
         }
@@ -1395,7 +1397,183 @@
         }
     }
 
-    function buildCollectionPreviewHTMLForEmail(title, collections) {
+    function buildIndividualItemCardForSchedule(item, themeColors) {
+        const itemTitle = item.title || item.name || 'Unknown Title';
+        const year = item.year;
+        const itemType = item.type || item.subtype || 'unknown';
+        
+        let displayTitle = itemTitle;
+        if (year) {
+            displayTitle += ` (${year})`;
+        }
+        
+        const typeIcons = {
+            'movie': '🎬',
+            'show': '📺', 
+            'album': '💿',
+            'track': '🎵',
+            'artist': '🎤'
+        };
+        const typeIcon = typeIcons[itemType] || '📄';
+        
+        let subtitle = "";
+        if (item.artist && itemType !== 'show') {
+            subtitle = item.artist;
+        } else if (item.parentTitle && itemType === 'track') {
+            subtitle = item.parentTitle;
+        } else if (item.grandparentTitle && itemType === 'track') {
+            subtitle = item.grandparentTitle;
+        } else if (itemType === 'show') {
+            const seasonCount = item.season_count || item.childCount || 0;
+            const episodeCount = item.episode_count || item.leafCount || 0;
+            if (seasonCount > 0) {
+                subtitle = `${seasonCount} season${seasonCount !== 1 ? 's' : ''}`;
+            } else if (episodeCount > 0) {
+                subtitle = `${episodeCount} episode${episodeCount !== 1 ? 's' : ''}`;
+            }
+        }
+        
+        let posterURL = null;
+        const thumbUrl = item.thumb;
+        const artUrl = item.art;
+        
+        if (thumbUrl) {
+            if (thumbUrl.startsWith('http')) {
+                try {
+                    const url = new URL(thumbUrl);
+                    posterURL = `/proxy-art${url.pathname}`;
+                } catch (e) {
+                    console.log('Failed to parse thumb URL:', thumbUrl);
+                }
+            } else {
+                posterURL = `/proxy-art${thumbUrl.startsWith('/') ? thumbUrl : '/' + thumbUrl}`;
+            }
+        } else if (artUrl) {
+            if (artUrl.startsWith('http')) {
+                try {
+                    const url = new URL(artUrl);
+                    posterURL = `/proxy-art${url.pathname}`;
+                } catch (e) {
+                    console.log('Failed to parse art URL:', artUrl);
+                }
+            } else {
+                posterURL = `/proxy-art${artUrl.startsWith('/') ? artUrl : '/' + artUrl}`;
+            }
+        }
+        
+        if (posterURL) {
+            return `
+            <table cellpadding="0" cellspacing="0" border="0" style="
+                background-color: ${themeColors.card_bg};
+                border-radius: 12px;
+                width: 120px;
+                margin: 0 auto;
+            ">
+                <tr>
+                    <td style="
+                        background-image: url('${posterURL}');
+                        background-size: cover;
+                        background-position: center;
+                        background-repeat: no-repeat;
+                        height: 180px;
+                        background-color: #f8f9fa;
+                        border-radius: 12px;
+                        position: relative;
+                        vertical-align: top;
+                    ">
+                        <table cellpadding="0" cellspacing="0" border="0" width="100%">
+                            <tr>
+                                <td style="text-align: right;">
+                                    <div style="
+                                        background-color: rgba(0, 0, 0, 0.8);
+                                        color: white;
+                                        padding: 4px 6px;
+                                        border-radius: 4px;
+                                        font-size: 10px;
+                                        font-family: 'IBM Plex Sans';
+                                        line-height: 1;
+                                        display: inline-block;
+                                        margin: 6px;
+                                    ">
+                                        ${typeIcon}
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="height: 150px; vertical-align: bottom;">
+                                    <div style="
+                                        background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent);
+                                        border-radius: 0 0 11px 11px;
+                                        padding: 6px;
+                                    ">
+                                        <div style="
+                                            font-weight: bold;
+                                            font-size: 12px;
+                                            color: white;
+                                            line-height: 1.2;
+                                            font-family: 'IBM Plex Sans';
+                                        ">${displayTitle}</div>
+                                        ${subtitle ? `
+                                            <div style="
+                                                font-size: 9px;
+                                                color: #ccc;
+                                                line-height: 1.2;
+                                                font-family: 'IBM Plex Sans';
+                                                margin-top: 2px;
+                                            ">${subtitle}</div>
+                                        ` : ''}
+                                    </div>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+            </table>
+            `;
+        } else {
+            return `
+            <table cellpadding="0" cellspacing="0" border="0" style="
+                background-color: ${themeColors.card_bg};
+                border-radius: 12px;
+                border: 1px solid ${themeColors.border};
+                width: 120px;
+                height: 180px;
+                margin: 0 auto;
+            ">
+                <tr>
+                    <td style="
+                        text-align: center;
+                        vertical-align: middle;
+                        padding: 12px;
+                        color: ${themeColors.text};
+                        font-family: 'IBM Plex Sans';
+                    ">
+                        <div style="
+                            font-size: 11px;
+                            margin-bottom: 8px;
+                        ">${typeIcon}</div>
+                        <div style="
+                            font-weight: bold;
+                            font-size: 14px;
+                            line-height: 1.2;
+                            margin-bottom: 8px;
+                            padding: 2px;
+                        ">${displayTitle}</div>
+                        ${subtitle ? `
+                            <div style="
+                                font-size: 9px;
+                                color: ${themeColors.muted_text};
+                                line-height: 1.2;
+                            ">${subtitle}</div>
+                        ` : ''}
+                    </td>
+                </tr>
+            </table>
+            `;
+        }
+    }
+
+    function buildCollectionPreviewHTMLForEmail(title, collections, groupIndex = 0) {
         const themeColors = {
             card_bg: 'var(--email-card-bg)',
             text: 'var(--email-text)', 
@@ -1411,11 +1589,33 @@
             `;
         }
 
+        let allItemsToDisplay = [];
+                
+        collections.forEach((collection, index) => {
+            const collectionId = `${groupIndex}-${index}-${collection.key}`;
+            const expandedItems = expandedCollections[collectionId];
+            
+            if (expandedItems && Object.keys(expandedItems).length > 0) {
+                Object.values(expandedItems).forEach(item => {
+                    allItemsToDisplay.push({
+                        ...item,
+                        isIndividualItem: true,
+                        originalCollection: collection.title
+                    });
+                });
+            } else {
+                allItemsToDisplay.push({
+                    ...collection,
+                    isIndividualItem: false
+                });
+            }
+        });
+
         const itemsPerRow = 5;
         let itemsHTML = "";
         
-        for (let i = 0; i < collections.length; i += itemsPerRow) {
-            const rowItems = collections.slice(i, i + itemsPerRow);
+        for (let i = 0; i < allItemsToDisplay.length; i += itemsPerRow) {
+            const rowItems = allItemsToDisplay.slice(i, i + itemsPerRow);
             const isPartialRow = rowItems.length < itemsPerRow;
             
             if (isPartialRow) {
@@ -1425,7 +1625,7 @@
                 rowHTML += '<table cellpadding="0" cellspacing="0" border="0" style="margin: 0 auto; border-collapse: separate;">';
                 rowHTML += '<tr>';
                 
-                rowItems.forEach((collection, j) => {
+                rowItems.forEach((item, j) => {
                     let cellSpacing = "0";
                     if (itemsCount === 2) {
                         cellSpacing = j === 0 ? "60px" : "0";
@@ -1437,7 +1637,9 @@
                         cellSpacing = j < itemsCount - 1 ? "6px" : "0";
                     }
                     
-                    const cardHTML = buildCollectionCard(collection, themeColors);
+                    const cardHTML = item.isIndividualItem
+                        ? buildIndividualItemCardForSchedule(item, themeColors)
+                        : buildCollectionCard(item, themeColors);
                     rowHTML += `<td style="vertical-align: top; padding-right: ${cellSpacing};">${cardHTML}</td>`;
                 });
                 
@@ -1446,7 +1648,7 @@
             } else {
                 let rowHTML = "<tr style='text-align: center;'>";
                 
-                rowItems.forEach((collection) => {
+                rowItems.forEach((item) => {
                     const cellStyle = `
                         width: 20%;
                         padding: 6px;
@@ -1454,7 +1656,9 @@
                         font-family: 'IBM Plex Sans';
                     `;
                     
-                    const cardHTML = buildCollectionCard(collection, themeColors);
+                    const cardHTML = item.isIndividualItem
+                        ? buildIndividualItemCardForSchedule(item, themeColors)
+                        : buildCollectionCard(item, themeColors);
                     rowHTML += `<td style="${cellStyle}">${cardHTML}</td>`;
                 });
                 

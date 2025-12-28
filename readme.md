@@ -164,19 +164,18 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Email click for recently added/available recommendations is going to chrome on mobile instead of app
 * Some clients show posters as small slivers instead of whole poster
 * Why is this generating 'New Device Connected' notifications for some?
-* Are libraries capped to 5 for some reason?
+* Are libraries capped to 5 for some reason? Do libraries that share name similarities cause issues (ie 2 libs with 'TV' in both names)?
 * Update Plex authentication for PlexAPI v0.31.1 (plexapi.plex no longer supported)
 
 #### And these items are feature requests:
 * Make top title into a text block so it is editable/removable
-* Have 'Expand' option on collections to switch to showing items in collection
 * Don't have page reload on stats/users pull
 * Keep settings details on error so user won't have to re-enter them
 * GitHub link should be the stylized logo
 * Api/webhooks?
 * Option for small cover art of each item in a stat table
 * IMDb ratings in stat tables
-* Auth page for hosted users | when this is in, add a hosted 'most recent newsletter' webpage | also when this is in, add opt out support | also hosted images to reduce email size
+* Auth page for hosted users | when this is in, add a hosted 'most recent newsletter' webpage | also, add opt out support | also hosted images to reduce email size
 * Snap-in for images/gifs/emojis
 * Functionality for full custom HTML templates
 * Ombi integration
@@ -211,6 +210,14 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 ---
 
 ## Recent Changes
+
+### v2025.2:pre-release
+
+#### Fixed:
+
+#### New Features:
+* Added 'Expand' option on collections to switch to showing items in collection
+
 
 ### v2025.1
 

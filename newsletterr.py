@@ -227,7 +227,8 @@ def init_db(db_path):
             subject TEXT,
             layout TEXT DEFAULT 'standard',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            expanded_collections TEXT DEFAULT '{}'
         )
     """)
     
@@ -658,6 +659,26 @@ def migrate_ra_recs_to_recently_added_recommendations():
     conn.close()
 
     print(f"Updated {updated} templates successfully.")
+
+def migrate_email_templates_for_expanded_collections():
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        
+        cursor.execute("PRAGMA table_info(email_templates)")
+        columns = [column[1] for column in cursor.fetchall()]
+        
+        if 'expanded_collections' not in columns:
+            print("Adding expanded_collections column to email_templates table...")
+            cursor.execute("ALTER TABLE email_templates ADD COLUMN expanded_collections TEXT DEFAULT '{}'")
+            conn.commit()
+            print("Successfully added expanded_collections column")
+            
+        conn.close()
+        
+    except Exception as e:
+        print(f"Error migrating email_templates table: {e}")
+        traceback.print_exc()
 
 def get_saved_email_lists():
     conn = sqlite3.connect(DB_PATH)
@@ -1646,6 +1667,75 @@ def fetch_recently_added_using_plex_sdk(tautulli_base_url, tautulli_api_key, ite
             })
     
     return recent_data
+
+def get_collection_items_for_email(collection_key, settings):
+    try:
+        plex_url = settings.get('plex_url', '').rstrip('/')
+        plex_token = settings.get('plex_token', '')
+        
+        if not plex_url or not plex_token:
+            print(f"ERROR: Plex connection not configured for collection {collection_key}")
+            return []
+        
+        collection_items_url = f"{plex_url}/library/metadata/{collection_key}/children"
+        headers = {
+            'X-Plex-Token': decrypt(plex_token),
+            'Accept': 'application/json'
+        }
+        
+        try:
+            global plex_headers
+            headers.update(plex_headers)
+        except NameError:
+            pass
+        
+        print(f"Fetching collection items from: {collection_items_url}")
+        response = requests.get(collection_items_url, headers=headers, timeout=30)
+        
+        if response.status_code != 200:
+            print(f"ERROR: Failed to fetch collection items. Status: {response.status_code}")
+            return []
+        
+        plex_data = response.json()
+        items = []
+        
+        if 'MediaContainer' in plex_data and 'Metadata' in plex_data['MediaContainer']:
+            for item in plex_data['MediaContainer']['Metadata']:
+                thumb = item.get('thumb', '')
+                if thumb and not thumb.startswith('http'):
+                    thumb = f"{plex_url}{thumb}?X-Plex-Token={decrypt(plex_token)}"
+                
+                art = item.get('art', '')
+                if art and not art.startswith('http'):
+                    art = f"{plex_url}{art}?X-Plex-Token={decrypt(plex_token)}"
+                
+                item_info = {
+                    'key': item.get('ratingKey'),
+                    'title': item.get('title', 'Unknown Title'),
+                    'type': item.get('type'),
+                    'year': item.get('year'),
+                    'tagline': item.get('tagline'),
+                    'summary': item.get('summary'),
+                    'rating': item.get('rating'),
+                    'duration': item.get('duration'),
+                    'addedAt': item.get('addedAt'),
+                    'thumb': thumb,
+                    'art': art,
+                    'childCount': item.get('childCount', 0),
+                    'leafCount': item.get('leafCount', 0),
+                    'parentTitle': item.get('parentTitle'),
+                    'grandparentTitle': item.get('grandparentTitle'),
+                    'subtype': item.get('type')
+                }
+                items.append(item_info)
+        
+        print(f"Successfully fetched {len(items)} items from collection {collection_key}")
+        return items
+        
+    except Exception as e:
+        print(f"ERROR: Exception fetching collection items for {collection_key}: {e}")
+        traceback.print_exc()
+        return []
 
 def run_tautulli_command(base_url, api_key, command, section_id, error, time_range='30', start='0'):
     out_data = None
@@ -2830,7 +2920,295 @@ def build_recommendations_section_with_cids(available_items, unavailable_items, 
         </div>
     """
 
-def build_collections_html_with_cids(all_collections, msg_root, theme_colors, base_url="", custom_title=None):
+def build_individual_item_card_html(item, theme_colors, msg_root, base_url=""):
+    item_title = item.get('title', 'Unknown Title')
+    year = item.get('year')
+    item_type = item.get('type', 'unknown')
+    
+    display_title = item_title
+    if year:
+        display_title += f" ({year})"
+    
+    type_icons = {
+        'movie': '🎬',
+        'show': '📺', 
+        'album': '💿',
+        'track': '🎵',
+        'artist': '🎤'
+    }
+    type_icon = type_icons.get(item_type, '📄')
+    
+    subtitle = ""
+    if item.get('parentTitle') and item_type in ['album', 'track']:
+        subtitle = item['parentTitle']
+    elif item.get('grandparentTitle') and item_type == 'track':
+        subtitle = item['grandparentTitle']
+    elif item_type == 'show':
+        season_count = item.get('childCount', 0)
+        episode_count = item.get('leafCount', 0)
+        if season_count > 0:
+            subtitle = f"{season_count} season{'s' if season_count != 1 else ''}"
+        elif episode_count > 0:
+            subtitle = f"{episode_count} episode{'s' if episode_count != 1 else ''}"
+    
+    poster_cid = None
+    poster_url = item.get('thumb', '')
+    if poster_url:
+        print(f"Attempting to fetch thumb image: {poster_url}")
+        if poster_url.startswith('http'):
+            poster_cid = fetch_and_attach_image(poster_url, msg_root, f"collection_{item.get('key', 'unknown')}_thumb", base_url)
+        else:
+            full_poster_url = f"/proxy-art{poster_url if poster_url.startswith('/') else '/' + poster_url}"
+            poster_cid = fetch_and_attach_image(full_poster_url, msg_root, f"collection_{item.get('key', 'unknown')}_thumb", base_url)
+        print(f"Thumb CID result: {poster_cid}")
+    
+    if not poster_cid:
+        print("No thumb CID, trying art URL...")
+        art_url = item.get('art', '')
+        if art_url:
+            print(f"Attempting to fetch art image: {art_url}")
+            if art_url.startswith('http'):
+                poster_cid = fetch_and_attach_image(art_url, msg_root, f"collection_{item.get('key', 'unknown')}_art", base_url)
+            else:
+                full_art_url = f"/proxy-art{art_url if art_url.startswith('/') else '/' + art_url}"
+                poster_cid = fetch_and_attach_image(full_art_url, msg_root, f"collection_{item.get('key', 'unknown')}_art", base_url)
+            print(f"Art CID result: {poster_cid}")
+    
+    if poster_cid:
+        return f"""
+        <table cellpadding="0" cellspacing="0" border="0" style="
+            background-color: {theme_colors['card_bg']};
+            border-radius: 12px;
+            width: 120px;
+            margin: 0;
+        ">
+            <tr>
+                <td style="
+                    background-image: url('cid:{poster_cid}');
+                    background-size: cover;
+                    background-position: center;
+                    background-repeat: no-repeat;
+                    height: 180px;
+                    background-color: #f8f9fa;
+                    border-radius: 12px;
+                    position: relative;
+                    vertical-align: top;
+                ">
+                    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+                        <tr>
+                            <td style="text-align: right;">
+                                <div style="
+                                    background-color: rgba(0, 0, 0, 0.8);
+                                    color: white;
+                                    padding: 4px 6px;
+                                    border-radius: 4px;
+                                    font-size: 10px;
+                                    font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
+                                    line-height: 1;
+                                    display: inline-block;
+                                    margin: 6px;
+                                ">
+                                    {type_icon}
+                                </div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="height: 148px; vertical-align: bottom;">
+                                <div style="
+                                    background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent);
+                                    border-radius: 0 0 11px 11px;
+                                    padding: 6px;
+                                ">
+                                    <div style="
+                                        font-weight: bold;
+                                        font-size: 11px;
+                                        color: white;
+                                        line-height: 1.2;
+                                        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
+                                    ">{display_title}</div>
+                                    {f'''<div style="
+                                        font-size: 9px;
+                                        color: #ccc;
+                                        line-height: 1.2;
+                                        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
+                                        margin-top: 2px;
+                                    ">{subtitle}</div>''' if subtitle else ''}
+                                </div>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+        </table>
+        """
+    else:
+        return f"""
+        <table cellpadding="0" cellspacing="0" border="0" style="
+            background-color: {theme_colors['card_bg']};
+            border-radius: 12px;
+            border: 1px solid {theme_colors['border']};
+            width: 120px;
+            height: 180px;
+            margin: 0;
+        ">
+            <tr>
+                <td style="
+                    text-align: center;
+                    vertical-align: middle;
+                    padding: 12px;
+                    color: {theme_colors['text']};
+                    font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
+                ">
+                    <div style="
+                        font-size: 11px;
+                        margin-bottom: 8px;
+                    ">{type_icon}</div>
+                    <div style="
+                        font-weight: bold;
+                        font-size: 14px;
+                        line-height: 1.2;
+                        margin-bottom: 8px;
+                        padding: 2px;
+                    ">{display_title}</div>
+                    {f'''<div style="
+                        font-size: 9px;
+                        color: {theme_colors['muted_text']};
+                        line-height: 1.2;
+                    ">{subtitle}</div>''' if subtitle else ''}
+                </td>
+            </tr>
+        </table>
+        """
+
+def build_collection_card_html(collection, theme_colors, msg_root, base_url=""):
+    poster_cid = None
+    poster_url = collection.get('thumb', '')
+    if poster_url:
+        print(f"Attempting to fetch thumb image: {poster_url}")
+        if poster_url.startswith('http'):
+            poster_cid = fetch_and_attach_image(poster_url, msg_root, f"collection_{collection.get('key', 'unknown')}_thumb", base_url)
+        else:
+            full_poster_url = f"/proxy-art{poster_url if poster_url.startswith('/') else '/' + poster_url}"
+            poster_cid = fetch_and_attach_image(full_poster_url, msg_root, f"collection_{collection.get('key', 'unknown')}_thumb", base_url)
+        print(f"Thumb CID result: {poster_cid}")
+    
+    if not poster_cid:
+        print("No thumb CID, trying art URL...")
+        art_url = collection.get('art', '')
+        if art_url:
+            print(f"Attempting to fetch art image: {art_url}")
+            if art_url.startswith('http'):
+                poster_cid = fetch_and_attach_image(art_url, msg_root, f"collection_{collection.get('key', 'unknown')}_art", base_url)
+            else:
+                full_art_url = f"/proxy-art{art_url if art_url.startswith('/') else '/' + art_url}"
+                poster_cid = fetch_and_attach_image(full_art_url, msg_root, f"collection_{collection.get('key', 'unknown')}_art", base_url)
+            print(f"Art CID result: {poster_cid}")
+    
+    collection_title = collection.get('title', 'Unknown Collection')
+    count = collection.get('childCount', 0)
+    subtype = collection.get('subtype', 'unknown')
+    summary = collection.get('summary', '')
+    type_icon = '📽️' if subtype == 'movie' else '📺' if subtype == 'show' else '🎧'
+    
+    if poster_cid:
+        poster_bg_url = f"cid:{poster_cid}"
+        print(f"Final poster src for {collection_title}: {poster_bg_url}")
+        
+        return f"""
+            <table cellpadding="0" cellspacing="0" border="0" style="
+                background-color: {theme_colors['card_bg']};
+                border-radius: 12px;
+                width: 120px;
+                margin: 0;
+            ">
+                <tr>
+                    <td style="
+                        background-image: url('{poster_bg_url}');
+                        background-size: cover;
+                        background-position: center;
+                        background-repeat: no-repeat;
+                        height: 180px;
+                        background-color: #f8f9fa;
+                        border-radius: 12px;
+                        position: relative;
+                        vertical-align: top;
+                    ">
+                        <table cellpadding="0" cellspacing="0" border="0" width="100%">
+                            <tr>
+                                <td style="text-align: right;">
+                                    <div style="
+                                        background-color: rgba(0, 0, 0, 0.8);
+                                        color: white;
+                                        padding: 4px 6px;
+                                        border-radius: 4px;
+                                        font-size: 10px;
+                                        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
+                                        line-height: 1;
+                                        display: inline-block;
+                                        margin: 6px;
+                                    ">
+                                        {type_icon} {count}
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="height: 148px; vertical-align: bottom;">
+                                    <div style="
+                                        background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent);
+                                        border-radius: 0 0 11px 11px;
+                                        padding: 6px;
+                                    ">
+                                        <div style="
+                                            font-weight: bold;
+                                            font-size: 12px;
+                                            color: white;
+                                            line-height: 1.2;
+                                            font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
+                                        ">{collection_title}</div>
+                                    </div>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+            </table>
+        """
+    else:
+        print(f"No valid image data for {collection_title}, using placeholder")
+        return f"""
+            <table cellpadding="0" cellspacing="0" border="0" style="
+                background-color: {theme_colors['card_bg']};
+                border-radius: 12px;
+                border: 1px solid {theme_colors['border']};
+                width: 120px;
+                height: 180px;
+                margin: 0;
+            ">
+                <tr>
+                    <td style="
+                        text-align: center;
+                        vertical-align: middle;
+                        padding: 12px;
+                    ">
+                        <div style="
+                            font-weight: bold;
+                            font-size: 14px;
+                            color: {theme_colors['text']};
+                            margin-bottom: 8px;
+                            font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
+                            padding: 2px;
+                        ">{collection_title}</div>
+                        <div style="
+                            font-size: 11px;
+                            color: {theme_colors['muted_text']};
+                            font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
+                        ">{type_icon} {count} items</div>
+                    </td>
+                </tr>
+            </table>
+        """
+
+def build_collections_html_with_cids(all_collections, msg_root, theme_colors, base_url="", custom_title=None, expanded_collections=None, group_index=0):
     if not all_collections:
         return f"""
         <div style="background-color: {theme_colors['card_bg']}; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid {theme_colors['border']}; font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;">
@@ -2838,24 +3216,52 @@ def build_collections_html_with_cids(all_collections, msg_root, theme_colors, ba
         </div>
         """
     
+    expanded_collections = expanded_collections or {}
+    all_items_to_display = []
+    
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("SELECT plex_url, plex_token FROM settings WHERE id = 1")
+    row = cursor.fetchone()
+    conn.close()
+    
+    plex_settings = {}
+    if row and row[0] and row[1]:
+        plex_settings = {
+            'plex_url': row[0],
+            'plex_token': row[1]
+        }
+
+    for collection_index, collection in enumerate(all_collections):
+        collection_id = f"{group_index}-{collection_index}-{collection.get('key')}"
+
+        if collection_id in expanded_collections and plex_settings:
+            print(f"Collection {collection_id} is expanded, fetching individual items...")
+            individual_items = get_collection_items_for_email(collection.get('key'), plex_settings)
+            
+            for item in individual_items:
+                item['is_individual_item'] = True
+                item['original_collection'] = collection.get('title', 'Unknown Collection')
+                all_items_to_display.append(item)
+        else:
+            collection['is_individual_item'] = False
+            all_items_to_display.append(collection)
+    
     items_html = ""
     items_per_row = 5
     
-    for i in range(0, len(all_collections), items_per_row):
-        row_items = all_collections[i:i + items_per_row]
-        
+    for i in range(0, len(all_items_to_display), items_per_row):
+        row_items = all_items_to_display[i:i + items_per_row]
         is_partial_row = len(row_items) < items_per_row
         
         if is_partial_row:
             items_count = len(row_items)
             
-            total_item_width = items_count * 140
-            
             row_html = f'<tr><td colspan="{items_per_row}" style="text-align: center; padding: 8px;">'
             row_html += '<table cellpadding="0" cellspacing="0" border="0" style="margin: 0 auto; border-collapse: separate;">'
             row_html += '<tr>'
             
-            for j, collection in enumerate(row_items):
+            for j, item in enumerate(row_items):
                 if items_count == 1:
                     cell_spacing = "0"
                 elif items_count == 2:
@@ -2866,183 +3272,20 @@ def build_collections_html_with_cids(all_collections, msg_root, theme_colors, ba
                     cell_spacing = "20px" if j < 3 else "0"
                 else:
                     cell_spacing = "8px" if j < items_count - 1 else "0"
-            
-                
-                print(f"Processing collection: {collection.get('title', 'Unknown')}")
-                print(f"Collection subtype: {collection.get('subtype', 'Unknown')}")
-                print(f"Collection thumb URL: {collection.get('thumb', 'No thumb')}")
-                print(f"Collection art URL: {collection.get('art', 'No art')}")
-                
-                poster_cid = None
-                poster_url = collection.get('thumb', '')
-                if poster_url:
-                    print(f"Attempting to fetch thumb image: {poster_url}")
-                    if poster_url.startswith('http'):
-                        poster_cid = fetch_and_attach_image(poster_url, msg_root, f"collection_{i}_{j}_thumb", base_url)
-                    else:
-                        full_poster_url = f"/proxy-art{poster_url if poster_url.startswith('/') else '/' + poster_url}"
-                        poster_cid = fetch_and_attach_image(full_poster_url, msg_root, f"collection_{i}_{j}_thumb", base_url)
-                    print(f"Thumb CID result: {poster_cid}")
-                
-                if not poster_cid:
-                    print("No thumb CID, trying art URL...")
-                    art_url = collection.get('art', '')
-                    if art_url:
-                        print(f"Attempting to fetch art image: {art_url}")
-                        if art_url.startswith('http'):
-                            poster_cid = fetch_and_attach_image(art_url, msg_root, f"collection_{i}_{j}_art", base_url)
-                        else:
-                            full_art_url = f"/proxy-art{art_url if art_url.startswith('/') else '/' + art_url}"
-                            poster_cid = fetch_and_attach_image(full_art_url, msg_root, f"collection_{i}_{j}_art", base_url)
-                        print(f"Art CID result: {poster_cid}")
-                
-                collection_title = collection.get('title', 'Unknown Collection')
-                count = collection.get('childCount', 0)
-                subtype = collection.get('subtype', 'unknown')
-                summary = collection.get('summary', '')
-                
-                type_icon = '📽️' if subtype == 'movie' else '📺' if subtype == 'show' else '🎧'
 
-                if poster_cid:
-                    poster_bg_url = f"cid:{poster_cid}"
-                    print(f"Final poster src for {collection_title}: {poster_bg_url}")
-                    
-                    card_html = f"""
-                        <table cellpadding="0" cellspacing="0" border="0" style="
-                            background-color: {theme_colors['card_bg']};
-                            border-radius: 12px;
-                            width: 120px;
-                            margin: 0;
-                        ">
-                            <tr>
-                                <td style="
-                                    background-image: url('{poster_bg_url}');
-                                    background-size: cover;
-                                    background-position: center;
-                                    background-repeat: no-repeat;
-                                    height: 180px;
-                                    background-color: #f8f9fa;
-                                    border-radius: 12px;
-                                    position: relative;
-                                    vertical-align: top;
-                                ">
-                                    <table cellpadding="0" cellspacing="0" border="0" width="100%">
-                                        <tr>
-                                            <td style="text-align: right;">
-                                                <div style="
-                                                    background-color: rgba(0, 0, 0, 0.8);
-                                                    color: white;
-                                                    padding: 4px 6px;
-                                                    border-radius: 4px;
-                                                    font-size: 10px;
-                                                    font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
-                                                    line-height: 1;
-                                                    display: inline-block;
-                                                    margin: 6px;
-                                                ">
-                                                    {type_icon} {count}
-                                                </div>
-                                            </td>
-                                        </tr>
-                                        <tr>
-                                            <td style="height: 148px; vertical-align: bottom;">
-                                                <div style="
-                                                    background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent);
-                                                    border-radius: 0 0 11px 11px;
-                                                ">
-                                                    <div style="
-                                                        font-weight: bold;
-                                                        font-size: 12px;
-                                                        color: white;
-                                                        line-height: 1.2;
-                                                        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
-                                                    ">{collection_title}</div>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    </table>
-                                </td>
-                            </tr>
-                        </table>
-                    """
+                if item.get('is_individual_item'):
+                    card_html = build_individual_item_card_html(item, theme_colors, msg_root, base_url)
                 else:
-                    print(f"No valid image data for {collection_title}, using placeholder")
-                    card_html = f"""
-                        <table cellpadding="0" cellspacing="0" border="0" style="
-                            background-color: {theme_colors['card_bg']};
-                            border-radius: 12px;
-                            border: 1px solid {theme_colors['border']};
-                            width: 120px;
-                            height: 180px;
-                            margin: 0;
-                        ">
-                            <tr>
-                                <td style="
-                                    text-align: center;
-                                    vertical-align: middle;
-                                    padding: 12px;
-                                ">
-                                    <div style="
-                                        font-weight: bold;
-                                        font-size: 14px;
-                                        color: {theme_colors['text']};
-                                        margin-bottom: 8px;
-                                        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
-                                        padding: 2px;
-                                    ">{collection_title}</div>
-                                    <div style="
-                                        font-size: 11px;
-                                        color: {theme_colors['muted_text']};
-                                        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
-                                    ">{type_icon} {count} items</div>
-                                </td>
-                            </tr>
-                        </table>
-                    """
+                    card_html = build_collection_card_html(item, theme_colors, msg_root, base_url)
                 
                 row_html += f'<td style="vertical-align: top; padding-right: {cell_spacing};">{card_html}</td>'
             
             row_html += '</tr></table></td></tr>'
-            
+            items_html += row_html
         else:
             row_html = "<tr style='text-align: center;'>"
             
-            for j, collection in enumerate(row_items):
-                print(f"Processing collection: {collection.get('title', 'Unknown')}")
-                print(f"Collection subtype: {collection.get('subtype', 'Unknown')}")
-                print(f"Collection thumb URL: {collection.get('thumb', 'No thumb')}")
-                print(f"Collection art URL: {collection.get('art', 'No art')}")
-                
-                poster_cid = None
-                poster_url = collection.get('thumb', '')
-                if poster_url:
-                    print(f"Attempting to fetch thumb image: {poster_url}")
-                    if poster_url.startswith('http'):
-                        poster_cid = fetch_and_attach_image(poster_url, msg_root, f"collection_{i}_{j}_thumb", base_url)
-                    else:
-                        full_poster_url = f"/proxy-art{poster_url if poster_url.startswith('/') else '/' + poster_url}"
-                        poster_cid = fetch_and_attach_image(full_poster_url, msg_root, f"collection_{i}_{j}_thumb", base_url)
-                    print(f"Thumb CID result: {poster_cid}")
-                
-                if not poster_cid:
-                    print("No thumb CID, trying art URL...")
-                    art_url = collection.get('art', '')
-                    if art_url:
-                        print(f"Attempting to fetch art image: {art_url}")
-                        if art_url.startswith('http'):
-                            poster_cid = fetch_and_attach_image(art_url, msg_root, f"collection_{i}_{j}_art", base_url)
-                        else:
-                            full_art_url = f"/proxy-art{art_url if art_url.startswith('/') else '/' + art_url}"
-                            poster_cid = fetch_and_attach_image(full_art_url, msg_root, f"collection_{i}_{j}_art", base_url)
-                        print(f"Art CID result: {poster_cid}")
-                
-                collection_title = collection.get('title', 'Unknown Collection')
-                count = collection.get('childCount', 0)
-                subtype = collection.get('subtype', 'unknown')
-                summary = collection.get('summary', '')
-                
-                type_icon = '📽️' if subtype == 'movie' else '📺' if subtype == 'show' else '🎧'
-                
+            for j, item in enumerate(row_items):
                 cell_style = f"""
                     width: 20%;
                     padding: 8px;
@@ -3050,108 +3293,15 @@ def build_collections_html_with_cids(all_collections, msg_root, theme_colors, ba
                     font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
                 """
 
-                if poster_cid:
-                    poster_bg_url = f"cid:{poster_cid}"
-                    print(f"Final poster src for {collection_title}: {poster_bg_url}")
-                    
-                    card_html = f"""
-                        <table cellpadding="0" cellspacing="0" border="0" style="
-                            background-color: {theme_colors['card_bg']};
-                            border-radius: 12px;
-                            width: 120px;
-                            margin: 0 auto;
-                        ">
-                            <tr>
-                                <td style="
-                                    background-image: url('{poster_bg_url}');
-                                    background-size: cover;
-                                    background-position: center;
-                                    background-repeat: no-repeat;
-                                    height: 180px;
-                                    background-color: #f8f9fa;
-                                    border-radius: 12px;
-                                    position: relative;
-                                    vertical-align: top;
-                                ">
-                                    <table cellpadding="0" cellspacing="0" border="0" width="100%">
-                                        <tr>
-                                            <td style="text-align: right;">
-                                                <div style="
-                                                    background-color: rgba(0, 0, 0, 0.8);
-                                                    color: white;
-                                                    padding: 4px 6px;
-                                                    border-radius: 4px;
-                                                    font-size: 10px;
-                                                    font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
-                                                    line-height: 1;
-                                                    display: inline-block;
-                                                    margin: 6px;
-                                                ">
-                                                    {type_icon} {count}
-                                                </div>
-                                            </td>
-                                        </tr>
-                                        <tr>
-                                            <td style="height: 148px; vertical-align: bottom;">
-                                                <div style="
-                                                    background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent);
-                                                    border-radius: 0 0 11px 11px;
-                                                ">
-                                                    <div style="
-                                                        font-weight: bold;
-                                                        font-size: 12px;
-                                                        color: white;
-                                                        line-height: 1.2;
-                                                        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
-                                                        padding: 2px;
-                                                    ">{collection_title}</div>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    </table>
-                                </td>
-                            </tr>
-                        </table>
-                    """
+                if item.get('is_individual_item'):
+                    card_html = build_individual_item_card_html(item, theme_colors, msg_root, base_url)
                 else:
-                    print(f"No valid image data for {collection_title}, using placeholder")
-                    card_html = f"""
-                        <table cellpadding="0" cellspacing="0" border="0" style="
-                            background-color: {theme_colors['card_bg']};
-                            border-radius: 12px;
-                            border: 1px solid {theme_colors['border']};
-                            width: 120px;
-                            height: 180px;
-                            margin: 0 auto;
-                        ">
-                            <tr>
-                                <td style="
-                                    text-align: center;
-                                    vertical-align: middle;
-                                    padding: 12px;
-                                ">
-                                    <div style="
-                                        font-weight: bold;
-                                        font-size: 14px;
-                                        color: {theme_colors['text']};
-                                        margin-bottom: 8px;
-                                        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
-                                    ">{collection_title}</div>
-                                    <div style="
-                                        font-size: 11px;
-                                        color: {theme_colors['muted_text']};
-                                        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
-                                    ">{type_icon} {count} items</div>
-                                </td>
-                            </tr>
-                        </table>
-                    """
+                    card_html = build_collection_card_html(item, theme_colors, msg_root, base_url)
                 
                 row_html += f'<td style="{cell_style}">{card_html}</td>'
             
             row_html += "</tr>"
-        
-        items_html += row_html
+            items_html += row_html
     
     container_style = f"""
         background-color: {theme_colors['card_bg']};
@@ -3195,7 +3345,7 @@ def attach_logo_image(msg_root, logo_filename, custom_logo_filename, base_url=""
         logo_url = f"/static/img/{logo_filename}"
     return fetch_and_attach_image(logo_url, msg_root, "logo", base_url)
 
-def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, display_preference, users_data, recommendations_data=None, user_dict=None, base_url="", target_user_key=None, is_scheduled=False, items_count=None, date_range=""):
+def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, display_preference, users_data, recommendations_data=None, user_dict=None, base_url="", target_user_key=None, is_scheduled=False, items_count=None, date_range="", expanded_collections=None):
     selected_items = json.loads(template_data.get('selected_items', '[]'))
     email_text = template_data.get('email_text', '')
     subject = template_data.get('subject', '')
@@ -3203,6 +3353,7 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, displ
     logo_filename = tautulli_data.get('settings', {}).get('logo_filename')
     custom_logo_filename = tautulli_data.get('settings', {}).get('custom_logo_filename')
     logo_width = tautulli_data.get('settings', {}).get('logo_width')
+    expanded_collections = expanded_collections or {}
     
     theme_colors = get_email_theme_colors()
 
@@ -3231,7 +3382,7 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, displ
     if email_text.strip():
         content_html += build_text_block_html(email_text, 'textblock', theme_colors)
     
-    for item in selected_items:
+    for group_index, item in enumerate(selected_items):
         item_type = item.get('type', '')
         
         if item_type in ['textblock', 'titleblock', 'headerblock']:
@@ -3277,7 +3428,7 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, displ
             group_title = item.get('title', 'Collections')
             group_collections = item.get('collections', [])
             if group_collections:
-                content_html += build_collections_html_with_cids(group_collections, msg_root, theme_colors, base_url, group_title)
+                content_html += build_collections_html_with_cids(group_collections, msg_root, theme_colors, base_url, group_title, expanded_collections, group_index)
 
     return build_complete_email_html_with_cid_logo(content_html, server_name, subject, logo_src, logo_width, is_scheduled)
 
@@ -3422,7 +3573,7 @@ def build_complete_email_html_with_cid_logo(content_html, server_name, subject, 
             </body>
         </html>"""
 
-def send_standard_email_with_cids(to_emails, subject, selected_items, from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, settings, from_name):
+def send_standard_email_with_cids(to_emails, subject, selected_items, from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, settings, from_name, expanded_collections=None):
     try:
         print(f"SMTP Config: {smtp_server}:{smtp_port} using {smtp_protocol}")
 
@@ -3474,9 +3625,14 @@ def send_standard_email_with_cids(to_emails, subject, selected_items, from_email
             msg_root,
             None,
             None,
+            None,
+            None,
             base_url,
             None,
-            False
+            False,
+            None,
+            "",
+            expanded_collections
         )
 
         plain_text = convert_html_to_plain_text(email_html)
@@ -3552,7 +3708,7 @@ def send_standard_email_with_cids(to_emails, subject, selected_items, from_email
         print("SMTP send error:", e)
         return jsonify({"error": str(e)}), 500
 
-def send_recommendations_email_with_cids(to_emails, subject, user_dict, selected_items, from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, settings, from_name):
+def send_recommendations_email_with_cids(to_emails, subject, user_dict, selected_items, from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, settings, from_name, expanded_collections=None):
     try:
         rec_user_keys = set()
         for item in selected_items:
@@ -3562,7 +3718,8 @@ def send_recommendations_email_with_cids(to_emails, subject, user_dict, selected
         if not rec_user_keys:
             return send_standard_email_with_cids(
                 to_emails, subject, selected_items, from_email, alias_email, 
-                reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, settings, from_name
+                reply_to_email, password, smtp_username, smtp_server, smtp_port,
+                smtp_protocol, settings, from_name, expanded_collections
             )
         
         recommendations_data = get_recommendations_for_users(rec_user_keys, to_emails, user_dict, use_cache=True)
@@ -3583,7 +3740,7 @@ def send_recommendations_email_with_cids(to_emails, subject, user_dict, selected
             success = send_single_user_email_with_cids(
                 recipients, subject, selected_items, user_key, recommendations_data,
                 from_email, alias_email, reply_to_email, password, smtp_username, 
-                smtp_server, smtp_port, smtp_protocol, settings, from_name
+                smtp_server, smtp_port, smtp_protocol, settings, from_name, expanded_collections
             )
             
             if success:
@@ -3599,7 +3756,7 @@ def send_recommendations_email_with_cids(to_emails, subject, user_dict, selected
         print("Error in send_recommendations_email_with_cids:", e)
         return jsonify({"error": str(e)}), 500
 
-def send_single_user_email_with_cids(recipients, subject, selected_items, user_key, recommendations_data, from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, settings, from_name):
+def send_single_user_email_with_cids(recipients, subject, selected_items, user_key, recommendations_data, from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, settings, from_name, expanded_collections=None):
     try:
         print(f"SMTP Config: {smtp_server}:{smtp_port} using {smtp_protocol}")
 
@@ -3674,7 +3831,10 @@ def send_single_user_email_with_cids(recipients, subject, selected_items, user_k
             user_dict,
             base_url,
             target_user_key=user_key,
-            is_scheduled=False
+            is_scheduled=False,
+            items_count=None,
+            date_range="",
+            expanded_collections=expanded_collections
         )
 
         plain_text = convert_html_to_plain_text(email_html)
@@ -3899,7 +4059,7 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
         
         templates_conn = sqlite3.connect(DB_PATH)
         templates_cursor = templates_conn.cursor()
-        templates_cursor.execute("SELECT name, subject, email_text, selected_items FROM email_templates WHERE id = ?", (template_id,))
+        templates_cursor.execute("SELECT name, subject, email_text, selected_items, expanded_collections FROM email_templates WHERE id = ?", (template_id,))
         template_result = templates_cursor.fetchone()
         templates_conn.close()
         
@@ -3907,8 +4067,9 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
             print(f"Template {template_id} not found")
             return False
         
-        template_name, subject, email_text, selected_items_json = template_result
+        template_name, subject, email_text, selected_items_json, expanded_collections_json = template_result
         selected_items = json.loads(selected_items_json) if selected_items_json else []
+        expanded_collections = json.loads(expanded_collections_json) if expanded_collections_json else {}
         
         settings_conn = sqlite3.connect(DB_PATH)
         settings_cursor = settings_conn.cursor()
@@ -3992,10 +4153,10 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
                 
                 success = send_scheduled_user_email_with_cids(
                     recipients, subject, selected_items, user_key, recommendations_data,
-                    from_email, alias_email, reply_to_email, encrypted_password,
-                    smtp_server, smtp_port, smtp_protocol, 
-                    server_name, tautulli_base_url, tautulli_api_key, date_range, items_count, template_name,
-                    logo_filename, logo_width, custom_logo_filename, from_name, display_preference, users_data
+                    from_email, alias_email, reply_to_email, encrypted_password, smtp_server,
+                    smtp_port, smtp_protocol, server_name, tautulli_base_url, tautulli_api_key,
+                    date_range, items_count, template_name, logo_filename, logo_width, custom_logo_filename,
+                    from_name, display_preference, users_data, expanded_collections
                 )
                 
                 if success:
@@ -4015,11 +4176,10 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
         else:
             print("Template has no recommendations, sending single email to all recipients...")
             return send_scheduled_single_email_with_cids(
-                to_emails_list, subject, selected_items,
-                from_email, alias_email, reply_to_email, encrypted_password,
-                smtp_server, smtp_port, smtp_protocol,
-                server_name, tautulli_base_url, tautulli_api_key, date_range, items_count, template_name,
-                logo_filename, logo_width, custom_logo_filename, from_name, display_preference, users_data
+                to_emails_list, subject, selected_items, from_email, alias_email, reply_to_email,
+                encrypted_password, smtp_server, smtp_port, smtp_protocol, server_name, tautulli_base_url,
+                tautulli_api_key, date_range, items_count, template_name, logo_filename, logo_width,
+                custom_logo_filename, from_name, display_preference, users_data, expanded_collections
             )
         
     except Exception as e:
@@ -4027,7 +4187,7 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
         traceback.print_exc()
         return False
 
-def send_scheduled_user_email_with_cids(recipients, subject, selected_items, user_key, recommendations_data, from_email, alias_email, reply_to_email, encrypted_password, smtp_server, smtp_port, smtp_protocol, server_name, tautulli_base_url, tautulli_api_key, date_range, items_count, template_name, logo_filename, logo_width, custom_logo_filename, from_name, display_preference, users_data):
+def send_scheduled_user_email_with_cids(recipients, subject, selected_items, user_key, recommendations_data, from_email, alias_email, reply_to_email, encrypted_password, smtp_server, smtp_port, smtp_protocol, server_name, tautulli_base_url, tautulli_api_key, date_range, items_count, template_name, logo_filename, logo_width, custom_logo_filename, from_name, display_preference, users_data, expanded_collections):
     try:
         print(f"SMTP Config: {smtp_server}:{smtp_port} using {smtp_protocol}")
 
@@ -4091,7 +4251,8 @@ def send_scheduled_user_email_with_cids(recipients, subject, selected_items, use
             target_user_key=user_key,
             is_scheduled=True,
             items_count=items_count,
-            date_range=date_range
+            date_range=date_range,
+            expanded_collections=expanded_collections
         )
 
         plain_text = convert_html_to_plain_text(email_html)
@@ -4158,7 +4319,7 @@ def send_scheduled_user_email_with_cids(recipients, subject, selected_items, use
         traceback.print_exc()
         return False
 
-def send_scheduled_single_email_with_cids(to_emails_list, subject, selected_items, from_email, alias_email, reply_to_email, encrypted_password, smtp_server, smtp_port, smtp_protocol, server_name, tautulli_base_url, tautulli_api_key, date_range, items_count, template_name, logo_filename, logo_width, custom_logo_filename, from_name, display_preference, users_data, email_text=""):
+def send_scheduled_single_email_with_cids(to_emails_list, subject, selected_items, from_email, alias_email, reply_to_email, encrypted_password, smtp_server, smtp_port, smtp_protocol, server_name, tautulli_base_url, tautulli_api_key, date_range, items_count, template_name, logo_filename, logo_width, custom_logo_filename, from_name, display_preference, users_data, expanded_collections, email_text=""):
     try:
         print(f"SMTP Config: {smtp_server}:{smtp_port} using {smtp_protocol}")
 
@@ -4220,7 +4381,8 @@ def send_scheduled_single_email_with_cids(to_emails_list, subject, selected_item
             None,
             True,
             items_count,
-            date_range
+            date_range,
+            expanded_collections
         )
 
         plain_text = convert_html_to_plain_text(email_html)
@@ -4783,6 +4945,116 @@ def fetch_collections(collection_type):
         print(f"Error fetching collections: {e}")
         return jsonify({"status": "error", "message": str(e)})
 
+@app.route('/get_collection_items', methods=['POST'])
+def get_collection_items():
+    """Endpoint to fetch items within a specific collection"""
+    try:
+        data = request.get_json()
+        collection_key = data.get('collection_key')
+        collection_type = data.get('collection_type')
+        
+        if not collection_key:
+            return jsonify({
+                'status': 'error',
+                'message': 'Collection key is required'
+            }), 400
+        
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT plex_url, plex_token FROM settings WHERE id = 1")
+        row = cursor.fetchone()
+        conn.close()
+
+        if not row or not row[0] or not row[1]:
+            return jsonify({"status": "error", "message": "Plex connection not configured"})
+
+        plex_url = row[0].rstrip('/')
+        plex_token = row[1]
+        
+        collection_items_url = f"{plex_url}/library/collections/{collection_key}/children"
+        
+        headers = {
+            'X-Plex-Token': decrypt(plex_token),
+            'Accept': 'application/json',
+            **plex_headers
+        }
+        
+        response = requests.get(collection_items_url, headers=headers, timeout=30)
+        
+        if response.status_code == 404:
+            return jsonify({
+                'status': 'error',
+                'message': 'Collection not found'
+            }), 404
+        elif response.status_code != 200:
+            return jsonify({
+                'status': 'error',
+                'message': f'Plex API error: {response.status_code}'
+            }), 500
+        
+        plex_data = response.json()
+        
+        items = []
+        if 'MediaContainer' in plex_data and 'Metadata' in plex_data['MediaContainer']:
+            for item in plex_data['MediaContainer']['Metadata']:
+                item_info = {
+                    'title': item.get('title', 'Unknown Title'),
+                    'key': item.get('key'),
+                    'type': item.get('type'),
+                    'year': item.get('year'),
+                    'tagline': item.get('tagline'),
+                    'summary': item.get('summary'),
+                    'rating': item.get('rating'),
+                    'duration': item.get('duration'),
+                    'addedAt': item.get('addedAt'),
+                    'thumb': item.get('thumb')
+                }
+                
+                if item.get('type') == 'movie':
+                    item_info['name'] = item_info['title']
+                elif item.get('type') == 'show':
+                    item_info['name'] = item_info['title']
+                    if 'leafCount' in item:
+                        item_info['episode_count'] = item['leafCount']
+                    if 'childCount' in item:
+                        item_info['season_count'] = item['childCount']
+                elif item.get('type') == 'album':
+                    item_info['name'] = item_info['title']
+                    if 'parentTitle' in item:
+                        item_info['artist'] = item['parentTitle']
+                elif item.get('type') == 'track':
+                    item_info['name'] = item_info['title']
+                    if 'grandparentTitle' in item:
+                        item_info['artist'] = item['grandparentTitle']
+                    if 'parentTitle' in item:
+                        item_info['album'] = item['parentTitle']
+                
+                items.append(item_info)
+        
+        items.sort(key=lambda x: x.get('title', '').lower())
+        
+        return jsonify({
+            'status': 'success',
+            'items': items,
+            'total_count': len(items),
+            'collection_key': collection_key,
+            'collection_type': collection_type
+        })
+        
+    except requests.RequestException as e:
+        print(f"Error fetching collection items from Plex: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': f'Failed to connect to Plex: {str(e)}'
+        }), 500
+    except Exception as e:
+        print(f"Error in get_collection_items: {e}")
+        traceback.print_exc()
+        return jsonify({
+            'status': 'error',
+            'message': f'Internal server error: {str(e)}'
+        }), 500
+
 @app.route('/pull_recommendations', methods=['POST'])
 def pull_recommendations():
     recommendations_json = {}
@@ -4892,6 +5164,7 @@ def send_email():
     subject = data['subject']
     user_dict = data.get('user_dict', {})
     selected_items = data.get('selected_items', [])
+    expanded_collections = data.get('expanded_collections', {})
     from_name = settings['from_name']
 
     has_recommendations = any(item.get('type') == 'recommendations' for item in selected_items)
@@ -4900,13 +5173,13 @@ def send_email():
         return send_recommendations_email_with_cids(
             to_emails, subject, user_dict, selected_items,
             from_email, alias_email, reply_to_email, password, smtp_username, 
-            smtp_server, smtp_port, smtp_protocol, settings, from_name
+            smtp_server, smtp_port, smtp_protocol, settings, from_name, expanded_collections
         )
     else:
         return send_standard_email_with_cids(
             to_emails, subject, selected_items,
             from_email, alias_email, reply_to_email, password, smtp_username,
-            smtp_server, smtp_port, smtp_protocol, settings, from_name
+            smtp_server, smtp_port, smtp_protocol, settings, from_name, expanded_collections
         )
 
 @app.route('/settings', methods=['GET', 'POST'])
@@ -5607,19 +5880,24 @@ def preview_schedule(schedule_id):
         
         templates_conn = sqlite3.connect(DB_PATH)
         templates_cursor = templates_conn.cursor()
-        templates_cursor.execute("SELECT name, subject, email_text, selected_items FROM email_templates WHERE id = ?", (template_id,))
+        templates_cursor.execute("SELECT name, subject, email_text, selected_items, expanded_collections FROM email_templates WHERE id = ?", (template_id,))
         template_result = templates_cursor.fetchone()
         templates_conn.close()
         
         if not template_result:
             return jsonify({"status": "error", "message": "Template not found"}), 404
         
-        template_name, subject, email_text, selected_items_json = template_result
+        template_name, subject, email_text, selected_items_json, expanded_collections_json = template_result
         
         try:
             selected_items = json.loads(selected_items_json) if selected_items_json else []
         except:
             selected_items = []
+
+        try:
+            expanded_collections = json.loads(expanded_collections_json) if expanded_collections_json else []
+        except:
+            expanded_collections = {}
 
         email_lists_conn = sqlite3.connect(DB_PATH)
         email_lists_cursor = email_lists_conn.cursor()
@@ -5718,7 +5996,8 @@ def preview_schedule(schedule_id):
             "recent_commands": [{'command': 'movie'}, {'command': 'show'}],
             "recommendations": recommendations_data or {},
             "user_dict": user_dict,
-            "users_full_data": users_full_data
+            "users_full_data": users_full_data,
+            "expanded_collections": expanded_collections
         })
         
     except Exception as e:
@@ -6105,7 +6384,7 @@ def get_email_templates():
     try:
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
-        cursor.execute("SELECT id, name, selected_items, email_text, subject FROM email_templates ORDER BY name")
+        cursor.execute("SELECT id, name, selected_items, email_text, subject, expanded_collections FROM email_templates ORDER BY name")
         templates = cursor.fetchall()
         conn.close()
         
@@ -6116,7 +6395,8 @@ def get_email_templates():
                 'name': template[1],
                 'selected_items': template[2],
                 'email_text': template[3],
-                'subject': template[4]
+                'subject': template[4],
+                'expanded_collections': template[5] or '{}'
             })
         
         return jsonify(template_list)
@@ -6132,6 +6412,7 @@ def save_email_template():
         selected_items = data.get('selected_items', '[]')
         email_text = data.get('email_text', '')
         subject = data.get('subject', '')
+        expanded_collections = data.get('expanded_collections', '{}')
         
         if not name:
             return jsonify({"status": "error", "message": "Template name is required"}), 400
@@ -6145,15 +6426,15 @@ def save_email_template():
         if existing:
             cursor.execute("""
                 UPDATE email_templates 
-                SET selected_items = ?, email_text = ?, subject = ?, updated_at = CURRENT_TIMESTAMP
+                SET selected_items = ?, email_text = ?, subject = ?, expanded_collections = ?, updated_at = CURRENT_TIMESTAMP
                 WHERE name = ?
-            """, (selected_items, email_text, subject, name))
+            """, (selected_items, email_text, subject, expanded_collections, name))
             message = "Template updated successfully"
         else:
             cursor.execute("""
-                INSERT INTO email_templates (name, selected_items, email_text, subject)
-                VALUES (?, ?, ?, ?)
-            """, (name, selected_items, email_text, subject))
+                INSERT INTO email_templates (name, selected_items, email_text, subject, expanded_collections)
+                VALUES (?, ?, ?, ?, ?)
+            """, (name, selected_items, email_text, subject, expanded_collections))
             message = "Template saved successfully"
         
         conn.commit()
@@ -6179,8 +6460,8 @@ def delete_email_template(template_id):
         return jsonify({"status": "error", "message": str(e)}), 500
 
 if __name__ == '__main__':
-    app.jinja_env.globals["version"] = "v2025.1"
-    app.jinja_env.globals["publish_date"] = "October 29, 2025"
+    app.jinja_env.globals["version"] = "v2025.2"
+    app.jinja_env.globals["publish_date"] = "December 28, 2025"
 
     app.jinja_env.globals["get_cache_status"] = get_global_cache_status
 
@@ -6250,6 +6531,7 @@ if __name__ == '__main__':
     migrate_schema("logo_width INTEGER")
     migrate_schema("recipient_display_name TEXT DEFAULT 'email'")
     migrate_ra_recs_to_recently_added_recommendations()
+    migrate_email_templates_for_expanded_collections()
 
     if os.environ.get("WERKZEUG_RUN_MAIN") == "true" and not app.debug:
         start_background_workers()

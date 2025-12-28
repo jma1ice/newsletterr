@@ -1719,6 +1719,172 @@
                 }
             }
 
+            function buildIndividualItemCard(item, themeColors) {
+                const itemTitle = item.title || item.name || 'Unknown Title';
+                const year = item.year ? ` (${item.year})` : '';
+                const type = item.type || 'unknown';
+                const typeIcon = getTypeIcon(type);
+                
+                let subtitle = '';
+                if (item.artist && type !== 'show') {
+                    subtitle = item.artist;
+                } else if (type === 'show' && item.season_count) {
+                    subtitle = `${item.season_count} seasons`;
+                } else if (item.album && type === 'track') {
+                    subtitle = item.album;
+                }
+                
+                let posterURL = null;
+                const thumbUrl = item.thumb;
+                
+                if (thumbUrl) {
+                    if (thumbUrl.startsWith('http')) {
+                        try {
+                            const url = new URL(thumbUrl);
+                            posterURL = `/proxy-art${url.pathname}`;
+                        } catch (e) {
+                            console.log('Failed to parse thumb URL:', thumbUrl);
+                        }
+                    } else {
+                        posterURL = `/proxy-art${thumbUrl.startsWith('/') ? thumbUrl : '/' + thumbUrl}`;
+                    }
+                }
+                
+                if (posterURL) {
+                    return `
+                        <table cellpadding="0" cellspacing="0" border="0" style="
+                            background-color: ${themeColors.card_bg};
+                            border-radius: 12px;
+                            width: 120px;
+                            margin: 0 auto;
+                        ">
+                            <tr>
+                                <td style="
+                                    background-image: url('${posterURL}');
+                                    background-size: cover;
+                                    background-position: center;
+                                    background-repeat: no-repeat;
+                                    height: 180px;
+                                    background-color: #f8f9fa;
+                                    border-radius: 12px;
+                                    position: relative;
+                                    vertical-align: top;
+                                ">
+                                    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+                                        <tr>
+                                            <td style="text-align: right;">
+                                                <div style="
+                                                    background-color: rgba(0, 0, 0, 0.8);
+                                                    color: white;
+                                                    padding: 4px 6px;
+                                                    border-radius: 4px;
+                                                    font-size: 10px;
+                                                    font-family: 'IBM Plex Sans';
+                                                    line-height: 1;
+                                                    display: inline-block;
+                                                    margin: 6px;
+                                                ">
+                                                    ${typeIcon}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td style="height: 150px; vertical-align: bottom;">
+                                                <div style="
+                                                    background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent);
+                                                    border-radius: 0 0 11px 11px;
+                                                    padding: 6px;
+                                                ">
+                                                    <div style="
+                                                        font-weight: bold;
+                                                        font-size: 11px;
+                                                        color: white;
+                                                        line-height: 1.2;
+                                                        font-family: 'IBM Plex Sans';
+                                                    ">${itemTitle}${year}</div>
+                                                    ${subtitle ? `
+                                                        <div style="
+                                                            font-size: 9px;
+                                                            color: #ccc;
+                                                            line-height: 1.2;
+                                                            font-family: 'IBM Plex Sans';
+                                                            margin-top: 2px;
+                                                        ">${subtitle}</div>
+                                                    ` : ''}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                </td>
+                            </tr>
+                        </table>
+                    `;
+                } else {
+                    return `
+                        <table cellpadding="0" cellspacing="0" border="0" style="
+                            background-color: ${themeColors.card_bg};
+                            border-radius: 12px;
+                            border: 1px solid ${themeColors.border};
+                            width: 120px;
+                            height: 180px;
+                            margin: 0 auto;
+                        ">
+                            <tr>
+                                <td style="
+                                    text-align: center;
+                                    vertical-align: middle;
+                                    padding: 12px;
+                                    color: ${themeColors.text};
+                                    font-family: 'IBM Plex Sans';
+                                ">
+                                    <div style="
+                                        font-size: 24px;
+                                        margin-bottom: 8px;
+                                    ">${typeIcon}</div>
+                                    <div style="
+                                        font-weight: bold;
+                                        font-size: 11px;
+                                        line-height: 1.2;
+                                        margin-bottom: 4px;
+                                    ">${itemTitle}${year}</div>
+                                    ${subtitle ? `
+                                        <div style="
+                                            font-size: 9px;
+                                            color: ${themeColors.muted_text};
+                                            line-height: 1.2;
+                                        ">${subtitle}</div>
+                                    ` : ''}
+                                </td>
+                            </tr>
+                        </table>
+                    `;
+                }
+            }
+
+            function getTypeIcon(type) {
+                switch (type) {
+                    case 'movie': return '🎬';
+                    case 'show': return '📺';
+                    case 'album': return '💿';
+                    case 'track': return '🎵';
+                    case 'artist': return '🎤';
+                    default: return '📄';
+                }
+            }
+
+            function getCollectionGroupIndex(collection) {
+                for (let i = 0; i < selectedItems.length; i++) {
+                    if (selectedItems[i].type === 'collection_group' && selectedItems[i].collections) {
+                        for (let j = 0; j < selectedItems[i].collections.length; j++) {
+                            if (selectedItems[i].collections[j].key === collection.key) {
+                                return i;
+                            }
+                        }
+                    }
+                }
+                return 0;
+            }
+
             function buildCollectionPreviewHTMLForEmail(title, collections) {
                 const themeColors = {
                     card_bg: 'var(--email-card-bg)',
@@ -1735,11 +1901,35 @@
                     `;
                 }
 
+                let allItemsToDisplay = [];
+                let hasExpandedCollections = false;
+                
+                collections.forEach((collection, index) => {
+                    const collectionId = `${getCollectionGroupIndex(collection)}-${index}-${collection.key}`;
+                    const expandedItems = window.expandedCollections[collectionId];
+                    
+                    if (expandedItems && Object.keys(expandedItems).length > 0) {
+                        hasExpandedCollections = true;
+                        Object.values(expandedItems).forEach(item => {
+                            allItemsToDisplay.push({
+                                ...item,
+                                isIndividualItem: true,
+                                originalCollection: collection.title
+                            });
+                        });
+                    } else {
+                        allItemsToDisplay.push({
+                            ...collection,
+                            isIndividualItem: false
+                        });
+                    }
+                });
+
                 const itemsPerRow = 5;
                 let itemsHTML = "";
                 
-                for (let i = 0; i < collections.length; i += itemsPerRow) {
-                    const rowItems = collections.slice(i, i + itemsPerRow);
+                for (let i = 0; i < allItemsToDisplay.length; i += itemsPerRow) {
+                    const rowItems = allItemsToDisplay.slice(i, i + itemsPerRow);
                     const isPartialRow = rowItems.length < itemsPerRow;
                     
                     if (isPartialRow) {
@@ -1749,7 +1939,7 @@
                         rowHTML += '<table cellpadding="0" cellspacing="0" border="0" style="margin: 0 auto; border-collapse: separate;">';
                         rowHTML += '<tr>';
                         
-                        rowItems.forEach((collection, j) => {
+                        rowItems.forEach((item, j) => {
                             let cellSpacing = "0";
                             if (itemsCount === 2) {
                                 cellSpacing = j === 0 ? "60px" : "0";
@@ -1761,7 +1951,9 @@
                                 cellSpacing = j < itemsCount - 1 ? "6px" : "0";
                             }
                             
-                            const cardHTML = buildCollectionCard(collection, themeColors);
+                            const cardHTML = item.isIndividualItem 
+                                ? buildIndividualItemCard(item, themeColors)
+                                : buildCollectionCard(item, themeColors);
                             rowHTML += `<td style="vertical-align: top; padding-right: ${cellSpacing};">${cardHTML}</td>`;
                         });
                         
@@ -1770,7 +1962,7 @@
                     } else {
                         let rowHTML = "<tr style='text-align: center;'>";
                         
-                        rowItems.forEach((collection) => {
+                        rowItems.forEach((item) => {
                             const cellStyle = `
                                 width: 20%;
                                 padding: 6px;
@@ -1778,7 +1970,9 @@
                                 font-family: 'IBM Plex Sans';
                             `;
                             
-                            const cardHTML = buildCollectionCard(collection, themeColors);
+                            const cardHTML = item.isIndividualItem 
+                                ? buildIndividualItemCard(item, themeColors)
+                                : buildCollectionCard(item, themeColors);
                             rowHTML += `<td style="${cellStyle}">${cardHTML}</td>`;
                         });
                         
@@ -2067,6 +2261,118 @@
             const renderedCharts = new Set();
         </script>
         <script>
+            window.expandedCollections = {};
+
+            function buildCollectionItemsDisplay(items) {
+                if (!items || Object.keys(items).length === 0) {
+                    return '<div class="text-muted small py-2"><em>No items found in this collection</em></div>';
+                }
+                
+                let itemsHtml = '<div class="collection-items-list" style="max-height: 200px; overflow-y: auto;">';
+                
+                Object.values(items).forEach(item => {
+                    const displayTitle = item.title || item.name || 'Unknown';
+                    const year = item.year ? ` (${item.year})` : '';
+                    const additionalInfo = [];
+                    
+                    if (item.artist && item.type !== 'show') {
+                        additionalInfo.push(`by ${item.artist}`);
+                    }
+                    if (item.album && item.type === 'track') {
+                        additionalInfo.push(`from ${item.album}`);
+                    }
+                    if (item.season_count && item.type === 'show') {
+                        additionalInfo.push(`${item.season_count} seasons`);
+                    }
+                    if (item.episode_count && item.type === 'show') {
+                        additionalInfo.push(`${item.episode_count} episodes`);
+                    }
+                    
+                    itemsHtml += `
+                        <div class="collection-item py-1 px-2 border-bottom" style="font-size: 0.8rem;">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="item-title" title="${displayTitle}${year}">
+                                    ${displayTitle}${year}
+                                </span>
+                                <small class="text-muted">${item.type || ''}</small>
+                            </div>
+                            ${additionalInfo.length > 0 ? `
+                                <div class="text-muted" style="font-size: 0.7rem;">
+                                    ${additionalInfo.join(' • ')}
+                                </div>
+                            ` : ''}
+                            ${item.tagline ? `
+                                <div class="text-muted" style="font-size: 0.7rem; font-style: italic;">
+                                    ${item.tagline}
+                                </div>
+                            ` : ''}
+                        </div>
+                    `;
+                });
+                
+                itemsHtml += '</div>';
+                itemsHtml += `
+                    <div class="text-muted small mt-2 pt-2 border-top">
+                        <strong>Total: ${Object.keys(items).length} items</strong>
+                    </div>
+                `;
+                
+                return itemsHtml;
+            }
+
+            async function expandCollection(expandedDiv, collectionKey, collectionType, buttonElement, collectionId) {
+                try {
+                    expandedDiv.innerHTML = `
+                        <div class="text-muted small py-2">
+                            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                            Loading collection items...
+                        </div>
+                    `;
+                    expandedDiv.style.display = 'block';
+                    
+                    const response = await fetch('/get_collection_items', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            collection_key: collectionKey,
+                            collection_type: collectionType
+                        })
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    
+                    const data = await response.json();
+                    
+                    if (data.status === 'success' && data.items) {
+                        window.expandedCollections[collectionId] = {};
+                        data.items.forEach(item => {
+                            window.expandedCollections[collectionId][item.key || item.ratingKey] = item;
+                        });
+                        
+                        expandedDiv.innerHTML = buildCollectionItemsDisplay(window.expandedCollections[collectionId]);
+                        
+                        buttonElement.textContent = '📂';
+                        buttonElement.title = 'Hide collection items';
+                        
+                        updateSelectedItemsDisplay();
+                        debouncedUpdatePreview();                        
+                    } else {
+                        throw new Error(data.message || 'Failed to load collection items');
+                    }
+                } catch (error) {
+                    console.error('Error loading collection items:', error);
+                    expandedDiv.innerHTML = `
+                        <div class="text-danger small py-2">
+                            <em>Error loading items: ${error.message}</em>
+                        </div>
+                    `;
+                }
+            }
+
             function updateSelectedItemsDisplay() {
                 const container = document.getElementById('selected-items-list');
                 
@@ -2142,13 +2448,48 @@
                                     </div>
                                     <div class="collection-group-items text-[#333] dark:text-[#8acbd4]" style="font-size: 0.85rem;">
                                         ${item.collections && item.collections.length > 0 
-                                            ? item.collections.map((col, i) => `
-                                                <div class="d-flex justify-content-between align-items-center py-1 border-bottom">
-                                                    <span>${col.title} (${col.childCount} items)</span>
-                                                    <button type="button" class="btn btn-sm btn-outline-danger remove-collection-btn" 
-                                                            data-group-index="${index}" data-collection-index="${i}">x</button>
-                                                </div>
-                                            `).join('')
+                                            ? item.collections.map((col, i) => {
+                                                const collectionId = `${index}-${i}-${col.key}`;
+                                                const isExpanded = window.expandedCollections[collectionId];
+                                                const expandedItemsCount = isExpanded ? Object.keys(isExpanded).length : 0;
+                                                
+                                                return `
+                                                    <div class="collection-item-wrapper mb-2">
+                                                        <div class="d-flex justify-content-between align-items-center py-1 border-bottom">
+                                                            <div class="d-flex align-items-center">
+                                                                <span>
+                                                                    ${col.title} 
+                                                                    ${isExpanded 
+                                                                        ? `<small class="text-success">(showing ${expandedItemsCount} items)</small>`
+                                                                        : `(${col.childCount} items)`
+                                                                    }
+                                                                </span>
+                                                                <button type="button" 
+                                                                    class="btn btn-sm btn-outline-info me-2 expand-collection-btn" 
+                                                                    data-group-index="${index}" 
+                                                                    data-collection-index="${i}"
+                                                                    data-collection-key="${col.key}"
+                                                                    data-collection-type="${col.type}"
+                                                                    data-collection-id="${collectionId}"
+                                                                    title="${isExpanded ? 'Hide collection items' : 'Show collection items'}"
+                                                                    style="font-size: 0.7rem; padding: 0.1rem 0.4rem;">
+                                                                    ${isExpanded ? '📂' : '📁'}
+                                                                </button>
+                                                            </div>
+                                                            <button type="button" class="btn btn-sm btn-outline-danger remove-collection-btn" 
+                                                                    data-group-index="${index}" data-collection-index="${i}">x</button>
+                                                        </div>
+                                                        <div class="collection-items-expanded" 
+                                                            id="collection-items-${index}-${i}" 
+                                                            style="display: ${isExpanded ? 'block' : 'none'}; margin-left: 20px; padding-left: 10px; border-left: 2px solid #007bff;">
+                                                            ${isExpanded 
+                                                                ? buildCollectionItemsDisplay(isExpanded) 
+                                                                : '<div class="text-muted small py-2"><em>Click the folder icon to load items...</em></div>'
+                                                            }
+                                                        </div>
+                                                    </div>
+                                                `;
+                                            }).join('')
                                             : '<em class="text-[#333] dark:text-[#8acbd4]">No collections added yet</em>'
                                         }
                                     </div>
@@ -2186,8 +2527,38 @@
                             const collectionIndex = parseInt(e.target.dataset.collectionIndex);
                             
                             if (selectedItems[groupIndex] && selectedItems[groupIndex].collections) {
+                                const collection = selectedItems[groupIndex].collections[collectionIndex];
+                                const collectionId = `${groupIndex}-${collectionIndex}-${collection.key}`;
+                                delete window.expandedCollections[collectionId];
+                                
                                 selectedItems[groupIndex].collections.splice(collectionIndex, 1);
                                 updateSelectedItemsDisplay();
+                                debouncedUpdatePreview();
+                            }
+                        });
+                    });
+
+                    document.querySelectorAll('.expand-collection-btn').forEach(btn => {
+                        btn.addEventListener('click', async (e) => {
+                            const groupIndex = parseInt(e.target.dataset.groupIndex);
+                            const collectionIndex = parseInt(e.target.dataset.collectionIndex);
+                            const collectionKey = e.target.dataset.collectionKey;
+                            const collectionType = e.target.dataset.collectionType;
+                            const collectionId = e.target.dataset.collectionId;
+                            
+                            const expandedDiv = document.getElementById(`collection-items-${groupIndex}-${collectionIndex}`);
+                            const isCurrentlyExpanded = window.expandedCollections[collectionId];
+                            
+                            if (!isCurrentlyExpanded) {
+                                await expandCollection(expandedDiv, collectionKey, collectionType, btn, collectionId);
+                            } else {
+                                delete window.expandedCollections[collectionId];
+                                expandedDiv.style.display = 'none';
+                                btn.textContent = '📁';
+                                btn.title = 'Show collection items';
+                                
+                                updateSelectedItemsDisplay();
+                                debouncedUpdatePreview();
                             }
                         });
                     });
@@ -3015,6 +3386,8 @@
                         }
                     });
 
+                    const expandedCollections = window.expandedCollections || {};
+
                     showSpinner('Sending email...');
 
                     const resp = await fetch('/send_email', {
@@ -3025,7 +3398,8 @@
                             subject,
                             email_html: emailHTML,
                             selected_items: selectedItems,
-                            user_dict: userDict
+                            user_dict: userDict,
+                            expanded_collections: expandedCollections
                         })
                     });
                     
@@ -3444,12 +3818,15 @@
                         }
                         return item;
                     });
+
+                    const expandedCollections = window.expandedCollections || {};
                     
                     const templateData = {
                         name: name,
                         selected_items: JSON.stringify(itemsWithContent),
                         email_text: textBlocks.join('\n\n'),
-                        subject: document.getElementById('subject').value
+                        subject: document.getElementById('subject').value,
+                        expanded_collections: JSON.stringify(expandedCollections)
                     };
 
                     const response = await fetch('/email_templates', {
@@ -3525,6 +3902,19 @@
                         }
                         return { ...item };
                     });
+
+                    if (template.expanded_collections) {
+                        try {
+                            const expandedCollections = JSON.parse(template.expanded_collections);
+                            window.expandedCollections = expandedCollections;
+                            console.log('Restored expansion state from template:', expandedCollections);
+                        } catch (e) {
+                            console.warn('Failed to parse expanded collections from template:', e);
+                            window.expandedCollections = {};
+                        }
+                    } else {
+                        window.expandedCollections = {};
+                    }
                     
                     selectedItems.forEach(item => {
                         if (item.type === 'graph' && !renderedCharts.has(item.id)) {

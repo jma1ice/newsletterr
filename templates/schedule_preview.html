@@ -50,11 +50,11 @@
     </div>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/highcharts/10.3.3/highcharts.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/highcharts/10.3.3/modules/exporting.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highcharts/10.3.3/highcharts.min.js" nonce="{{ nonce }}"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highcharts/10.3.3/modules/exporting.min.js" nonce="{{ nonce }}"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" nonce="{{ nonce }}"></script>
 
-<script>
+<script nonce="{{ nonce }}">
     const urlParams = new URLSearchParams(window.location.search);
     const scheduleId = urlParams.get('schedule_id');
     const themeSettings = {{ theme_settings | tojson }};

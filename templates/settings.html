@@ -27,6 +27,7 @@
             </div><br>
 
             <form method="POST" id="settings_form">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }} " />
                 <label for="from_email">From:</label><br>
                 <input type="email" id="from_email" name="from_email"
                     {% if settings.from_email != "" %}value="{{ settings.from_email }}"{% endif %}
@@ -195,16 +196,34 @@
                         <input type="text" value="{{ settings.text_color }}" readonly>
                     </div><br>
                 </div>
-                
+
+                <label for="login_toggle">Login Page:</label><br>
+                <select id="login_toggle" name="login_toggle">
+                    <option value="disabled" {% if settings.login_toggle == 'disabled' %}selected{% endif %}>Disabled</option>
+                    <option value="enabled" {% if settings.login_toggle == 'enabled' %}selected{% endif %}>Enabled</option>
+                </select><br><br>
+
+                <div id="login_options" style="display: {% if settings.login_toggle == 'enabled' %}block{% else %}none{% endif %};">
+                    <label for="nl_username">Username:</label><br>
+                    <input type="text" id="nl_username" name="nl_username"
+                        {% if settings.nl_username != "" %}value="{{ settings.nl_username }}"{% endif %}
+                        placeholder="Newsletterr Username" {% if settings.login_toggle == 'enabled' %}required{% endif %}><br><br>
+
+                    <label for="nl_password">Password:</label><br>
+                    <input type="password" id="nl_password" name="nl_password"
+                        {% if settings.nl_password != "" %}value="{{ settings.nl_password }}"{% endif %}
+                        placeholder="Newsletterr Password" {% if settings.login_toggle == 'enabled' %}required{% endif %}><br><br>
+                </div>
+
                 <button id="apply_settings" class="button">Apply Settings</button>
             </form>
         </div>
-        <script>
+        <script nonce="{{ nonce }}">
             document.getElementById('settings_form').addEventListener('submit', (e) => {
                 showSpinner('Applying settings...');
             });
         </script>
-        <script>
+        <script nonce="{{ nonce }}">
             document.querySelectorAll('input[type="color"]').forEach(colorInput => {
                 const textInput = colorInput.parentElement.querySelector('input[type="text"]');
                 
@@ -219,7 +238,7 @@
                 });
             });
         </script>
-        <script>
+        <script nonce="{{ nonce }}">
             document.getElementById('email_theme').addEventListener('change', function() {
                 const colorInputs = document.getElementById('color_inputs');
                 if (this.value === 'custom') {
@@ -229,7 +248,28 @@
                 }
             });
         </script>
-        <script>
+        <script nonce="{{ nonce }}">
+            document.getElementById('login_toggle').addEventListener('change', function() {
+                const loginOptions = document.getElementById('login_options');
+                const nlUser = document.getElementById('nl_username');
+                const nlPass = document.getElementById('nl_password');
+                if (this.value === 'enabled') {
+                    loginOptions.style.display = 'block';
+
+                    nlUser.setAttribute('required', true);
+                    nlPass.setAttribute('required', true);
+                } else {
+                    loginOptions.style.display = 'none';
+
+                    nlUser.removeAttribute('required');
+                    nlUser.value = "";
+                    
+                    nlPass.removeAttribute('required');
+                    nlPass.value = "";
+                }
+            });
+        </script>
+        <script nonce="{{ nonce }}">
             function openCenteredPopup(url, w = 520, h = 680, name = 'plex-auth', offsetX = 0, offsetY = 0) {
                 const dualLeft = window.screenLeft ?? window.screenX;
                 const dualTop  = window.screenTop  ?? window.screenY;
@@ -391,7 +431,7 @@
                 }
             });
         </script>
-        <script>
+        <script nonce="{{ nonce }}">
             const logoFileInput = document.getElementById('logo_file');
             const logoFilenameSelect = document.getElementById('logo_filename');
             const customLogoFilenameHidden = document.getElementById('custom_logo_filename');
@@ -504,7 +544,7 @@
                     const response = await fetch('/upload-logo', {
                         method: 'POST',
                         body: (() => {
-                            // formData.append('csrf_token', '{{ csrf_token }}');
+                            formData.append('csrf_token', '{{ csrf_token }}');
                             return formData;
                         })()
                     });
@@ -547,8 +587,8 @@
 
                 try {
                     const response = await fetch('/delete-logo', {
-                        method: 'POST'
-                        // headers: { 'X-CSRF-Token': '{{ csrf_token }}' }
+                        method: 'POST',
+                        headers: { 'X-CSRF-Token': '{{ csrf_token }}' }
                     });
 
                     const result = await response.json();

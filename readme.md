@@ -160,14 +160,19 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 
 ## Planned Changes
 
-### For the v2025.2 sprint, these items are to be addressed:
+### For the v2026.1 sprint, these items are to be addressed:
 * Email click for recently added/available recommendations is going to chrome on mobile instead of app
 * Some clients show posters as small slivers instead of whole poster
 * Why is this generating 'New Device Connected' notifications for some?
-* Are libraries capped to 5 for some reason? Do libraries that share name similarities cause issues (ie 2 libs with 'TV' in both names)?
+* Are libraries capped to 5 for some reason?
+* Why do libraries that share name similarities cause issues in email preview (ie 2 libs with 'TV' in both names)?
 * Update Plex authentication for PlexAPI v0.31.1 (plexapi.plex no longer supported)
+* Recommendations pull will hang for a short period if conjurr is not running
 
 #### And these items are feature requests:
+* Add sections to settings page (email server | external services | email styling | login page)
+* Add HSTS option in settings
+* Add a hosted 'most recent newsletter' webpage | also, add opt out support | also hosted images to reduce email size
 * Make top title into a text block so it is editable/removable
 * Don't have page reload on stats/users pull
 * Keep settings details on error so user won't have to re-enter them
@@ -175,7 +180,6 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Api/webhooks?
 * Option for small cover art of each item in a stat table
 * IMDb ratings in stat tables
-* Auth page for hosted users | when this is in, add a hosted 'most recent newsletter' webpage | also, add opt out support | also hosted images to reduce email size
 * Snap-in for images/gifs/emojis
 * Functionality for full custom HTML templates
 * Ombi integration
@@ -211,12 +215,15 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 
 ## Recent Changes
 
-### v2025.2:pre-release
+### v2025.2:
 
 #### Fixed:
 
 #### New Features:
 * Added 'Expand' option on collections to switch to showing items in collection
+* Require CSRF token when POSTing to routes
+* Login page for self hosting
+* Safe 'get' function replaced requests.get
 
 
 ### v2025.1
@@ -227,42 +234,6 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 
 #### New Features:
 * Compiled EXE and ELF files
-
-
-### v0.9.17
-
-#### Fixed:
-* Allow for multiple named collections sections
-* Collections no longer get stuck to bottom of email
-* If no collections art it now shows plexs 2x2 'composite' image
-* Moved background workers start call to app start instead of webpage visit
-* Recently added now uses artwork from the show not the episode/season
-* Recently added now filters for when episodes of a show are found and only adds one instance of that show
-* Fixed everywhere days and # of items is hardcoded
-* Recently added pulls show info over episode info when available
-* Switched recently added pull from Tautulli to direct Plex API call. This fixes 100 item limit
-* Added 'ALL' BCC list to scheduler options
-* Now shows # of items in scheduler table
-* Fixed 0m for shows and audio changed to genre
-* Fixed the issue with RA cards showing up as different heights in different email clients
-* Added a font fallback stack
-* Now gets https direct connect plex url by default, fixing issue where Plex 'Secure Connections > Required' setting was causing image 401
-* Made BCC lists editable
-* Stat titles now include the date range they were pulled for
-
-#### New Features:
-* Added more date range options in schedule builder to match dashboard
-* Added many more options for scheduled emails frequency
-* Added collections snap-in - thank you yungsnuzzy!
-* Custom logo logic in settings. Added in small/banner/custom/none dropdown - thanks dreondre!
-* Got rid of library name on recently added overlay
-* Made posters clickable for available recommendations and recently added items to take users to Plex to watch
-* Added option for recs to show email/username/friendly name
-* Nixed the view buttons
-* Renamed 'ra' and 'recs' snap in block for clarity
-* Changed date on recently added to days since added
-* Added an HTML Block to text blocks for easy link adding
-* Graph overhaul - fixed fonts, sizing, and added date range graph is for to title
 
 ---
 

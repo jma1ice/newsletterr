@@ -168,11 +168,13 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Why do libraries that share name similarities cause issues in email preview (ie 2 libs with 'TV' in both names)?
 * Update Plex authentication for PlexAPI v0.31.1 (plexapi.plex no longer supported)
 * Recommendations pull will hang for a short period if conjurr is not running
+* Pop out preview does not update with changes to the email
 
 #### And these items are feature requests:
 * Add sections to settings page (email server | external services | email styling | login page)
 * Add HSTS option in settings
 * Add a hosted 'most recent newsletter' webpage | also, add opt out support | also hosted images to reduce email size
+* Separator blocks to add lines between sections in emails
 * Make top title into a text block so it is editable/removable
 * Don't have page reload on stats/users pull
 * Keep settings details on error so user won't have to re-enter them
@@ -200,6 +202,7 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Test api button
 * Add in To: vs BCC: option
 * Make collections clickable - is this possible?
+* Date range for stats (i.e. 1.1.25 - 1.1.26)
 * Mobile optimizations, i.e.:
 ```
 <style>
@@ -214,6 +217,15 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 ---
 
 ## Recent Changes
+
+### v2025.2.1:
+
+#### Fixed:
+* Fixed small issue with expanded collections not showing in received email if the Collection Group name is changed
+
+#### New Features:
+* Added a collapse UI button to expanded collections that leaves the collection expanded in the email but preserves space in the Snap-Ins UI
+
 
 ### v2025.2:
 

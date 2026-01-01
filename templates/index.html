@@ -923,7 +923,9 @@
 
                     let contentHTML = "";
                     
-                    for (let item of selectedItems) {
+                    for (let itemIndex = 0; itemIndex < selectedItems.length; itemIndex++) {
+                        const item = selectedItems[itemIndex];
+
                         if (item.type === 'textblock') {
                             const content = getTextBlockContent(item.id);
                             if (content && content.trim().length > 0) {
@@ -952,9 +954,11 @@
                             contentHTML += buildRecommendationsPreviewHTML(item.userKey);
                         } else if (item.type === 'collection_group') {
                             if (item.collections && item.collections.length > 0) {
+                                const stableGroupId = item.id || `group-${itemIndex}`;
                                 contentHTML += buildCollectionPreviewHTMLForEmail(
-                                    item.title || 'Collections', 
-                                    item.collections
+                                    item.title || 'Collections',
+                                    item.collections,
+                                    stableGroupId
                                 );
                             }
                         }
@@ -1874,7 +1878,7 @@
                 return 0;
             }
 
-            function buildCollectionPreviewHTMLForEmail(title, collections) {
+            function buildCollectionPreviewHTMLForEmail(title, collections, stableGroupId = 'group-0') {
                 const themeColors = {
                     card_bg: 'var(--email-card-bg)',
                     text: 'var(--email-text)', 
@@ -1894,7 +1898,7 @@
                 let hasExpandedCollections = false;
                 
                 collections.forEach((collection, index) => {
-                    const collectionId = `${getCollectionGroupIndex(collection)}-${index}-${collection.key}`;
+                    const collectionId = `${stableGroupId}-${index}-${collection.key}`;
                     const expandedItems = window.expandedCollections[collectionId];
                     
                     if (expandedItems && Object.keys(expandedItems).length > 0) {
@@ -2251,6 +2255,66 @@
         </script>
         <script nonce="{{ nonce }}">
             window.expandedCollections = {};
+            window.collapsedCollectionsUI = {};
+
+            function convertExpandedCollectionsForBackend() {
+                const convertedCollections = {};
+                
+                console.log('Converting expanded collections:', window.expandedCollections);
+                console.log('Selected items:', selectedItems);
+                
+                for (const [stableCollectionId, items] of Object.entries(window.expandedCollections)) {
+                    console.log('Processing collection ID:', stableCollectionId);
+                    
+                    const parts = stableCollectionId.split('-');
+                    
+                    if (parts.length >= 3) {
+                        let groupArrayIndex = -1;
+                        let collectionIndex, collectionKey;
+                        
+                        if (parts[0] === 'collection' && parts[1] === 'group' && parts.length >= 5) {
+                            const stableGroupId = `${parts[0]}-${parts[1]}-${parts[2]}`;
+                            collectionIndex = parts[3];
+                            collectionKey = parts.slice(4).join('-');
+                            
+                            console.log('Parsed stable group format:', {stableGroupId, collectionIndex, collectionKey});
+                            
+                            for (let i = 0; i < selectedItems.length; i++) {
+                                if (selectedItems[i] && selectedItems[i].type === 'collection_group' && selectedItems[i].id === stableGroupId) {
+                                    groupArrayIndex = i;
+                                    break;
+                                }
+                            }
+                        } else if (parts[0] === 'group' && parts.length >= 4) {
+                            groupArrayIndex = parseInt(parts[1]);
+                            collectionIndex = parts[2];
+                            collectionKey = parts.slice(3).join('-');
+                            
+                            console.log('Parsed group format:', {groupArrayIndex, collectionIndex, collectionKey});
+                        }
+                        
+                        if (groupArrayIndex !== -1 && collectionIndex !== undefined) {
+                            const backendCollectionId = `${groupArrayIndex}-${collectionIndex}-${collectionKey}`;
+                            convertedCollections[backendCollectionId] = items;
+                            console.log('Converted:', stableCollectionId, '→', backendCollectionId);
+                        } else {
+                            console.warn('Failed to convert collection ID:', stableCollectionId);
+                        }
+                    }
+                }
+                
+                console.log('Final converted collections:', convertedCollections);
+                return convertedCollections;
+            }
+
+            function findGroupIndexByStableId(stableId) {
+                for (let i = 0; i < selectedItems.length; i++) {
+                    if (selectedItems[i].id === stableId || `group-${i}` === stableId) {
+                        return i;
+                    }
+                }
+                return -1;
+            }
 
             function buildCollectionItemsDisplay(items) {
                 if (!items || Object.keys(items).length === 0) {
@@ -2439,7 +2503,8 @@
                                     <div class="collection-group-items text-[#333] dark:text-[#8acbd4]" style="font-size: 0.85rem;">
                                         ${item.collections && item.collections.length > 0 
                                             ? item.collections.map((col, i) => {
-                                                const collectionId = `${index}-${i}-${col.key}`;
+                                                const stableGroupId = item.id || `group-${index}`;
+                                                const collectionId = `${stableGroupId}-${i}-${col.key}`;
                                                 const isExpanded = window.expandedCollections[collectionId];
                                                 const expandedItemsCount = isExpanded ? Object.keys(isExpanded).length : 0;
                                                 
@@ -2456,7 +2521,7 @@
                                                                 </span>
                                                                 <button type="button" 
                                                                     class="btn btn-sm btn-outline-info me-2 expand-collection-btn" 
-                                                                    data-group-index="${index}" 
+                                                                    data-group-index="${stableGroupId}" 
                                                                     data-collection-index="${i}"
                                                                     data-collection-key="${col.key}"
                                                                     data-collection-type="${col.type}"
@@ -2465,13 +2530,23 @@
                                                                     style="font-size: 0.7rem; padding: 0.1rem 0.4rem;">
                                                                     ${isExpanded ? '📂' : '📁'}
                                                                 </button>
+                                                                ${isExpanded ? `
+                                                                <button type="button" 
+                                                                    class="btn btn-sm btn-outline-secondary me-2 collapse-ui-collection-btn" 
+                                                                    data-group-index="${stableGroupId}" 
+                                                                    data-collection-index="${i}"
+                                                                    data-collection-id="${collectionId}"
+                                                                    title="Hide items in snap-ins (keeps expanded in preview/email)"
+                                                                    style="font-size: 0.7rem; padding: 0.1rem 0.4rem;">
+                                                                    👁️‍🗨️
+                                                                </button>` : ""}
                                                             </div>
                                                             <button type="button" class="btn btn-sm btn-outline-danger remove-collection-btn" 
-                                                                    data-group-index="${index}" data-collection-index="${i}">x</button>
+                                                                    data-group-index="${stableGroupId}" data-collection-index="${i}">x</button>
                                                         </div>
                                                         <div class="collection-items-expanded" 
-                                                            id="collection-items-${index}-${i}" 
-                                                            style="display: ${isExpanded ? 'block' : 'none'}; margin-left: 20px; padding-left: 10px; border-left: 2px solid #007bff;">
+                                                            id="collection-items-${stableGroupId}-${i}" 
+                                                            style="display: ${isExpanded && !window.collapsedCollectionsUI[collectionId] ? 'block' : 'none'}; margin-left: 20px; padding-left: 10px; border-left: 2px solid #007bff;">
                                                             ${isExpanded 
                                                                 ? buildCollectionItemsDisplay(isExpanded) 
                                                                 : '<div class="text-muted small py-2"><em>Click the folder icon to load items...</em></div>'
@@ -2513,13 +2588,15 @@
                     
                     document.querySelectorAll('.remove-collection-btn').forEach(btn => {
                         btn.addEventListener('click', (e) => {
-                            const groupIndex = parseInt(e.target.dataset.groupIndex);
+                            const stableGroupId = e.target.dataset.groupIndex;
+                            const groupIndex = findGroupIndexByStableId(stableGroupId);
                             const collectionIndex = parseInt(e.target.dataset.collectionIndex);
                             
                             if (selectedItems[groupIndex] && selectedItems[groupIndex].collections) {
                                 const collection = selectedItems[groupIndex].collections[collectionIndex];
-                                const collectionId = `${groupIndex}-${collectionIndex}-${collection.key}`;
+                                const collectionId = `${stableGroupId}-${collectionIndex}-${collection.key}`;
                                 delete window.expandedCollections[collectionId];
+                                delete window.collapsedCollectionsUI[collectionId];
                                 
                                 selectedItems[groupIndex].collections.splice(collectionIndex, 1);
                                 updateSelectedItemsDisplay();
@@ -2530,25 +2607,50 @@
 
                     document.querySelectorAll('.expand-collection-btn').forEach(btn => {
                         btn.addEventListener('click', async (e) => {
-                            const groupIndex = parseInt(e.target.dataset.groupIndex);
+                            const stableGroupId = e.target.dataset.groupIndex;
+                            const groupIndex = findGroupIndexByStableId(stableGroupId);
                             const collectionIndex = parseInt(e.target.dataset.collectionIndex);
                             const collectionKey = e.target.dataset.collectionKey;
                             const collectionType = e.target.dataset.collectionType;
                             const collectionId = e.target.dataset.collectionId;
                             
-                            const expandedDiv = document.getElementById(`collection-items-${groupIndex}-${collectionIndex}`);
+                            const expandedDiv = document.getElementById(`collection-items-${stableGroupId}-${collectionIndex}`);
                             const isCurrentlyExpanded = window.expandedCollections[collectionId];
                             
                             if (!isCurrentlyExpanded) {
                                 await expandCollection(expandedDiv, collectionKey, collectionType, btn, collectionId);
                             } else {
                                 delete window.expandedCollections[collectionId];
+                                delete window.collapsedCollectionsUI[collectionId];
                                 expandedDiv.style.display = 'none';
                                 btn.textContent = '📁';
                                 btn.title = 'Show collection items';
                                 
                                 updateSelectedItemsDisplay();
                                 debouncedUpdatePreview();
+                            }
+                        });
+                    });
+
+                    document.querySelectorAll(".collapse-ui-collection-btn").forEach(btn => {
+                        btn.addEventListener("click", (e) => {
+                            const stableGroupId = e.target.dataset.groupIndex;
+                            const groupIndex = findGroupIndexByStableId(stableGroupId);
+                            const collectionIndex = parseInt(e.target.dataset.collectionIndex);
+                            const collectionId = e.target.dataset.collectionId;
+                            
+                            const expandedDiv = document.getElementById(`collection-items-${stableGroupId}-${collectionIndex}`);
+                            
+                            if (!window.collapsedCollectionsUI[collectionId]) {
+                                window.collapsedCollectionsUI[collectionId] = true;
+                                expandedDiv.style.display = "none";
+                                e.target.textContent = "👁️";
+                                e.target.title = "Show items in snap-ins";
+                            } else {
+                                delete window.collapsedCollectionsUI[collectionId];
+                                expandedDiv.style.display = "block";
+                                e.target.textContent = "👁️‍🗨️";
+                                e.target.title = "Hide items in snap-ins (keeps expanded in preview/email)";
                             }
                         });
                     });
@@ -3396,7 +3498,7 @@
                             email_html: emailHTML,
                             selected_items: selectedItems,
                             user_dict: userDict,
-                            expanded_collections: expandedCollections
+                            expanded_collections: convertExpandedCollectionsForBackend()
                         })
                     });
                     
@@ -3827,7 +3929,7 @@
                         selected_items: JSON.stringify(itemsWithContent),
                         email_text: textBlocks.join('\n\n'),
                         subject: document.getElementById('subject').value,
-                        expanded_collections: JSON.stringify(expandedCollections)
+                        expanded_collections: JSON.stringify(convertExpandedCollectionsForBackend())
                     };
 
                     const response = await fetch('/email_templates', {
@@ -3910,9 +4012,11 @@
                             const expandedCollections = JSON.parse(template.expanded_collections);
                             window.expandedCollections = expandedCollections;
                             console.log('Restored expansion state from template:', expandedCollections);
+                            window.collapsedCollectionsUI = {};
                         } catch (e) {
                             console.warn('Failed to parse expanded collections from template:', e);
                             window.expandedCollections = {};
+                            window.collapsedCollectionsUI = {};
                         }
                     } else {
                         window.expandedCollections = {};

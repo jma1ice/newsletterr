@@ -83,13 +83,11 @@
     <h2 class="text-2xl font-bold mb-2">Recent Changes</h2>
     <dt class="font-semibold dark:border-gray-300">Fixes:</dt>
     <ul class="list-disc list-inside space-y-2 text-sm mb-2">
+        <li>Fixed small issue with expanded collections not showing in received email if the Collection Group name is changed</li>
     </ul>
     <dt class="font-semibold dark:border-gray-300">New Features:</dt>
     <ul class="list-disc list-inside space-y-2 text-sm mb-2">
-        <li>Added 'Expand' option on collections to switch to showing items in collection</li>
-        <li>Require CSRF token when POSTing to routes</li>
-        <li>Login page for self hosting</li>
-        <li>Safe 'get' function replaced requests.get</li>
+        <li>Added a collapse UI button to expanded collections that leaves the collection expanded in the email but preserves space in the Snap-Ins UI</li>
     </ul>
 </div>
 {% endblock %}

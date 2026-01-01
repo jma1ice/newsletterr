@@ -1784,7 +1784,7 @@ def get_collection_items_for_email(collection_key, settings):
             print(f"ERROR: Plex connection not configured for collection {collection_key}")
             return []
         
-        collection_items_url = f"{plex_url}/library/metadata/{collection_key}/children"
+        collection_items_url = f"{plex_url}/library/collections/{collection_key}/children"
         headers = {
             'X-Plex-Token': decrypt(plex_token),
             'Accept': 'application/json'
@@ -3338,19 +3338,29 @@ def build_collections_html_with_cids(all_collections, msg_root, theme_colors, ba
             'plex_url': row[0],
             'plex_token': row[1]
         }
+    else:
+        plex_settings = None
 
     for collection_index, collection in enumerate(all_collections):
-        collection_id = f"{group_index}-{collection_index}-{collection.get('key')}"
+        collection_key = collection.get('key')
+        collection_id = f"{group_index}-{collection_index}-{collection_key}"
 
         if collection_id in expanded_collections and plex_settings:
             print(f"Collection {collection_id} is expanded, fetching individual items...")
-            individual_items = get_collection_items_for_email(collection.get('key'), plex_settings)
+            individual_items = get_collection_items_for_email(collection_key, plex_settings)
             
             for item in individual_items:
                 item['is_individual_item'] = True
                 item['original_collection'] = collection.get('title', 'Unknown Collection')
                 all_items_to_display.append(item)
         else:
+            print(f"  No match for {collection_id}")
+            if not (collection_id in expanded_collections):
+                print(f"     Reason: Collection ID not in expanded_collections")
+                if expanded_collections:
+                    print(f"     Available expanded IDs: {list(expanded_collections.keys())}")
+            if not plex_settings:
+                print(f"     Reason: No plex_settings available")
             collection['is_individual_item'] = False
             all_items_to_display.append(collection)
     
@@ -6728,8 +6738,8 @@ def delete_email_template(template_id):
         return jsonify({"status": "error", "message": str(e)}), 500
 
 if __name__ == '__main__':
-    app.jinja_env.globals["version"] = "v2025.2"
-    app.jinja_env.globals["publish_date"] = "December 31, 2025"
+    app.jinja_env.globals["version"] = "v2025.2.1"
+    app.jinja_env.globals["publish_date"] = "January 1, 2026"
 
     app.jinja_env.globals["get_cache_status"] = get_global_cache_status
 

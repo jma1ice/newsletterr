@@ -207,7 +207,7 @@ def init_db(db_path):
             text_color TEXT DEFAULT "#62a1a4",
             email_theme TEXT DEFAULT "newsletterr_blue",
             from_name TEXT,
-            login_toggle TEXT,
+            login_toggle TEXT DEFAULT "disabled",
             nl_username TEXT,
             nl_password TEXT
         )
@@ -398,6 +398,9 @@ def requires_auth(f):
         cursor.execute("SELECT login_toggle FROM settings WHERE id = 1")
         login_toggle = cursor.fetchone()
         conn.close()
+
+        if login_toggle == None:
+            return f(*args, **kwargs)
 
         if login_toggle[0] != 'enabled':
             return f(*args, **kwargs)

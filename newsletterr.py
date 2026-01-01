@@ -6728,8 +6728,8 @@ def delete_email_template(template_id):
         return jsonify({"status": "error", "message": str(e)}), 500
 
 if __name__ == '__main__':
-    app.jinja_env.globals["version"] = "v2025.2"
-    app.jinja_env.globals["publish_date"] = "December 31, 2025"
+    app.jinja_env.globals["version"] = "v2025.2.1"
+    app.jinja_env.globals["publish_date"] = "January 1, 2026"
 
     app.jinja_env.globals["get_cache_status"] = get_global_cache_status
 

@@ -923,7 +923,9 @@
 
                     let contentHTML = "";
                     
-                    for (let item of selectedItems) {
+                    for (let itemIndex = 0; itemIndex < selectedItems.length; itemIndex++) {
+                        const item = selectedItems[itemIndex];
+
                         if (item.type === 'textblock') {
                             const content = getTextBlockContent(item.id);
                             if (content && content.trim().length > 0) {
@@ -954,7 +956,8 @@
                             if (item.collections && item.collections.length > 0) {
                                 contentHTML += buildCollectionPreviewHTMLForEmail(
                                     item.title || 'Collections', 
-                                    item.collections
+                                    item.collections,
+                                    itemIndex
                                 );
                             }
                         }
@@ -1874,7 +1877,7 @@
                 return 0;
             }
 
-            function buildCollectionPreviewHTMLForEmail(title, collections) {
+            function buildCollectionPreviewHTMLForEmail(title, collections, groupIndex=0) {
                 const themeColors = {
                     card_bg: 'var(--email-card-bg)',
                     text: 'var(--email-text)', 
@@ -1894,7 +1897,7 @@
                 let hasExpandedCollections = false;
                 
                 collections.forEach((collection, index) => {
-                    const collectionId = `${getCollectionGroupIndex(collection)}-${index}-${collection.key}`;
+                    const collectionId = `${groupIndex}-${index}-${collection.key}`;
                     const expandedItems = window.expandedCollections[collectionId];
                     
                     if (expandedItems && Object.keys(expandedItems).length > 0) {
@@ -2251,6 +2254,7 @@
         </script>
         <script nonce="{{ nonce }}">
             window.expandedCollections = {};
+            window.collapsedCollectionsUI = {};
 
             function buildCollectionItemsDisplay(items) {
                 if (!items || Object.keys(items).length === 0) {
@@ -2465,13 +2469,23 @@
                                                                     style="font-size: 0.7rem; padding: 0.1rem 0.4rem;">
                                                                     ${isExpanded ? '📂' : '📁'}
                                                                 </button>
+                                                                ${isExpanded ? `
+                                                                <button type="button" 
+                                                                    class="btn btn-sm btn-outline-secondary me-2 collapse-ui-collection-btn" 
+                                                                    data-group-index="${index}" 
+                                                                    data-collection-index="${i}"
+                                                                    data-collection-id="${collectionId}"
+                                                                    title="Hide items in snap-ins (keeps expanded in preview/email)"
+                                                                    style="font-size: 0.7rem; padding: 0.1rem 0.4rem;">
+                                                                    👁️‍🗨️
+                                                                </button>` : ""}
                                                             </div>
                                                             <button type="button" class="btn btn-sm btn-outline-danger remove-collection-btn" 
                                                                     data-group-index="${index}" data-collection-index="${i}">x</button>
                                                         </div>
                                                         <div class="collection-items-expanded" 
                                                             id="collection-items-${index}-${i}" 
-                                                            style="display: ${isExpanded ? 'block' : 'none'}; margin-left: 20px; padding-left: 10px; border-left: 2px solid #007bff;">
+                                                            style="display: ${isExpanded && !window.collapsedCollectionsUI[collectionId] ? 'block' : 'none'}; margin-left: 20px; padding-left: 10px; border-left: 2px solid #007bff;">
                                                             ${isExpanded 
                                                                 ? buildCollectionItemsDisplay(isExpanded) 
                                                                 : '<div class="text-muted small py-2"><em>Click the folder icon to load items...</em></div>'
@@ -2520,6 +2534,7 @@
                                 const collection = selectedItems[groupIndex].collections[collectionIndex];
                                 const collectionId = `${groupIndex}-${collectionIndex}-${collection.key}`;
                                 delete window.expandedCollections[collectionId];
+                                delete window.collapsedCollectionsUI[collectionId];
                                 
                                 selectedItems[groupIndex].collections.splice(collectionIndex, 1);
                                 updateSelectedItemsDisplay();
@@ -2543,12 +2558,35 @@
                                 await expandCollection(expandedDiv, collectionKey, collectionType, btn, collectionId);
                             } else {
                                 delete window.expandedCollections[collectionId];
+                                delete window.collapsedCollectionsUI[collectionId];
                                 expandedDiv.style.display = 'none';
                                 btn.textContent = '📁';
                                 btn.title = 'Show collection items';
                                 
                                 updateSelectedItemsDisplay();
                                 debouncedUpdatePreview();
+                            }
+                        });
+                    });
+
+                    document.querySelectorAll(".collapse-ui-collection-btn").forEach(btn => {
+                        btn.addEventListener("click", (e) => {
+                            const groupIndex = parseInt(e.target.dataset.groupIndex);
+                            const collectionIndex = parseInt(e.target.dataset.collectionIndex);
+                            const collectionId = e.target.dataset.collectionId;
+                            
+                            const expandedDiv = document.getElementById(`collection-items-${groupIndex}-${collectionIndex}`);
+                            
+                            if (!window.collapsedCollectionsUI[collectionId]) {
+                                window.collapsedCollectionsUI[collectionId] = true;
+                                expandedDiv.style.display = "none";
+                                e.target.textContent = "👁️";
+                                e.target.title = "Show items in snap-ins";
+                            } else {
+                                delete window.collapsedCollectionsUI[collectionId];
+                                expandedDiv.style.display = "block";
+                                e.target.textContent = "👁️‍🗨️";
+                                e.target.title = "Hide items in snap-ins (keeps expanded in preview/email)";
                             }
                         });
                     });
@@ -3910,9 +3948,11 @@
                             const expandedCollections = JSON.parse(template.expanded_collections);
                             window.expandedCollections = expandedCollections;
                             console.log('Restored expansion state from template:', expandedCollections);
+                            window.collapsedCollectionsUI = {};
                         } catch (e) {
                             console.warn('Failed to parse expanded collections from template:', e);
                             window.expandedCollections = {};
+                            window.collapsedCollectionsUI = {};
                         }
                     } else {
                         window.expandedCollections = {};

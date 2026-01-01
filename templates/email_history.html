@@ -9,7 +9,8 @@
                 <p class="text-info mb-0">View all sent emails and their recipients</p>
             </div>
             {% if emails %}
-                <form method="POST" action="{{ url_for('clear_email_history') }}" onsubmit="return confirm('Are you sure you want to permanently delete all email history entries? This cannot be undone.');">
+                <form method="POST" action="/email_history/clear" onsubmit="return confirm('Are you sure you want to permanently delete all email history entries? This cannot be undone.');">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }} " />
                     <button type="submit" class="btn btn-danger">
                         🗑️ Clear History
                     </button>

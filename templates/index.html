@@ -3,7 +3,11 @@
 {% block content %}
 <div class="container-fluid">
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <h1>newsletterr dashboard</h1>
+        {% if username != "" %}
+            <h1>welcome, {{ username }}!</h1>
+        {% else %}
+            <h1>newsletterr dashboard</h1>
+        {% endif %}
         <button id="sendEmailBtn" class="btn btn-success btn-lg px-5 py-3" style="font-size: 1.6rem; font-weight: 700; min-width: 220px; box-shadow: 0 4px 8px rgba(0,0,0,0.2);">
             📧 Send Email
         </button>
@@ -20,6 +24,7 @@
                 <tr style="height: 100%; padding: 10px;">
                     <td style="width: 20%; padding: 10px; vertical-align: top;">
                         <form method="POST" id="stats_form">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token }} " />
                             <label for="items_to_pull">Recently Added Items (#):</label>
                             <input type="number" id="items_to_pull" name="items_to_pull" value="10" style="width: 8.5rem; margin-bottom: 8px;" /><br>
                             <label for="days_to_pull">Time Range (days):</label>
@@ -501,8 +506,8 @@
                 </tr>
             </table>
         </div>
-        <script>
-            const recentPayload = {{ recent_data | tojson }};
+        <script nonce="{{ nonce }}">
+            const recentPayload = {{ recent_data | tojson | safe }};
 
             function buildThumb(path) {
                 if (!path) return '';
@@ -631,13 +636,6 @@
                 });
             })();
 
-            const libSel = document.getElementById('ra-lib');
-            [...new Set(items.map(i => i.library).filter(Boolean))].sort().forEach(lib => {
-                const opt = document.createElement('option');
-                opt.value = lib; opt.textContent = lib;
-                libSel.appendChild(opt);
-            });
-
             const grid = document.getElementById('ra-grid');
             const empty = document.getElementById('ra-empty');
 
@@ -671,17 +669,8 @@
                 });
                 empty.classList.toggle('hidden', list.length !== 0);
             }
-
-            function applyFilter() {
-                const lb = libSel.value;
-                if (lb === '') { render([], { showEmpty:false }); return; }
-                if (lb === '__ALL__') { render(items); return; }
-                render(items.filter(it => it.library === lb));
-            }
-
-            libSel.addEventListener('input', applyFilter);
         </script>
-        <script>
+        <script nonce="{{ nonce }}">
             document.getElementById('time_range_week').addEventListener('click', () => {
                 document.getElementById('days_to_pull').value = 7;
                 showSpinner('Getting stats and users...');
@@ -713,10 +702,10 @@
                 document.getElementById('stats_form').submit();
             });
         </script>
-        <script>
+        <script nonce="{{ nonce }}">
             let selectedItems = [];
-            const statsList = {{ stats | tojson }};
-            const themeSettings = {{ theme_settings | tojson }};
+            const statsList = JSON.parse('{{ stats | tojson | safe }}');
+            const themeSettings = JSON.parse('{{ theme_settings | tojson | safe }}');
 
             function getThemedEmailCSS() {
                 const emailTheme = themeSettings.email_theme || 'newsletter_blue';
@@ -2115,7 +2104,7 @@
                 }, 100);
             });
         </script>
-        <script>
+        <script nonce="{{ nonce }}">
             function showRAPreviewFor(libName) {
                 const preview = document.getElementById('ra-preview');
                 const ul = document.getElementById('ra-view');
@@ -2200,7 +2189,7 @@
                 }
             });
         </script>
-        <script>
+        <script nonce="{{ nonce }}">
             function themeVars(isDark) {
                 return {
                     text: isDark ? '#8acbd4' : '#333',
@@ -2255,12 +2244,12 @@
                 applyChartTheme(!nowDark);
             });
 
-            const graphDataList = {{ graph_data | tojson }};
-            const graphCommands = {{ graph_commands | tojson }};
+            const graphDataList = JSON.parse('{{ graph_data | tojson | safe }}');
+            const graphCommands = JSON.parse('{{ graph_commands | tojson | safe }}');
 
             const renderedCharts = new Set();
         </script>
-        <script>
+        <script nonce="{{ nonce }}">
             window.expandedCollections = {};
 
             function buildCollectionItemsDisplay(items) {
@@ -2333,7 +2322,8 @@
                     const response = await fetch('/get_collection_items', {
                         method: 'POST',
                         headers: {
-                            'Content-Type': 'application/json'
+                            'Content-Type': 'application/json',
+                            'X-CSRF-Token': '{{ csrf_token }}',
                         },
                         body: JSON.stringify({
                             collection_key: collectionKey,
@@ -3014,10 +3004,10 @@
 
             updateSelectedItemsDisplay();
         </script>
-        <script id="recommendations-json" type="application/json">
-            {{ recommendations_json | tojson }}
+        <script id="recommendations-json" type="application/json" nonce="{{ nonce }}">
+            {{ recommendations_json | tojson | safe }}
         </script>
-        <script>
+        <script nonce="{{ nonce }}">
             function readJSONFromScript(id) {
                 const el = document.getElementById(id);
                 if (!el) return {};
@@ -3032,9 +3022,9 @@
             }
 
             let recsPayload = readJSONFromScript('recommendations-json');
-            const userDict = {{ user_dict | tojson }} || {};
+            const userDict = JSON.parse('{{ user_dict | tojson | safe }}') || {};
 
-            const usersFullData = {{ users_full_data | tojson if users_full_data else '[]' }};
+            const usersFullData = JSON.parse('{{ users_full_data | tojson | safe if users_full_data else "[]" }}');
             const displayPreference = "{{ settings.recipient_display_name }}";
 
             function getUserDisplayName(userKey) {
@@ -3056,7 +3046,7 @@
                 }
             }
         </script>
-        <script>
+        <script nonce="{{ nonce }}">
             function posterCard(p, faded=false) {
                 const src = p.url ? `/proxy-img?u=${encodeURIComponent(p.url)}` : '';
                 const title = p.title || '';
@@ -3257,7 +3247,7 @@
             };
             buildRecsUserRows();
         </script>
-        <script>
+        <script nonce="{{ nonce }}">
             document.getElementById('pullRecsBtn').addEventListener('click', async () => {
                 showSpinner('Pulling recommendations...');
 
@@ -3281,20 +3271,24 @@
                 const to_emails = toList.join(', ');
 
                 const payload = {
-                    stats: {{ stats | tojson }},
-                    user_dict: {{ user_dict | tojson }},
-                    graph_data: {{ graph_data | tojson }},
-                    graph_commands: {{ graph_commands | tojson }},
-                    recent_data: {{ recent_data | tojson }},
-                    libs: {{ libs | tojson }},
-                    settings: {{ settings | tojson }},
+                    stats: JSON.parse('{{ stats | tojson | safe }}'),
+                    user_dict: JSON.parse('{{ user_dict | tojson | safe }}'),
+                    graph_data: JSON.parse('{{ graph_data | tojson | safe }}'),
+                    graph_commands: JSON.parse('{{ graph_commands | tojson | safe }}'),
+                    recent_data: {{ recent_data | tojson | safe }},
+                    libs: JSON.parse('{{ libs | tojson | safe }}'),
+                    settings: JSON.parse('{{ settings | tojson | safe }}'),
                     to_emails
                 };
 
                 try {
                     const resp = await fetch('/pull_recommendations', {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'Accept': 'text/html' },
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'text/html',
+                            'X-CSRF-Token': '{{ csrf_token }}',
+                        },
                         body: JSON.stringify(payload),
                         credentials: 'same-origin'
                     });
@@ -3334,7 +3328,7 @@
                 }
             });
         </script>
-        <script>
+        <script nonce="{{ nonce }}">
             function collectEmailsFromChips() {
                 return Array.from(document.querySelectorAll('#bcc_chips .nl-chip'))
                     .map(ch => ch.dataset.email)
@@ -3392,7 +3386,10 @@
 
                     const resp = await fetch('/send_email', {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-Token': '{{ csrf_token }}',
+                        },
                         body: JSON.stringify({
                             to_emails,
                             subject,
@@ -3418,12 +3415,12 @@
                 hideSpinner();
             });
         </script>
-        <script>
+        <script nonce="{{ nonce }}">
             document.getElementById('stats_form').addEventListener('submit', (e) => {
                 showSpinner('Getting stats and users...');
             });
         </script>
-        <script>
+        <script nonce="{{ nonce }}">
             (function () {
                 const box = document.getElementById('bcc_chips');
                 const input = document.getElementById('email_chip_input');
@@ -3510,7 +3507,7 @@
                 syncHiddenFromDOM();
             })();
         </script>
-        <script>
+        <script nonce="{{ nonce }}">
             document.addEventListener('DOMContentLoaded', () => {
                 const selector = document.getElementById('email_list_selector');
                 const deleteBtn = document.getElementById('delete_list_btn');
@@ -3521,7 +3518,7 @@
                 const bccChipsContainer = document.getElementById('bcc_chips');
                 const emailInput = document.getElementById('email_chip_input');
                 
-                const allUserEmails = {{ user_dict.values() | list | tojson }};
+                const allUserEmails = JSON.parse('{{ user_dict.values() | list | tojson | safe }}');
                 
                 function collectEmailsFromChips() {
                     return Array.from(document.querySelectorAll('#bcc_chips .nl-chip'))
@@ -3605,7 +3602,10 @@
                     try {
                         const response = await fetch('/email_lists', {
                             method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-Token': '{{ csrf_token }}',
+                            },
                             body: JSON.stringify({
                                 name: name,
                                 emails: emails.join(', ')
@@ -3670,7 +3670,7 @@
                 setReadOnlyMode(false);
             });
         </script>
-        <script>
+        <script nonce="{{ nonce }}">
             document.addEventListener('DOMContentLoaded', () => {
                 const bccHeader = document.querySelector('[onclick*="bcc-collapse"]');
                 if (bccHeader) {
@@ -3702,6 +3702,7 @@
                                 method: 'POST',
                                 headers: {
                                     'Content-Type': 'application/json',
+                                    'X-CSRF-Token': '{{ csrf_token }}',
                                 }
                             });
                             
@@ -3832,7 +3833,8 @@
                     const response = await fetch('/email_templates', {
                         method: 'POST',
                         headers: {
-                            'Content-Type': 'application/json'
+                            'Content-Type': 'application/json',
+                            'X-CSRF-Token': '{{ csrf_token }}',
                         },
                         body: JSON.stringify(templateData)
                     });
@@ -4034,8 +4036,7 @@
                 loadEmailTemplates();
             });
         </script>
-
-        <script>
+        <script nonce="{{ nonce }}">
             let movieCollections = [];
             let showCollections = [];
 
@@ -4254,7 +4255,7 @@
                 document.getElementById('audio-collections-dropdown').value = '';
                 document.getElementById('add-movie-collection-btn').disabled = true;
                 document.getElementById('add-show-collection-btn').disabled = true;
-                ment.getElementById('add-audio-collection-btn').disabled = true;
+                document.getElementById('add-audio-collection-btn').disabled = true;
                 
                 console.log('Added collection to group:', collection.title);
             }

@@ -1,4 +1,4 @@
-import os, math, uuid, base64, smtplib, sqlite3, requests, time, threading, re, json, mimetypes, shutil, calendar, traceback, io, sys
+import os, math, uuid, base64, smtplib, sqlite3, requests, time, threading, re, json, mimetypes, shutil, calendar, traceback, io, sys, secrets, html, bleach
 from collections import defaultdict
 from cryptography.fernet import Fernet, InvalidToken
 from datetime import datetime, timezone, timedelta
@@ -7,7 +7,8 @@ from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.utils import make_msgid, formataddr
-from flask import Flask, render_template, request, jsonify, Response, redirect, url_for
+from flask import Flask, render_template, request, jsonify, Response, redirect, url_for, session, abort, make_response
+from functools import wraps
 from pathlib import Path
 from PIL import Image, ImageFilter, ImageEnhance
 from playwright.sync_api import sync_playwright
@@ -205,7 +206,10 @@ def init_db(db_path):
             background_color TEXT DEFAULT "#333333",
             text_color TEXT DEFAULT "#62a1a4",
             email_theme TEXT DEFAULT "newsletterr_blue",
-            from_name TEXT
+            from_name TEXT,
+            login_toggle TEXT,
+            nl_username TEXT,
+            nl_password TEXT
         )
     """)
     
@@ -330,6 +334,17 @@ def init_db(db_path):
         cursor.execute("ALTER TABLE settings ADD COLUMN from_name TEXT")
         conn.commit()
 
+    login_columns = [
+        ('login_toggle', 'TEXT DEFAULT "disabled"'),
+        ('nl_username', 'TEXT'),
+        ('nl_password', 'TEXT')
+    ]
+    for col_name, col_def in login_columns:
+        if col_name not in settings_columns:
+            print(f"Adding {col_name} column to settings table...")
+            cursor.execute(f'ALTER TABLE settings ADD COLUMN {col_name} {col_def}')
+            conn.commit()
+
     cursor.execute("PRAGMA table_info(settings)")
     columns = [column[1] for column in cursor.fetchall()]
     if 'custom_logo_filename' not in columns:
@@ -338,6 +353,95 @@ def init_db(db_path):
         conn.commit()
     
     conn.close()
+
+def require_csrf_for_json():
+    token = request.headers.get('X-CSRF-Token') or request.form.get('csrf_token')
+    if not token or token.strip() != session.get('csrf_token'):
+        abort(400)
+
+def sanitize_html_input(text):
+    if not text:
+        return ""
+
+    allowed_tags = [
+        'p', 'br', 'strong', 'b', 'em', 'i', 'u', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+        'ul', 'ol', 'li', 'blockquote', 'a', 'img', 'div', 'span'
+    ]
+
+    allowed_attributes = {
+        'a': ['href', 'title'],
+        'img': ['src', 'alt', 'title', 'width', 'height'],
+        'div': ['class'],
+        'span': ['class', 'style']
+    }
+
+    allowed_protocols = ['http', 'https', 'mailto']
+
+    return bleach.clean(
+        text,
+        tags=allowed_tags,
+        attributes=allowed_attributes,
+        protocols=allowed_protocols,
+        strip=True
+    )
+
+def escape_html_output(text):
+    if not text:
+        return ""
+    return html.escape(text)
+
+def requires_auth(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT login_toggle FROM settings WHERE id = 1")
+        login_toggle = cursor.fetchone()
+        conn.close()
+
+        if login_toggle[0] != 'enabled':
+            return f(*args, **kwargs)
+
+        if not session.get('authenticated'):
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+def check_credentials(username, password):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("SELECT nl_username, nl_password FROM settings WHERE id = 1")
+    login_info = cursor.fetchone()
+    conn.close()
+
+    expected_username, expected_password = login_info
+
+    if not expected_password:
+        return False
+
+    return username == expected_username and password == decrypt(expected_password)
+
+def safe_get(url: str, *, timeout: int = 15, retries: int = 2, **kwargs):
+    for attempt in range(retries + 1):
+        try:
+            return requests.get(url, timeout=timeout, **kwargs)
+        except requests.RequestException as e:
+            if attempt == retries:
+                raise
+            time.sleep(1.0 * (attempt + 1))
+
+def sanitize_html(html: str) -> str:
+    allowed_tags = [
+        'p','br','strong','em','b','i','u','ul','ol','li','a','h1','h2','h3','h4','h5','h6',
+        'blockquote','code','pre','span'
+    ]
+    allowed_attrs = {
+        'a': ['href','title','target','rel'],
+        'span': ['style'],
+        '*': ['style']
+    }
+    cleaned = bleach.clean(html, tags=allowed_tags, attributes=allowed_attrs, strip=True)
+    return cleaned
 
 def get_theme_settings():
     conn = sqlite3.connect(DB_PATH)
@@ -1327,7 +1431,7 @@ def search_plex_for_rating_key(title, year, media_type, plex_url, plex_token, tm
                 'X-Plex-Client-Identifier': str(uuid.uuid4())
             }
             
-            response = requests.get(api_url, headers=headers, timeout=10)
+            response = safe_get(api_url, headers=headers, timeout=10)
             response.raise_for_status()
             data = response.json()
             
@@ -1359,7 +1463,7 @@ def search_plex_for_rating_key(title, year, media_type, plex_url, plex_token, tm
             'X-Plex-Client-Identifier': str(uuid.uuid4())
         }
         
-        response = requests.get(api_url, headers=headers, timeout=10)
+        response = safe_get(api_url, headers=headers, timeout=10)
         response.raise_for_status()
         data = response.json()
         
@@ -1444,7 +1548,7 @@ def fetch_tv_shows_from_plex_sdk(section_id, limit=10, machine_id=None):
             'X-Plex-Client-Identifier': str(uuid.uuid4())
         }
         
-        response = requests.get(api_url, headers=headers, timeout=10)
+        response = safe_get(api_url, headers=headers, timeout=10)
         response.raise_for_status()
         data = response.json()
         
@@ -1512,7 +1616,7 @@ def fetch_movies_from_plex_sdk(section_id, limit=10, machine_id=None):
             'X-Plex-Client-Identifier': str(uuid.uuid4())
         }
         
-        response = requests.get(api_url, headers=headers, timeout=10)
+        response = safe_get(api_url, headers=headers, timeout=10)
         response.raise_for_status()
         data = response.json()
         
@@ -1580,7 +1684,7 @@ def fetch_albums_from_plex_sdk(section_id, limit=10, machine_id=None):
             'X-Plex-Client-Identifier': str(uuid.uuid4())
         }
         
-        response = requests.get(api_url, headers=headers, timeout=10)
+        response = safe_get(api_url, headers=headers, timeout=10)
         response.raise_for_status()
         data = response.json()
         
@@ -1690,7 +1794,7 @@ def get_collection_items_for_email(collection_key, settings):
             pass
         
         print(f"Fetching collection items from: {collection_items_url}")
-        response = requests.get(collection_items_url, headers=headers, timeout=30)
+        response = safe_get(collection_items_url, headers=headers, timeout=30)
         
         if response.status_code != 200:
             print(f"ERROR: Failed to fetch collection items. Status: {response.status_code}")
@@ -1753,7 +1857,7 @@ def run_tautulli_command(base_url, api_key, command, section_id, error, time_ran
             api_url = f"{base_url}/api/v2?apikey={decrypt(api_key)}&cmd={command}&time_range={time_range}"
 
     try:
-        response = requests.get(api_url)
+        response = safe_get(api_url)
         response.raise_for_status()
         data = response.json()
 
@@ -1799,7 +1903,7 @@ def run_conjurr_command(base_url, user_dict, error):
     for user in user_dict.keys():
         try:
             api_url = f"{api_base_url}{user}"
-            response = requests.get(api_url)
+            response = safe_get(api_url)
             response.raise_for_status()
             data = response.json()
 
@@ -1865,7 +1969,7 @@ def _check_github_latest():
 
     url = f"https://api.github.com/repos/{app.config['GITHUB_OWNER']}/{app.config['GITHUB_REPO']}/releases/latest"
     try:
-        r = requests.get(url, headers=headers, timeout=10)
+        r = safe_get(url, headers=headers, timeout=10)
         if r.status_code == 304:
             _update_cache["checked_at"] = time.time()
             return
@@ -2109,7 +2213,7 @@ def fetch_and_attach_image(image_url, msg_root, cid_name, base_url=""):
             'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8'
         }
         
-        response = requests.get(full_url, timeout=15, headers=headers)
+        response = safe_get(full_url, timeout=15, headers=headers)
         print(f"Response status: {response.status_code}")
         print(f"Response content length: {len(response.content)}")
         
@@ -2158,7 +2262,7 @@ def fetch_and_attach_blurred_image(image_url, msg_root, cid_name, base_url=""):
         else:
             full_url = image_url
         
-        response = requests.get(full_url, timeout=10)
+        response = safe_get(full_url, timeout=10)
         response.raise_for_status()
         
         image = Image.open(io.BytesIO(response.content))
@@ -4590,7 +4694,20 @@ def inject_update_info():
         }
     }
 
+@app.after_request
+def set_security_headers(resp: Response):
+    try:
+        resp.headers.setdefault('X-Frame-Options', 'DENY')
+        resp.headers.setdefault('X-Content-Type-Options', 'nosniff')
+        resp.headers.setdefault('Referrer-Policy', 'no-referrer')
+        # If running behind HTTPS, HSTS can be enabled by the operator
+        # resp.headers.setdefault('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload')
+        return resp
+    except Exception:
+        return resp
+
 @app.route('/', methods=['GET', 'POST'])
+@requires_auth
 def index():
     stats = None
     users = None
@@ -4622,6 +4739,10 @@ def index():
     filtered_users = {}
     error = None
     alert = None
+
+    username = ""
+    if session.get('username'):
+        username = session.get('username')
 
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
@@ -4703,10 +4824,15 @@ def index():
                     user_dict[user['user_id']] = user['email']
 
     if request.method == 'POST':
+        token = request.form.get("csrf_token").strip()
+        if not token or token != session.get("csrf_token"):
+            abort(400)
+
         if settings['server_name'] == "":
             return render_template('index.html', error='Please enter tautulli info on settings page',
                                     stats=stats, user_dict=user_dict, graph_data=graph_data,
-                                    graph_commands=graph_commands, alert=alert, settings=settings)
+                                    graph_commands=graph_commands, alert=alert, settings=settings,
+                                    username=username)
         else:
             time_range = request.form.get("days_to_pull")
             count = request.form.get("items_to_pull")
@@ -4784,18 +4910,61 @@ def index():
         }
 
     theme_settings = get_theme_settings()
-        
+
+    if alert == None:
+        alert = request.args.get('alert')
+
+    if not session.get("csrf_token"):
+        session["csrf_token"] = secrets.token_urlsafe(32)
     return render_template('index.html',
                            stats=stats, user_dict=user_dict, users_full_data=users_full_data,
-                           graph_data=graph_data, graph_commands=graph_commands,
-                           recent_data=recent_data, libs=libs,
-                           error=error, alert=alert, settings=settings,
-                           email_lists=email_lists, cache_info=cache_info,
-                           recommendations_json=recommendations_json, filtered_users=filtered_users,
-                           theme_settings=theme_settings
+                           graph_data=graph_data, graph_commands=graph_commands, recent_data=recent_data,
+                           libs=libs, error=error, alert=alert, settings=settings, email_lists=email_lists,
+                           cache_info=cache_info, recommendations_json=recommendations_json,
+                           filtered_users=filtered_users, theme_settings=theme_settings,
+                           nonce=secrets.token_urlsafe(16), csrf_token=session["csrf_token"], username=username
                         )
 
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("SELECT login_toggle FROM settings WHERE id = 1")
+    login_toggle = cursor.fetchone()
+    conn.close()
+
+    alert = request.args.get('alert')
+    if login_toggle[0] != 'enabled':
+        return redirect(url_for('index', alert=alert))
+
+    if request.method == 'POST':
+        token = request.form.get("csrf_token").strip()
+        if not token or token != session.get("csrf_token"):
+            abort(400)
+
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '')
+
+        if check_credentials(username, password):
+            session['authenticated'] = True
+            session['username'] = username
+            return redirect(url_for('index'))
+        else:
+            return render_template('login.html', error='Invalid credentials')
+        
+    if not session.get("csrf_token"):
+        session["csrf_token"] = secrets.token_urlsafe(32)
+
+    return render_template('login.html', alert=alert, csrf_token=session["csrf_token"])
+
+@app.route('/logout')
+@requires_auth
+def logout():
+    session.clear()
+    return redirect(url_for('login'))
+
 @app.route('/proxy-art/<path:art_path>')
+@requires_auth
 def proxy_art(art_path):
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
@@ -4851,7 +5020,7 @@ def proxy_art(art_path):
             'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8'
         }
         
-        r = requests.get(full_url, stream=True, timeout=15, headers=headers)
+        r = safe_get(full_url, stream=True, timeout=15, headers=headers)
         r.raise_for_status()
         
         content_type = r.headers.get('Content-Type', 'image/jpeg')
@@ -4865,15 +5034,17 @@ def proxy_art(art_path):
         return Response("Image not found", status=404)
 
 @app.get("/proxy-img")
+@requires_auth
 def proxy_img():
     url = request.args.get("u", "")
     if not url.startswith(("http://","https://")):
         return Response(status=400)
-    r = requests.get(url, timeout=15)
+    r = safe_get(url, timeout=15)
     ct = r.headers.get("Content-Type", "image/jpeg")
     return Response(r.content, headers={"Content-Type": ct, "Cache-Control": "public, max-age=86400"})
 
 @app.route('/fetch_collections/<collection_type>', methods=['GET'])
+@requires_auth
 def fetch_collections(collection_type):
     try:
         conn = sqlite3.connect(DB_PATH)
@@ -4890,7 +5061,7 @@ def fetch_collections(collection_type):
 
         sections_url = f"{plex_url}/library/sections"
         
-        sections_response = requests.get(
+        sections_response = safe_get(
             sections_url,
             headers={"X-Plex-Token": decrypt(plex_token), "Accept": "application/json"},
             timeout = 10
@@ -4909,7 +5080,7 @@ def fetch_collections(collection_type):
                 section_title = section.get("title", "Unknown Library")
                 
                 collections_url = f"{plex_url}/library/sections/{section_id}/collections"
-                collections_response = requests.get(collections_url, headers={"X-Plex-Token": decrypt(plex_token), "Accept": "application/json"}, timeout=10)
+                collections_response = safe_get(collections_url, headers={"X-Plex-Token": decrypt(plex_token), "Accept": "application/json"}, timeout=10)
                 
                 if collections_response.status_code == 200:
                     collections_data = collections_response.json()
@@ -4946,8 +5117,9 @@ def fetch_collections(collection_type):
         return jsonify({"status": "error", "message": str(e)})
 
 @app.route('/get_collection_items', methods=['POST'])
+@requires_auth
 def get_collection_items():
-    """Endpoint to fetch items within a specific collection"""
+    require_csrf_for_json()
     try:
         data = request.get_json()
         collection_key = data.get('collection_key')
@@ -4979,7 +5151,7 @@ def get_collection_items():
             **plex_headers
         }
         
-        response = requests.get(collection_items_url, headers=headers, timeout=30)
+        response = safe_get(collection_items_url, headers=headers, timeout=30)
         
         if response.status_code == 404:
             return jsonify({
@@ -5056,7 +5228,9 @@ def get_collection_items():
         }), 500
 
 @app.route('/pull_recommendations', methods=['POST'])
+@requires_auth
 def pull_recommendations():
+    require_csrf_for_json()
     recommendations_json = {}
     error = None
     alert = None
@@ -5120,7 +5294,9 @@ def pull_recommendations():
                             recommendations_json=recommendations_json, filtered_users=filtered_users, alert=alert, theme_settings=theme_settings)
 
 @app.route('/send_email', methods=['POST'])
+@requires_auth
 def send_email():
+    require_csrf_for_json()
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("""
@@ -5183,9 +5359,12 @@ def send_email():
         )
 
 @app.route('/settings', methods=['GET', 'POST'])
+@requires_auth
 def settings():
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
+
+    alert = request.args.get('alert')
 
     theme_presets = {
         "newsletterr_blue": {
@@ -5214,9 +5393,19 @@ def settings():
     }
 
     if request.method == "POST":
+        token = request.form.get("csrf_token").strip()
+        if not token or token != session.get("csrf_token"):
+            abort(400)
+
         cursor.execute("SELECT custom_logo_filename FROM settings WHERE id = 1")
         db_custom_logo = cursor.fetchone()
         existing_custom_logo = db_custom_logo[0] if db_custom_logo and db_custom_logo[0] else ""
+
+        cursor.execute("SELECT login_toggle, nl_username, nl_password FROM settings WHERE id = 1")
+        db_login_info = cursor.fetchone()
+        existing_login_toggle = db_login_info[0] if db_login_info and db_login_info[0] else ""
+        existing_nl_username = db_login_info[1] if db_login_info and db_login_info[1] else ""
+        existing_nl_password = db_login_info[2] if db_login_info and db_login_info[2] else ""
 
         from_email = request.form.get("from_email")
         alias_email = request.form.get("alias_email")
@@ -5237,6 +5426,9 @@ def settings():
         email_theme = request.form.get("email_theme", "newsletterr_blue")
         from_name = request.form.get("from_name")
         custom_logo_filename = request.form.get("custom_logo_filename", "")
+        login_toggle = request.form.get("login_toggle")
+        nl_username = request.form.get("nl_username")
+        nl_password = encrypt(request.form.get("nl_password"))
 
         if not custom_logo_filename and existing_custom_logo:
             custom_logo_filename = existing_custom_logo
@@ -5267,17 +5459,19 @@ def settings():
             INSERT INTO settings
             (id, from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, plex_url, tautulli_url,
                 tautulli_api, conjurr_url, recipient_display_name, logo_filename, logo_width, email_theme, primary_color, secondary_color, accent_color, background_color,
-                text_color, from_name, custom_logo_filename)
-            VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                text_color, from_name, custom_logo_filename, login_toggle, nl_username, nl_password)
+            VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (id) DO UPDATE
             SET from_email = excluded.from_email, alias_email = excluded.alias_email, reply_to_email = excluded.reply_to_email, password = excluded.password,
                 smtp_username = excluded.smtp_username, smtp_server = excluded.smtp_server, smtp_port = excluded.smtp_port, smtp_protocol = excluded.smtp_protocol,
                 server_name = excluded.server_name, plex_url = excluded.plex_url, tautulli_url = excluded.tautulli_url, tautulli_api = excluded.tautulli_api,
-                conjurr_url = excluded.conjurr_url, recipient_display_name = excluded.recipient_display_name, logo_filename = excluded.logo_filename, logo_width = excluded.logo_width, email_theme = excluded.email_theme,
-                primary_color = excluded.primary_color, secondary_color = excluded.secondary_color, accent_color = excluded.accent_color,
-                background_color = excluded.background_color, text_color = excluded.text_color, from_name = excluded.from_name, custom_logo_filename = excluded.custom_logo_filename
+                conjurr_url = excluded.conjurr_url, recipient_display_name = excluded.recipient_display_name, logo_filename = excluded.logo_filename, logo_width = excluded.logo_width,
+                email_theme = excluded.email_theme, primary_color = excluded.primary_color, secondary_color = excluded.secondary_color, accent_color = excluded.accent_color,
+                background_color = excluded.background_color, text_color = excluded.text_color, from_name = excluded.from_name, custom_logo_filename = excluded.custom_logo_filename,
+                login_toggle = excluded.login_toggle, nl_username = excluded.nl_username, nl_password = excluded.nl_password
         """, (from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, plex_url, tautulli_url, tautulli_api,
-              conjurr_url, recipient_display_name, logo_filename, logo_width, email_theme, primary_color, secondary_color, accent_color, background_color, text_color, from_name, custom_logo_filename))
+              conjurr_url, recipient_display_name, logo_filename, logo_width, email_theme, primary_color, secondary_color, accent_color, background_color, text_color, from_name,
+              custom_logo_filename, login_toggle, nl_username, nl_password))
         conn.commit()
         cursor.execute("SELECT plex_token FROM settings WHERE id = 1")
         plex_token = cursor.fetchone()[0]
@@ -5308,10 +5502,31 @@ def settings():
             "background_color": background_color,
             "text_color": text_color,
             "from_name": from_name,
-            "custom_logo_filename": custom_logo_filename
+            "custom_logo_filename": custom_logo_filename,
+            "login_toggle": login_toggle,
+            "nl_username": nl_username,
+            "nl_password": decrypt(nl_password)
         }
 
-        return render_template('settings.html', alert="Settings saved successfully!", settings=settings)
+        if login_toggle == 'disabled':
+            session.pop('username', None)
+
+        if existing_nl_username != nl_username:
+            session.pop('username', None)
+            session.pop('authenticated', None)
+            return redirect(url_for('login', alert="Settings saved successfully!"))
+        
+        if decrypt(existing_nl_password) != decrypt(nl_password):
+            session.pop('username', None)
+            session.pop('authenticated', None)
+            return redirect(url_for('login', alert="Settings saved successfully!"))
+
+        if existing_login_toggle != login_toggle:
+            session.pop('username', None)
+            session.pop('authenticated', None)
+            return redirect(url_for('login', alert="Settings saved successfully!"))
+
+        return redirect(url_for('settings', alert="Settings saved successfully!", settings=settings))
 
     try:
         from_email = cursor.execute("SELECT from_email FROM settings WHERE id = 1").fetchone()[0]
@@ -5339,6 +5554,9 @@ def settings():
         text_color = cursor.execute("SELECT text_color FROM settings WHERE id = 1").fetchone()[0]
         from_name = cursor.execute("SELECT from_name FROM settings WHERE id = 1").fetchone()[0]
         custom_logo_filename = cursor.execute("SELECT custom_logo_filename FROM settings WHERE id = 1").fetchone()[0]
+        login_toggle = cursor.execute("SELECT login_toggle FROM settings WHERE id = 1").fetchone()[0]
+        nl_username = cursor.execute("SELECT nl_username FROM settings WHERE id = 1").fetchone()[0]
+        nl_password = cursor.execute("SELECT nl_password FROM settings WHERE id = 1").fetchone()[0]
     except:
         from_email = cursor.execute("SELECT from_email FROM settings WHERE id = 1").fetchone()
         alias_email = cursor.execute("SELECT alias_email FROM settings WHERE id = 1").fetchone()
@@ -5365,6 +5583,9 @@ def settings():
         text_color = cursor.execute("SELECT text_color FROM settings WHERE id = 1").fetchone()
         from_name = cursor.execute("SELECT from_name FROM settings WHERE id = 1").fetchone()
         custom_logo_filename = cursor.execute("SELECT custom_logo_filename FROM settings WHERE id = 1").fetchone()
+        login_toggle = cursor.execute("SELECT login_toggle FROM settings WHERE id = 1").fetchone()
+        nl_username = cursor.execute("SELECT nl_username FROM settings WHERE id = 1").fetchone()
+        nl_password = cursor.execute("SELECT nl_password FROM settings WHERE id = 1").fetchone()
 
     current_theme = email_theme or "newsletterr_blue"
     if current_theme in theme_presets and current_theme != "custom":
@@ -5396,7 +5617,9 @@ def settings():
         "background_color": background_color or "#333333",
         "text_color": text_color or "#62a1a4",
         "from_name": from_name or "",
-        "custom_logo_filename": custom_logo_filename or ""
+        "custom_logo_filename": custom_logo_filename or "",
+        "login_toggle": login_toggle or "disabled",
+        "nl_username": nl_username or ""
     }
     if password == '' or password is None:
         settings["password"] = ""
@@ -5426,16 +5649,24 @@ def settings():
         conn.commit()
     else:
         settings["logo_width"] = int(logo_width)
+    if nl_password == '' or nl_password is None:
+        settings["nl_password"] = ""
+    else:
+        settings["nl_password"] = decrypt(nl_password)
     
     conn.close()
-    return render_template('settings.html', settings=settings)
+
+    if not session.get("csrf_token"):
+        session["csrf_token"] = secrets.token_urlsafe(32)
+    return render_template('settings.html', settings=settings, alert=alert, nonce=secrets.token_urlsafe(16), csrf_token=session["csrf_token"])
 
 @app.route('/upload-logo', methods=['POST'])
+@requires_auth
 def upload_logo():
-    # if request.content_type and request.content_type.startswith('multipart/form-data'):
-    #     token = request.form.get('csrf_token')
-    #     if not token or token != session.get('csrf_token'):
-    #         abort(400)
+    if request.content_type and request.content_type.startswith('multipart/form-data'):
+        token = request.form.get('csrf_token')
+        if not token or token != session.get('csrf_token'):
+            abort(400)
 
     try:
         if 'logo' not in request.files:
@@ -5494,9 +5725,9 @@ def upload_logo():
         return jsonify({"status": "error", "message": f"Upload failed: {str(e)}"}), 500
 
 @app.route('/delete-logo', methods=['POST'])
+@requires_auth
 def delete_logo():
-    # require_csrf_for_json()
-
+    require_csrf_for_json()
     try:
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
@@ -5534,6 +5765,7 @@ def delete_logo():
         return jsonify({"status": "error", "message": f"Delete failed: {str(e)}"}), 500
 
 @app.post('/api/plex/pin')
+@requires_auth
 def plex_create_pin():
     with PlexAPI() as plex_api:
         res = plex_api.plex.get_pin(request={
@@ -5554,6 +5786,7 @@ def plex_create_pin():
     return jsonify({"pin_id": res.auth_pin_container.id, "code": res.auth_pin_container.code, "auth_url": auth_url, "expires_in": res.auth_pin_container.expires_in})
 
 @app.get('/api/plex/pin/<int:pin_id>')
+@requires_auth
 def plex_poll_pin(pin_id: int):
     with PlexAPI() as plex_api:
         res = plex_api.plex.get_token_by_pin_id(request={
@@ -5583,6 +5816,7 @@ def plex_poll_pin(pin_id: int):
     return jsonify({"connected": False})
 
 @app.get('/api/plex/info')
+@requires_auth
 def plex_get_info():
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
@@ -5600,7 +5834,7 @@ def plex_get_info():
         "includeHttps": "1"
     }
     
-    response = requests.get(url, headers=headers, params=params)
+    response = safe_get(url, headers=headers, params=params)
     data = response.json()
     
     def select_best_connection(connections):
@@ -5634,10 +5868,12 @@ def plex_get_info():
     return jsonify({"connected": False})
 
 @app.route('/about', methods=['GET'])
+@requires_auth
 def about():
     return render_template('about.html')
 
 @app.route('/email_history', methods=['GET'])
+@requires_auth
 def email_history():
     try:
         conn = sqlite3.connect(DB_PATH)
@@ -5669,13 +5905,18 @@ def email_history():
                 'template_name': email[6] if len(email) > 6 and email[6] else 'Manual'
             })
         
-        return render_template('email_history.html', emails=email_list)
+        if not session.get("csrf_token"):
+            session["csrf_token"] = secrets.token_urlsafe(32)
+        
+        return render_template('email_history.html', emails=email_list, csrf_token=session["csrf_token"])
     except Exception as e:
         print(f"Error loading email history: {e}")
         return render_template('email_history.html', emails=[])
 
 @app.route('/email_history/clear', methods=['POST'])
+@requires_auth
 def clear_email_history():
+    require_csrf_for_json()
     try:
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
@@ -5688,6 +5929,7 @@ def clear_email_history():
         return redirect(url_for('email_history'))
 
 @app.route('/email_history/recipients/<int:email_id>', methods=['GET'])
+@requires_auth
 def get_email_recipients(email_id):
     try:
         conn = sqlite3.connect(DB_PATH)
@@ -5709,6 +5951,7 @@ def get_email_recipients(email_id):
         return jsonify({'error': str(e)}), 500
 
 @app.route('/scheduling', methods=['GET'])
+@requires_auth
 def scheduling():
     try:
         schedules = get_email_schedules()
@@ -5719,17 +5962,19 @@ def scheduling():
         templates_cursor.execute("SELECT id, name FROM email_templates ORDER BY name")
         templates = [{'id': row[0], 'name': row[1]} for row in templates_cursor.fetchall()]
         templates_conn.close()
+
+        if not session.get("csrf_token"):
+            session["csrf_token"] = secrets.token_urlsafe(32)
         
-        return render_template('scheduling.html', 
-                             schedules=schedules, 
-                             email_lists=email_lists, 
-                             templates=templates)
+        return render_template('scheduling.html', schedules=schedules, email_lists=email_lists, templates=templates, csrf_token=session["csrf_token"])
     except Exception as e:
         print(f"Error loading scheduling page: {e}")
         return render_template('scheduling.html', schedules=[], email_lists=[], templates=[])
 
 @app.route('/scheduling/create', methods=['POST'])
+@requires_auth
 def create_schedule():
+    require_csrf_for_json()
     try:
         data = request.get_json()
         name = data.get('name', '').strip()
@@ -5762,6 +6007,7 @@ def create_schedule():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/scheduling/<int:schedule_id>', methods=['PUT'])
+@requires_auth
 def update_schedule(schedule_id):
     try:
         data = request.get_json()
@@ -5795,6 +6041,7 @@ def update_schedule(schedule_id):
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/scheduling/<int:schedule_id>', methods=['DELETE'])
+@requires_auth
 def delete_schedule(schedule_id):
     try:
         delete_email_schedule(schedule_id)
@@ -5804,7 +6051,9 @@ def delete_schedule(schedule_id):
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/scheduling/<int:schedule_id>/send-now', methods=['POST'])
+@requires_auth
 def send_schedule_now(schedule_id):
+    require_csrf_for_json()
     try:
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
@@ -5847,7 +6096,9 @@ def send_schedule_now(schedule_id):
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/scheduling/<int:schedule_id>/toggle', methods=['POST'])
+@requires_auth
 def toggle_schedule(schedule_id):
+    require_csrf_for_json()
     try:
         data = request.get_json()
         is_active = data.get('is_active', True)
@@ -5859,6 +6110,7 @@ def toggle_schedule(schedule_id):
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/scheduling/<int:schedule_id>/preview', methods=['GET'])
+@requires_auth
 def preview_schedule(schedule_id):
     try:
         conn = sqlite3.connect(DB_PATH)
@@ -6006,6 +6258,7 @@ def preview_schedule(schedule_id):
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/scheduling/<int:schedule_id>/preview-page', methods=['GET'])
+@requires_auth
 def preview_schedule_page(schedule_id):
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
@@ -6092,6 +6345,7 @@ def preview_schedule_page(schedule_id):
     )
 
 @app.route('/scheduling/calendar-data', methods=['GET'])
+@requires_auth
 def get_calendar_data():
     try:
         month = int(request.args.get('month', datetime.now().month))
@@ -6328,11 +6582,14 @@ def get_calendar_data():
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/clear_cache', methods=['POST'])
+@requires_auth
 def clear_cache_route():
+    require_csrf_for_json()
     clear_cache()
     return jsonify({"status": "success", "message": "Cache cleared successfully"})
 
 @app.route('/cache_status', methods=['GET'])
+@requires_auth
 def cache_status():
     status = {}
     for key in cache_storage:
@@ -6344,6 +6601,7 @@ def cache_status():
     return jsonify(status)
 
 @app.route('/email_lists', methods=['GET'])
+@requires_auth
 def get_email_lists():
     try:
         lists = get_saved_email_lists()
@@ -6352,7 +6610,9 @@ def get_email_lists():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/email_lists', methods=['POST'])
+@requires_auth
 def save_email_list_route():
+    require_csrf_for_json()
     try:
         data = request.get_json()
         name = data.get('name', '').strip()
@@ -6372,6 +6632,7 @@ def save_email_list_route():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/email_lists/<int:list_id>', methods=['DELETE'])
+@requires_auth
 def delete_email_list_route(list_id):
     try:
         delete_email_list(list_id)
@@ -6380,6 +6641,7 @@ def delete_email_list_route(list_id):
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/email_templates', methods=['GET'])
+@requires_auth
 def get_email_templates():
     try:
         conn = sqlite3.connect(DB_PATH)
@@ -6405,7 +6667,9 @@ def get_email_templates():
         return jsonify([])
 
 @app.route('/email_templates', methods=['POST'])
+@requires_auth
 def save_email_template():
+    require_csrf_for_json()
     try:
         data = request.get_json()
         name = data.get('name', '').strip()
@@ -6446,6 +6710,7 @@ def save_email_template():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/email_templates/<int:template_id>', methods=['DELETE'])
+@requires_auth
 def delete_email_template(template_id):
     try:
         conn = sqlite3.connect(DB_PATH)
@@ -6461,7 +6726,7 @@ def delete_email_template(template_id):
 
 if __name__ == '__main__':
     app.jinja_env.globals["version"] = "v2025.2"
-    app.jinja_env.globals["publish_date"] = "December 28, 2025"
+    app.jinja_env.globals["publish_date"] = "December 31, 2025"
 
     app.jinja_env.globals["get_cache_status"] = get_global_cache_status
 
@@ -6522,6 +6787,8 @@ if __name__ == '__main__':
 
     DATA_KEY = ensure_data_key()
     fernet = Fernet(DATA_KEY)
+    if not app.secret_key:
+        app.secret_key = secrets.token_hex(16) + DATA_KEY[:16]
 
     os.makedirs("database", exist_ok=True)
     

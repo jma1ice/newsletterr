@@ -221,7 +221,7 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 ### v2025.2.1:
 
 #### Fixed:
-* Fixed small issue with expanded collections not showing in received email
+* Fixed small issue with expanded collections not showing in received email if the Collection Group name is changed
 
 #### New Features:
 * Added a collapse UI button to expanded collections that leaves the collection expanded in the email but preserves space in the Snap-Ins UI

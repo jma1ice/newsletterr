@@ -47,16 +47,17 @@
             {% if session["username"] %}
                 <li><a href="{{ url_for('logout') }}" class="hover:underline">logout</a></li>
             {% endif %}
-            <li style="margin-left: 20px;">
+            <li id="cache-li" style="margin-left: 20px;">
                 {% set cache_status = get_cache_status() %}
                 <span class="cache-badge-base {{ cache_status.class }}" 
                       title="{{ cache_status.status }}\nPresent: {{ cache_status.present|join(', ') if cache_status.present else 'none' }}\nMissing: {{ cache_status.missing|join(', ') if cache_status.missing else 'none' }}">
-                    <strong>Cache:</strong>
-                    {% if cache_status.has_data %}
-                        {{ cache_status.age_display }}
-                    {% else %}
-                        none
-                    {% endif %}
+                    <strong id="cache-badge">Cache:
+                        {% if cache_status.has_data %}
+                            {{ cache_status.age_display }}
+                        {% else %}
+                            none
+                        {% endif %}
+                    </strong>
                 </span>
             </li>
         </ul>
@@ -69,7 +70,7 @@
                 <a href="{{ update_info.release_url }}" target="_blank" rel="noopener">See release notes</a>
             </div>
         {% endif %}
-        <div style="display: flex;">
+        <div id="nav-right" style="display: flex;">
             <button id="theme-toggle" type="button" role="switch" aria-checked="false" aria-label="Toggle dark mode" class="relative inline-flex h-8 w-16 items-center rounded-full bg-gray-200 dark:bg-gray-700 transition-colors focus:outline-none transform -translate-x-2 translate-y-2.5">
                 <span class="pointer-events-none absolute inset-0 z-20 flex items-center justify-between px-1">
                     <svg class="h-5 w-5 text-amber-400 transition-opacity duration-100 ease-in-out dark:!opacity-0 transform translate-x-1 translate-y-0.5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">

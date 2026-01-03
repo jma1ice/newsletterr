@@ -203,20 +203,19 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Add in To: vs BCC: option
 * Make collections clickable - is this possible?
 * Date range for stats (i.e. 1.1.25 - 1.1.26)
-* Mobile optimizations, i.e.:
-```
-<style>
-   @media (max-width: 600px) {
-      .stack { display:block !important; width:100% !important; }
-      .gpx { padding-left:0 !important; padding-right:0 !important; }
-      .poster { width:100% !important; height:auto !important; }
-   }
-</style>
-```
 
 ---
 
 ## Recent Changes
+
+### v2026.1:
+
+#### Fixed:
+* CSS Optimizations
+
+#### New Features:
+* 
+
 
 ### v2025.2.1:
 

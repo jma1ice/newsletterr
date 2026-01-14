@@ -424,7 +424,7 @@ def check_credentials(username, password):
 
     return username == expected_username and password == decrypt(expected_password)
 
-def safe_get(url: str, *, timeout: int = 15, retries: int = 2, **kwargs):
+def safe_get(url: str, *, timeout: int = 120, retries: int = 2, **kwargs):
     for attempt in range(retries + 1):
         try:
             return requests.get(url, timeout=timeout, **kwargs)
@@ -1905,7 +1905,7 @@ def run_conjurr_command(base_url, user_dict, error):
 
     for user in user_dict.keys():
         try:
-            api_url = f"{api_base_url}{user}"
+            api_url = f"{api_base_url}{user}&mode=history"
             response = safe_get(api_url)
             response.raise_for_status()
             data = response.json()

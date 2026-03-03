@@ -424,7 +424,7 @@ def check_credentials(username, password):
 
     return username == expected_username and password == decrypt(expected_password)
 
-def safe_get(url: str, *, timeout: int = 15, retries: int = 2, **kwargs):
+def safe_get(url: str, *, timeout: int = 120, retries: int = 2, **kwargs):
     for attempt in range(retries + 1):
         try:
             return requests.get(url, timeout=timeout, **kwargs)
@@ -2170,44 +2170,92 @@ def convert_html_to_plain_text(html_content):
 def fetch_and_attach_image(image_url, msg_root, cid_name, base_url=""):
     try:
         print(f"fetch_and_attach_image called with: {image_url}")
-        
-        is_local_static = (
-            image_url.startswith('/static/') or 
-            image_url.startswith('/static\\') or
-            'static/img/' in image_url or
-            'static/uploads/' in image_url
-        )
-        
-        if is_local_static:
-            full_url = urljoin(base_url or "http://127.0.0.1:6397", image_url)
-            print(f"Local static file, fetching directly: {full_url}")
-        elif image_url.startswith('/library/') or image_url.startswith('/photo/'):
-            full_url = urljoin(base_url or "http://127.0.0.1:6397", f"/proxy-art{image_url}")
-            print(f"Plex image, using proxy: {full_url}")
-        elif image_url.startswith('http'):
-            parsed = urlparse(image_url)
+        # If we were given a local proxy URL (e.g. /proxy-img?u=...), unwrap it to the real target URL.
+        # When building emails, there is no authenticated browser session, so fetching /proxy-img
+        # would return the login HTML instead of an image.
+        try:
+            if image_url.startswith('/proxy-img'):
+                parsed_proxy = urlparse(image_url)
+                q = parse_qs(parsed_proxy.query or '')
+                real_url = (q.get('u') or [None])[0]
+                if real_url and real_url.startswith(('http://', 'https://')):
+                    print(f"Unwrapping proxy-img URL to direct URL for email: {real_url}")
+                    image_url = real_url
+        except Exception as _unwrap_err:
+            print(f"Warning: failed to unwrap proxy-img URL '{image_url}': {_unwrap_err}")
+
+        full_url = None
+
+        # Special case: internal proxy-art URL used for Plex artwork.
+        # When building emails, calling /proxy-art over HTTP would hit @requires_auth
+        # and return the login HTML instead of an image. Instead, resolve directly
+        # against Plex using the stored Plex URL and token.
+        if image_url.startswith('/proxy-art/'):
+            try:
+                art_path = image_url[len('/proxy-art/'):].lstrip('/')
+                import sqlite3  # local import to avoid circulars at module import time
+                conn = sqlite3.connect(DB_PATH)
+                cursor = conn.cursor()
+                cursor.execute("SELECT plex_url, plex_token FROM settings WHERE id = 1")
+                row = cursor.fetchone()
+                conn.close()
+
+                if not row or not row[0] or not row[1]:
+                    print("proxy-art email fetch: Plex not configured or missing token; skipping image.")
+                    return None
+
+                plex_url = (row[0] or '').rstrip('/')
+                plex_token_enc = row[1]
+                plex_token = decrypt(plex_token_enc)
+
+                full_url = f"{plex_url}/{art_path}"
+                if '?' in full_url:
+                    full_url += f"&X-Plex-Token={plex_token}"
+                else:
+                    full_url += f"?X-Plex-Token={plex_token}"
+                print(f"Email proxy-art fetch: {full_url}")
+            except Exception as e:
+                print(f"Error preparing proxy-art email fetch for {image_url}: {e}")
+                return None
+
+        if full_url is None:
+            is_local_static = (
+                image_url.startswith('/static/') or 
+                image_url.startswith('/static\\') or
+                'static/img/' in image_url or
+                'static/uploads/' in image_url
+            )
             
-            if '/library/' in parsed.path or '/photo/' in parsed.path or '/composite/' in parsed.path:
-                path = parsed.path
-                query = parsed.query
+            if is_local_static:
+                full_url = urljoin(base_url or "http://127.0.0.1:6397", image_url)
+                print(f"Local static file, fetching directly: {full_url}")
+            elif image_url.startswith('/library/') or image_url.startswith('/photo/'):
+                full_url = urljoin(base_url or "http://127.0.0.1:6397", f"/proxy-art{image_url}")
+                print(f"Plex image, using proxy: {full_url}")
+            elif image_url.startswith('http'):
+                parsed = urlparse(image_url)
                 
-                if query:
-                    params = parse_qs(query)
-                    if 'X-Plex-Token' in params:
-                        del params['X-Plex-Token']
+                if '/library/' in parsed.path or '/photo/' in parsed.path or '/composite/' in parsed.path:
+                    path = parsed.path
+                    query = parsed.query
                     
-                    if params:
-                        query_str = urlencode(params, doseq=True)
-                        path = f"{path}?{query_str}"
-                
-                full_url = urljoin(base_url or "http://127.0.0.1:6397", f"/proxy-art{path}")
-                print(f"Full Plex URL, using proxy: {full_url}")
+                    if query:
+                        params = parse_qs(query)
+                        if 'X-Plex-Token' in params:
+                            del params['X-Plex-Token']
+                        
+                        if params:
+                            query_str = urlencode(params, doseq=True)
+                            path = f"{path}?{query_str}"
+                    
+                    full_url = urljoin(base_url or "http://127.0.0.1:6397", f"/proxy-art{path}")
+                    print(f"Full Plex URL, using proxy: {full_url}")
+                else:
+                    full_url = image_url
+                    print(f"External URL, fetching directly: {full_url}")
             else:
-                full_url = image_url
-                print(f"External URL, fetching directly: {full_url}")
-        else:
-            full_url = urljoin(base_url or "http://127.0.0.1:6397", image_url)
-            print(f"Default case, fetching: {full_url}")
+                full_url = urljoin(base_url or "http://127.0.0.1:6397", image_url)
+                print(f"Default case, fetching: {full_url}")
         
         print(f"Final URL to fetch: {full_url}")
         
@@ -2260,7 +2308,35 @@ def fetch_and_attach_image(image_url, msg_root, cid_name, base_url=""):
 
 def fetch_and_attach_blurred_image(image_url, msg_root, cid_name, base_url=""):
     try:
-        if image_url.startswith('/'):
+        # Support proxy-art URLs for blurred backgrounds as well (same login-redirect issue).
+        if image_url.startswith('/proxy-art/'):
+            try:
+                art_path = image_url[len('/proxy-art/'):].lstrip('/')
+                import sqlite3
+                conn = sqlite3.connect(DB_PATH)
+                cursor = conn.cursor()
+                cursor.execute("SELECT plex_url, plex_token FROM settings WHERE id = 1")
+                row = cursor.fetchone()
+                conn.close()
+
+                if not row or not row[0] or not row[1]:
+                    print("proxy-art blurred email fetch: Plex not configured or missing token; skipping image.")
+                    return None
+
+                plex_url = (row[0] or '').rstrip('/')
+                plex_token_enc = row[1]
+                plex_token = decrypt(plex_token_enc)
+
+                full_url = f"{plex_url}/{art_path}"
+                if '?' in full_url:
+                    full_url += f"&X-Plex-Token={plex_token}"
+                else:
+                    full_url += f"?X-Plex-Token={plex_token}"
+                print(f"Email proxy-art blurred fetch: {full_url}")
+            except Exception as e:
+                print(f"Error preparing proxy-art blurred email fetch for {image_url}: {e}")
+                return None
+        elif image_url.startswith('/'):
             full_url = urljoin(base_url or "http://127.0.0.1:6397", image_url)
         else:
             full_url = image_url
@@ -4319,7 +4395,7 @@ def send_scheduled_user_email_with_cids(recipients, subject, selected_items, use
             print("Port 587 typically uses TLS (STARTTLS)")
 
         msg_root = MIMEMultipart('related')
-        msg_root['Subject'] = f"[SCHEDULED] {subject}"
+        msg_root['Subject'] = subject
         
         if alias_email:
             if from_name == '':
@@ -4416,7 +4492,7 @@ def send_scheduled_user_email_with_cids(recipients, subject, selected_items, use
             history_cursor = history_conn.cursor()
             history_cursor.execute('''INSERT INTO email_history (subject, recipients, email_content, content_size_kb, recipient_count, template_name)
                             VALUES (?, ?, ?, ?, ?, ?)''',
-                            (f"[SCHEDULED] {subject}", ', '.join(all_recipients), email_content[:1000], content_size_kb, len(all_recipients), template_name))
+                            (subject, ', '.join(all_recipients), email_content[:1000], content_size_kb, len(all_recipients), template_name))
             history_conn.commit()
             history_conn.close()
         except Exception as log_err:
@@ -4451,7 +4527,7 @@ def send_scheduled_single_email_with_cids(to_emails_list, subject, selected_item
             print("Port 587 typically uses TLS (STARTTLS)")
 
         msg_root = MIMEMultipart('related')
-        msg_root['Subject'] = f"[SCHEDULED] {subject}"
+        msg_root['Subject'] = subject
         
         if alias_email:
             if from_name == '':
@@ -4546,7 +4622,7 @@ def send_scheduled_single_email_with_cids(to_emails_list, subject, selected_item
             history_cursor = history_conn.cursor()
             history_cursor.execute('''INSERT INTO email_history (subject, recipients, email_content, content_size_kb, recipient_count, template_name)
                             VALUES (?, ?, ?, ?, ?, ?)''',
-                            (f"[SCHEDULED] {subject}", ', '.join(all_recipients), email_content[:1000], content_size_kb, len(all_recipients), template_name))
+                            (subject, ', '.join(all_recipients), email_content[:1000], content_size_kb, len(all_recipients), template_name))
             history_conn.commit()
             history_conn.close()
         except Exception as log_err:

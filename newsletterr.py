@@ -1126,9 +1126,14 @@ def background_scheduler():
             current_time = time.time()
             
             if current_time - last_cache_refresh > CACHE_DURATION:
-                print(f"Daily cache refresh triggered at {now.isoformat()}")
-                refresh_daily_cache()
-                last_cache_refresh = current_time
+                cache_info = get_cache_info('recent_data')
+                if cache_info.get('exists') and cache_info.get('age_hours', 999) * 3600 < 60:
+                    print("Cache recently updated manually, skipping background refresh")
+                    last_cache_refresh = current_time
+                else:
+                    print(f"Daily cache refresh triggered at {now.isoformat()}")
+                    refresh_daily_cache()
+                    last_cache_refresh = current_time
             
             conn = sqlite3.connect(DB_PATH)
             cursor = conn.cursor()
@@ -1170,6 +1175,9 @@ def background_scheduler():
         time.sleep(60)
 
 def refresh_daily_cache():
+    if not _REFRESH_LOCK.acquire(blocking=False):
+        print("Cache refresh already in progress, skipping.")
+        return
     try:
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
@@ -1260,6 +1268,10 @@ def refresh_daily_cache():
             print("✓ Graph data cache refreshed")
         
         libraries, _ = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_library_names', None, None, "10")
+        if not libraries:
+            print("No libraries found")
+            return recent_data
+
         library_section_ids = {}
         for library in libraries:
             library_section_ids[f"{library['section_id']}"] = library["section_name"]
@@ -1274,6 +1286,9 @@ def refresh_daily_cache():
         
     except Exception as e:
         print(f"Error in daily cache refresh: {e}")
+
+    finally:
+        _REFRESH_LOCK.release()
 
 def capture_chart_images_via_headless(schedule_id: int, base: str, theme: str) -> dict:
     url = f"{base}/scheduling/{schedule_id}/preview-page?schedule_id={schedule_id}"
@@ -6749,7 +6764,7 @@ def delete_email_template(template_id):
 
 if __name__ == '__main__':
     app.jinja_env.globals["version"] = "v2026.1"
-    app.jinja_env.globals["publish_date"] = "March 14, 2026"
+    app.jinja_env.globals["publish_date"] = "March 15, 2026"
 
     app.jinja_env.globals["get_cache_status"] = get_global_cache_status
 
@@ -6809,6 +6824,7 @@ if __name__ == '__main__':
     _WORKERS_STARTED = False
     _WORKERS_LOCK = threading.Lock()
     _RENDER_LOCK = threading.Lock()
+    _REFRESH_LOCK = threading.Lock()
 
     DATA_KEY = ensure_data_key()
     fernet = Fernet(DATA_KEY)
@@ -6825,7 +6841,9 @@ if __name__ == '__main__':
     migrate_ra_recs_to_recently_added_recommendations()
     migrate_email_templates_for_expanded_collections()
 
-    if os.environ.get("WERKZEUG_RUN_MAIN") == "true" and not app.debug:
+    if os.environ.get("WERKZEUG_RUN_MAIN") == "true" or not app.debug:
         start_background_workers()
 
-    app.run(host="0.0.0.0", port=6397, debug=True)
+    debug = os.environ.get("FLASK_DEBUG", "0") == "1"
+
+    app.run(host="0.0.0.0", port=6397, debug=debug)

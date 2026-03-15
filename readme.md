@@ -164,13 +164,9 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Email click for recently added/available recommendations is going to chrome on mobile instead of app - this is an issue with the new Plex client, have not seen a fix yet and no info released by Plex at this time
 * Some clients show posters as small slivers instead of whole poster
 * Why is this generating 'New Device Connected' notifications for some?
-* Are libraries capped to 5 for some reason?
-* Why do libraries that share name similarities cause issues in email preview (ie 2 libs with 'TV' in both names)?
 * Update Plex authentication for PlexAPI v0.31.1 (plexapi.plex no longer supported)
 * Recommendations pull will hang for a short period if conjurr is not running
 * Pop out preview does not update with changes to the email
-* Recently Added is now doubling up on items in the builder, but not in the actual sent email
-* Graphs hang after the security changes, my first instinct is the safe_get() function
 * Is scheduled send using the same SMTP Username/From fields as one-off send?
 
 #### And these items are feature requests:
@@ -192,7 +188,7 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Option to sort recently added by IMDb rating
 * Option to pull recently added by # of days - when this is in should be able to show 'new items since x date' in email
 * GitHub webhook to pull submitted issues to Discord channel
-* Sonarr/Radarr calendar integration for 'coming soon'
+* Sonarr/Radarr calendar integration for 'coming soon' type email
 * Servarr PR
 * Stats for total items in library
 * Ratings (G, PG, etc) listed on recently added
@@ -220,6 +216,8 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Some CSS Optimizations for mobile - more still in the works
 * Timeout on safe_get() extended to 120s so that conjurr api call has enough time to generate the recommendations
 * Fixed authentication issue with /proxy-art that made art unavailble in the sent email if a login page was set up
+* Fixed a bug where libraries that share name similarities were causing both libraries to be pulled into the 'recently added' snap in
+* Fixed graph hanging bug by moving some variable declarations higher and packaging highcharts with the app instead of calls to the CDN
 
 #### New Features:
 * 

@@ -68,11 +68,16 @@
         </div>
         <div>
             <dt class="font-semibold dark:border-gray-300">Check out our other project</dt>
-            <a target="_blank" href="https://github.com/yungsnuzzy/conjurr">conjurr</a><br><br>
-            <a target="_blank" href="https://github.com/yungsnuzzy/autoytdlp">autoytdlp</a><br><br>
-            <a target="_blank" href="https://github.com/jma1ice/scorepad">ScorePad</a><br><br>
-            <a target="_blank" href="https://github.com/jma1ice/focus">FOCUS</a><br><br>
-            <a target="_blank" href="https://github.com/jma1ice/onairr">OnAirr</a><br><br>
+            <a target="_blank" href="https://github.com/yungsnuzzy/conjurr">conjurr</a>
+            <p>AI Recommendations for your users</p>
+            <a target="_blank" href="https://github.com/yungsnuzzy/autoytdlp">autoytdlp</a>
+            <p>Automated YouTube downloader and processor</p>
+            <a target="_blank" href="https://github.com/jma1ice/scorepad">ScorePad</a>
+            <p>Scorekeeping site for card games</p>
+            <a target="_blank" href="https://github.com/jma1ice/focus">FOCUS</a>
+            <p>Productivity app to help keep your projects on track</p>
+            <a target="_blank" href="https://github.com/jma1ice/onairr">OnAirr</a>
+            <p>Minimal Plex 'Now Streaming' interface</p>
             <a target="_blank" href="https://ko-fi.com/newsletterr">Tip the developers!</a>
         </div>
     </dl>
@@ -95,6 +100,8 @@
         <li>Some CSS Optimizations for mobile - more still in the works</li>
         <li>Timeout on safe_get() extended to 120s so that conjurr api call has enough time to generate the recommendations</li>
         <li>Fixed authentication issue with /proxy-art that made art unavailble in the sent email if a login page was set up</li>
+        <li>Fixed a bug where libraries that share name similarities were causing both libraries to be pulled into the 'recently added' snap in</li>
+        <li>Fixed graph hanging bug by moving some variable declarations higher and packaging highcharts with the app instead of calls to the CDN</li>
     </ul>
     <dt class="font-semibold dark:border-gray-300">New Features:</dt>
     <ul class="list-disc list-inside space-y-2 text-sm mb-2">

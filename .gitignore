@@ -4,3 +4,4 @@ env/
 .db
 __pycache__/
 *.json
+venv/

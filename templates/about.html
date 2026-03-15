@@ -34,13 +34,19 @@
         </div>
     </div>
 
-    <div class="border-1 border-green-400 dark:border-green-500 rounded-lg p-2 w-[239px]">
-        <div class="grid grid-cols-1 gap-2 w-100">
+    <div class="border-1 border-green-400 dark:border-green-500 rounded-lg p-2 w-25 mb-2">
+        <div class="grid grid-cols-2 gap-2 w-100">
             <div class="flex w-100 items-center space-x-3 p-3 bg-[#8acbd4] dark:bg-[#62a1a4] rounded-lg">
                 <div class="w-20 h-10 bg-[#62a1a4] dark:bg-[#8acbd4] rounded-full flex items-center justify-center text-[#333] font-bold">
                     Ko-Fi
                 </div>
                 <div class="font-semibold text-[#333]">@taehatypes</div>
+            </div>
+            <div class="flex w-100 items-center space-x-3 p-3 bg-[#8acbd4] dark:bg-[#62a1a4] rounded-lg">
+                <div class="w-20 h-10 bg-[#62a1a4] dark:bg-[#8acbd4] rounded-full flex items-center justify-center text-[#333] font-bold">
+                    GitHub
+                </div>
+                <div class="font-semibold text-[#333]">@quinneydavid</div>
             </div>
         </div>
     </div>
@@ -64,6 +70,9 @@
             <dt class="font-semibold dark:border-gray-300">Check out our other project</dt>
             <a target="_blank" href="https://github.com/yungsnuzzy/conjurr">conjurr</a><br><br>
             <a target="_blank" href="https://github.com/yungsnuzzy/autoytdlp">autoytdlp</a><br><br>
+            <a target="_blank" href="https://github.com/jma1ice/scorepad">ScorePad</a><br><br>
+            <a target="_blank" href="https://github.com/jma1ice/focus">FOCUS</a><br><br>
+            <a target="_blank" href="https://github.com/jma1ice/onairr">OnAirr</a><br><br>
             <a target="_blank" href="https://ko-fi.com/newsletterr">Tip the developers!</a>
         </div>
     </dl>
@@ -83,11 +92,13 @@
     <h2 class="text-2xl font-bold mb-2">Recent Changes</h2>
     <dt class="font-semibold dark:border-gray-300">Fixes:</dt>
     <ul class="list-disc list-inside space-y-2 text-sm mb-2">
-        <li>Fixed small issue with expanded collections not showing in received email if the Collection Group name is changed</li>
+        <li>Some CSS Optimizations for mobile - more still in the works</li>
+        <li>Timeout on safe_get() extended to 120s so that conjurr api call has enough time to generate the recommendations</li>
+        <li>Fixed authentication issue with /proxy-art that made art unavailble in the sent email if a login page was set up</li>
     </ul>
     <dt class="font-semibold dark:border-gray-300">New Features:</dt>
     <ul class="list-disc list-inside space-y-2 text-sm mb-2">
-        <li>Added a collapse UI button to expanded collections that leaves the collection expanded in the email but preserves space in the Snap-Ins UI</li>
+        <li></li>
     </ul>
 </div>
 {% endblock %}

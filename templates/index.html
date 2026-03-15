@@ -504,6 +504,9 @@
         </div>
         <script nonce="{{ nonce }}">
             const recentPayload = {{ recent_data | tojson | safe }};
+            const renderedCharts = new Set();
+            const graphDataList = JSON.parse('{{ graph_data | tojson | safe }}');
+            const graphCommands = JSON.parse('{{ graph_commands | tojson | safe }}');
 
             function buildThumb(path) {
                 if (!path) return '';
@@ -1246,7 +1249,7 @@
                 
                 if (libraryFilter) {
                     allItems = allItems.filter(item => 
-                        item.library_name && item.library_name.toLowerCase().includes(libraryFilter.toLowerCase())
+                        item.library_name && item.library_name.toLowerCase() === libraryFilter.toLowerCase()
                     );
                 }
 
@@ -2243,11 +2246,6 @@
                 const nowDark = document.documentElement.classList.contains('dark');
                 applyChartTheme(!nowDark);
             });
-
-            const graphDataList = JSON.parse('{{ graph_data | tojson | safe }}');
-            const graphCommands = JSON.parse('{{ graph_commands | tojson | safe }}');
-
-            const renderedCharts = new Set();
         </script>
         <script nonce="{{ nonce }}">
             window.expandedCollections = {};

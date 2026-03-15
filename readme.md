@@ -167,7 +167,6 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Update Plex authentication for PlexAPI v0.31.1 (plexapi.plex no longer supported)
 * Recommendations pull will hang for a short period if conjurr is not running
 * Pop out preview does not update with changes to the email
-* Is scheduled send using the same SMTP Username/From fields as one-off send?
 
 #### And these items are feature requests:
 * Add sections to settings page (email server | external services | email styling | login page)
@@ -218,6 +217,7 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Fixed authentication issue with /proxy-art that made art unavailble in the sent email if a login page was set up
 * Fixed a bug where libraries that share name similarities were causing both libraries to be pulled into the 'recently added' snap in
 * Fixed graph hanging bug by moving some variable declarations higher and packaging highcharts with the app instead of calls to the CDN
+* Fixed missing smtp_username variable from scheduled email send logic
 
 #### New Features:
 * 

@@ -4215,7 +4215,7 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
         
         settings_conn = sqlite3.connect(DB_PATH)
         settings_cursor = settings_conn.cursor()
-        settings_cursor.execute("SELECT from_email, alias_email, reply_to_email, password, smtp_server, smtp_port, smtp_protocol, server_name, tautulli_url, tautulli_api, logo_filename, logo_width, custom_logo_filename, from_name FROM settings WHERE id = 1")
+        settings_cursor.execute("SELECT from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, tautulli_url, tautulli_api, logo_filename, logo_width, custom_logo_filename, from_name FROM settings WHERE id = 1")
         settings_result = settings_cursor.fetchone()
         settings_conn.close()
         
@@ -4223,7 +4223,7 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
             print("SMTP settings not found in database")
             return False
         
-        from_email, alias_email, reply_to_email, encrypted_password, smtp_server, smtp_port, smtp_protocol, server_name, tautulli_base_url, tautulli_api_key, logo_filename, logo_width, custom_logo_filename, from_name = settings_result
+        from_email, alias_email, reply_to_email, encrypted_password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, tautulli_base_url, tautulli_api_key, logo_filename, logo_width, custom_logo_filename, from_name = settings_result
         
         public_base = os.environ.get("PUBLIC_BASE_URL", "http://127.0.0.1:6397")
         theme = 'dark'
@@ -4295,10 +4295,10 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
                 
                 success = send_scheduled_user_email_with_cids(
                     recipients, subject, selected_items, user_key, recommendations_data,
-                    from_email, alias_email, reply_to_email, encrypted_password, smtp_server,
-                    smtp_port, smtp_protocol, server_name, tautulli_base_url, tautulli_api_key,
-                    date_range, items_count, template_name, logo_filename, logo_width, custom_logo_filename,
-                    from_name, display_preference, users_data, expanded_collections
+                    from_email, alias_email, reply_to_email, encrypted_password, smtp_username,
+                    smtp_server, smtp_port, smtp_protocol, server_name, tautulli_base_url,
+                    tautulli_api_key, date_range, items_count, template_name, logo_filename, logo_width,
+                    custom_logo_filename, from_name, display_preference, users_data, expanded_collections
                 )
                 
                 if success:
@@ -4319,9 +4319,9 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
             print("Template has no recommendations, sending single email to all recipients...")
             return send_scheduled_single_email_with_cids(
                 to_emails_list, subject, selected_items, from_email, alias_email, reply_to_email,
-                encrypted_password, smtp_server, smtp_port, smtp_protocol, server_name, tautulli_base_url,
-                tautulli_api_key, date_range, items_count, template_name, logo_filename, logo_width,
-                custom_logo_filename, from_name, display_preference, users_data, expanded_collections
+                encrypted_password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name,
+                tautulli_base_url, tautulli_api_key, date_range, items_count, template_name, logo_filename,
+                logo_width, custom_logo_filename, from_name, display_preference, users_data, expanded_collections
             )
         
     except Exception as e:
@@ -4329,7 +4329,7 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
         traceback.print_exc()
         return False
 
-def send_scheduled_user_email_with_cids(recipients, subject, selected_items, user_key, recommendations_data, from_email, alias_email, reply_to_email, encrypted_password, smtp_server, smtp_port, smtp_protocol, server_name, tautulli_base_url, tautulli_api_key, date_range, items_count, template_name, logo_filename, logo_width, custom_logo_filename, from_name, display_preference, users_data, expanded_collections):
+def send_scheduled_user_email_with_cids(recipients, subject, selected_items, user_key, recommendations_data, from_email, alias_email, reply_to_email, encrypted_password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, tautulli_base_url, tautulli_api_key, date_range, items_count, template_name, logo_filename, logo_width, custom_logo_filename, from_name, display_preference, users_data, expanded_collections):
     try:
         print(f"SMTP Config: {smtp_server}:{smtp_port} using {smtp_protocol}")
 
@@ -4406,13 +4406,15 @@ def send_scheduled_user_email_with_cids(recipients, subject, selected_items, use
         if smtp_protocol == 'SSL':
             print(f"Using SMTP_SSL on port {smtp_port}")
             server = smtplib.SMTP_SSL(smtp_server, int(smtp_port))
-            server.login(from_email, decrypt(encrypted_password))
+            login_username = smtp_username if smtp_username else from_email
+            server.login(login_username, decrypt(encrypted_password))
         else:
             print(f"Using SMTP with STARTTLS on port {smtp_port}")
             server = smtplib.SMTP(smtp_server, int(smtp_port))
             print("Starting TLS...")
             server.starttls()
-            server.login(from_email, decrypt(encrypted_password))
+            login_username = smtp_username if smtp_username else from_email
+            server.login(login_username, decrypt(encrypted_password))
         
         print("SMTP connection established successfully")
         
@@ -4461,7 +4463,7 @@ def send_scheduled_user_email_with_cids(recipients, subject, selected_items, use
         traceback.print_exc()
         return False
 
-def send_scheduled_single_email_with_cids(to_emails_list, subject, selected_items, from_email, alias_email, reply_to_email, encrypted_password, smtp_server, smtp_port, smtp_protocol, server_name, tautulli_base_url, tautulli_api_key, date_range, items_count, template_name, logo_filename, logo_width, custom_logo_filename, from_name, display_preference, users_data, expanded_collections, email_text=""):
+def send_scheduled_single_email_with_cids(to_emails_list, subject, selected_items, from_email, alias_email, reply_to_email, encrypted_password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, tautulli_base_url, tautulli_api_key, date_range, items_count, template_name, logo_filename, logo_width, custom_logo_filename, from_name, display_preference, users_data, expanded_collections, email_text=""):
     try:
         print(f"SMTP Config: {smtp_server}:{smtp_port} using {smtp_protocol}")
 
@@ -4536,13 +4538,15 @@ def send_scheduled_single_email_with_cids(to_emails_list, subject, selected_item
         if smtp_protocol == 'SSL':
             print(f"Using SMTP_SSL on port {smtp_port}")
             server = smtplib.SMTP_SSL(smtp_server, int(smtp_port))
-            server.login(from_email, decrypt(encrypted_password))
+            login_username = smtp_username if smtp_username else from_email
+            server.login(login_username, decrypt(encrypted_password))
         else:
             print(f"Using SMTP with STARTTLS on port {smtp_port}")
             server = smtplib.SMTP(smtp_server, int(smtp_port))
             print("Starting TLS...")
             server.starttls()
-            server.login(from_email, decrypt(encrypted_password))
+            login_username = smtp_username if smtp_username else from_email
+            server.login(login_username, decrypt(encrypted_password))
         
         print("SMTP connection established successfully")
         

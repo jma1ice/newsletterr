@@ -176,7 +176,6 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Make top title into a text block so it is editable/removable
 * Don't have page reload on stats/users pull
 * Keep settings details on error so user won't have to re-enter them
-* GitHub link should be the stylized logo
 * Option for small cover art of each item in a stat table
 * IMDb ratings in stat tables
 * Snap-in for images/gifs/emojis
@@ -220,7 +219,7 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Fixed missing smtp_username variable from scheduled email send logic
 
 #### New Features:
-* 
+* GitHub link is now a stylized logo
 
 
 ### v2025.2.1:

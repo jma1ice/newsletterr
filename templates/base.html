@@ -134,13 +134,15 @@
     </p>
     <p class="middle-foot">
         <a target="_blank" href="https://ko-fi.com/newsletterr" style="display: inline-flex; align-items: center; text-decoration: none;">
-            <img src="{{ url_for('static', filename='img/kofi.png') }}" alt="Ko-fi" style="height: 16px; margin-right: 6px;">
+            <img src="{{ url_for('static', filename='img/kofi.png') }}" alt="Ko-fi" style="height: 22px; margin-right: 6px;">
             <span>Tip the devs</span>
         </a>
     </p>
     <p class="right-foot">
-        {{ version }}
-        <a target="_blank" href="https://github.com/jma1ice/newsletterr">GitHub</a>
+        <a target="_blank" href="https://github.com/jma1ice/newsletterr" style="display: inline-flex; align-items: center; text-decoration: none;">
+            <span>{{ version }}</span>
+            <img src="{{ url_for('static', filename='img/github.png') }}" alt="GitHub" style="height: 22px; margin-left: 6px;">
+        </a>
     </p>
 </footer>
 </html>

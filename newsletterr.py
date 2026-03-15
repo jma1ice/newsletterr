@@ -404,6 +404,9 @@ def requires_auth(f):
 
         if login_toggle[0] != 'enabled':
             return f(*args, **kwargs)
+        
+        if request.headers.get('X-Internal-Token') == INTERNAL_TOKEN:
+            return f(*args, **kwargs)
 
         if not session.get('authenticated'):
             return redirect(url_for('login'))
@@ -424,7 +427,7 @@ def check_credentials(username, password):
 
     return username == expected_username and password == decrypt(expected_password)
 
-def safe_get(url: str, *, timeout: int = 15, retries: int = 2, **kwargs):
+def safe_get(url: str, *, timeout: int = 120, retries: int = 2, **kwargs):
     for attempt in range(retries + 1):
         try:
             return requests.get(url, timeout=timeout, **kwargs)
@@ -1905,7 +1908,7 @@ def run_conjurr_command(base_url, user_dict, error):
 
     for user in user_dict.keys():
         try:
-            api_url = f"{api_base_url}{user}"
+            api_url = f"{api_base_url}{user}&mode=history"
             response = safe_get(api_url)
             response.raise_for_status()
             data = response.json()
@@ -2213,7 +2216,8 @@ def fetch_and_attach_image(image_url, msg_root, cid_name, base_url=""):
         
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8'
+            'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
+            'X-Internal-Token': INTERNAL_TOKEN
         }
         
         response = safe_get(full_url, timeout=15, headers=headers)
@@ -2265,7 +2269,13 @@ def fetch_and_attach_blurred_image(image_url, msg_root, cid_name, base_url=""):
         else:
             full_url = image_url
         
-        response = safe_get(full_url, timeout=10)
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
+            'X-Internal-Token': INTERNAL_TOKEN
+        }
+
+        response = safe_get(full_url, timeout=10, headers=headers)
         response.raise_for_status()
         
         image = Image.open(io.BytesIO(response.content))
@@ -6739,9 +6749,11 @@ def delete_email_template(template_id):
 
 if __name__ == '__main__':
     app.jinja_env.globals["version"] = "v2026.1"
-    app.jinja_env.globals["publish_date"] = "January 3, 2026"
+    app.jinja_env.globals["publish_date"] = "March 14, 2026"
 
     app.jinja_env.globals["get_cache_status"] = get_global_cache_status
+
+    INTERNAL_TOKEN = os.environ.get('INTERNAL_TOKEN', secrets.token_hex(32))
 
     CACHE_DURATION = 86400
     CACHE_EXTENDED_DURATION = 86400 * 7

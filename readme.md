@@ -161,7 +161,7 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 ## Planned Changes
 
 ### For the v2026.1 sprint, these items are to be addressed:
-* Email click for recently added/available recommendations is going to chrome on mobile instead of app
+* Email click for recently added/available recommendations is going to chrome on mobile instead of app - this is an issue with the new Plex client, have not seen a fix yet and no info released by Plex at this time
 * Some clients show posters as small slivers instead of whole poster
 * Why is this generating 'New Device Connected' notifications for some?
 * Are libraries capped to 5 for some reason?
@@ -169,6 +169,9 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Update Plex authentication for PlexAPI v0.31.1 (plexapi.plex no longer supported)
 * Recommendations pull will hang for a short period if conjurr is not running
 * Pop out preview does not update with changes to the email
+* Recently Added is now doubling up on items in the builder, but not in the actual sent email
+* Graphs hang after the security changes, my first instinct is the safe_get() function
+* Is scheduled send using the same SMTP Username/From fields as one-off send?
 
 #### And these items are feature requests:
 * Add sections to settings page (email server | external services | email styling | login page)
@@ -179,7 +182,6 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Don't have page reload on stats/users pull
 * Keep settings details on error so user won't have to re-enter them
 * GitHub link should be the stylized logo
-* Api/webhooks?
 * Option for small cover art of each item in a stat table
 * IMDb ratings in stat tables
 * Snap-in for images/gifs/emojis
@@ -203,6 +205,10 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Add in To: vs BCC: option
 * Make collections clickable - is this possible?
 * Date range for stats (i.e. 1.1.25 - 1.1.26)
+* More mobile CSS optimizations
+* Filter 0 length run time out of recently added
+* Setting for custom intro/outro text so custom does not have to be set every time
+* [Plex Wrapped](https://github.com/netplexflix/Plex-Wrapped-for-Tautulli?tab=readme-ov-file) API call integration
 
 ---
 
@@ -211,7 +217,9 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 ### v2026.1:
 
 #### Fixed:
-* CSS Optimizations
+* Some CSS Optimizations for mobile - more still in the works
+* Timeout on safe_get() extended to 120s so that conjurr api call has enough time to generate the recommendations
+* Fixed authentication issue with /proxy-art that made art unavailble in the sent email if a login page was set up
 
 #### New Features:
 * 

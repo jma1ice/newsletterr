@@ -50,9 +50,9 @@
     </div>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/highcharts/10.3.3/highcharts.min.js" nonce="{{ nonce }}"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/highcharts/10.3.3/modules/exporting.min.js" nonce="{{ nonce }}"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" nonce="{{ nonce }}"></script>
+<script src="{{ url_for('static', filename='js/html2canvas.min.js') }}" nonce="{{ nonce }}"></script>
+<script src="{{ url_for('static', filename='js/highcharts.js') }}" nonce="{{ nonce }}"></script>
+<script src="{{ url_for('static', filename='js/highcharts-exporting.js') }}" nonce="{{ nonce }}"></script>
 
 <script nonce="{{ nonce }}">
     const urlParams = new URLSearchParams(window.location.search);

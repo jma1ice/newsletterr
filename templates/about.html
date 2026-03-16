@@ -102,11 +102,13 @@
         <li>Fixed authentication issue with /proxy-art that made art unavailble in the sent email if a login page was set up</li>
         <li>Fixed a bug where libraries that share name similarities were causing both libraries to be pulled into the 'recently added' snap in</li>
         <li>Fixed graph hanging bug by moving some variable declarations higher and packaging highcharts with the app instead of calls to the CDN</li>
+        <li>While we're at it, moved all CDN calls to local files</li>
         <li>Fixed missing smtp_username variable from scheduled email send logic</li>
     </ul>
     <dt class="font-semibold dark:border-gray-300">New Features:</dt>
     <ul class="list-disc list-inside space-y-2 text-sm mb-2">
         <li>GitHub link is now a stylized logo</li>
+        <li>Page no longer reloads on stats/users pull</li>
     </ul>
 </div>
 {% endblock %}

@@ -14,22 +14,23 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css?family=IBM+Plex+Sans:400,700&display=swap" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-    <script src="https://cdn.tailwindcss.com" nonce="{{ nonce }}"></script>
+    <link href="{{ url_for('static', filename='css/tailwind.min.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
+    <script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}" nonce="{{ nonce }}"></script>
+    <script src="{{ url_for('static', filename='js/html2canvas.min.js') }}" nonce="{{ nonce }}"></script>
+    <script src="{{ url_for('static', filename='js/highcharts.js') }}" nonce="{{ nonce }}"></script>
+    <script src="{{ url_for('static', filename='js/highcharts-exporting.js') }}" nonce="{{ nonce }}"></script>
+    <script src="{{ url_for('static', filename='js/highcharts-offline-exporting.js') }}" nonce="{{ nonce }}"></script>
+    <!-- Tailwind Play CDN - downloaded [03.15.26], re-run: curl -L -o static/js/tailwind-play-cdn.js https://cdn.tailwindcss.com -->
+    <script src="{{ url_for('static', filename='js/tailwind-play-cdn.js') }}" nonce="{{ nonce }}"></script>
     <script nonce="{{ nonce }}">
         tailwind.config = {
             darkMode: 'class',
             corePlugins: { preflight: false }
         };
     </script>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" nonce="{{ nonce }}"></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <meta name="color-scheme" content="light dark">
-    <script src="{{ url_for('static', filename='js/highcharts.js') }}" nonce="{{ nonce }}"></script>
-    <script src="{{ url_for('static', filename='js/highcharts-exporting.js') }}" nonce="{{ nonce }}"></script>
-    <script src="{{ url_for('static', filename='js/highcharts-offline-exporting.js') }}" nonce="{{ nonce }}"></script>
-    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js" nonce="{{ nonce }}"></script>
     <title>{% block title %}newsletterr{% endblock %}</title>
 </head>
 <body>

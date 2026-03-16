@@ -174,7 +174,6 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Add a hosted 'most recent newsletter' webpage | also, add opt out support | also hosted images to reduce email size
 * Separator blocks to add lines between sections in emails
 * Make top title into a text block so it is editable/removable
-* Don't have page reload on stats/users pull
 * Keep settings details on error so user won't have to re-enter them
 * Option for small cover art of each item in a stat table
 * IMDb ratings in stat tables
@@ -216,10 +215,12 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Fixed authentication issue with /proxy-art that made art unavailble in the sent email if a login page was set up
 * Fixed a bug where libraries that share name similarities were causing both libraries to be pulled into the 'recently added' snap in
 * Fixed graph hanging bug by moving some variable declarations higher and packaging highcharts with the app instead of calls to the CDN
+* While we're at it, moved all CDN calls to local files
 * Fixed missing smtp_username variable from scheduled email send logic
 
 #### New Features:
 * GitHub link is now a stylized logo
+* Page no longer reloads on stats/users pull
 
 
 ### v2025.2.1:

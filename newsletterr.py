@@ -4748,7 +4748,7 @@ def set_security_headers(resp: Response):
     except Exception:
         return resp
 
-@app.route('/', methods=['GET', 'POST'])
+@app.route('/', methods=['GET'])
 @requires_auth
 def index():
     stats = None
@@ -4865,66 +4865,6 @@ def index():
                 if user['email'] != None and user['is_active']:
                     user_dict[user['user_id']] = user['email']
 
-    if request.method == 'POST':
-        token = request.form.get("csrf_token").strip()
-        if not token or token != session.get("csrf_token"):
-            abort(400)
-
-        if settings['server_name'] == "":
-            return render_template('index.html', error='Please enter tautulli info on settings page',
-                                    stats=stats, user_dict=user_dict, graph_data=graph_data,
-                                    graph_commands=graph_commands, alert=alert, settings=settings,
-                                    username=username)
-        else:
-            time_range = request.form.get("days_to_pull")
-            count = request.form.get("items_to_pull")
-            tautulli_base_url = settings['tautulli_url'].rstrip('/')
-            tautulli_api_key = settings['tautulli_api']
-            
-            cache_params = {
-                'time_range': time_range,
-                'count': count,
-                'url': tautulli_base_url,
-                'timestamp': time.time()
-            }
-
-            stats, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_home_stats', 'Stats', error, time_range)
-            set_cached_data('stats', stats, cache_params)
-            
-            users, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_users', 'Users', error)
-            set_cached_data('users', users, cache_params)
-            
-            graph_data = []
-            for command in graph_commands:
-                try:
-                    gd, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, command["command"], command["name"], error, time_range)
-                    graph_data.append(gd if gd is not None else {})
-                except Exception as e:
-                    graph_data.append({})
-                    if error is None:
-                        error = f"Graph Error: {str(e)}"
-                    else:
-                        error += f", Graph Error: {str(e)}"
-            set_cached_data('graph_data', graph_data, cache_params)
-
-            libraries, _ = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_library_names', None, None, "10")
-            library_section_ids = {}
-            for library in libraries:
-                library_section_ids[f"{library['section_id']}"] = library["section_name"]
-            
-            recent_data = fetch_recent_data_for_index(tautulli_base_url, tautulli_api_key, count)
-            set_cached_data('recent_data', recent_data, cache_params)
-            
-            user_dict = {}
-            users_full_data = None
-            if users:
-                users_full_data = users
-                for user in users:
-                    if user['email'] != None and user['is_active']:
-                        user_dict[user['user_id']] = user['email']
-            
-            alert = f"Fresh data loaded! Stats/graphs for {time_range} days, and {count} recently added items."
-
     if graph_data == []:
         graph_data = [{},{}]
         
@@ -5004,6 +4944,104 @@ def login():
 def logout():
     session.clear()
     return redirect(url_for('login'))
+
+@app.route('/pull_stats', methods=['POST'])
+@requires_auth
+def pull_stats():
+    require_csrf_for_json()
+    data = request.get_json()
+    time_range = str(data.get('time_range', 30))
+    count = str(data.get('count', 10))
+
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("SELECT tautulli_url, tautulli_api, server_name FROM settings WHERE id = 1")
+    row = cursor.fetchone()
+    conn.close()
+
+    if not row:
+        return jsonify({"error": "Please enter tautulli info on settings page"}), 500
+
+    tautulli_base_url = row[0].rstrip('/')
+    tautulli_api_key = decrypt(row[1])
+
+    cache_params = {
+        'time_range': time_range,
+        'count': count,
+        'url': tautulli_base_url,
+        'timestamp': time.time()
+    }
+
+    stats, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_home_stats', 'Stats', None, time_range)
+    set_cached_data('stats', stats, cache_params)
+
+    users, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_users', 'Users', error)
+    set_cached_data('users', users, cache_params)
+
+    graph_data = []
+    graph_commands = [
+        {'command': 'get_concurrent_streams_by_stream_type', 'name': 'Stream Type'},
+        {'command': 'get_plays_by_date', 'name': 'Plays by Date'},
+        {'command': 'get_plays_by_dayofweek', 'name': 'Plays by Day'},
+        {'command': 'get_plays_by_hourofday', 'name': 'Plays by Hour'},
+        {'command': 'get_plays_by_source_resolution', 'name': 'Plays by Source Res'},
+        {'command': 'get_plays_by_stream_resolution', 'name': 'Plays by Stream Res'},
+        {'command': 'get_plays_by_stream_type', 'name': 'Plays by Stream Type'},
+        {'command': 'get_plays_by_top_10_platforms', 'name': 'Plays by Top Platforms'},
+        {'command': 'get_plays_by_top_10_users', 'name': 'Plays by Top Users'},
+        {'command': 'get_plays_per_month', 'name': 'Plays per Month'},
+        {'command': 'get_stream_type_by_top_10_platforms', 'name': 'Stream Type by Top Platforms'},
+        {'command': 'get_stream_type_by_top_10_users', 'name': 'Stream Type by Top Users'}
+    ]
+    for command in graph_commands:
+        try:
+            gd, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, command["command"], command["name"], error, time_range)
+            graph_data.append(gd if gd is not None else {})
+        except Exception as e:
+            graph_data.append({})
+            if error is None:
+                error = f"Graph Error: {str(e)}"
+            else:
+                error += f", Graph Error: {str(e)}"
+    set_cached_data('graph_data', graph_data, cache_params)
+
+    libraries, _ = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_library_names', None, None, "10")
+    library_section_ids = {}
+    for library in libraries:
+        library_section_ids[f"{library['section_id']}"] = library["section_name"]
+
+    recent_data = fetch_recent_data_for_index(tautulli_base_url, tautulli_api_key, count)
+    set_cached_data('recent_data', recent_data, cache_params)
+
+    user_dict = {}
+    users_full_data = None
+    if users:
+        users_full_data = users
+        for user in users:
+            if user['email'] != None and user['is_active']:
+                user_dict[user['user_id']] = user['email']
+
+    return jsonify({
+        "success": True,
+        "alert": f"Fresh data loaded! Stats/graphs for {time_range} days, and {count} recently added items.",
+        "stats": stats or [],
+        "graph_data": graph_data,
+        "graph_commands": graph_commands,
+        "recent_data": recent_data,
+        "user_dict": user_dict,
+        "users_full_data": users_full_data,
+        "cache_info": {
+            "stats": get_cache_info('stats'),
+            "users": get_cache_info('users'),
+            "graph_data": get_cache_info('graph_data'),
+            "recent_data": get_cache_info('recent_data'),
+            "recommendations_json": get_cache_info('recommendations_json'),
+            "filtered_users": get_cache_info('filtered_users'),
+        },
+        "time_range": time_range,
+        "count": count,
+        "error": error
+    })
 
 @app.route('/proxy-art/<path:art_path>')
 @requires_auth

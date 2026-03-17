@@ -164,7 +164,6 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Email click for recently added/available recommendations is going to chrome on mobile instead of app - this is an issue with the new Plex client, have not seen a fix yet and no info released by Plex at this time
 * Some clients show posters as small slivers instead of whole poster
 * Update Plex authentication for PlexAPI v0.31.1 (plexapi.plex no longer supported)
-* Recommendations pull will hang for a short period if conjurr is not running
 * Pop out preview does not update with changes to the email
 
 #### And these items are feature requests:
@@ -217,6 +216,7 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * While we're at it, moved all CDN calls to local files
 * Fixed missing smtp_username variable from scheduled email send logic
 * Added consistent headers to avoid repeated 'New Device Connected' notifications on Plex API calls
+* Fixed bug where recommendations pull would hang for a short period if conjurr is not running
 
 #### New Features:
 * GitHub link is now a stylized logo

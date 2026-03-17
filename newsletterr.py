@@ -1405,6 +1405,37 @@ def group_recipients_by_user(to_emails_list, user_dict):
 def send_scheduled_email(schedule_id, email_list_id, template_id):
     return send_scheduled_email_with_cids(schedule_id, email_list_id, template_id)
 
+def get_plex_client_identifier():
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT plex_client_id FROM settings WHERE id = 1")
+        row = cursor.fetchone()
+        conn.close()
+        if row and row[0]:
+            return row[0]
+        client_id = str(uuid.uuid4())
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("UPDATE settings SET plex_client_id = ? WHERE id = 1", (client_id,))
+        conn.commit()
+        conn.close()
+        return client_id
+    except Exception:
+        return str(uuid.uuid4())
+
+def get_plex_headers(extra=None):
+    headers = {
+        'Accept': 'application/json',
+        'X-Plex-Client-Identifier': get_plex_client_identifier(),
+        'X-Plex-Product': 'Newsletterr',
+        'X-Plex-Device-Name': 'Newsletterr',
+        'X-Plex-Version': app.jinja_env.globals.get('version', ''),
+    }
+    if extra:
+        headers.update(extra)
+    return headers
+
 def get_plex_machine_id():
     try:
         conn = sqlite3.connect(DB_PATH)
@@ -1447,10 +1478,7 @@ def search_plex_for_rating_key(title, year, media_type, plex_url, plex_token, tm
             search_query = quote_plus(title)
             api_url = f"{plex_url}/search?query={search_query}&X-Plex-Token={decrypted_token}"
             
-            headers = {
-                'Accept': 'application/json',
-                'X-Plex-Client-Identifier': str(uuid.uuid4())
-            }
+            headers = get_plex_headers()
             
             response = safe_get(api_url, headers=headers, timeout=10)
             response.raise_for_status()
@@ -1479,10 +1507,7 @@ def search_plex_for_rating_key(title, year, media_type, plex_url, plex_token, tm
         search_query = quote_plus(title)
         api_url = f"{plex_url}/search?query={search_query}&X-Plex-Token={decrypted_token}"
         
-        headers = {
-            'Accept': 'application/json',
-            'X-Plex-Client-Identifier': str(uuid.uuid4())
-        }
+        headers = get_plex_headers()
         
         response = safe_get(api_url, headers=headers, timeout=10)
         response.raise_for_status()
@@ -1564,10 +1589,7 @@ def fetch_tv_shows_from_plex_sdk(section_id, limit=10, machine_id=None):
             f"&X-Plex-Token={plex_token}"
         )
         
-        headers = {
-            'Accept': 'application/json',
-            'X-Plex-Client-Identifier': str(uuid.uuid4())
-        }
+        headers = get_plex_headers()
         
         response = safe_get(api_url, headers=headers, timeout=10)
         response.raise_for_status()
@@ -1632,10 +1654,7 @@ def fetch_movies_from_plex_sdk(section_id, limit=10, machine_id=None):
             f"&X-Plex-Token={plex_token}"
         )
         
-        headers = {
-            'Accept': 'application/json',
-            'X-Plex-Client-Identifier': str(uuid.uuid4())
-        }
+        headers = get_plex_headers()
         
         response = safe_get(api_url, headers=headers, timeout=10)
         response.raise_for_status()
@@ -1700,10 +1719,7 @@ def fetch_albums_from_plex_sdk(section_id, limit=10, machine_id=None):
             f"&X-Plex-Token={plex_token}"
         )
         
-        headers = {
-            'Accept': 'application/json',
-            'X-Plex-Client-Identifier': str(uuid.uuid4())
-        }
+        headers = get_plex_headers()
         
         response = safe_get(api_url, headers=headers, timeout=10)
         response.raise_for_status()
@@ -1803,17 +1819,8 @@ def get_collection_items_for_email(collection_key, settings):
             return []
         
         collection_items_url = f"{plex_url}/library/collections/{collection_key}/children"
-        headers = {
-            'X-Plex-Token': decrypt(plex_token),
-            'Accept': 'application/json'
-        }
-        
-        try:
-            global plex_headers
-            headers.update(plex_headers)
-        except NameError:
-            pass
-        
+        headers = get_plex_headers({'X-Plex-Token': decrypt(plex_token)})
+
         print(f"Fetching collection items from: {collection_items_url}")
         response = safe_get(collection_items_url, headers=headers, timeout=30)
         
@@ -5143,7 +5150,7 @@ def fetch_collections(collection_type):
         
         sections_response = safe_get(
             sections_url,
-            headers={"X-Plex-Token": decrypt(plex_token), "Accept": "application/json"},
+            headers = get_plex_headers({'X-Plex-Token': decrypt(plex_token)}),
             timeout = 10
         )
         if sections_response.status_code != 200:
@@ -5160,7 +5167,7 @@ def fetch_collections(collection_type):
                 section_title = section.get("title", "Unknown Library")
                 
                 collections_url = f"{plex_url}/library/sections/{section_id}/collections"
-                collections_response = safe_get(collections_url, headers={"X-Plex-Token": decrypt(plex_token), "Accept": "application/json"}, timeout=10)
+                collections_response = safe_get(collections_url, headers=get_plex_headers({'X-Plex-Token': decrypt(plex_token)}), timeout=10)
                 
                 if collections_response.status_code == 200:
                     collections_data = collections_response.json()
@@ -5225,11 +5232,7 @@ def get_collection_items():
         
         collection_items_url = f"{plex_url}/library/collections/{collection_key}/children"
         
-        headers = {
-            'X-Plex-Token': decrypt(plex_token),
-            'Accept': 'application/json',
-            **plex_headers
-        }
+        headers = get_plex_headers({'X-Plex-Token': decrypt(plex_token)})
         
         response = safe_get(collection_items_url, headers=headers, timeout=30)
         
@@ -5905,11 +5908,7 @@ def plex_get_info():
     token = row[0]
 
     url = "https://plex.tv/api/v2/resources"
-    headers = {
-        "Accept": "application/json",
-        "X-Plex-Client-Identifier": plex_headers['X-Plex-Client-Identifier'],
-        "X-Plex-Token": decrypt(token)
-    }
+    headers = get_plex_headers({"X-Plex-Token": decrypt(token)})
     params = {
         "includeHttps": "1"
     }
@@ -6806,7 +6805,7 @@ def delete_email_template(template_id):
 
 if __name__ == '__main__':
     app.jinja_env.globals["version"] = "v2026.1"
-    app.jinja_env.globals["publish_date"] = "March 15, 2026"
+    app.jinja_env.globals["publish_date"] = "March 16, 2026"
 
     app.jinja_env.globals["get_cache_status"] = get_global_cache_status
 
@@ -6835,9 +6834,6 @@ if __name__ == '__main__':
     }
 
     DB_PATH = os.path.join("database", "data.db")
-    plex_headers = {
-        "X-Plex-Client-Identifier": str(uuid.uuid4())
-    }
     
     if getattr(sys, 'frozen', False):
         ROOT = Path(sys.executable).parent
@@ -6880,8 +6876,11 @@ if __name__ == '__main__':
     migrate_schema("logo_filename TEXT")
     migrate_schema("logo_width INTEGER")
     migrate_schema("recipient_display_name TEXT DEFAULT 'email'")
+    migrate_schema("plex_client_id TEXT")
     migrate_ra_recs_to_recently_added_recommendations()
     migrate_email_templates_for_expanded_collections()
+
+    plex_headers = get_plex_headers()
 
     if os.environ.get("WERKZEUG_RUN_MAIN") == "true" or not app.debug:
         start_background_workers()

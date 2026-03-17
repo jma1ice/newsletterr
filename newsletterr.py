@@ -1915,6 +1915,14 @@ def run_conjurr_command(base_url, user_dict, error):
         else:
             error += ", Conjurr Error: No Base URL provided"
 
+    try:
+        safe_get(f"{base_url}", timeout=5, retries=0)
+    except requests.exceptions.RequestException:
+        try:
+            safe_get(base_url, timeout=5, retries=0)
+        except requests.exceptions.RequestException as e:
+            return [{}, f"Conjurr Error: Could not reach conjurr at {base_url}. Is it running?"]
+
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("SELECT plex_url, plex_token FROM settings WHERE id = 1")
@@ -5354,7 +5362,10 @@ def pull_recommendations():
         else:
             conjurr_base_url = conjurr_settings['conjurr_url']
             recommendations_json, error = run_conjurr_command(conjurr_base_url, filtered_users, error)
-            alert = "User recommendations pulled from conjurr!"
+            if error:
+                alert = None
+            else:
+                alert = "User recommendations pulled from conjurr!"
 
             cache_params = {'timestamp': time.time()}
 
@@ -5374,7 +5385,8 @@ def pull_recommendations():
 
     return render_template('index.html', stats=stats, user_dict=user_dict, graph_data=graph_data, cache_info=cache_info,
                             graph_commands=graph_commands, recent_data=recent_data, libs=libs, settings=settings,
-                            recommendations_json=recommendations_json, filtered_users=filtered_users, alert=alert, theme_settings=theme_settings)
+                            recommendations_json=recommendations_json, filtered_users=filtered_users, alert=alert,
+                            error=error, theme_settings=theme_settings)
 
 @app.route('/send_email', methods=['POST'])
 @requires_auth
@@ -6805,7 +6817,7 @@ def delete_email_template(template_id):
 
 if __name__ == '__main__':
     app.jinja_env.globals["version"] = "v2026.1"
-    app.jinja_env.globals["publish_date"] = "March 16, 2026"
+    app.jinja_env.globals["publish_date"] = "March 17, 2026"
 
     app.jinja_env.globals["get_cache_status"] = get_global_cache_status
 

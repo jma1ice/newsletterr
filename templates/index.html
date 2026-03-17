@@ -3405,6 +3405,21 @@
                     const newRecsPreview = doc.getElementById('recs-preview');
                     oldRecsPreview.replaceWith(newRecsPreview);
 
+                    const oldAlertP = document.getElementById('alert_p');
+                    const newAlertP = doc.getElementById('alert_p');
+                    if (oldAlertP && newAlertP) {
+                        newAlertP.style.display = '';
+                        oldAlertP.replaceWith(newAlertP);
+
+                    }
+
+                    const oldErrorP = document.getElementById('error_p');
+                    const newErrorP = doc.getElementById('error_p');
+                    if (oldErrorP && newErrorP) {
+                        newErrorP.style.display = '';
+                        oldErrorP.replaceWith(newErrorP);
+                    }
+
                     const oldData = document.getElementById('recommendations-json');
                     const newData = doc.getElementById('recommendations-json');
                     if (newData) {

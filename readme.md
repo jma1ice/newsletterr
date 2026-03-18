@@ -160,46 +160,62 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 
 ## Planned Changes
 
-### For the v2026.1 sprint, these items are to be addressed:
-* Email click for recently added/available recommendations is going to chrome on mobile instead of app - this is an issue with the new Plex client, have not seen a fix yet and no info released by Plex at this time
-* Some clients show posters as small slivers instead of whole poster
+### For the v2026.2 sprint, these items are to be addressed:
+* Some email clients show posters as small slivers instead of whole poster
+* Contributor area on about can start clipping out on lower size screens
+* API fields in settings should be a password field
 * Update Plex authentication for PlexAPI v0.31.1 (plexapi.plex no longer supported)
-* Pop out preview does not update with changes to the email
+* Email click for recently added/available recommendations is going to browser on mobile instead of Plex app - this is an issue with the new Plex client, have not seen a fix yet and no info released by Plex at this time
 
 #### And these items are feature requests:
-* Add sections to settings page (email server | external services | email styling | login page)
-* Add HSTS option in settings
-* Add a hosted 'most recent newsletter' webpage | also, add opt out support | also hosted images to reduce email size
-* Separator blocks to add lines between sections in emails
-* Make top title into a text block so it is editable/removable
-* Keep settings details on error so user won't have to re-enter them
-* Option for small cover art of each item in a stat table
-* IMDb ratings in stat tables
-* Snap-in for images/gifs/emojis
+--- Snapins ---
+* Filter 0 length run time out of recently added
 * Functionality for full custom HTML templates
-* Ombi integration
+* Export email HTML button
+* Import template button and functionality
+* IMDb ratings in stat tables
+* Ratings (G, PG, etc) listed on recently added
+* Pop out preview does not update with changes to the email
+* Snap-in for images/gifs/emojis
+
+--- Settings ---
+* Add sections to settings page (email server | external services | email styling | login page)
+* Keep settings details on error so user won't have to re-enter them
+* Test api button
+* Setting for custom intro/outro text so custom does not have to be set every time
+* Add HSTS option in settings
+* Option for small cover art of each item in a stat table
 * Setting to choose duration or play counts for stats/graphs
 * Setting to hide play counts in stats/graphs
 * Option to sort recently added by IMDb rating
 * Option to pull recently added by # of days - when this is in should be able to show 'new items since x date' in email
-* GitHub webhook to pull submitted issues to Discord channel
-* Sonarr/Radarr calendar integration for 'coming soon' type email
-* Servarr PR
-* Stats for total items in library
-* Ratings (G, PG, etc) listed on recently added
-* Export email HTML button
-* Export logs button | link to discord
 * Option in settings for width of RA/Recs grids
-* Ko-fi -> Discord integration for contributor role
 * Logo positioning setting
-* Test api button
 * Add in To: vs BCC: option
-* Make collections clickable - is this possible?
-* Date range for stats (i.e. 1.1.25 - 1.1.26)
-* More mobile CSS optimizations
-* Filter 0 length run time out of recently added
-* Setting for custom intro/outro text so custom does not have to be set every time
+* Option to use or not use [SCHEDULED] in scheduled email subject
+
+--- Integrations ---
+ -- GitHub / Discord --
+* GitHub webhook to pull submitted issues to Discord channel
+* Ko-fi -> Discord integration for contributor role
+* Export logs button | link to discord
+ -- Other --
+* Sonarr/Radarr calendar integration for 'coming soon' type email
 * [Plex Wrapped](https://github.com/netplexflix/Plex-Wrapped-for-Tautulli?tab=readme-ov-file) API call integration
+* Ombi integration
+* Servarr PR
+
+--- Hosted ---
+* Add a hosted 'most recent newsletter' webpage
+* Add opt out support
+* Add hosted images to reduce email size
+
+--- Misc. ---
+* Stats for total items in library
+* Date range for stats (i.e. 1.1.25 - 1.1.26)
+* Make collections clickable - is this possible?
+* More mobile CSS optimizations
+* Discord text should be stylized logo to match GitHub
 
 ---
 
@@ -221,6 +237,9 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 #### New Features:
 * GitHub link is now a stylized logo
 * Page no longer reloads on stats/users pull
+* Added separator blocks to add lines between sections in emails
+* Made the header title into a text input (under subject) so that it is editable/removable
+* Made 'Title' Text Block drag-able and not pinned to top
 
 
 ### v2025.2.1:

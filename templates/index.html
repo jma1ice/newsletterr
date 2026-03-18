@@ -121,6 +121,8 @@
                         <form method="POST" action="/send_email" style="margin-top: 0;">
                             Subject: <input type="text" name="subject" id="subject" placeholder="Subject"
                                         value="{{ settings.server_name }} News" style="width: 18rem;" required><br><br>
+                            Header Title: <input type="text" name="email_header_title" id="email_header_title" placeholder="Leave blank to hide"
+                                        value="{{ settings.server_name }} Newsletter" style="width: 15.8rem;"><br><br>
                         </form>
                     </td>
                     <td id="preview-row" style="width: 40%; padding: 10px; vertical-align: top; position: sticky; top: 80px;">
@@ -172,6 +174,9 @@
                                     </button>
                                     <button type="button" class="btn button btn-sm" id="add-text-block-btn">
                                         + Text Block
+                                    </button>
+                                    <button type="button" class="btn button btn-sm" id="add-separator-btn" title="Add a horizontal divider line">
+                                        + Separator
                                     </button>
                                     <button type="button" class="btn button btn-sm" id="add-html-text-block-btn">
                                         + HTML Block
@@ -914,6 +919,7 @@
                     
                     const serverName = "{{ settings.server_name }}";
                     const subject = document.getElementById('subject').value;
+                    const emailHeaderTitle = document.getElementById('email_header_title').value;
                     const logoFilename = "{{ settings.logo_filename }}";
                     const logoWidth = "{{ settings.logo_width }}";
                     const customLogoFilename = "{{ settings.custom_logo_filename }}"
@@ -942,7 +948,9 @@
                                 const formattedContent = content.trim().replace(/\n/g, "<br>");
                                 contentHTML += `<div style="margin-bottom: 20px; font-size: 2em; font-weight: bold; text-align: center; color: var(--email-text);">${formattedContent}</div>`;
                             }
-                        } else if (item.type === 'stat') {
+                        } else if (item.type === 'separator') {
+                            contentHTML += `<hr style="border: none; border-top: 1px solid var(--email-text); margin: 20px auto; width: 80%;">`;
+                        }else if (item.type === 'stat') {
                             contentHTML += buildStatPreviewHTML(item.id);
                         } else if (item.type === 'graph') {
                             contentHTML += buildGraphPreviewHTML(item.id);
@@ -962,7 +970,7 @@
                         }
                     }
 
-                    const completeHTML = buildPreviewEmailHTML(contentHTML, serverName, subject, logoFilename, logoWidth, customLogoFilename, themedCSS);
+                    const completeHTML = buildPreviewEmailHTML(contentHTML, serverName, subject, emailHeaderTitle, logoFilename, logoWidth, customLogoFilename, themedCSS);
                     
                     const frame = document.getElementById('preview');
                     if (!frame) {
@@ -2006,7 +2014,7 @@
                 `;
             }
 
-            function buildPreviewEmailHTML(contentHTML, serverName, subject, logoFilename, logoWidth, customLogoFilename, themedCSS) {
+            function buildPreviewEmailHTML(contentHTML, serverName, subject, emailHeaderTitle, logoFilename, logoWidth, customLogoFilename, themedCSS) {
                 let logoHTML = "";
                 let logoSrc = "";
                 if (logoFilename && logoWidth) {
@@ -2030,7 +2038,7 @@
                             <div class="email-container">
                                 <div class="email-header">
                                     ${logoHTML}
-                                    <h1 class="email-title">${serverName} Newsletter</h1>
+                                    <h1 class="email-title">${emailHeaderTitle}</h1>
                                 </div>
                                 
                                 <div class="email-content">
@@ -2104,6 +2112,10 @@
                     console.log('Running initial updatePreview...');
                     updatePreview();
                 }, 100);
+            });
+
+            document.addEventListener('DOMContentLoaded', () => {
+                document.getElementById('email_header_title').addEventListener('input', debouncedUpdatePreview);
             });
         </script>
         <script nonce="{{ nonce }}">
@@ -2435,7 +2447,7 @@
                             const placeholderText = 'Enter your title here...';
                             htmlContent += `
                                 <div class="selected-item d-flex flex-column p-2 mb-2 border rounded" 
-                                     data-index="${index}" data-fixed="top" draggable="false">
+                                     data-index="${index}" draggable="true">
                                     <div class="d-flex justify-content-between align-items-center mb-2">
                                         <span class="item-name">${item.name}</span>
                                         <div>
@@ -2471,6 +2483,17 @@
                                         style="height: 60px; font-size: 0.9rem; resize: vertical;"
                                         placeholder="${placeholderText}"
                                         oninput="updateTextBlockName('${item.id}', ${index})">${currentContent}</textarea>
+                                </div>
+                            `;
+                        } else if (item.type === 'separator') {
+                            htmlContent += `
+                                <div class="selected-item d-flex align-items-center justify-content-between p-2 mb-2 border rounded"
+                                    data-index="${index}" draggable="true">
+                                    <span class="item-name" style="font-size: 0.9rem;">- Separator</span>
+                                    <div>
+                                        <span class="badge badge-secondary me-2">separator</span>
+                                        <button type="button" class="btn btn-sm btn-outline-danger remove-item-btn" data-index="${index}">x</button>
+                                    </div>
                                 </div>
                             `;
                         } else if (item.type === 'collection_group') {
@@ -2761,13 +2784,7 @@
                     }
                 }
 
-                if (type === 'titleblock') {
-                    const existing = selectedItems.findIndex(it => it.type === 'titleblock');
-                    if (existing !== -1) selectedItems.splice(existing, 1);
-                    selectedItems.unshift(item);
-                } else {
-                    selectedItems.push(item);
-                }
+                selectedItems.push(item);
 
                 updateSelectedItemsDisplay();
                 return true;
@@ -2810,13 +2827,7 @@
 
                 const item = { id, name: name || id, type, ...extra };
 
-                if (type === 'titleblock') {
-                    const existing = selectedItems.findIndex(it => it.type === 'titleblock');
-                    if (existing !== -1) selectedItems.splice(existing, 1);
-                    selectedItems.unshift(item);
-                } else {
-                    selectedItems.push(item);
-                }
+                selectedItems.push(item);
 
                 updateSelectedItemsDisplay();
                 return true;
@@ -2839,13 +2850,9 @@
             function setupDragAndDrop() {
                 const items = () => Array.from(document.querySelectorAll('.selected-item'));
                 const indexOfEl = (el) => allItems().indexOf(el);
-                const isFixed = (el) => el?.dataset?.fixed === 'top';
-                const clampToMovable = (i) => Math.max(1, i);
                 let draggedElement = null;
                 
                 items().forEach((item, index) => {
-                    if (isFixed(item)) return;
-
                     item.addEventListener('dragstart', (e) => {
                         draggedElement = item;
                         e.dataTransfer.setData('text/plain', index);
@@ -2967,6 +2974,12 @@
                 window.previewUpdateTimeout = setTimeout(updatePreview, 300);
             }
 
+            function createSeparatorBlock() {
+                textBlockCounter++;
+                const id = `separator-block-${textBlockCounter}`;
+                addItem(id, '  Separator', 'separator');
+            }
+
             function createIntroBlock() {
                 textBlockCounter++;
                 const textBlockId = `intro-block-${textBlockCounter}`;
@@ -3041,6 +3054,7 @@
                 if (!btn) return;
 
                 if (btn.id === 'add-text-block-btn') { createTextBlock(); return; }
+                if (btn.id === 'add-separator-btn') { createSeparatorBlock(); return; }
                 if (btn.id === 'add-html-text-block-btn') { createTextBlock(blockType = 'html-link'); return; }
                 if (btn.id === 'add-intro-btn') { createIntroBlock(); return; }
                 if (btn.id === 'add-outro-btn') { createOutroBlock(); return; }
@@ -3447,6 +3461,7 @@
 
             document.getElementById('sendEmailBtn').addEventListener('click', async () => {
                 const subject = document.getElementById('subject').value;
+                const emailHeaderTitle = document.getElementById('email_header_title').value;
                 
                 const chipInput = document.getElementById('email_chip_input');
                 if (chipInput && chipInput.value.trim()) {
@@ -3503,6 +3518,7 @@
                         body: JSON.stringify({
                             to_emails,
                             subject,
+                            email_header_title: emailHeaderTitle,
                             email_html: emailHTML,
                             selected_items: selectedItems,
                             user_dict: userDict,
@@ -4048,6 +4064,7 @@
                         selected_items: JSON.stringify(itemsWithContent),
                         email_text: textBlocks.join('\n\n'),
                         subject: document.getElementById('subject').value,
+                        email_header_title: document.getElementById('email_header_title')?.value || '',
                         expanded_collections: JSON.stringify(convertExpandedCollectionsForBackend())
                     };
 
@@ -4070,14 +4087,6 @@
                 } catch (error) {
                     console.error('Error saving template:', error);
                     alert('Error saving template');
-                }
-            }
-
-            function ensureTitleOnTop() {
-                const i = selectedItems.findIndex(it => it.type === 'titleblock');
-                if (i > 0) {
-                    const [t] = selectedItems.splice(i, 1);
-                    selectedItems.unshift(t);
                 }
             }
 
@@ -4181,10 +4190,10 @@
                             button.disabled = true;
                         }
                     });
-                    
+
                     document.getElementById('subject').value = template.subject || '';
-                    
-                    ensureTitleOnTop();
+                    document.getElementById('email_header_title').value = template.email_header_title || '';
+
                     updateSelectedItemsDisplay();
                     
                     setTimeout(() => {

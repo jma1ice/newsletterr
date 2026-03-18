@@ -158,8 +158,8 @@ body {
     transition: background-color 0.3s ease-in-out, color 0.3s ease-in-out, transform 0.3s ease-in-out;
 }
 
-#add-html-text-block-btn, #add-text-block-btn {
-    padding: 0.5rem 0.5rem;
+#add-html-text-block-btn, #add-text-block-btn, #add-title-btn, #add-header-btn, #add-intro-btn, #add-separator-btn, #add-outro-btn {
+    padding: 0.25rem 0.25rem;
 }
 
 .dark .button {

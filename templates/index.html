@@ -142,6 +142,14 @@
                                     <button id="reset-template-btn" class="btn btn-outline-secondary btn-sm" title="Clear all items and reset to Custom template">
                                         🔄 Reset
                                     </button>
+                                    <div id="custom-html-toggle-row" class="align-items-center gap-2 border-1 border-secondary rounded p-1">
+                                        <div class="form-check form-switch mb-0">
+                                            <input class="form-check-input mt-3" type="checkbox" id="custom-html-toggle" role="switch">
+                                            <label class="form-check-label" for="custom-html-toggle" style="font-size: 0.9rem; max-width: 5rem;">
+                                                Custom HTML Mode
+                                            </label>
+                                        </div>
+                                    </div>
                                     <label for="template-selector" class="form-label mb-0">Template:</label>
                                     <select id="template-selector" class="form-select" style="width: 200px;">
                                         <option value="">Custom</option>
@@ -156,6 +164,11 @@
                                 <div id="selected-items-empty" class="text-muted text-center py-3">
                                     No items selected. Use the buttons below to add items to your email.
                                 </div>
+                            </div>
+                            <div id="custom-html-pane" style="display: none;">
+                                <textarea id="custom-html-editor" class="form-control font-monospace text-alert" 
+                                        style="height: 500px; font-size: 0.8rem; resize: vertical;"
+                                        placeholder="Paste your complete HTML email here..."></textarea>
                             </div>
                         </div>
 
@@ -512,204 +525,6 @@
             })();
         </script>
         <script nonce="{{ nonce }}">
-            let recentPayload = {{ recent_data | tojson | safe }};
-            const renderedCharts = new Set();
-            let graphDataList = JSON.parse('{{ graph_data | tojson | safe }}');
-            let graphCommands = JSON.parse('{{ graph_commands | tojson | safe }}');
-
-            function buildThumb(path) {
-                if (!path) return '';
-                const p = path.startsWith('/') ? path : '/' + path;
-                return `/proxy-art${p}`;
-            }
-
-            function pickThumb(it) {
-                const type = (it.media_type || it.type || '').toLowerCase();
-
-                const candidates = (type === 'episode' || type === 'season')
-                    ? [it.grandparent_thumb, it.parent_thumb, it.thumb, it.art]
-                    : [it.thumb, it.art, it.parent_thumb, it.grandparent_thumb];
-
-                return candidates.find(Boolean) || '';
-            }
-
-            const flatten = (arr) => arr.flatMap(x => x?.recently_added || []);
-            const msToHMS = (ms) => {
-                ms = parseInt(ms || 0, 10);
-                const s = Math.round(ms / 1000);
-                const h = Math.floor(s/3600), m = Math.floor((s%3600)/60);
-                return h ? `${h}h ${m}m` : `${m}m`;
-            };
-
-            const formatDate = (d) => {
-                if (!d) return '';
-                
-                let targetDate;
-                if (/^\d+$/.test(String(d))) {
-                    targetDate = new Date(parseInt(d, 10) * 1000);
-                } else {
-                    targetDate = new Date(d);
-                }
-                
-                if (isNaN(targetDate)) return '';
-                
-                const now = new Date();
-                const diffMs = now - targetDate;
-                const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-                
-                if (diffDays < 0) {
-                    return `in ${Math.abs(diffDays)} days`;
-                } else if (diffDays === 0) {
-                    return 'today';
-                } else if (diffDays === 1) {
-                    return 'yesterday';
-                } else {
-                    return `${diffDays} days ago`;
-                }
-            };
-
-            const items = flatten(recentPayload).map(it => {
-                const title = it.title || it.full_title || it.parent_title || it.grandparent_title || '(untitled)';
-                const sub = it.year || it.grandparent_title || it.parent_title || '';
-                const thumbPath = pickThumb(it);
-
-                const item_type = (it.media_type || it.type || '').toLowerCase();
-                let summary = '';
-                if (item_type === 'episode' || item_type === 'season') {
-                    summary = it.grandparent_tagline || it.grandparent_summary || it.parent_summary || it.tagline || it.summary || '';
-                } else {
-                    summary = it.tagline || it.summary || '';
-                }
-
-                return {
-                    library: it.library_name || it.section_name || it.media_type || '',
-                    title,
-                    sub,
-                    summary: summary,
-                    duration: msToHMS(it.duration),
-                    added: formatDate(it.updated_at || it.originally_available_at),
-                    thumb: thumbPath
-                };
-            });
-
-            const slug = s => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'');
-
-            function renderRAGrid(list, target) {
-                target.innerHTML = '';
-                list.forEach(it => {
-                    const imgURL = it.thumb ? `/proxy-art${it.thumb.startsWith('/')?it.thumb:('/'+it.thumb)}` : '';
-                    const li = document.createElement('li');
-                    li.className = "group rounded-2xl overflow-hidden bg-[#8acbd4] dark:bg-[#333] ";
-                    li.innerHTML = `
-                        <div class="relative aspect-[2/3] bg-gray-200 dark:bg-gray-700">
-                        ${imgURL ? `<img loading="lazy" src="${imgURL}" class="h-full w-full object-cover">` : ''}
-                        ${it.library ? `<div class="ra-pill absolute top-1 right-1 text-xs px-2 py-1 rounded-full bg-black/70 text-white"><span class="pill_text">${it.library}</span></div>` : ''}
-                        ${it.added ? `<div class="ra-pill absolute bottom-1 right-1 text-[11px] text-white/90"><span class="bg-black/60 rounded px-1.5 py-0.5"><span class="pill_text">${it.added}</span></span></div>` : ''}
-                        </div>
-                        <div class="p-3">
-                        <div class="font-semibold line-clamp-2 text-[#333] dark:text-[#8acbd4]">${it.title}</div>
-                        <div class="text-xs text-gray-500 dark:text-gray-400">${it.sub ? it.sub + ' • ' : ''}${it.duration}</div>
-                        ${it.summary ? `<div class="mt-2 text-xs text-gray-600 dark:text-gray-300 line-clamp-5">${it.summary}</div>` : ''}
-                        </div>`;
-                    target.appendChild(li);
-                });
-            }
-
-            function buildRALibraryRows() {
-                const libs = [...new Set(items.map(i => i.library).filter(Boolean))].sort();
-                const host = document.getElementById('ra-lib-list');
-                if (!host) return;
-
-                libs.forEach(lib => {
-                    const row = document.createElement('div');
-                    row.className = 'col-12 mb-2';
-                    const id = `ra-lib-${slug(lib)}`;
-
-                    row.innerHTML = `
-                        <div class="d-flex justify-content-between align-items-center p-2 border rounded">
-                            <span style="font-size: .9rem;">${lib}</span>
-                            <div>
-                                <button hidden type="button" class="btn button-outline btn-sm me-1 ra-view-btn" 
-                                        data-lib="${lib}" data-target="${id}" style="font-size: .8rem; padding: .25rem .5rem;">
-                                View
-                                </button>
-                                <button type="button" class="btn button btn-sm ra-add-btn" 
-                                        data-type="recently added" data-lib="${lib}" data-id="${id}" data-name="Recently Added: ${lib}"
-                                        style="font-size: .8rem; padding: .25rem .5rem;">
-                                Add
-                                </button>
-                            </div>
-                        </div>`;
-                    host.appendChild(row);
-                });
-            }
-            buildRALibraryRows();
-
-            const grid = document.getElementById('ra-grid');
-            const empty = document.getElementById('ra-empty');
-
-            function render(list) {
-                grid.innerHTML = '';
-                list.forEach(it => {
-                    const imgURL = buildThumb(it.thumb);
-                    const li = document.createElement('li');
-                    li.className = "group rounded-2xl overflow-hidden bg-[#8acbd4] dark:bg-[#333] " + 
-                    "!shadow-[0_6px_18px_rgba(0, 0, 0, 0.6)] hover:!shadow-[0_10px_28px_rgba(0, 0, 0, 0.6)] " + 
-                    "dark:!shadow-[0_6px_18px_rgba(74, 127, 130, 0.6)] dark:hover:!shadow-[0_10px_28px_rgba(74, 127, 130, 0.6)]";
-                    li.dataset.lib = it.library;
-                    li.innerHTML = `
-                        <style>
-                            .ra-pill{ display:inline-flex; align-items:center; justify-content:center; line-height:1; }
-                        </style>
-                        <div class="relative aspect-[2/3] bg-gray-200 dark:bg-gray-700">
-                            ${imgURL ? `<img loading="lazy" src="${imgURL}" class="h-full w-full object-cover">` : ''}
-                            ${it.library ? `<div class="ra-pill absolute top-1 right-1 text-xs px-2 py-1 rounded-full bg-black/70 text-white"><span class="pill_text">${it.library}</span></div>` : ''}
-                            ${it.added ? `<div class="ra-pill absolute bottom-1 right-1 text-[11px] text-white/90 bg-black/60 rounded px-1.5 py-0.5"><span class="pill_text">${it.added}</span></div>` : ''}
-                        </div>
-                        <div class="p-3">
-                            <div class="font-semibold line-clamp-2">${it.title}</div>
-                            <div class="text-xs text-gray-500 dark:text-gray-400">
-                                ${it.sub ? it.sub + ' • ' : ''}${it.duration}
-                            </div>
-                            ${it.summary ? `<div class="mt-2 text-xs text-gray-600 dark:text-gray-300 line-clamp-5">${it.summary}</div>` : ''}
-                        </div>
-                    `;
-                    grid.appendChild(li);
-                });
-                empty.classList.toggle('hidden', list.length !== 0);
-            }
-        </script>
-        <script nonce="{{ nonce }}">
-            document.getElementById('time_range_week').addEventListener('click', () => {
-                document.getElementById('days_to_pull').value = 7;
-                document.getElementById('stats_form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
-            });
-            document.getElementById('time_range_month').addEventListener('click', () => {
-                document.getElementById('days_to_pull').value = 30;
-                document.getElementById('stats_form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
-            });
-            document.getElementById('time_range_quarter').addEventListener('click', () => {
-                document.getElementById('days_to_pull').value = 90;
-                document.getElementById('stats_form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
-            });
-            document.getElementById('time_range_two_q').addEventListener('click', () => {
-                document.getElementById('days_to_pull').value = 180;
-                document.getElementById('stats_form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
-            });
-            document.getElementById('time_range_three_q').addEventListener('click', () => {
-                document.getElementById('days_to_pull').value = 270;
-                document.getElementById('stats_form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
-            });
-            document.getElementById('time_range_year').addEventListener('click', () => {
-                document.getElementById('days_to_pull').value = 365;
-                document.getElementById('stats_form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
-            });
-        </script>
-        <script nonce="{{ nonce }}">
-            let selectedItems = [];
-            let statsList = JSON.parse('{{ stats | tojson | safe }}');
-            const themeSettings = JSON.parse('{{ theme_settings | tojson | safe }}');
-
             function getThemedEmailCSS() {
                 const emailTheme = themeSettings.email_theme || 'newsletter_blue';
                 const isDark = document.documentElement.classList.contains('dark');
@@ -908,8 +723,38 @@
                 `;
             }
 
+            function resizePreviewFrame(frame) {
+                try {
+                    const doc = frame.contentDocument || frame.contentWindow.document;
+                    if (doc && doc.body) {
+                        const contentHeight = Math.max(
+                            doc.body.scrollHeight,
+                            doc.body.offsetHeight,
+                            doc.documentElement.clientHeight,
+                            doc.documentElement.scrollHeight,
+                            doc.documentElement.offsetHeight
+                        );
+                        
+                        const minHeight = 480;
+                        const maxHeight = 1200;
+                        const newHeight = Math.max(minHeight, Math.min(maxHeight, contentHeight + 40));
+                        
+                        frame.style.height = newHeight + 'px';
+                    }
+                } catch (e) {
+                    console.log('Could not resize iframe:', e);
+                }
+            }
+
             async function updatePreview() {
                 try {
+                    if (document.getElementById('custom-html-toggle')?.checked) {
+                        const html = document.getElementById('custom-html-editor')?.value || '';
+                        const frame = document.getElementById('preview');
+                        if (frame) frame.srcdoc = html;
+                        return;
+                    }
+
                     console.log('updatePreview called with selectedItems:', selectedItems);
                     
                     if (typeof selectedItems === 'undefined') {
@@ -999,6 +844,254 @@
                         frame.srcdoc = `<html><body><p>Error updating preview: ${error.message}</p></body></html>`;
                     }
                 }
+            }
+
+            function debounce(func, wait) {
+                let timeout;
+                return function executedFunction(...args) {
+                    const later = () => {
+                        clearTimeout(timeout);
+                        func(...args);
+                    };
+                    clearTimeout(timeout);
+                    timeout = setTimeout(later, wait);
+                };
+            }
+
+            const debouncedUpdatePreview = debounce(updatePreview, 300);
+
+            document.getElementById('custom-html-toggle').addEventListener('change', function() {
+                const isCustom = this.checked;
+                document.getElementById('custom-html-pane').style.display = isCustom ? 'block' : 'none';
+                document.getElementById('selected-items-list').style.display = isCustom ? 'none' : 'block';
+
+                document.querySelectorAll('.mb-4').forEach(el => {
+                    if (el !== document.getElementById('custom-html-toggle-row')?.closest('.mb-4')) {
+                        el.style.display = isCustom ? 'none' : '';
+                    }
+                });
+
+                if (isCustom) {
+                    const editor = document.getElementById('custom-html-editor');
+                    editor.removeEventListener('input', debouncedUpdatePreview);
+                    editor.addEventListener('input', debouncedUpdatePreview);
+                }
+
+                updatePreview();
+            });
+
+            document.getElementById('custom-html-editor').addEventListener('input', debouncedUpdatePreview);
+        </script>
+        <script nonce="{{ nonce }}">
+            let recentPayload = {{ recent_data | tojson | safe }};
+            const renderedCharts = new Set();
+            let graphDataList = JSON.parse('{{ graph_data | tojson | safe }}');
+            let graphCommands = JSON.parse('{{ graph_commands | tojson | safe }}');
+            const themeSettings = (() => {
+                try {
+                    return JSON.parse('{{ theme_settings | tojson | safe if theme_settings else "{}" }}');
+                } catch (e) {
+                    console.error("Error parsing theme settings:", e);
+                    return {};
+                }
+            })();
+
+            function buildThumb(path) {
+                if (!path) return '';
+                const p = path.startsWith('/') ? path : '/' + path;
+                return `/proxy-art${p}`;
+            }
+
+            function pickThumb(it) {
+                const type = (it.media_type || it.type || '').toLowerCase();
+
+                const candidates = (type === 'episode' || type === 'season')
+                    ? [it.grandparent_thumb, it.parent_thumb, it.thumb, it.art]
+                    : [it.thumb, it.art, it.parent_thumb, it.grandparent_thumb];
+
+                return candidates.find(Boolean) || '';
+            }
+
+            const flatten = (arr) => arr.flatMap(x => x?.recently_added || []);
+            const msToHMS = (ms) => {
+                ms = parseInt(ms || 0, 10);
+                const s = Math.round(ms / 1000);
+                const h = Math.floor(s/3600), m = Math.floor((s%3600)/60);
+                return h ? `${h}h ${m}m` : `${m}m`;
+            };
+
+            const formatDate = (d) => {
+                if (!d) return '';
+                
+                let targetDate;
+                if (/^\d+$/.test(String(d))) {
+                    targetDate = new Date(parseInt(d, 10) * 1000);
+                } else {
+                    targetDate = new Date(d);
+                }
+                
+                if (isNaN(targetDate)) return '';
+                
+                const now = new Date();
+                const diffMs = now - targetDate;
+                const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+                
+                if (diffDays < 0) {
+                    return `in ${Math.abs(diffDays)} days`;
+                } else if (diffDays === 0) {
+                    return 'today';
+                } else if (diffDays === 1) {
+                    return 'yesterday';
+                } else {
+                    return `${diffDays} days ago`;
+                }
+            };
+
+            const items = flatten(recentPayload).map(it => {
+                const title = it.title || it.full_title || it.parent_title || it.grandparent_title || '(untitled)';
+                const sub = it.year || it.grandparent_title || it.parent_title || '';
+                const thumbPath = pickThumb(it);
+
+                const item_type = (it.media_type || it.type || '').toLowerCase();
+                let summary = '';
+                if (item_type === 'episode' || item_type === 'season') {
+                    summary = it.grandparent_tagline || it.grandparent_summary || it.parent_summary || it.tagline || it.summary || '';
+                } else {
+                    summary = it.tagline || it.summary || '';
+                }
+
+                return {
+                    library: it.library_name || it.section_name || it.media_type || '',
+                    title,
+                    sub,
+                    summary: summary,
+                    duration: msToHMS(it.duration),
+                    added: formatDate(it.updated_at || it.originally_available_at),
+                    thumb: thumbPath
+                };
+            });
+
+            const slug = s => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'');
+
+            function renderRAGrid(list, target) {
+                target.innerHTML = '';
+                list.forEach(it => {
+                    const imgURL = it.thumb ? `/proxy-art${it.thumb.startsWith('/')?it.thumb:('/'+it.thumb)}` : '';
+                    const li = document.createElement('li');
+                    li.className = "group rounded-2xl overflow-hidden bg-[#8acbd4] dark:bg-[#333] ";
+                    li.innerHTML = `
+                        <div class="relative aspect-[2/3] bg-gray-200 dark:bg-gray-700">
+                        ${imgURL ? `<img loading="lazy" src="${imgURL}" class="h-full w-full object-cover">` : ''}
+                        ${it.library ? `<div class="ra-pill absolute top-1 right-1 text-xs px-2 py-1 rounded-full bg-black/70 text-white"><span class="pill_text">${it.library}</span></div>` : ''}
+                        ${it.added ? `<div class="ra-pill absolute bottom-1 right-1 text-[11px] text-white/90"><span class="bg-black/60 rounded px-1.5 py-0.5"><span class="pill_text">${it.added}</span></span></div>` : ''}
+                        </div>
+                        <div class="p-3">
+                        <div class="font-semibold line-clamp-2 text-[#333] dark:text-[#8acbd4]">${it.title}</div>
+                        <div class="text-xs text-gray-500 dark:text-gray-400">${it.sub ? it.sub + ' • ' : ''}${it.duration}</div>
+                        ${it.summary ? `<div class="mt-2 text-xs text-gray-600 dark:text-gray-300 line-clamp-5">${it.summary}</div>` : ''}
+                        </div>`;
+                    target.appendChild(li);
+                });
+            }
+
+            function buildRALibraryRows() {
+                const libs = [...new Set(items.map(i => i.library).filter(Boolean))].sort();
+                const host = document.getElementById('ra-lib-list');
+                if (!host) return;
+
+                libs.forEach(lib => {
+                    const row = document.createElement('div');
+                    row.className = 'col-12 mb-2';
+                    const id = `ra-lib-${slug(lib)}`;
+
+                    row.innerHTML = `
+                        <div class="d-flex justify-content-between align-items-center p-2 border rounded">
+                            <span style="font-size: .9rem;">${lib}</span>
+                            <div>
+                                <button hidden type="button" class="btn button-outline btn-sm me-1 ra-view-btn" 
+                                        data-lib="${lib}" data-target="${id}" style="font-size: .8rem; padding: .25rem .5rem;">
+                                View
+                                </button>
+                                <button type="button" class="btn button btn-sm ra-add-btn" 
+                                        data-type="recently added" data-lib="${lib}" data-id="${id}" data-name="Recently Added: ${lib}"
+                                        style="font-size: .8rem; padding: .25rem .5rem;">
+                                Add
+                                </button>
+                            </div>
+                        </div>`;
+                    host.appendChild(row);
+                });
+            }
+            buildRALibraryRows();
+
+            const grid = document.getElementById('ra-grid');
+            const empty = document.getElementById('ra-empty');
+
+            function render(list) {
+                grid.innerHTML = '';
+                list.forEach(it => {
+                    const imgURL = buildThumb(it.thumb);
+                    const li = document.createElement('li');
+                    li.className = "group rounded-2xl overflow-hidden bg-[#8acbd4] dark:bg-[#333] " + 
+                    "!shadow-[0_6px_18px_rgba(0, 0, 0, 0.6)] hover:!shadow-[0_10px_28px_rgba(0, 0, 0, 0.6)] " + 
+                    "dark:!shadow-[0_6px_18px_rgba(74, 127, 130, 0.6)] dark:hover:!shadow-[0_10px_28px_rgba(74, 127, 130, 0.6)]";
+                    li.dataset.lib = it.library;
+                    li.innerHTML = `
+                        <style>
+                            .ra-pill{ display:inline-flex; align-items:center; justify-content:center; line-height:1; }
+                        </style>
+                        <div class="relative aspect-[2/3] bg-gray-200 dark:bg-gray-700">
+                            ${imgURL ? `<img loading="lazy" src="${imgURL}" class="h-full w-full object-cover">` : ''}
+                            ${it.library ? `<div class="ra-pill absolute top-1 right-1 text-xs px-2 py-1 rounded-full bg-black/70 text-white"><span class="pill_text">${it.library}</span></div>` : ''}
+                            ${it.added ? `<div class="ra-pill absolute bottom-1 right-1 text-[11px] text-white/90 bg-black/60 rounded px-1.5 py-0.5"><span class="pill_text">${it.added}</span></div>` : ''}
+                        </div>
+                        <div class="p-3">
+                            <div class="font-semibold line-clamp-2">${it.title}</div>
+                            <div class="text-xs text-gray-500 dark:text-gray-400">
+                                ${it.sub ? it.sub + ' • ' : ''}${it.duration}
+                            </div>
+                            ${it.summary ? `<div class="mt-2 text-xs text-gray-600 dark:text-gray-300 line-clamp-5">${it.summary}</div>` : ''}
+                        </div>
+                    `;
+                    grid.appendChild(li);
+                });
+                empty.classList.toggle('hidden', list.length !== 0);
+            }
+        </script>
+        <script nonce="{{ nonce }}">
+            document.getElementById('time_range_week').addEventListener('click', () => {
+                document.getElementById('days_to_pull').value = 7;
+                document.getElementById('stats_form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+            });
+            document.getElementById('time_range_month').addEventListener('click', () => {
+                document.getElementById('days_to_pull').value = 30;
+                document.getElementById('stats_form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+            });
+            document.getElementById('time_range_quarter').addEventListener('click', () => {
+                document.getElementById('days_to_pull').value = 90;
+                document.getElementById('stats_form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+            });
+            document.getElementById('time_range_two_q').addEventListener('click', () => {
+                document.getElementById('days_to_pull').value = 180;
+                document.getElementById('stats_form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+            });
+            document.getElementById('time_range_three_q').addEventListener('click', () => {
+                document.getElementById('days_to_pull').value = 270;
+                document.getElementById('stats_form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+            });
+            document.getElementById('time_range_year').addEventListener('click', () => {
+                document.getElementById('days_to_pull').value = 365;
+                document.getElementById('stats_form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+            });
+        </script>
+        <script nonce="{{ nonce }}">
+            let selectedItems = [];
+            let statsList = [];
+            try {
+                statsList = JSON.parse('{{ stats | tojson | safe if stats else "[]" }}');
+            } catch (e) {
+                statsList = [];
+                console.error("Error parsing stats:", e);
             }
 
             function buildStatPreviewHTML(statId) {
@@ -2059,46 +2152,7 @@
                     </html>`;
             }
 
-            function resizePreviewFrame(frame) {
-                try {
-                    const doc = frame.contentDocument || frame.contentWindow.document;
-                    if (doc && doc.body) {
-                        const contentHeight = Math.max(
-                            doc.body.scrollHeight,
-                            doc.body.offsetHeight,
-                            doc.documentElement.clientHeight,
-                            doc.documentElement.scrollHeight,
-                            doc.documentElement.offsetHeight
-                        );
-                        
-                        const minHeight = 480;
-                        const maxHeight = 1200;
-                        const newHeight = Math.max(minHeight, Math.min(maxHeight, contentHeight + 40));
-                        
-                        frame.style.height = newHeight + 'px';
-                    }
-                } catch (e) {
-                    console.log('Could not resize iframe:', e);
-                }
-            }
-
-            function debounce(func, wait) {
-                let timeout;
-                return function executedFunction(...args) {
-                    const later = () => {
-                        clearTimeout(timeout);
-                        func(...args);
-                    };
-                    clearTimeout(timeout);
-                    timeout = setTimeout(later, wait);
-                };
-            }
-
-            const debouncedUpdatePreview = debounce(updatePreview, 300);
-
             document.addEventListener('DOMContentLoaded', () => {
-                document.getElementById('email_text').addEventListener('input', debouncedUpdatePreview);
-                
                 console.log('DOM loaded, testing preview...');
                 const frame = document.getElementById('preview');
                 if (frame) {
@@ -3522,7 +3576,8 @@
                             email_html: emailHTML,
                             selected_items: selectedItems,
                             user_dict: userDict,
-                            expanded_collections: convertExpandedCollectionsForBackend()
+                            expanded_collections: convertExpandedCollectionsForBackend(),
+                            custom_html: document.getElementById('custom-html-toggle')?.checked ? (document.getElementById('custom-html-editor')?.value || '') : ''
                         })
                     });
                     
@@ -4058,14 +4113,17 @@
                     });
 
                     const expandedCollections = window.expandedCollections || {};
-                    
+                    const isCustomHtml = document.getElementById('custom-html-toggle')?.checked || false;
+                    const customHtml = isCustomHtml ? (document.getElementById('custom-html-editor')?.value || '') : '';
+
                     const templateData = {
                         name: name,
                         selected_items: JSON.stringify(itemsWithContent),
                         email_text: textBlocks.join('\n\n'),
                         subject: document.getElementById('subject').value,
                         email_header_title: document.getElementById('email_header_title')?.value || '',
-                        expanded_collections: JSON.stringify(convertExpandedCollectionsForBackend())
+                        expanded_collections: JSON.stringify(convertExpandedCollectionsForBackend()),
+                        custom_html: customHtml
                     };
 
                     const response = await fetch('/email_templates', {
@@ -4093,7 +4151,19 @@
             function loadTemplate(template) {
                 try {
                     const items = JSON.parse(template.selected_items);
-                    
+                    const customHtml = template.custom_html || '';
+                    const toggle = document.getElementById('custom-html-toggle');
+                    const editor = document.getElementById('custom-html-editor');
+
+                    if (customHtml && toggle && editor) {
+                        toggle.checked = true;
+                        editor.value = customHtml;
+                        toggle.dispatchEvent(new Event('change'));
+                    } else if (toggle) {
+                        toggle.checked = false;
+                        toggle.dispatchEvent(new Event('change'));
+                    }
+
                     selectedItems = [];
                     
                     document.querySelectorAll('.add-stat-btn, .add-graph-btn, .ra-add-btn, .recs-add-btn').forEach(btn => {

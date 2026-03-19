@@ -672,6 +672,30 @@ footer p {
     border-color: #333 !important;
 }
 
+#custom-html-editor {
+    background-color: #8acbd4;
+    color: #222;
+    border-color: #ccc;
+}
+
+#custom-html-editor:focus {
+    background-color: #8acbd4 !important;
+    color: #222;
+    box-shadow: none;
+}
+
+.dark #custom-html-editor {
+    background-color: #4a4a4a !important;
+    border-color: #666 !important;
+    color: #8acbd4;
+}
+
+.dark #custom-html-editor:focus {
+    background-color: #4a4a4a !important;
+    color: #8acbd4;
+    box-shadow: none;
+}
+
 @media (max-width: 768px) {
     
     body {

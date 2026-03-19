@@ -169,8 +169,6 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 
 #### And these items are feature requests:
 --- Snapins ---
-* Filter 0 length run time out of recently added
-* Functionality for full custom HTML templates
 * Export email HTML button
 * Import template button and functionality
 * IMDb ratings in stat tables
@@ -233,6 +231,7 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Fixed missing smtp_username variable from scheduled email send logic
 * Added consistent headers to avoid repeated 'New Device Connected' notifications on Plex API calls
 * Fixed bug where recommendations pull would hang for a short period if conjurr is not running
+* Fixed bug where missing theme_settings in an early return to index was causing an error updating the preview
 
 #### New Features:
 * GitHub link is now a stylized logo
@@ -240,6 +239,8 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Added separator blocks to add lines between sections in emails
 * Made the header title into a text input (under subject) so that it is editable/removable
 * Made 'Title' Text Block drag-able and not pinned to top
+* Recently Added now filters out 0 length run time items
+* Added functionality for full custom HTML templates
 
 
 ### v2025.2.1:

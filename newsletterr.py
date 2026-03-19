@@ -816,6 +816,21 @@ def migrate_email_templates_for_header_title():
         print(f"Error migrating email_templates for email_header_title: {e}")
         traceback.print_exc()
 
+def migrate_email_templates_for_custom_html():
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("PRAGMA table_info(email_templates)")
+        columns = [column[1] for column in cursor.fetchall()]
+        if 'custom_html' not in columns:
+            print("Adding custom_html column to email_templates table...")
+            cursor.execute("ALTER TABLE email_templates ADD COLUMN custom_html TEXT DEFAULT ''")
+            conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"Error migrating email_templates for custom_html: {e}")
+        traceback.print_exc()
+
 def get_saved_email_lists():
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
@@ -1628,6 +1643,11 @@ def fetch_tv_shows_from_plex_sdk(section_id, limit=10, machine_id=None):
         for directory in media_container.get('Metadata', []):
             rating_key = str(directory.get('ratingKey', ''))
 
+            duration = int(directory.get('duration', 0) or 0)
+            if duration == 0:
+                print(f"Skipping show '{directory.get('title')}' - zero duration")
+                continue
+
             show = {
                 'title': directory.get('title', 'Unknown'),
                 'rating_key': rating_key,
@@ -1692,6 +1712,11 @@ def fetch_movies_from_plex_sdk(section_id, limit=10, machine_id=None):
         
         for video in media_container.get('Metadata', []):
             rating_key = str(video.get('ratingKey', ''))
+
+            duration = int(video.get('duration', 0) or 0)
+            if duration == 0:
+                print(f"Skipping movie '{video.get('title')}' - zero duration")
+                continue
             
             movie = {
                 'title': video.get('title', 'Unknown'),
@@ -1813,21 +1838,23 @@ def fetch_recently_added_using_plex_sdk(tautulli_base_url, tautulli_api_key, ite
         items = []
         
         if section_type == 'show':
-            items = fetch_tv_shows_from_plex_sdk(section_id, items_count, machine_id)
+            items = fetch_tv_shows_from_plex_sdk(section_id, items_count * 5, machine_id)
         elif section_type == 'movie':
-            items = fetch_movies_from_plex_sdk(section_id, items_count, machine_id)
+            items = fetch_movies_from_plex_sdk(section_id, items_count * 5, machine_id)
         elif section_type == 'artist':
             items = fetch_albums_from_plex_sdk(section_id, items_count, machine_id)
         else:
             print(f"Using Tautulli fallback for library type: {section_type}")
-            rd, _ = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_recently_added', section_id, None, str(items_count), 0)
+            rd, _ = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_recently_added', section_id, None, str(items_count * 5), 0)
             if rd and rd.get('recently_added'):
-                items = rd['recently_added']
+                items = [item for item in rd['recently_added'] if int(item.get('duration', 0) or 0) > 0]
                 for item in items:
                     item['library_name'] = library_name
                     if 'rating_key' in item and machine_id:
                         item['plex_url'] = build_plex_web_link(item['rating_key'], machine_id)
-        
+
+        items = items[:items_count]
+
         if items:
             recent_data.append({
                 'recently_added': items
@@ -3529,6 +3556,9 @@ def attach_logo_image(msg_root, logo_filename, custom_logo_filename, base_url=""
     return fetch_and_attach_image(logo_url, msg_root, "logo", base_url)
 
 def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, display_preference, users_data, recommendations_data=None, user_dict=None, base_url="", target_user_key=None, is_scheduled=False, items_count=None, date_range="", expanded_collections=None, email_header_title=None):
+    custom_html = template_data.get('custom_html', '').strip()
+    if custom_html:
+        return custom_html
     selected_items = json.loads(template_data.get('selected_items', '[]'))
     email_text = template_data.get('email_text', '')
     subject = template_data.get('subject', '')
@@ -3762,7 +3792,7 @@ def build_complete_email_html_with_cid_logo(content_html, server_name, subject, 
             </body>
         </html>"""
 
-def send_standard_email_with_cids(to_emails, subject, email_header_title, selected_items, from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, settings, from_name, expanded_collections=None):
+def send_standard_email_with_cids(to_emails, subject, email_header_title, selected_items, from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, settings, from_name, custom_html, expanded_collections=None):
     try:
         print(f"SMTP Config: {smtp_server}:{smtp_port} using {smtp_protocol}")
 
@@ -3803,7 +3833,8 @@ def send_standard_email_with_cids(to_emails, subject, email_header_title, select
         template_data = {
             'selected_items': json.dumps(selected_items),
             'email_text': '',
-            'subject': subject
+            'subject': subject,
+            'custom_html': custom_html
         }
         
         base_url = os.environ.get("PUBLIC_BASE_URL", "http://127.0.0.1:6397")
@@ -3898,7 +3929,7 @@ def send_standard_email_with_cids(to_emails, subject, email_header_title, select
         print("SMTP send error:", e)
         return jsonify({"error": str(e)}), 500
 
-def send_recommendations_email_with_cids(to_emails, subject, email_header_title, user_dict, selected_items, from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, settings, from_name, expanded_collections=None):
+def send_recommendations_email_with_cids(to_emails, subject, email_header_title, user_dict, selected_items, from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, settings, from_name, custom_html, expanded_collections=None):
     try:
         rec_user_keys = set()
         for item in selected_items:
@@ -3909,7 +3940,7 @@ def send_recommendations_email_with_cids(to_emails, subject, email_header_title,
             return send_standard_email_with_cids(
                 to_emails, subject, email_header_title, selected_items, from_email, alias_email, 
                 reply_to_email, password, smtp_username, smtp_server, smtp_port,
-                smtp_protocol, settings, from_name, expanded_collections
+                smtp_protocol, settings, from_name, custom_html, expanded_collections
             )
         
         recommendations_data = get_recommendations_for_users(rec_user_keys, to_emails, user_dict, use_cache=True)
@@ -3930,7 +3961,7 @@ def send_recommendations_email_with_cids(to_emails, subject, email_header_title,
             success = send_single_user_email_with_cids(
                 recipients, subject, email_header_title, selected_items, user_key, recommendations_data,
                 from_email, alias_email, reply_to_email, password, smtp_username, 
-                smtp_server, smtp_port, smtp_protocol, settings, from_name, expanded_collections
+                smtp_server, smtp_port, smtp_protocol, settings, from_name, custom_html, expanded_collections
             )
             
             if success:
@@ -3946,7 +3977,7 @@ def send_recommendations_email_with_cids(to_emails, subject, email_header_title,
         print("Error in send_recommendations_email_with_cids:", e)
         return jsonify({"error": str(e)}), 500
 
-def send_single_user_email_with_cids(recipients, subject, email_header_title, selected_items, user_key, recommendations_data, from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, settings, from_name, expanded_collections=None):
+def send_single_user_email_with_cids(recipients, subject, email_header_title, selected_items, user_key, recommendations_data, from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, settings, from_name, custom_html, expanded_collections=None):
     try:
         print(f"SMTP Config: {smtp_server}:{smtp_port} using {smtp_protocol}")
 
@@ -4004,7 +4035,8 @@ def send_single_user_email_with_cids(recipients, subject, email_header_title, se
         template_data = {
             'selected_items': json.dumps(selected_items),
             'email_text': '',
-            'subject': subject
+            'subject': subject,
+            'custom_html': custom_html
         }
         
         base_url = os.environ.get("PUBLIC_BASE_URL", "http://127.0.0.1:6397")
@@ -4250,7 +4282,7 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
         
         templates_conn = sqlite3.connect(DB_PATH)
         templates_cursor = templates_conn.cursor()
-        templates_cursor.execute("SELECT name, subject, email_text, selected_items, expanded_collections, email_header_title FROM email_templates WHERE id = ?", (template_id,))
+        templates_cursor.execute("SELECT name, subject, email_text, selected_items, expanded_collections, email_header_title, custom_html FROM email_templates WHERE id = ?", (template_id,))
         template_result = templates_cursor.fetchone()
         templates_conn.close()
         
@@ -4258,10 +4290,11 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
             print(f"Template {template_id} not found")
             return False
         
-        template_name, subject, email_text, selected_items_json, expanded_collections_json, email_header_title = template_result
+        template_name, subject, email_text, selected_items_json, expanded_collections_json, email_header_title, custom_html = template_result
         selected_items = json.loads(selected_items_json) if selected_items_json else []
         expanded_collections = json.loads(expanded_collections_json) if expanded_collections_json else {}
         email_header_title = email_header_title or ''
+        custom_html = custom_html or ''
         
         settings_conn = sqlite3.connect(DB_PATH)
         settings_cursor = settings_conn.cursor()
@@ -4344,9 +4377,9 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
                     continue
                 
                 success = send_scheduled_user_email_with_cids(
-                    recipients, subject, email_header_title, selected_items, user_key, recommendations_data,
-                    from_email, alias_email, reply_to_email, encrypted_password, smtp_username,
-                    smtp_server, smtp_port, smtp_protocol, server_name, tautulli_base_url,
+                    recipients, subject, email_header_title, custom_html, selected_items, user_key,
+                    recommendations_data, from_email, alias_email, reply_to_email, encrypted_password,
+                    smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, tautulli_base_url,
                     tautulli_api_key, date_range, items_count, template_name, logo_filename, logo_width,
                     custom_logo_filename, from_name, display_preference, users_data, expanded_collections
                 )
@@ -4368,8 +4401,8 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
         else:
             print("Template has no recommendations, sending single email to all recipients...")
             return send_scheduled_single_email_with_cids(
-                to_emails_list, subject, email_header_title, selected_items, from_email, alias_email, reply_to_email,
-                encrypted_password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name,
+                to_emails_list, subject, email_header_title, custom_html, selected_items, from_email, alias_email,
+                reply_to_email, encrypted_password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name,
                 tautulli_base_url, tautulli_api_key, date_range, items_count, template_name, logo_filename,
                 logo_width, custom_logo_filename, from_name, display_preference, users_data, expanded_collections
             )
@@ -4379,7 +4412,7 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
         traceback.print_exc()
         return False
 
-def send_scheduled_user_email_with_cids(recipients, subject, email_header_title, selected_items, user_key, recommendations_data, from_email, alias_email, reply_to_email, encrypted_password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, tautulli_base_url, tautulli_api_key, date_range, items_count, template_name, logo_filename, logo_width, custom_logo_filename, from_name, display_preference, users_data, expanded_collections):
+def send_scheduled_user_email_with_cids(recipients, subject, email_header_title, custom_html, selected_items, user_key, recommendations_data, from_email, alias_email, reply_to_email, encrypted_password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, tautulli_base_url, tautulli_api_key, date_range, items_count, template_name, logo_filename, logo_width, custom_logo_filename, from_name, display_preference, users_data, expanded_collections):
     try:
         print(f"SMTP Config: {smtp_server}:{smtp_port} using {smtp_protocol}")
 
@@ -4424,7 +4457,8 @@ def send_scheduled_user_email_with_cids(recipients, subject, email_header_title,
         template_data = {
             'selected_items': json.dumps(selected_items),
             'email_text': '',
-            'subject': subject
+            'subject': subject,
+            'custom_html': custom_html
         }
         
         base_url = os.environ.get("PUBLIC_BASE_URL", "http://127.0.0.1:6397")
@@ -4514,7 +4548,7 @@ def send_scheduled_user_email_with_cids(recipients, subject, email_header_title,
         traceback.print_exc()
         return False
 
-def send_scheduled_single_email_with_cids(to_emails_list, subject, email_header_title, selected_items, from_email, alias_email, reply_to_email, encrypted_password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, tautulli_base_url, tautulli_api_key, date_range, items_count, template_name, logo_filename, logo_width, custom_logo_filename, from_name, display_preference, users_data, expanded_collections, email_text=""):
+def send_scheduled_single_email_with_cids(to_emails_list, subject, email_header_title, custom_html, selected_items, from_email, alias_email, reply_to_email, encrypted_password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, tautulli_base_url, tautulli_api_key, date_range, items_count, template_name, logo_filename, logo_width, custom_logo_filename, from_name, display_preference, users_data, expanded_collections, email_text=""):
     try:
         print(f"SMTP Config: {smtp_server}:{smtp_port} using {smtp_protocol}")
 
@@ -4559,9 +4593,10 @@ def send_scheduled_single_email_with_cids(to_emails_list, subject, email_header_
         template_data = {
             'selected_items': json.dumps(selected_items),
             'email_text': email_text,
-            'subject': subject
+            'subject': subject,
+            'custom_html': custom_html
         }
-        
+
         base_url = os.environ.get("PUBLIC_BASE_URL", "http://127.0.0.1:6397")
         
         email_html = build_email_html_with_all_cids(
@@ -5406,7 +5441,7 @@ def pull_recommendations():
             return render_template('index.html', error='Please enter conjurr info on settings page',
                                     stats=stats, user_dict=user_dict, graph_data=graph_data,
                                     graph_commands=graph_commands, recent_data=recent_data,
-                                    libs=libs, settings=settings)
+                                    libs=libs, settings=settings, theme_settings=get_theme_settings())
         else:
             conjurr_base_url = conjurr_settings['conjurr_url']
             recommendations_json, error = run_conjurr_command(conjurr_base_url, filtered_users, error)
@@ -5486,6 +5521,7 @@ def send_email():
     selected_items = data.get('selected_items', [])
     expanded_collections = data.get('expanded_collections', {})
     from_name = settings['from_name']
+    custom_html = data.get('custom_html', '')
 
     has_recommendations = any(item.get('type') == 'recommendations' for item in selected_items)
 
@@ -5493,13 +5529,15 @@ def send_email():
         return send_recommendations_email_with_cids(
             to_emails, subject, email_header_title, user_dict, selected_items,
             from_email, alias_email, reply_to_email, password, smtp_username, 
-            smtp_server, smtp_port, smtp_protocol, settings, from_name, expanded_collections
+            smtp_server, smtp_port, smtp_protocol, settings, from_name, custom_html,
+            expanded_collections
         )
     else:
         return send_standard_email_with_cids(
             to_emails, subject, email_header_title, selected_items,
             from_email, alias_email, reply_to_email, password, smtp_username,
-            smtp_server, smtp_port, smtp_protocol, settings, from_name, expanded_collections
+            smtp_server, smtp_port, smtp_protocol, settings, from_name, custom_html,
+            expanded_collections
         )
 
 @app.route('/settings', methods=['GET', 'POST'])
@@ -6786,7 +6824,7 @@ def get_email_templates():
     try:
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
-        cursor.execute("SELECT id, name, selected_items, email_text, subject, expanded_collections, email_header_title FROM email_templates ORDER BY name")
+        cursor.execute("SELECT id, name, selected_items, email_text, subject, expanded_collections, email_header_title, custom_html FROM email_templates ORDER BY name")
         templates = cursor.fetchall()
         conn.close()
         
@@ -6799,7 +6837,8 @@ def get_email_templates():
                 'email_text': template[3],
                 'subject': template[4],
                 'expanded_collections': template[5] or '{}',
-                'email_header_title': template[6] or ''
+                'email_header_title': template[6] or '',
+                'custom_html': template[7] or ''
             })
         
         return jsonify(template_list)
@@ -6819,6 +6858,7 @@ def save_email_template():
         subject = data.get('subject', '')
         expanded_collections = data.get('expanded_collections', '{}')
         email_header_title = data.get('email_header_title', '')
+        custom_html = data.get('custom_html', '')
         
         if not name:
             return jsonify({"status": "error", "message": "Template name is required"}), 400
@@ -6832,15 +6872,15 @@ def save_email_template():
         if existing:
             cursor.execute("""
                 UPDATE email_templates 
-                SET selected_items = ?, email_text = ?, subject = ?, expanded_collections = ?, email_header_title = ?, updated_at = CURRENT_TIMESTAMP
+                SET selected_items = ?, email_text = ?, subject = ?, expanded_collections = ?, email_header_title = ?, custom_html = ?, updated_at = CURRENT_TIMESTAMP
                 WHERE name = ?
-            """, (selected_items, email_text, subject, expanded_collections, email_header_title, name))
+            """, (selected_items, email_text, subject, expanded_collections, email_header_title, custom_html, name))
             message = "Template updated successfully"
         else:
             cursor.execute("""
-                INSERT INTO email_templates (name, selected_items, email_text, subject, expanded_collections, email_header_title)
-                VALUES (?, ?, ?, ?, ?, ?)
-            """, (name, selected_items, email_text, subject, expanded_collections, email_header_title))
+                INSERT INTO email_templates (name, selected_items, email_text, subject, expanded_collections, email_header_title, custom_html)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (name, selected_items, email_text, subject, expanded_collections, email_header_title, custom_html))
             message = "Template saved successfully"
         
         conn.commit()
@@ -6868,7 +6908,7 @@ def delete_email_template(template_id):
 
 if __name__ == '__main__':
     app.jinja_env.globals["version"] = "v2026.1"
-    app.jinja_env.globals["publish_date"] = "March 17, 2026"
+    app.jinja_env.globals["publish_date"] = "March 18, 2026"
 
     app.jinja_env.globals["get_cache_status"] = get_global_cache_status
 
@@ -6943,6 +6983,7 @@ if __name__ == '__main__':
     migrate_ra_recs_to_recently_added_recommendations()
     migrate_email_templates_for_expanded_collections()
     migrate_email_templates_for_header_title()
+    migrate_email_templates_for_custom_html()
 
     plex_headers = get_plex_headers()
 

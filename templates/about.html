@@ -106,6 +106,7 @@
         <li>Fixed missing smtp_username variable from scheduled email send logic</li>
         <li>Added consistent headers to avoid repeated 'New Device Connected' notifications on Plex API calls</li>
         <li>Fixed bug where recommendations pull would hang for a short period if conjurr is not running</li>
+        <li>Fixed bug where missing theme_settings in an early return to index was causing an error updating the preview</li>
     </ul>
     <dt class="font-semibold dark:border-gray-300">New Features:</dt>
     <ul class="list-disc list-inside space-y-2 text-sm mb-2">
@@ -114,6 +115,8 @@
         <li>Added separator blocks to add lines between sections in emails</li>
         <li>Made the header title into a text input (under subject) so that it is editable/removable</li>
         <li>Made 'Title' Text Block drag-able and not pinned to top</li>
+        <li>Recently Added now filters out 0 length run time items</li>
+        <li>Added functionality for full custom HTML templates</li>
     </ul>
 </div>
 {% endblock %}

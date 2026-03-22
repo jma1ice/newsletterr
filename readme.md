@@ -237,7 +237,8 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Added an import email template button
 * Ratings (G, PG, etc) are now listed on recently added
 * Added IMDb ratings in stat tables - requires Tautulli PR approval and then update
-* Added snap-in for images/gifs/emojis
+* Added snap-ins for images/gifs
+* Added emoji support to various Text Block Snap-ins
 * Pop out preview now updates with changes to the email
 
 

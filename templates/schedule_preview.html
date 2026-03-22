@@ -776,6 +776,33 @@
                 if (groupCollections.length > 0) {
                     contentHTML += buildCollectionPreviewHTMLForEmail(groupTitle, groupCollections, itemIndex);
                 }
+            } else if (item.type === 'separator') {
+                contentHTML += `<hr style="border: none; border-top: 1px solid var(--email-text); margin: 20px auto; width: 80%;">`;
+
+            } else if (item.type === 'image' || item.type === 'gif') {
+                if (item.src) {
+                    const alignStyle = item.align === 'left' ? 'margin-right: auto;'
+                                    : item.align === 'right' ? 'margin-left: auto;'
+                                    : 'margin-left: auto; margin-right: auto;';
+                    contentHTML += `
+                        <div style="text-align: ${item.align || 'center'}; margin: 10px 0;">
+                            <img src="${item.src}"
+                                width="${item.width || 400}"
+                                style="display: block; max-width: 100%; height: auto; ${alignStyle}"
+                                alt="">
+                        </div>`;
+                }
+
+            } else if (item.type === 'emoji') {
+                if (item.content) {
+                    contentHTML += `
+                        <div style="
+                            text-align: ${item.align || 'center'};
+                            font-size: ${item.size || '2em'};
+                            line-height: 1.4;
+                            margin: 10px 0;
+                        ">${item.content}</div>`;
+                }
             }
         }
 
@@ -829,15 +856,15 @@
         
         function getStatHeaders(title) {
             if (title === "Most Watched Movies" || title === "Most Watched TV Shows") {
-                return ["Title", "Year", "Plays", "Hours Played", "Rating"];
+                return ["Title", "Year", "Plays", "Hours Played", "Cert.", "Score"];
             } else if (title === "Most Popular Movies" || title === "Most Popular TV Shows") {
-                return ["Title", "Year", "Plays", "Users", "Rating"];
+                return ["Title", "Year", "Plays", "Users", "Cert.", "Score"];
             } else if (title === "Most Played Artists") {
                 return ["Author", "Year", "Plays", "Hours Played"];
             } else if (title === "Most Popular Artists") {
                 return ["Author", "Year", "Plays", "Users"];
             } else if (title === "Recently Watched") {
-                return ["Title", "Year", "Rating"];
+                return ["Title", "Year", "Cert.", "Score"];
             } else if (title === "Most Active Libraries") {
                 return ["Library", "Plays", "Hours Played"];
             } else if (title === "Most Active Users") {
@@ -885,6 +912,7 @@
             const skipRatingStats = ["Most Active Libraries", "Most Played Artists", "Most Popular Artists", "Most Active Users", "Most Active Platforms", "Most Concurrent Streams"];
             if (!skipRatingStats.includes(title)) {
                 cells.push(row.content_rating || '');
+                cells.push(row.rating ? `${row.rating}` : 'NA');
             }
             
             if (title === "Most Concurrent Streams") {
@@ -1010,6 +1038,7 @@
             } else {
                 duration = msToHMS(item.duration);
             }
+            const contentRating = item.content_rating || item.media_rating || '';
             const added = formatDate(item.updated_at || item.originally_available_at);
             const library = item.library_name || item.section_name || '';
 
@@ -1028,7 +1057,8 @@
                 added,
                 thumb: thumbPath,
                 library,
-                plex_url: item.plex_url || ''
+                plex_url: item.plex_url || '',
+                contentRating
             };
         });
         
@@ -1070,8 +1100,8 @@
                         <div style="font-weight: bold; font-size: 14px; color: var(--email-text); margin-bottom: 4px; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
                             ${item.title}
                         </div>
-                        <div style="font-size: 11px; color: var(--email-muted); margin-bottom: 8px; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
-                            ${item.sub ? item.sub + ' • ' : ''}${item.duration}
+                        <div style="font-size: 10px; color: var(--email-muted); margin-bottom: 8px; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                            ${item.sub ? item.sub + ' • ' : ''}${item.duration ? item.duration + ' • ' : ''}${item.contentRating}
                         </div>
                         ${item.summary ? `
                             <div style="font-size: 11px; color: var(--email-text); opacity: 0.8; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden;">
@@ -1712,6 +1742,10 @@
     }
 
     function buildCompleteEmailHTML(contentHTML, serverName, subject) {
+        const customHtml = templateData?.custom_html || '';
+        if (customHtml.trim()) return customHtml;
+
+        const headerTitle = templateData?.email_header_title || '';
         const logoFilename = "{{ settings.logo_filename }}";
         const logoWidth = "{{ settings.logo_width }}";
         const customLogoFilename = "{{ settings.custom_logo_filename }}"
@@ -1738,7 +1772,7 @@
                     <div class="email-container">
                         <div class="email-header">
                             ${logoHTML}
-                            <h1 class="email-title">${serverName} Newsletter</h1>
+                            ${headerTitle ? `<h1 class="email-title">${headerTitle}</h1>` : ''}
                         </div>
                         
                         <div class="email-content">

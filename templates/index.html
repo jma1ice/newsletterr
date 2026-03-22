@@ -128,9 +128,18 @@
                     <td id="preview-row" style="width: 40%; padding: 10px; vertical-align: top; position: sticky; top: 80px;">
                         <div class="d-flex justify-content-between align-items-center mb-2">
                             <span>Preview:</span>
-                            <button id="popout-preview-btn" class="btn button-outline btn-sm" title="Open preview in new window">
-                                🗗 Pop-out
-                            </button>
+                            <div class="d-flex gap-2">
+                                <button id="export-html-btn" class="btn button-outline btn-sm" title="Export email as HTML file">
+                                    ⬇ Export HTML
+                                </button>
+                                <button id="import-html-btn" class="btn button-outline btn-sm" title="Import HTML file as template">
+                                    ⬆ Import HTML
+                                </button>
+                                <input type="file" id="import-html-input" accept=".html" style="display: none;">
+                                <button id="popout-preview-btn" class="btn button-outline btn-sm" title="Open preview in new window">
+                                    🗗 Pop-out
+                                </button>
+                            </div>
                         </div>
                         <iframe class="frame bg-black !important" id="preview"></iframe>
                     </td>
@@ -201,12 +210,22 @@
                             </div>
                         </div>
 
+                        <div class="mb-4">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h2>Media</h2>
+                                <div class="d-flex gap-2">
+                                    <button type="button" class="btn button btn-sm" id="add-image-btn" title="Add an image or GIF from file or URL">
+                                        + Image/GIF
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <input type="file" id="media-upload-input" accept=".png,.jpg,.jpeg,.webp,.gif" style="display: none;">
+
                         <div class="row">
                             <div class="col-md-6">
-                                {% if recent_data %}
-                                    <h2>Recently Added</h2>
-                                    <div id="ra-lib-list" class="row"></div>
-                                {% endif %}
+                                <h2 id="ra-header" style="{{ '' if recent_data else 'display:none;' }}">Recently Added</h2>
+                                <div id="ra-lib-list" class="row" style="{{ '' if recent_data else 'display:none;' }}"></div>
                             </div>
                             <div class="col-md-6" id="recs-col">
                                 {% if recommendations_json %}
@@ -280,62 +299,23 @@
 
                         <div class="row">
                             <div class="col-md-6">
-                                {% if stats %}
-                                    <h2>Available Stats</h2>
-                                    <div class="row">
-                                        {% for stat in stats %}
-                                            <div class="col-12 mb-2">
-                                                <div class="d-flex justify-content-between align-items-center p-2 border rounded">
-                                                    <span style="font-size: 0.9rem;">{{ stat.stat_title }}</span>
-                                                    <div>
-                                                        <button hidden type="button" class="btn button-outline btn-sm me-1 view-stat-btn" 
-                                                                data-target="stat-{{ loop.index0 }}" style="font-size: 0.8rem; padding: 0.25rem 0.5rem;">
-                                                            View
-                                                        </button>
-                                                        <button type="button" class="btn button btn-sm add-stat-btn" 
-                                                                data-id="stat-{{ loop.index0 }}" 
-                                                                data-name="{{ stat.stat_title }}"
-                                                                data-type="stat" style="font-size: 0.8rem; padding: 0.25rem 0.5rem;">
-                                                            Add
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        {% endfor %}
+                                <h2>Available Stats</h2>
+                                <div id="stats-list" class="row">
+                                    <div class="alert alert-info" style="font-size: 0.9rem; padding: 0.75rem;">
+                                        <i class="fas fa-info-circle me-2"></i>
+                                        No stats data available. Click <strong>"Get Stats\Users"</strong> to load data.
                                     </div>
-                                {% endif %}
+                                </div>
                             </div>
                             
                             <div class="col-md-6">
                                 <h2>Available Graphs</h2>
-                                {% if graph_data != [{},{}] %}
-                                    <div class="row">
-                                        {% for graph in graph_data %}
-                                            <div class="col-12 mb-2">
-                                                <div class="d-flex justify-content-between align-items-center p-2 border rounded">
-                                                    <span style="font-size: 0.9rem;">{{ graph_commands[loop.index0].name }}</span>
-                                                    <div>
-                                                        <button hidden type="button" class="btn button-outline btn-sm me-1 view-graph-btn" 
-                                                                data-target="graph-{{ loop.index0 }}" style="font-size: 0.8rem; padding: 0.25rem 0.5rem;">
-                                                            View
-                                                        </button>
-                                                        <button type="button" class="btn button btn-sm add-graph-btn" 
-                                                                data-id="graph-{{ loop.index0 }}" 
-                                                                data-name="{{ graph_commands[loop.index0].name }}"
-                                                                data-type="graph" style="font-size: 0.8rem; padding: 0.25rem 0.5rem;">
-                                                            Add
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        {% endfor %}
-                                    </div>
-                                {% else %}
+                                <div id="graphs-list" class="row">
                                     <div class="alert alert-info" style="font-size: 0.9rem; padding: 0.75rem;">
                                         <i class="fas fa-info-circle me-2"></i>
                                         No graph data available. Click <strong>"Get Stats\Users"</strong> to load data.
                                     </div>
-                                {% endif %}
+                                </div>
                             </div>
                         </div>
 
@@ -362,7 +342,8 @@
                                                                     <th>Year</th>
                                                                     <th>Plays</th>
                                                                     <th>Hours Played</th>
-                                                                    <th>Rating</th>
+                                                                    <th>Cert.</th>
+                                                                    <th>Score</th>
                                                                 </tr>
                                                             </thead>
                                                         {% elif stat.stat_title == "Most Popular Movies" or stat.stat_title == "Most Popular TV Shows" %}
@@ -372,7 +353,8 @@
                                                                     <th>Year</th>
                                                                     <th>Plays</th>
                                                                     <th>Users</th>
-                                                                    <th>Rating</th>
+                                                                    <th>Cert.</th>
+                                                                    <th>Score</th>
                                                                 </tr>
                                                             </thead>
                                                         {% elif stat.stat_title == "Most Played Artists" %}
@@ -398,7 +380,8 @@
                                                                 <tr>
                                                                     <th>Title</th>
                                                                     <th>Year</th>
-                                                                    <th>Rating</th>
+                                                                    <th>Cert.</th>
+                                                                    <th>Score</th>
                                                                 </tr>
                                                             </thead>
                                                         {% elif stat.stat_title == "Most Active Libraries" %}
@@ -466,6 +449,7 @@
                                                                     {% if stat.stat_title == "Most Active Libraries" or stat.stat_title == "Most Played Artists" or stat.stat_title == "Most Popular Artists" or stat.stat_title == "Most Active Users" or stat.stat_title == "Most Active Platforms" or stat.stat_title == "Most Concurrent Streams" %}
                                                                     {% else %}
                                                                         <td>{{ row.content_rating }}</td>
+                                                                        <td>{{ row.rating if row.rating else 'NA' }}</td>
                                                                     {% endif %}
 
                                                                     {% if stat.stat_title == "Most Concurrent Streams" %}
@@ -515,6 +499,45 @@
                     </td>
                 </tr>
             </table>
+            <div id="gif-picker-modal" style="display: none; position: fixed; inset: 0; z-index: 9999; background: rgba(0,0,0,0.7);">
+                <div style="
+                    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+                    width: min(600px, 95vw); max-height: 80vh;
+                    display: flex; flex-direction: column;
+                    border-radius: 12px; overflow: hidden;
+                    background: var(--bs-body-bg, #fff);
+                    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+                ">
+                    <div style="padding: 12px 16px; border-bottom: 1px solid #ddd; display: flex; gap: 8px; align-items: center; flex-shrink: 0;">
+                        <input type="text" id="gif-search-input" class="form-control form-control-sm"
+                            placeholder="Search KLIPY" style="flex: 1;">
+                        <button id="gif-search-btn" class="btn button btn-sm">Search</button>
+                        <button id="gif-picker-close" class="btn btn-outline-secondary btn-sm">✕</button>
+                    </div>
+
+                    <div id="gif-results-grid" style="
+                        flex: 1; overflow-y: auto; padding: 10px;
+                        display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;
+                        min-height: 200px;
+                    ">
+                        <div id="gif-results-empty" style="grid-column: 1/-1; text-align: center; padding: 40px; color: #888;">
+                            Search for GIFs above
+                        </div>
+                    </div>
+
+                    <div style="padding: 8px 16px; border-top: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            <button id="gif-prev-btn" class="btn btn-outline-secondary btn-sm" disabled>← Prev</button>
+                            <span id="gif-page-label" style="font-size: 0.8rem; color: #888;">Page 1</span>
+                            <button id="gif-next-btn" class="btn button btn-sm" disabled>Next →</button>
+                        </div>
+                        <a href="https://klipy.com" target="_blank" rel="noopener"
+                        style="font-size: 0.75rem; color: #888; text-decoration: none; opacity: 0.8;">
+                            Powered by KLIPY
+                        </a>
+                    </div>
+                </div>
+            </div>
         </div>
         <script nonce="{{ nonce }}">
             (function() {
@@ -525,6 +548,9 @@
             })();
         </script>
         <script nonce="{{ nonce }}">
+            let popoutWindow = null;
+            let currentTimeRange = {{ cache_info.graph_data.params.time_range | default(30) }};
+
             function getThemedEmailCSS() {
                 const emailTheme = themeSettings.email_theme || 'newsletter_blue';
                 const isDark = document.documentElement.classList.contains('dark');
@@ -795,7 +821,30 @@
                             }
                         } else if (item.type === 'separator') {
                             contentHTML += `<hr style="border: none; border-top: 1px solid var(--email-text); margin: 20px auto; width: 80%;">`;
-                        }else if (item.type === 'stat') {
+                        } else if (item.type === 'image' || item.type === 'gif') {
+                            if (item.src) {
+                                const alignStyle = item.align === 'left' ? 'margin-right: auto;' 
+                                                : item.align === 'right' ? 'margin-left: auto;' 
+                                                : 'margin-left: auto; margin-right: auto;';
+                                contentHTML += `
+                                    <div style="text-align: ${item.align || 'center'}; margin: 10px 0;">
+                                        <img src="${item.src}" 
+                                            width="${item.width || 400}"
+                                            style="display: block; max-width: 100%; height: auto; ${alignStyle}"
+                                            alt="">
+                                    </div>`;
+                            }
+                        } else if (item.type === 'emoji') {
+                            if (item.content) {
+                                contentHTML += `
+                                    <div style="
+                                        text-align: ${item.align || 'center'};
+                                        font-size: ${item.size || '2em'};
+                                        line-height: 1.4;
+                                        margin: 10px 0;
+                                    ">${item.content}</div>`;
+                            }
+                        } else if (item.type === 'stat') {
                             contentHTML += buildStatPreviewHTML(item.id);
                         } else if (item.type === 'graph') {
                             contentHTML += buildGraphPreviewHTML(item.id);
@@ -824,6 +873,17 @@
                     }
                     
                     frame.srcdoc = completeHTML;
+
+                    if (typeof popoutWindow !== 'undefined' && popoutWindow && !popoutWindow.closed) {
+                        try {
+                            popoutWindow.document.open();
+                            popoutWindow.document.write(completeHTML);
+                            popoutWindow.document.close();
+                            popoutWindow.document.title = 'Email Preview';
+                        } catch(e) {
+                            popoutWindow = null;
+                        }
+                    }
                     
                     frame.onload = function() {
                         try {
@@ -947,29 +1007,33 @@
                 }
             };
 
-            const items = flatten(recentPayload).map(it => {
-                const title = it.title || it.full_title || it.parent_title || it.grandparent_title || '(untitled)';
-                const sub = it.year || it.grandparent_title || it.parent_title || '';
-                const thumbPath = pickThumb(it);
+            function buildItemsFromPayload() {
+                return flatten(recentPayload).map(it => {
+                    const title = it.title || it.full_title || it.parent_title || it.grandparent_title || '(untitled)';
+                    const sub = it.year || it.grandparent_title || it.parent_title || '';
+                    const thumbPath = pickThumb(it);
 
-                const item_type = (it.media_type || it.type || '').toLowerCase();
-                let summary = '';
-                if (item_type === 'episode' || item_type === 'season') {
-                    summary = it.grandparent_tagline || it.grandparent_summary || it.parent_summary || it.tagline || it.summary || '';
-                } else {
-                    summary = it.tagline || it.summary || '';
-                }
+                    const item_type = (it.media_type || it.type || '').toLowerCase();
+                    let summary = '';
+                    if (item_type === 'episode' || item_type === 'season') {
+                        summary = it.grandparent_tagline || it.grandparent_summary || it.parent_summary || it.tagline || it.summary || '';
+                    } else {
+                        summary = it.tagline || it.summary || '';
+                    }
 
-                return {
-                    library: it.library_name || it.section_name || it.media_type || '',
-                    title,
-                    sub,
-                    summary: summary,
-                    duration: msToHMS(it.duration),
-                    added: formatDate(it.updated_at || it.originally_available_at),
-                    thumb: thumbPath
-                };
-            });
+                    return {
+                        library: it.library_name || it.section_name || it.media_type || '',
+                        title,
+                        sub,
+                        summary: summary,
+                        duration: msToHMS(it.duration),
+                        added: formatDate(it.updated_at || it.originally_available_at),
+                        thumb: thumbPath,
+                        content_rating: it.content_rating || ''
+                    };
+                });
+            }
+            let items = buildItemsFromPayload();
 
             const slug = s => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'');
 
@@ -995,9 +1059,11 @@
             }
 
             function buildRALibraryRows() {
+                items = buildItemsFromPayload();
                 const libs = [...new Set(items.map(i => i.library).filter(Boolean))].sort();
                 const host = document.getElementById('ra-lib-list');
                 if (!host) return;
+                host.innerHTML = '';
 
                 libs.forEach(lib => {
                     const row = document.createElement('div');
@@ -1022,7 +1088,86 @@
                     host.appendChild(row);
                 });
             }
-            buildRALibraryRows();
+
+            function buildStatsRows() {
+                const host = document.getElementById('stats-list');
+                if (!host) return;
+
+                const isEmpty = !statsList || statsList.length === 0;
+
+                if (isEmpty) {
+                    host.innerHTML = `
+                        <div class="alert alert-info" style="font-size: 0.9rem; padding: 0.75rem;">
+                            No stats data available. Click <strong>"Get Stats\\Users"</strong> to load data.
+                        </div>`;
+                    return;
+                }
+
+                host.innerHTML = statsList.map((stat, index) => `
+                    <div class="col-12 mb-2">
+                        <div class="d-flex justify-content-between align-items-center p-2 border rounded">
+                            <span style="font-size: 0.9rem;">${stat.stat_title}</span>
+                            <div>
+                                <button hidden type="button" class="btn button-outline btn-sm me-1 view-stat-btn"
+                                        data-target="stat-${index}" style="font-size: 0.8rem; padding: 0.25rem 0.5rem;">
+                                    View
+                                </button>
+                                <button type="button" class="btn button btn-sm add-stat-btn"
+                                        data-id="stat-${index}"
+                                        data-name="${stat.stat_title}"
+                                        data-type="stat" style="font-size: 0.8rem; padding: 0.25rem 0.5rem;">
+                                    Add
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            function buildGraphsRows() {
+                const host = document.getElementById('graphs-list');
+                if (!host) return;
+
+                const isEmpty = !graphDataList || graphDataList.length === 0 || 
+                                JSON.stringify(graphDataList) === JSON.stringify([{}, {}]);
+
+                if (isEmpty) {
+                    host.innerHTML = `
+                        <div class="alert alert-info" style="font-size: 0.9rem; padding: 0.75rem;">
+                            No graph data available. Click <strong>"Get Stats\\Users"</strong> to load data.
+                        </div>`;
+                    return;
+                }
+
+                host.innerHTML = graphDataList.map((graph, index) => {
+                    const name = graphCommands[index]?.name || `Graph ${index}`;
+                    return `
+                        <div class="col-12 mb-2">
+                            <div class="d-flex justify-content-between align-items-center p-2 border rounded">
+                                <span style="font-size: 0.9rem;">${name}</span>
+                                <div>
+                                    <button hidden type="button" class="btn button-outline btn-sm me-1 view-graph-btn"
+                                            data-target="graph-${index}" style="font-size: 0.8rem; padding: 0.25rem 0.5rem;">
+                                        View
+                                    </button>
+                                    <button type="button" class="btn button btn-sm add-graph-btn"
+                                            data-id="graph-${index}"
+                                            data-name="${name}"
+                                            data-type="graph" style="font-size: 0.8rem; padding: 0.25rem 0.5rem;">
+                                        Add
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            document.addEventListener('DOMContentLoaded', () => {
+                buildRALibraryRows();
+                buildStatsRows();
+                buildGraphsRows();
+            });
 
             const grid = document.getElementById('ra-grid');
             const empty = document.getElementById('ra-empty');
@@ -1125,15 +1270,15 @@
 
                 function getStatHeaders(title) {
                     if (title === "Most Watched Movies" || title === "Most Watched TV Shows") {
-                        return ["Title", "Year", "Plays", "Hours Played", "Rating"];
+                        return ["Title", "Year", "Plays", "Hours Played", "Cert.", "Score"];
                     } else if (title === "Most Popular Movies" || title === "Most Popular TV Shows") {
-                        return ["Title", "Year", "Plays", "Users", "Rating"];
+                        return ["Title", "Year", "Plays", "Users", "Cert.", "Score"];
                     } else if (title === "Most Played Artists") {
                         return ["Author", "Year", "Plays", "Hours Played"];
                     } else if (title === "Most Popular Artists") {
                         return ["Author", "Year", "Plays", "Users"];
                     } else if (title === "Recently Watched") {
-                        return ["Title", "Year", "Rating"];
+                        return ["Title", "Year", "Cert.", "Score"];
                     } else if (title === "Most Active Libraries") {
                         return ["Library", "Plays", "Hours Played"];
                     } else if (title === "Most Active Users") {
@@ -1181,6 +1326,7 @@
                     const skipRatingStats = ["Most Active Libraries", "Most Played Artists", "Most Popular Artists", "Most Active Users", "Most Active Platforms", "Most Concurrent Streams"];
                     if (!skipRatingStats.includes(title)) {
                         cells.push(row.content_rating || '');
+                        cells.push(row.rating ? `${row.rating}` : 'NA');
                     }
                     
                     if (title === "Most Concurrent Streams") {
@@ -1203,7 +1349,7 @@
                     <div class="stats-card">
                         ${backgroundElements}
                         <div class="stats-content">
-                            <div class="stats-header">${title} - Last {{ cache_info.graph_data.params.time_range }} days</div>
+                            <div class="stats-header">${title} - Last ${currentTimeRange} days</div>
                             <table class="stats-table">
                                 <thead><tr>${headerHTML}</tr></thead>
                                 <tbody>${rowsHTML}</tbody>
@@ -1273,7 +1419,7 @@
                                     fontFamily: 'IBM Plex Sans, Segoe UI, Helvetica, Arial, sans-serif'
                                 }
                             },
-                            title: { text: commandInfo.name + ' - Last ' + '{{ cache_info.graph_data.params.time_range }}' + ' days' },
+                            title: { text: commandInfo.name + ' - Last ' + currentTimeRange + ' days' },
                             exporting: { enabled: true },
                             xAxis: { categories: graphData.categories },
                             yAxis: { title: { text: 'Plays' } },
@@ -1391,6 +1537,7 @@
                     } else {
                         duration = msToHMS(item.duration);
                     }
+                    const contentRating = item.content_rating || item.media_rating || '';
                     const added = formatDate(item.updated_at || item.originally_available_at);
                     const library = item.library_name || item.section_name || '';
 
@@ -1409,7 +1556,8 @@
                         added,
                         thumb: thumbPath,
                         library,
-                        plex_url: item.plex_url || ''
+                        plex_url: item.plex_url || '',
+                        contentRating
                     };
                 });
                 
@@ -1451,8 +1599,8 @@
                                 <div style="font-weight: bold; font-size: 14px; color: var(--email-text); margin-bottom: 4px; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
                                     ${item.title}
                                 </div>
-                                <div style="font-size: 11px; color: var(--email-muted); margin-bottom: 8px; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
-                                    ${item.sub ? item.sub + ' • ' : ''}${item.duration}
+                                <div style="font-size: 10px; color: var(--email-muted); margin-bottom: 8px; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                                    ${item.sub ? item.sub + ' • ' : ''}${item.duration ? item.duration + ' • ' : ''}${item.contentRating}
                                 </div>
                                 ${item.summary ? `
                                     <div style="font-size: 11px; color: var(--email-text); opacity: 0.8; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden;">
@@ -2515,6 +2663,12 @@
                                         style="height: 60px; font-size: 0.9rem; resize: vertical;"
                                         placeholder="${placeholderText}"
                                         oninput="updateTextBlockName('${item.id}', ${index})">${currentContent}</textarea>
+                                    <button type="button" class="btn button-outline btn-sm mt-1 emoji-toggle-btn" data-target="emoji-picker-${item.id}" title="Insert emoji into text block">
+                                        + Emoji
+                                    </button>
+                                    <div id="emoji-picker-${item.id}" style="display: none; margin-top: 4px;">
+                                        <emoji-picker data-textblock-id="${item.id}" style="width: 100%; --emoji-size: 1.2rem; --num-columns: 10;"></emoji-picker>
+                                    </div>
                                 </div>
                             `;
                         } else if (item.type === 'textblock' || item.type === 'headerblock') {
@@ -2537,6 +2691,12 @@
                                         style="height: 60px; font-size: 0.9rem; resize: vertical;"
                                         placeholder="${placeholderText}"
                                         oninput="updateTextBlockName('${item.id}', ${index})">${currentContent}</textarea>
+                                    <button type="button" class="btn button-outline btn-sm mt-1 emoji-toggle-btn" data-target="emoji-picker-${item.id}" title="Insert emoji into text block">
+                                        + Emoji
+                                    </button>
+                                    <div id="emoji-picker-${item.id}" style="display: none; margin-top: 4px;">
+                                        <emoji-picker data-textblock-id="${item.id}" style="width: 100%; --emoji-size: 1.2rem; --num-columns: 10;"></emoji-picker>
+                                    </div>
                                 </div>
                             `;
                         } else if (item.type === 'separator') {
@@ -2547,6 +2707,44 @@
                                     <div>
                                         <span class="badge badge-secondary me-2">separator</span>
                                         <button type="button" class="btn btn-sm btn-outline-danger remove-item-btn" data-index="${index}">x</button>
+                                    </div>
+                                </div>
+                            `;
+                        } else if (item.type === 'image' || item.type === 'gif') {
+                            htmlContent += `
+                                <div class="selected-item d-flex flex-column p-2 mb-2 border rounded"
+                                    data-index="${index}" draggable="true">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <span class="item-name">${item.type === 'gif' ? 'GIF' : 'Image/GIF'}</span>
+                                        <div>
+                                            <span class="badge badge-secondary me-2">${item.type}</span>
+                                            <button type="button" class="btn btn-sm btn-outline-danger remove-item-btn" data-index="${index}">x</button>
+                                        </div>
+                                    </div>
+                                    ${item.src ? `<img src="${item.src}" style="max-height: 80px; max-width: 100%; object-fit: contain; margin-bottom: 8px; border-radius: 4px;">` : ''}
+                                    <div class="d-flex gap-2 align-items-center mb-2">
+                                        <input type="text" class="form-control form-control-sm media-src-input"
+                                            data-index="${index}"
+                                            placeholder="Image URL or upload a file..."
+                                            value="${item.src || ''}"
+                                            style="flex: 1;">
+                                        <button type="button" class="btn button btn-sm media-upload-btn" data-index="${index}" title="Upload from device">
+                                            📁
+                                        </button>
+                                        <button type="button" class="btn button btn-sm media-gif-search-btn" data-index="${index}" title="Search GIFs">
+                                            🔍 GIF
+                                        </button>
+                                    </div>
+                                    <div class="d-flex gap-2 align-items-center">
+                                        <label style="font-size: 0.8rem; white-space: nowrap;">Width (px):</label>
+                                        <input type="number" class="form-control form-control-sm media-width-input"
+                                            data-index="${index}" value="${item.width || 400}" style="width: 80px;">
+                                        <label style="font-size: 0.8rem;">Align:</label>
+                                        <select class="form-select form-select-sm media-align-select" data-index="${index}" style="width: 100px;">
+                                            <option value="left" ${item.align === 'left' ? 'selected' : ''}>Left</option>
+                                            <option value="center" ${item.align === 'center' ? 'selected' : ''}>Center</option>
+                                            <option value="right" ${item.align === 'right' ? 'selected' : ''}>Right</option>
+                                        </select>
                                     </div>
                                 </div>
                             `;
@@ -2724,6 +2922,131 @@
                             }
                         });
                     });
+
+                    document.querySelectorAll('.media-src-input').forEach(input => {
+                        input.addEventListener('input', (e) => {
+                            const index = parseInt(e.target.dataset.index);
+                            if (selectedItems[index]) {
+                                selectedItems[index].src = e.target.value.trim();
+                                if (selectedItems[index].src.toLowerCase().includes('.gif') || selectedItems[index].src.includes('klipy')) {
+                                    selectedItems[index].type = 'gif';
+                                }
+                                debouncedUpdatePreview();
+                            }
+                        });
+                    });
+
+                    document.querySelectorAll('.media-width-input').forEach(input => {
+                        input.addEventListener('input', (e) => {
+                            const index = parseInt(e.target.dataset.index);
+                            if (selectedItems[index]) {
+                                selectedItems[index].width = parseInt(e.target.value) || 400;
+                                debouncedUpdatePreview();
+                            }
+                        });
+                    });
+
+                    document.querySelectorAll('.media-align-select').forEach(sel => {
+                        sel.addEventListener('change', (e) => {
+                            const index = parseInt(e.target.dataset.index);
+                            if (selectedItems[index]) {
+                                selectedItems[index].align = e.target.value;
+                                debouncedUpdatePreview();
+                            }
+                        });
+                    });
+
+                    document.querySelectorAll('.emoji-content-input').forEach(input => {
+                        input.addEventListener('input', (e) => {
+                            const index = parseInt(e.target.dataset.index);
+                            if (selectedItems[index]) {
+                                selectedItems[index].content = e.target.value;
+                                selectedItems[index].name = `${e.target.value || 'Emoji'}`;
+                                debouncedUpdatePreview();
+                            }
+                        });
+                    });
+
+                    document.querySelectorAll('.emoji-size-select').forEach(sel => {
+                        sel.addEventListener('change', (e) => {
+                            const index = parseInt(e.target.dataset.index);
+                            if (selectedItems[index]) {
+                                selectedItems[index].size = e.target.value;
+                                debouncedUpdatePreview();
+                            }
+                        });
+                    });
+
+                    document.querySelectorAll('.emoji-align-select').forEach(sel => {
+                        sel.addEventListener('change', (e) => {
+                            const index = parseInt(e.target.dataset.index);
+                            if (selectedItems[index]) {
+                                selectedItems[index].align = e.target.value;
+                                debouncedUpdatePreview();
+                            }
+                        });
+                    });
+
+                    document.querySelectorAll('.media-upload-btn').forEach(btn => {
+                        btn.addEventListener('click', (e) => {
+                            const index = parseInt(e.target.dataset.index);
+                            const input = document.getElementById('media-upload-input');
+                            input.dataset.targetIndex = index;
+                            input.click();
+                        });
+                    });
+
+                    document.querySelectorAll('.media-gif-search-btn').forEach(btn => {
+                        btn.addEventListener('click', (e) => {
+                            const index = parseInt(e.target.dataset.index);
+                            openGifPicker(index);
+                        });
+                    });
+
+                    document.querySelectorAll('.emoji-toggle-btn').forEach(btn => {
+                        btn.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            const targetId = btn.dataset.target;
+                            const container = document.getElementById(targetId);
+                            if (!container) return;
+                            const isVisible = container.style.display !== 'none';
+                            document.querySelectorAll('[id^="emoji-picker-"]').forEach(el => {
+                                if (el.tagName !== 'EMOJI-PICKER') el.style.display = 'none';
+                            });
+                            container.style.display = isVisible ? 'none' : 'block';
+                        });
+                    });
+
+                    document.querySelectorAll('emoji-picker').forEach(picker => {
+                        picker.addEventListener('emoji-click', (e) => {
+                            const emoji = e.detail.unicode;
+                            const textblockId = picker.dataset.textblockId;
+                            const textarea = document.querySelector(`[data-textblock-id="${textblockId}"]`);
+                            if (!textarea) return;
+
+                            const start = textarea.selectionStart ?? textarea.value.length;
+                            const end = textarea.selectionEnd ?? textarea.value.length;
+                            textarea.value = textarea.value.slice(0, start) + emoji + textarea.value.slice(end);
+
+                            const newPos = start + emoji.length;
+                            textarea.setSelectionRange(newPos, newPos);
+                            textarea.focus();
+
+                            setTextBlockContent(textblockId, textarea.value);
+                            debouncedUpdatePreview();
+
+                            const container = document.getElementById(`emoji-picker-${textblockId}`);
+                            if (container) container.style.display = 'none';
+                        });
+                    });
+
+                    document.addEventListener('click', (e) => {
+                        if (!e.target.closest('.emoji-toggle-btn') && !e.target.closest('[id^="emoji-picker-"]')) {
+                            document.querySelectorAll('[id^="emoji-picker-"]').forEach(el => {
+                                if (el.tagName !== 'EMOJI-PICKER') el.style.display = 'none';
+                            });
+                        }
+                    });
                     
                     setupDragAndDrop();
                 }
@@ -2812,7 +3135,7 @@
                                         fontFamily: 'IBM Plex Sans, Segoe UI, Helvetica, Arial, sans-serif'
                                     }
                                 },
-                                title: { text: graphCommands[index].name + ' - Last ' + '{{ cache_info.graph_data.params.time_range }}' + ' days' },
+                                title: { text: graphCommands[index].name + ' - Last ' + currentTimeRange + ' days' },
                                 exporting: { enabled: true },
                                 xAxis: { categories: graphData.categories },
                                 yAxis: { title: { text: 'Plays' } },
@@ -2961,6 +3284,7 @@
             let textBlockCounter = 0;
             let titleBlockCounter = 0;
             let headerBlockCounter = 0;
+            let mediaBlockCounter = 0;
             
             function createTextBlock(blockType = 'text') {
                 textBlockCounter++;
@@ -3103,6 +3427,14 @@
                 return null;
             }
 
+            function createImageBlock(src = '', isUpload = false) {
+                mediaBlockCounter++;
+                const id = `image-block-${mediaBlockCounter}`;
+                const item = { id, name: 'Image/GIF', type: 'image', src, width: 400, align: 'center', isUpload };
+                selectedItems.push(item);
+                updateSelectedItemsDisplay();
+            }
+
             document.addEventListener('click', async (e) => {
                 const btn = e.target.closest('button');
                 if (!btn) return;
@@ -3114,6 +3446,7 @@
                 if (btn.id === 'add-outro-btn') { createOutroBlock(); return; }
                 if (btn.id === 'add-title-btn') { createTitleBlock(); return; }
                 if (btn.id === 'add-header-btn') { createHeaderBlock(); return; }
+                if (btn.id === 'add-image-btn') { createImageBlock(); return; }
 
                 if (btn.classList.contains('remove-item-btn')) {
                     const index = parseInt(btn.dataset.index, 10);
@@ -3121,7 +3454,6 @@
                     if (btn.classList.contains('title-remove')) { titleBlockCounter = 0; }
                     return;
                 }
-
 
                 const isAdd =
                     btn.classList.contains('add-stat-btn') ||
@@ -3434,11 +3766,11 @@
                 const to_emails = toList.join(', ');
 
                 const payload = {
-                    stats: JSON.parse('{{ stats | tojson | safe }}'),
-                    user_dict: JSON.parse('{{ user_dict | tojson | safe }}'),
-                    graph_data: JSON.parse('{{ graph_data | tojson | safe }}'),
-                    graph_commands: JSON.parse('{{ graph_commands | tojson | safe }}'),
-                    recent_data: {{ recent_data | tojson | safe }},
+                    stats: statsList,
+                    user_dict: userDict,
+                    graph_data: graphDataList,
+                    graph_commands: graphCommands,
+                    recent_data: recentPayload,
                     libs: JSON.parse('{{ libs | tojson | safe }}'),
                     settings: JSON.parse('{{ settings | tojson | safe }}'),
                     to_emails
@@ -3597,6 +3929,8 @@
             });
         </script>
         <script nonce="{{ nonce }}">
+            let allUserEmails = JSON.parse('{{ user_dict.values() | list | tojson | safe }}');
+            
             function updateCacheBadge(cacheInfo, timeRange) {
                 const badge = document.getElementById('cache-status-badge');
                 if (!badge) return;
@@ -3653,13 +3987,18 @@
                             host.innerHTML = '';
                             buildRALibraryRows();
                         }
+                        const raHeader = document.getElementById('ra-header');
+                        if (raHeader) raHeader.style.display = '';
+                        if (host) host.style.display = '';
                     }
 
                     if (data.stats) {
                         statsList = data.stats;
+                        buildStatsRows();
                     }
                     if (data.graph_data) {
                         graphDataList = data.graph_data;
+                        buildGraphsRows();
                     }
 
                     if (data.graph_commands) {
@@ -3669,11 +4008,6 @@
                     if (data.users_full_data) {
                         usersFullData.length = 0;
                         data.users_full_data.forEach(u => usersFullData.push(u));
-                    }
-
-                    if (data.user_dict) {
-                        Object.keys(userDict).forEach(k => delete userDict[k]);
-                        Object.assign(userDict, data.user_dict);
                     }
 
                     if (data.cache_info) {
@@ -3700,9 +4034,31 @@
                         }
                     }
 
-                    renderedCharts.clear();
+                    if (data.time_range) currentTimeRange = parseInt(data.time_range);
 
+                    renderedCharts.clear();
                     updatePreview();
+
+                    if (data.user_dict) {
+                        Object.keys(userDict).forEach(k => delete userDict[k]);
+                        Object.assign(userDict, data.user_dict);
+
+                        allUserEmails.length = 0;
+                        Object.values(data.user_dict).filter(Boolean).forEach(e => allUserEmails.push(e));
+
+                        if (window.chipsClear && window.chipsAddTokens) {
+                            window.chipsClear();
+                            window.chipsAddTokens(Object.values(data.user_dict).join(', '));
+                        }
+
+                        const selector = document.getElementById('email_list_selector');
+                        if (selector) {
+                            const allOption = Array.from(selector.options).find(o => o.value === 'ALL');
+                            if (allOption) {
+                                allOption.dataset.emails = Object.values(data.user_dict).join(', ');
+                            }
+                        }
+                    }
                 } catch (err) {
                     console.error('Error pulling stats:', err);
                     const errorEl = document.getElementById('error_p');
@@ -3748,9 +4104,13 @@
                 }
 
                 function addEmail(email) {
-                    if (!email || !isEmail(email)) return;
+                    if (!email || !isEmail(email)) {
+                        return;
+                    };
                     const sel = `.nl-chip[data-email="${CSS.escape(email)}"]`;
-                    if (box.querySelector(sel)) return;
+                    if (box.querySelector(sel)) {
+                        return;
+                    };
                     box.insertBefore(makeChip(email), input);
                     syncHiddenFromDOM();
                 }
@@ -3760,7 +4120,20 @@
                         addEmail(normalize(t));
                     });
                 }
-
+                window.chipsAddTokens = (str) => {
+                    chipsObserver.disconnect();
+                    String(str).split(/[,\n;\s]+/).filter(Boolean).forEach(t => {
+                        addEmail(normalize(t));
+                    });
+                    chipsObserver.observe(box, { childList: true });
+                    syncHiddenFromDOM();
+                };
+                window.chipsClear = () => {
+                    chipsObserver.disconnect();
+                    box.querySelectorAll('.nl-chip').forEach(chip => chip.remove());
+                    chipsObserver.observe(box, { childList: true });
+                    syncHiddenFromDOM();
+                };
                 addTokens(ta.value || '');
 
                 input.addEventListener('keydown', (e) => {
@@ -3789,7 +4162,8 @@
                     if (chip) { chip.remove(); syncHiddenFromDOM(); }
                 });
 
-                new MutationObserver(syncHiddenFromDOM).observe(box, { childList: true });
+                const chipsObserver = new MutationObserver(syncHiddenFromDOM);
+                chipsObserver.observe(box, { childList: true });
 
                 document.getElementById('sendEmailBtn')?.addEventListener('click', () => {
                     if (input.value.trim()) { addTokens(input.value); input.value = ''; }
@@ -3809,8 +4183,6 @@
                 const cancelBtn = document.getElementById('cancel_save_btn');
                 const bccChipsContainer = document.getElementById('bcc_chips');
                 const emailInput = document.getElementById('email_chip_input');
-                
-                const allUserEmails = JSON.parse('{{ user_dict.values() | list | tojson | safe }}');
                 
                 function collectEmailsFromChips() {
                     return Array.from(document.querySelectorAll('#bcc_chips .nl-chip'))
@@ -4088,6 +4460,11 @@
                         btn.classList.add('button');
                         btn.disabled = false;
                     });
+                    const editor = document.getElementById('custom-html-editor');
+                    if (editor) {
+                        editor.value = '';
+                        editor.dispatchEvent(new Event('input'));
+                    }
                     
                     updateSelectedItemsDisplay();
                     
@@ -4312,23 +4689,117 @@
                 }
             });
 
+            document.getElementById('export-html-btn').addEventListener('click', () => {
+                const frame = document.getElementById('preview');
+                const html = frame?.srcdoc || '';
+
+                if (!html.trim()) {
+                    alert('Nothing to export, add some snap-ins first.');
+                    return;
+                }
+
+                const subject = document.getElementById('subject')?.value.trim() || 'newsletterr-email';
+                const filename = subject.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') + '.html';
+
+                const blob = new Blob([html], { type: 'text/html' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                a.click();
+                URL.revokeObjectURL(url);
+            });
+
+            document.getElementById('import-html-btn').addEventListener('click', () => {
+                document.getElementById('import-html-input').click();
+            });
+
+            document.getElementById('import-html-input').addEventListener('change', async (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+
+                const html = await file.text();
+                if (!html.trim()) {
+                    alert('File appears to be empty.');
+                    return;
+                }
+
+                const templateName = prompt('Enter a name for this template:', file.name.replace('.html', ''));
+                if (!templateName?.trim()) {
+                    e.target.value = '';
+                    return;
+                }
+
+                const toggle = document.getElementById('custom-html-toggle');
+                const editor = document.getElementById('custom-html-editor');
+                if (toggle && editor) {
+                    toggle.checked = true;
+                    toggle.dispatchEvent(new Event('change'));
+                    editor.value = html;
+                    editor.dispatchEvent(new Event('input'));
+                }
+
+                try {
+                    const resp = await fetch('/email_templates', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-Token': '{{ csrf_token }}',
+                        },
+                        body: JSON.stringify({
+                            name: templateName.trim(),
+                            selected_items: '[]',
+                            email_text: '',
+                            subject: document.getElementById('subject')?.value || '',
+                            expanded_collections: '{}',
+                            header_title: '',
+                            custom_html: html
+                        }),
+                        credentials: 'same-origin'
+                    });
+
+                    const result = await resp.json();
+                    if (result.status === 'success') {
+                        await loadEmailTemplates();
+
+                        const selector = document.getElementById('template-selector');
+                        const newTemplate = emailTemplates.find(t => t.name === templateName.trim());
+                        if (newTemplate) {
+                            selector.value = newTemplate.id;
+                            document.getElementById('delete-template-btn').style.display = 'inline-block';
+                            document.getElementById('delete-template-btn').dataset.templateId = newTemplate.id;
+                        }
+                    } else {
+                        alert('Failed to save template: ' + result.message);
+                    }
+                } catch (err) {
+                    console.error('Error saving imported template:', err);
+                    alert('Something went wrong saving the template.');
+                }
+
+                e.target.value = '';
+            });
+
             document.getElementById('popout-preview-btn').addEventListener('click', function() {
                 const frame = document.getElementById('preview');
                 if (!frame || !frame.srcdoc) {
                     alert('No preview content available');
                     return;
                 }
+
+                if (popoutWindow && !popoutWindow.closed) {
+                    popoutWindow.focus();
+                    return;
+                }
+
+                popoutWindow = window.open('', 'EmailPreview', 'width=800,height=600,scrollbars=yes,resizable=yes');
                 
-                const popupWindow = window.open('', 'EmailPreview', 'width=800,height=600,scrollbars=yes,resizable=yes');
-                
-                if (popupWindow) {
-                    popupWindow.document.open();
-                    popupWindow.document.write(frame.srcdoc);
-                    popupWindow.document.close();
-                    
-                    popupWindow.document.title = 'Email Preview';
-                    
-                    popupWindow.focus();
+                if (popoutWindow) {
+                    popoutWindow.document.open();
+                    popoutWindow.document.write(frame.srcdoc);
+                    popoutWindow.document.close();
+                    popoutWindow.document.title = 'Email Preview';
+                    popoutWindow.focus();
                 } else {
                     alert('Pop-up blocked! Please allow pop-ups for this site to use the preview feature.');
                 }
@@ -4774,6 +5245,186 @@
             };
 
             console.log('Mobile navigation script loaded');
+        </script>
+        <script nonce="{{ nonce }}">
+            document.getElementById('media-upload-input').addEventListener('change', async (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+
+                const targetIndex = e.target.dataset.targetIndex !== undefined 
+                    ? parseInt(e.target.dataset.targetIndex) 
+                    : null;
+
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('csrf_token', '{{ csrf_token }}');
+
+                showSpinner('Uploading media...');
+                try {
+                    const resp = await fetch('/upload/media', { method: 'POST', body: formData, credentials: 'same-origin' });
+                    const result = await resp.json();
+                    if (result.status === 'success') {
+                        if (targetIndex !== null && selectedItems[targetIndex]) {
+                            selectedItems[targetIndex].src = result.url;
+                            selectedItems[targetIndex].isUpload = true;
+                            updateSelectedItemsDisplay();
+                            debouncedUpdatePreview();
+                        } else {
+                            createImageBlock(result.url, true);
+                        }
+                    } else {
+                        alert('Upload failed: ' + result.message);
+                    }
+                } catch (err) {
+                    console.error('Upload error:', err);
+                    alert('Something went wrong uploading the file.');
+                } finally {
+                    hideSpinner();
+                    e.target.value = '';
+                    delete e.target.dataset.targetIndex;
+                }
+            });
+        </script>
+        <script nonce=" {{ nonce }}">
+            (function initGifPicker() {
+                let currentTargetIndex = null;
+                let currentPage = 1;
+                let currentQuery = '';
+                let isLoading = false;
+
+                function openGifPicker(index) {
+                    currentTargetIndex = index;
+                    currentPage = 1;
+                    currentQuery = '';
+                    document.getElementById('gif-search-input').value = '';
+                    document.getElementById('gif-results-grid').innerHTML = `
+                        <div id="gif-results-empty" style="grid-column: 1/-1; text-align: center; padding: 40px; color: #888;">
+                            Search for GIFs above
+                        </div>`;
+                    document.getElementById('gif-prev-btn').disabled = true;
+                    document.getElementById('gif-next-btn').disabled = true;
+                    document.getElementById('gif-page-label').textContent = 'Page 1';
+                    document.getElementById('gif-picker-modal').style.display = 'block';
+                    document.getElementById('gif-search-input').focus();
+                }
+
+                function closeGifPicker() {
+                    document.getElementById('gif-picker-modal').style.display = 'none';
+                    currentTargetIndex = null;
+                }
+
+                async function searchGifs(query, page = 1) {
+                    if (!query.trim() || isLoading) return;
+                    isLoading = true;
+
+                    const grid = document.getElementById('gif-results-grid');
+                    grid.innerHTML = `
+                        <div style="grid-column: 1/-1; text-align: center; padding: 40px; color: #888;">
+                            <div class="spinner-border spinner-border-sm" role="status"></div>
+                            <span class="ms-2">Searching...</span>
+                        </div>`;
+                    document.getElementById('gif-prev-btn').disabled = true;
+                    document.getElementById('gif-next-btn').disabled = true;
+
+                    try {
+                        const resp = await fetch(
+                            `/api/gif/search?q=${encodeURIComponent(query)}&page=${page}&per_page=12`,
+                            { credentials: 'same-origin' }
+                        );
+                        const data = await resp.json();
+
+                        if (data.error) {
+                            grid.innerHTML = `<div style="grid-column: 1/-1; text-align: center; padding: 40px; color: #c00;">${data.error}</div>`;
+                            return;
+                        }
+
+                        const results = data.results || [];
+                        if (results.length === 0) {
+                            grid.innerHTML = `<div style="grid-column: 1/-1; text-align: center; padding: 40px; color: #888;">No results for "${query}"</div>`;
+                            return;
+                        }
+
+                        grid.innerHTML = results.map(gif => `
+                            <div class="gif-result-item" data-url="${gif.url}" data-title="${gif.title || ''}"
+                                style="cursor: pointer; border-radius: 6px; overflow: hidden; aspect-ratio: 1; background: #111; position: relative;">
+                                <img src="${gif.preview_url || gif.url}"
+                                    alt="${gif.title || ''}"
+                                    loading="lazy"
+                                    style="width: 100%; height: 100%; object-fit: cover; display: block; transition: opacity 0.2s;"
+                                    onmouseover="this.style.opacity='0.8'"
+                                    onmouseout="this.style.opacity='1'">
+                            </div>
+                        `).join('');
+
+                        document.getElementById('gif-page-label').textContent = `Page ${page}`;
+                        document.getElementById('gif-prev-btn').disabled = page <= 1;
+                        document.getElementById('gif-next-btn').disabled = results.length < 12;
+
+                        document.querySelectorAll('.gif-result-item').forEach(el => {
+                            el.addEventListener('click', () => {
+                                const url = el.dataset.url;
+                                if (currentTargetIndex !== null && selectedItems[currentTargetIndex]) {
+                                    selectedItems[currentTargetIndex].src = url;
+                                    selectedItems[currentTargetIndex].type = 'gif';
+                                    selectedItems[currentTargetIndex].name = 'GIF';
+                                } else {
+                                    mediaBlockCounter++;
+                                    const id = `gif-block-${mediaBlockCounter}`;
+                                    selectedItems.push({ id, name: 'GIF', type: 'gif', src: url, width: 400, align: 'center' });
+                                }
+                                updateSelectedItemsDisplay();
+                                debouncedUpdatePreview();
+                                closeGifPicker();
+                            });
+                        });
+
+                    } catch (err) {
+                        console.error('GIF search error:', err);
+                        grid.innerHTML = `<div style="grid-column: 1/-1; text-align: center; padding: 40px; color: #c00;">Search failed. Please try again.</div>`;
+                    } finally {
+                        isLoading = false;
+                    }
+                }
+
+                document.getElementById('gif-search-btn').addEventListener('click', () => {
+                    currentQuery = document.getElementById('gif-search-input').value;
+                    currentPage = 1;
+                    searchGifs(currentQuery, currentPage);
+                });
+
+                document.getElementById('gif-search-input').addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        currentQuery = e.target.value;
+                        currentPage = 1;
+                        searchGifs(currentQuery, currentPage);
+                    }
+                });
+
+                document.getElementById('gif-prev-btn').addEventListener('click', () => {
+                    if (currentPage > 1) {
+                        currentPage--;
+                        searchGifs(currentQuery, currentPage);
+                    }
+                });
+
+                document.getElementById('gif-next-btn').addEventListener('click', () => {
+                    currentPage++;
+                    searchGifs(currentQuery, currentPage);
+                });
+
+                document.getElementById('gif-picker-close').addEventListener('click', closeGifPicker);
+                document.getElementById('gif-picker-modal').addEventListener('click', (e) => {
+                    if (e.target === document.getElementById('gif-picker-modal')) closeGifPicker();
+                });
+
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'Escape' && document.getElementById('gif-picker-modal').style.display === 'block') {
+                        closeGifPicker();
+                    }
+                });
+
+                window.openGifPicker = openGifPicker;
+            })();
         </script>
     </div>
 </div>

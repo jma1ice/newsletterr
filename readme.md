@@ -162,20 +162,12 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 
 ### For the v2026.2 sprint, these items are to be addressed:
 * Some email clients show posters as small slivers instead of whole poster
-* Contributor area on about can start clipping out on lower size screens
+* Contributor area on about page can start clipping out on lower size screens
 * API fields in settings should be a password field
 * Update Plex authentication for PlexAPI v0.31.1 (plexapi.plex no longer supported)
 * Email click for recently added/available recommendations is going to browser on mobile instead of Plex app - this is an issue with the new Plex client, have not seen a fix yet and no info released by Plex at this time
 
 #### And these items are feature requests:
---- Snapins ---
-* Export email HTML button
-* Import template button and functionality
-* IMDb ratings in stat tables
-* Ratings (G, PG, etc) listed on recently added
-* Pop out preview does not update with changes to the email
-* Snap-in for images/gifs/emojis
-
 --- Settings ---
 * Add sections to settings page (email server | external services | email styling | login page)
 * Keep settings details on error so user won't have to re-enter them
@@ -185,8 +177,8 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Option for small cover art of each item in a stat table
 * Setting to choose duration or play counts for stats/graphs
 * Setting to hide play counts in stats/graphs
-* Option to sort recently added by IMDb rating
 * Option to pull recently added by # of days - when this is in should be able to show 'new items since x date' in email
+* Option to sort recently added by IMDb rating (when pulled by days)
 * Option in settings for width of RA/Recs grids
 * Logo positioning setting
 * Add in To: vs BCC: option
@@ -210,7 +202,7 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 
 --- Misc. ---
 * Stats for total items in library
-* Date range for stats (i.e. 1.1.25 - 1.1.26)
+* Date range for stats (i.e. 1.1.25 - 1.1.26) (instead of 'last X days')
 * Make collections clickable - is this possible?
 * More mobile CSS optimizations
 * Discord text should be stylized logo to match GitHub
@@ -241,6 +233,12 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Made 'Title' Text Block drag-able and not pinned to top
 * Recently Added now filters out 0 length run time items
 * Added functionality for full custom HTML templates
+* Added an export email HTML button
+* Added an import email template button
+* Ratings (G, PG, etc) are now listed on recently added
+* Added IMDb ratings in stat tables - requires Tautulli PR approval and then update
+* Added snap-in for images/gifs/emojis
+* Pop out preview now updates with changes to the email
 
 
 ### v2025.2.1:

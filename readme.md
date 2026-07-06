@@ -198,6 +198,7 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Can Snap-Ins work with custom HTML?
 * Settings submit should audit the external tools api test
 * Does this work with Emby/Jellyfin?
+* app/legacy.py:2471 uses bare BytesIO where only io is imported, so the poster max-height resize path silently fails inside its try/except. app/legacy.py:1345 returns recent_data before it's assigned when Tautulli returns no libraries
 
 ---
 

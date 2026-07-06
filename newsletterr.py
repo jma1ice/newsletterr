@@ -16,6 +16,7 @@ from plex_api_client import PlexAPI
 from urllib.parse import quote_plus, urljoin, urlparse, parse_qs, urlencode, quote
 
 app = Flask(__name__, template_folder = 'templates', static_folder = 'static')
+_hsts_enabled = False
 
 def get_global_cache_status():
     try:
@@ -23,7 +24,7 @@ def get_global_cache_status():
         present = []
         missing = []
         oldest_age = 0.0
-        date_range_display = '—'
+        date_range_display = '-'
         max_range = 0
 
         for key in cache_keys:
@@ -351,7 +352,15 @@ def init_db(db_path):
         print("Adding custom_logo_filename column to settings table...")
         cursor.execute("ALTER TABLE settings ADD COLUMN custom_logo_filename TEXT")
         conn.commit()
-    
+
+    cursor.execute("PRAGMA table_info(settings)")
+    columns = [column[1] for column in cursor.fetchall()]
+    for col_name, col_def in [('default_intro_text', 'TEXT DEFAULT ""'), ('default_outro_text', 'TEXT DEFAULT ""'), ('hsts_enabled', 'TEXT DEFAULT "disabled"'), ('scheduled_subject_prefix', 'TEXT DEFAULT "enabled"'), ('logo_position', 'TEXT DEFAULT "center"'), ('hide_stat_play_counts', 'TEXT DEFAULT "disabled"'), ('hide_graph_play_counts', 'TEXT DEFAULT "disabled"'), ('stats_type', 'TEXT DEFAULT "plays"'), ('recently_added_mode', 'TEXT DEFAULT "items"'), ('recently_added_sort', 'TEXT DEFAULT "date"'), ('ra_grid_columns', 'TEXT DEFAULT "5"'), ('recs_grid_columns', 'TEXT DEFAULT "5"'), ('stat_cover_art', 'TEXT DEFAULT "disabled"'), ('send_mode', 'TEXT DEFAULT "bcc"'), ('poster_max_height', 'TEXT DEFAULT ""'), ('musicseerr_url', 'TEXT DEFAULT ""'), ('musicseerr_api_key', 'TEXT DEFAULT ""')]:
+        if col_name not in columns:
+            print(f"Adding {col_name} column to settings table...")
+            cursor.execute(f'ALTER TABLE settings ADD COLUMN {col_name} {col_def}')
+            conn.commit()
+
     conn.close()
 
 def require_csrf_for_json():
@@ -795,9 +804,12 @@ def migrate_email_templates_for_header_title():
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
 
-        cursor.execute("SELECT server_name FROM settings WHERE id = 1")
-        row = cursor.fetchone()
-        server_name = row[0]
+        try:
+            cursor.execute("SELECT server_name FROM settings WHERE id = 1")
+            row = cursor.fetchone()
+            server_name = row[0]
+        except Exception:
+            server_name = "Server"
 
         cursor.execute("PRAGMA table_info(email_templates)")
         columns = [column[1] for column in cursor.fetchall()]
@@ -1222,22 +1234,28 @@ def refresh_daily_cache():
     try:
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
-        cursor.execute("SELECT server_name, tautulli_url, tautulli_api FROM settings WHERE id = 1")
+        cursor.execute("SELECT server_name, tautulli_url, tautulli_api, stats_type, recently_added_mode, recently_added_sort FROM settings WHERE id = 1")
         row = cursor.fetchone()
         conn.close()
-        
+
         if not row or not row[0]:
             print("No settings found for cache refresh")
             return
-            
+
         settings = {
             "server_name": row[0],
             "tautulli_url": row[1],
-            "tautulli_api": row[2]
+            "tautulli_api": row[2],
+            "stats_type": row[3] or 'plays',
+            "recently_added_mode": row[4] or 'items',
+            "recently_added_sort": row[5] or 'date'
         }
-        
+
         tautulli_base_url = settings['tautulli_url'].rstrip('/')
         tautulli_api_key = settings['tautulli_api']
+        stats_type = settings.get('stats_type', 'plays')
+        recently_added_mode = settings.get('recently_added_mode', 'items')
+        recently_added_sort = settings.get('recently_added_sort', 'date')
         
         time_range = "30"
         count = "10"
@@ -1281,11 +1299,11 @@ def refresh_daily_cache():
         
         error = None
         
-        stats, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_home_stats', 'Stats', error, time_range)
+        stats, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_home_stats', 'Stats', error, time_range, stats_type=stats_type)
         if stats:
             set_cached_data('stats', stats, cache_params)
             print("✓ Stats cache refreshed")
-        
+
         users, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_users', 'Users', error)
         user_list = []
         if users:
@@ -1297,10 +1315,10 @@ def refresh_daily_cache():
         if user_list:
             set_cached_data('users', user_list, cache_params)
             print("✓ Users cache refreshed")
-        
+
         graph_data = []
         for command in graph_commands:
-            gd, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, command["command"], command["name"], error, time_range)
+            gd, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, command["command"], command["name"], error, time_range, y_axis=stats_type)
             if gd:
                 graph_data.append(gd)
         
@@ -1317,8 +1335,8 @@ def refresh_daily_cache():
         for library in libraries:
             library_section_ids[f"{library['section_id']}"] = library["section_name"]
         
-        recent_data = fetch_recent_data_for_index(tautulli_base_url, tautulli_api_key, count)
-        
+        recent_data = fetch_recent_data_for_index(tautulli_base_url, tautulli_api_key, count, recently_added_mode=recently_added_mode, recently_added_sort=recently_added_sort)
+
         if recent_data:
             set_cached_data('recent_data', recent_data, cache_params)
             print("✓ Recent data cache refreshed")
@@ -1606,29 +1624,40 @@ def search_plex_for_rating_key(title, year, media_type, plex_url, plex_token, tm
         traceback.print_exc()
         return None
 
-def fetch_tv_shows_from_plex_sdk(section_id, limit=10, machine_id=None):
+def fetch_tv_shows_from_plex_sdk(section_id, limit=10, machine_id=None, days=None):
     try:
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         cursor.execute("SELECT plex_url, plex_token FROM settings WHERE id = 1")
         plex_settings = cursor.fetchone()
         conn.close()
-        
+
         if not plex_settings or not plex_settings[0] or not plex_settings[1]:
             print("Plex not configured")
             return []
-        
+
         plex_url = plex_settings[0].rstrip('/')
         plex_token = decrypt(plex_settings[1])
-        
-        api_url = (
-            f"{plex_url}/library/sections/{section_id}/all"
-            f"?type=2"
-            f"&sort=episode.addedAt:desc"
-            f"&X-Plex-Container-Start=0"
-            f"&X-Plex-Container-Size={limit}"
-            f"&X-Plex-Token={plex_token}"
-        )
+
+        if days:
+            api_url = (
+                f"{plex_url}/library/sections/{section_id}/all"
+                f"?type=2"
+                f"&sort=addedAt:desc"
+                f"&addedAt%3E%3E=-{days}d"
+                f"&X-Plex-Container-Start=0"
+                f"&X-Plex-Container-Size=500"
+                f"&X-Plex-Token={plex_token}"
+            )
+        else:
+            api_url = (
+                f"{plex_url}/library/sections/{section_id}/all"
+                f"?type=2"
+                f"&sort=episode.addedAt:desc"
+                f"&X-Plex-Container-Start=0"
+                f"&X-Plex-Container-Size={limit}"
+                f"&X-Plex-Token={plex_token}"
+            )
         
         headers = get_plex_headers()
         
@@ -1664,11 +1693,12 @@ def fetch_tv_shows_from_plex_sdk(section_id, limit=10, machine_id=None):
                 'media_type': 'show',
                 'type': 'show',
                 'library_name': library_name,
-                'plex_url': build_plex_web_link(rating_key, machine_id) if rating_key else ''
+                'plex_url': build_plex_web_link(rating_key, machine_id) if rating_key else '',
+                'rating': str(directory.get('rating', ''))
             }
             shows.append(show)
         
-        print(f"Fetched {len(shows)} TV shows from Plex API (sorted by recent episode)")
+        print(f"Fetched {len(shows)} TV shows from Plex API ({'by date filter' if days else 'sorted by recent episode'})")
         return shows
             
     except Exception as e:
@@ -1676,29 +1706,40 @@ def fetch_tv_shows_from_plex_sdk(section_id, limit=10, machine_id=None):
         traceback.print_exc()
         return []
 
-def fetch_movies_from_plex_sdk(section_id, limit=10, machine_id=None):
+def fetch_movies_from_plex_sdk(section_id, limit=10, machine_id=None, days=None):
     try:
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         cursor.execute("SELECT plex_url, plex_token FROM settings WHERE id = 1")
         plex_settings = cursor.fetchone()
         conn.close()
-        
+
         if not plex_settings or not plex_settings[0] or not plex_settings[1]:
             print("Plex not configured")
             return []
-        
+
         plex_url = plex_settings[0].rstrip('/')
         plex_token = decrypt(plex_settings[1])
-        
-        api_url = (
-            f"{plex_url}/library/sections/{section_id}/all"
-            f"?type=1"
-            f"&sort=addedAt:desc"
-            f"&X-Plex-Container-Start=0"
-            f"&X-Plex-Container-Size={limit}"
-            f"&X-Plex-Token={plex_token}"
-        )
+
+        if days:
+            api_url = (
+                f"{plex_url}/library/sections/{section_id}/all"
+                f"?type=1"
+                f"&sort=addedAt:desc"
+                f"&addedAt%3E%3E=-{days}d"
+                f"&X-Plex-Container-Start=0"
+                f"&X-Plex-Container-Size=500"
+                f"&X-Plex-Token={plex_token}"
+            )
+        else:
+            api_url = (
+                f"{plex_url}/library/sections/{section_id}/all"
+                f"?type=1"
+                f"&sort=addedAt:desc"
+                f"&X-Plex-Container-Start=0"
+                f"&X-Plex-Container-Size={limit}"
+                f"&X-Plex-Token={plex_token}"
+            )
         
         headers = get_plex_headers()
         
@@ -1734,11 +1775,12 @@ def fetch_movies_from_plex_sdk(section_id, limit=10, machine_id=None):
                 'media_type': 'movie',
                 'type': 'movie',
                 'library_name': library_name,
-                'plex_url': build_plex_web_link(rating_key, machine_id) if rating_key else ''
+                'plex_url': build_plex_web_link(rating_key, machine_id) if rating_key else '',
+                'rating': str(video.get('rating', ''))
             }
             movies.append(movie)
         
-        print(f"Fetched {len(movies)} movies from Plex API")
+        print(f"Fetched {len(movies)} movies from Plex API ({'by date filter' if days else 'sorted by addedAt'})")
         return movies
             
     except Exception as e:
@@ -1746,29 +1788,40 @@ def fetch_movies_from_plex_sdk(section_id, limit=10, machine_id=None):
         traceback.print_exc()
         return []
 
-def fetch_albums_from_plex_sdk(section_id, limit=10, machine_id=None):
+def fetch_albums_from_plex_sdk(section_id, limit=10, machine_id=None, days=None):
     try:
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         cursor.execute("SELECT plex_url, plex_token FROM settings WHERE id = 1")
         plex_settings = cursor.fetchone()
         conn.close()
-        
+
         if not plex_settings or not plex_settings[0] or not plex_settings[1]:
             print("Plex not configured")
             return []
-        
+
         plex_url = plex_settings[0].rstrip('/')
         plex_token = decrypt(plex_settings[1])
-        
-        api_url = (
-            f"{plex_url}/library/sections/{section_id}/all"
-            f"?type=9"
-            f"&sort=addedAt:desc"
-            f"&X-Plex-Container-Start=0"
-            f"&X-Plex-Container-Size={limit}"
-            f"&X-Plex-Token={plex_token}"
-        )
+
+        if days:
+            api_url = (
+                f"{plex_url}/library/sections/{section_id}/all"
+                f"?type=9"
+                f"&sort=addedAt:desc"
+                f"&addedAt%3E%3E=-{days}d"
+                f"&X-Plex-Container-Start=0"
+                f"&X-Plex-Container-Size=500"
+                f"&X-Plex-Token={plex_token}"
+            )
+        else:
+            api_url = (
+                f"{plex_url}/library/sections/{section_id}/all"
+                f"?type=9"
+                f"&sort=addedAt:desc"
+                f"&X-Plex-Container-Start=0"
+                f"&X-Plex-Container-Size={limit}"
+                f"&X-Plex-Token={plex_token}"
+            )
         
         headers = get_plex_headers()
         
@@ -1801,7 +1854,8 @@ def fetch_albums_from_plex_sdk(section_id, limit=10, machine_id=None):
                 'media_type': 'album',
                 'type': 'album',
                 'library_name': library_name,
-                'plex_url': build_plex_web_link(rating_key, machine_id) if rating_key else ''
+                'plex_url': build_plex_web_link(rating_key, machine_id) if rating_key else '',
+                'rating': str(album.get('rating', ''))
             }
             albums.append(album_data)
         
@@ -1813,53 +1867,63 @@ def fetch_albums_from_plex_sdk(section_id, limit=10, machine_id=None):
         traceback.print_exc()
         return []
 
-def fetch_recently_added_using_plex_sdk(tautulli_base_url, tautulli_api_key, items_count=10):
+def fetch_recently_added_using_plex_sdk(tautulli_base_url, tautulli_api_key, items_count=10, recently_added_mode="items", recently_added_sort="date"):
     recent_data = []
-    
+    days_mode = recently_added_mode == "days"
+
     machine_id = get_plex_machine_id()
     if machine_id:
         print(f"Plex machine ID: {machine_id}")
     else:
         print("Warning: Could not get Plex machine ID, links may not work")
-    
+
     libraries, _ = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_library_names', None, None, "10")
-    
+
     if not libraries:
         print("No libraries found")
         return recent_data
-    
+
     for library in libraries:
         section_id = library['section_id']
         section_type = library['section_type']
         library_name = library['section_name']
-        
-        print(f"\nFetching recently added for library: {library_name} (type: {section_type})")
-        
+
+        print(f"\nFetching recently added for library: {library_name} (type: {section_type}, mode: {recently_added_mode})")
+
         items = []
-        
+        days_val = int(items_count) if days_mode else None
+
         if section_type == 'show':
-            items = fetch_tv_shows_from_plex_sdk(section_id, items_count * 5, machine_id)
+            items = fetch_tv_shows_from_plex_sdk(section_id, items_count * 5, machine_id, days=days_val)
         elif section_type == 'movie':
-            items = fetch_movies_from_plex_sdk(section_id, items_count * 5, machine_id)
+            items = fetch_movies_from_plex_sdk(section_id, items_count * 5, machine_id, days=days_val)
         elif section_type == 'artist':
-            items = fetch_albums_from_plex_sdk(section_id, items_count, machine_id)
+            items = fetch_albums_from_plex_sdk(section_id, items_count, machine_id, days=days_val)
         else:
             print(f"Using Tautulli fallback for library type: {section_type}")
-            rd, _ = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_recently_added', section_id, None, str(items_count * 5), 0)
+            fetch_count = str(items_count * 5) if not days_mode else "500"
+            rd, _ = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_recently_added', section_id, None, fetch_count, 0)
             if rd and rd.get('recently_added'):
                 items = [item for item in rd['recently_added'] if int(item.get('duration', 0) or 0) > 0]
+                if days_mode:
+                    cutoff = int((datetime.now() - timedelta(days=int(items_count))).timestamp())
+                    items = [item for item in items if int(item.get('added_at', 0) or 0) >= cutoff]
                 for item in items:
                     item['library_name'] = library_name
                     if 'rating_key' in item and machine_id:
                         item['plex_url'] = build_plex_web_link(item['rating_key'], machine_id)
 
-        items = items[:items_count]
+        if recently_added_sort == "rating":
+            items.sort(key=lambda x: float(x.get('rating', '') or 0), reverse=True)
+
+        if not days_mode:
+            items = items[:items_count]
 
         if items:
             recent_data.append({
                 'recently_added': items
             })
-    
+
     return recent_data
 
 def get_collection_items_for_email(collection_key, settings):
@@ -1922,20 +1986,24 @@ def get_collection_items_for_email(collection_key, settings):
         traceback.print_exc()
         return []
 
-def run_tautulli_command(base_url, api_key, command, section_id, error, time_range='30', start='0'):
+def run_tautulli_command(base_url, api_key, command, section_id, error, time_range='30', start='0', y_axis='plays', stats_type='plays'):
     out_data = None
-    
+    _NO_Y_AXIS_COMMANDS = {'get_concurrent_streams_by_stream_type'}
+
     if command == 'get_users' or command == 'get_library_names':
         api_url = f"{base_url}/api/v2?apikey={decrypt(api_key)}&cmd={command}"
     elif command == 'get_recently_added':
         api_url = f"{base_url}/api/v2?apikey={decrypt(api_key)}&cmd={command}&count={time_range}&section_id={section_id}&start={start}"
         print(f"Tautulli API call: get_recently_added with count={time_range}, start={start}")
+    elif command == 'get_home_stats':
+        api_url = f"{base_url}/api/v2?apikey={decrypt(api_key)}&cmd={command}&time_range={time_range}&stats_type={stats_type}"
     else:
+        _y = f"&y_axis={y_axis}" if command not in _NO_Y_AXIS_COMMANDS else ""
         if command == 'get_plays_per_month':
             month_range = str(math.ceil(int(time_range) / 30))
-            api_url = f"{base_url}/api/v2?apikey={decrypt(api_key)}&cmd={command}&time_range={month_range}"
+            api_url = f"{base_url}/api/v2?apikey={decrypt(api_key)}&cmd={command}&time_range={month_range}{_y}"
         else:
-            api_url = f"{base_url}/api/v2?apikey={decrypt(api_key)}&cmd={command}&time_range={time_range}"
+            api_url = f"{base_url}/api/v2?apikey={decrypt(api_key)}&cmd={command}&time_range={time_range}{_y}"
 
     try:
         response = safe_get(api_url)
@@ -2038,6 +2106,66 @@ def run_conjurr_command(base_url, user_dict, error):
 
     return [recommendations_dict, error]
 
+
+def fetch_musicseerr_users(base_url, api_key):
+    """Returns {email_lower: musicseerr_user_id} for Musicseerr users with ListenBrainz linked."""
+    try:
+        response = safe_get(f"{base_url}/api/v1/wrapped/users", headers={'X-Wrapped-Api-Key': api_key})
+        response.raise_for_status()
+        data = response.json()
+    except requests.exceptions.RequestException:
+        return {}
+    return {
+        (u.get('email') or '').strip().lower(): u['id']
+        for u in data.get('users', [])
+        if u.get('email') and u.get('has_listenbrainz')
+    }
+
+
+def run_musicseerr_command(base_url, api_key, user_dict, error):
+    """Mirrors run_conjurr_command's shape: fetches per-user Musicseerr wrapped stats,
+    matching newsletterr's {user_id: email} dict to Musicseerr users by email, and
+    returns {user_id: wrapped_payload} keyed the same way recommendations_dict is keyed
+    so it plugs into group_recipients_by_user() unmodified.
+    """
+    if not base_url:
+        return [{}, (error + ", " if error else "") + "Musicseerr Error: No Base URL provided"]
+    if not api_key:
+        return [{}, (error + ", " if error else "") + "Musicseerr Error: No API key provided"]
+
+    email_to_musicseerr_id = fetch_musicseerr_users(base_url, api_key)
+    wrapped_dict = {}
+
+    for user, email in user_dict.items():
+        musicseerr_id = email_to_musicseerr_id.get((email or '').strip().lower())
+        if not musicseerr_id:
+            continue
+        try:
+            response = safe_get(
+                f"{base_url}/api/v1/wrapped/user/{musicseerr_id}",
+                headers={'X-Wrapped-Api-Key': api_key},
+            )
+            response.raise_for_status()
+            data = response.json()
+            if data.get('has_data'):
+                wrapped_dict[user] = data
+        except requests.exceptions.RequestException as e:
+            error = (error + ", " if error else "") + f"Musicseerr Error: {e}"
+
+    return [wrapped_dict, error]
+
+
+def fetch_musicseerr_server_stats(base_url, api_key):
+    if not base_url or not api_key:
+        return None, "Musicseerr Error: URL and API key are required"
+    try:
+        response = safe_get(f"{base_url}/api/v1/wrapped/server", headers={'X-Wrapped-Api-Key': api_key})
+        response.raise_for_status()
+        return response.json(), None
+    except requests.exceptions.RequestException as e:
+        return None, f"Musicseerr Error: {e}"
+
+
 def _norm(v: str):
     if not v:
         return (0,)
@@ -2122,31 +2250,34 @@ def build_enhanced_user_dict(users_data):
                 }
     return user_dict
 
-def get_stat_headers(title):
+def get_stat_headers(title, hide_play_counts=False):
     if title == "Most Watched Movies" or title == "Most Watched TV Shows":
-        return ["Title", "Year", "Plays", "Hours Played", "Cert.", "Score"]
+        headers = ["Title", "Year", "Plays", "Hours Played", "Cert.", "Score"]
     elif title == "Most Popular Movies" or title == "Most Popular TV Shows":
-        return ["Title", "Year", "Plays", "Users", "Cert.", "Score"]
+        headers = ["Title", "Year", "Plays", "Users", "Cert.", "Score"]
     elif title == "Most Played Artists":
-        return ["Author", "Year", "Plays", "Hours Played"]
+        headers = ["Author", "Year", "Plays", "Hours Played"]
     elif title == "Most Popular Artists":
-        return ["Author", "Year", "Plays", "Users"]
+        headers = ["Author", "Year", "Plays", "Users"]
     elif title == "Recently Watched":
-        return ["Title", "Year", "Cert.", "Score"]
+        headers = ["Title", "Year", "Cert.", "Score"]
     elif title == "Most Active Libraries":
-        return ["Library", "Plays", "Hours Played"]
+        headers = ["Library", "Plays", "Hours Played"]
     elif title == "Most Active Users":
-        return ["Username", "Plays", "Hours Played"]
+        headers = ["Username", "Plays", "Hours Played"]
     elif title == "Most Active Platforms":
-        return ["Platform", "Plays", "Hours Played"]
+        headers = ["Platform", "Plays", "Hours Played"]
     elif title == "Most Concurrent Streams":
-        return ["Category", "Count"]
+        headers = ["Category", "Count"]
     else:
-        return ["Title", "Value"]
+        headers = ["Title", "Value"]
+    if hide_play_counts:
+        headers = [h for h in headers if h != "Plays"]
+    return headers
 
-def get_stat_cells(title, row):
+def get_stat_cells(title, row, hide_play_counts=False):
     cells = []
-    
+
     if title == "Most Active Libraries":
         cells.append(row.get('section_name', ''))
     elif title == "Most Active Users":
@@ -2155,35 +2286,35 @@ def get_stat_cells(title, row):
         cells.append(row.get('platform', ''))
     else:
         cells.append(row.get('title', ''))
-    
+
     skip_year_stats = ["Most Active Libraries", "Most Active Users", "Most Active Platforms", "Most Concurrent Streams"]
     if title not in skip_year_stats:
         cells.append(row.get('year', ''))
-    
-    if "Recently" not in title and "Concurrent" not in title:
+
+    if "Recently" not in title and "Concurrent" not in title and not hide_play_counts:
         cells.append(row.get('total_plays', 0))
-    
+
     hours_stats = ["Most Watched Movies", "Most Watched TV Shows", "Most Played Artists", "Most Active Libraries", "Most Active Users", "Most Active Platforms"]
     users_stats = ["Most Popular Movies", "Most Popular TV Shows", "Most Popular Artists"]
-    
+
     if title in hours_stats:
         hours = round(row.get('total_duration', 0) / 3600) if row.get('total_duration') else 0
         cells.append(int(hours))
     elif title in users_stats:
         cells.append(row.get('users_watched', ''))
-    
+
     skip_rating_stats = ["Most Active Libraries", "Most Played Artists", "Most Popular Artists", "Most Active Users", "Most Active Platforms", "Most Concurrent Streams"]
     if title not in skip_rating_stats:
         cells.append(row.get('content_rating', ''))
         rating = row.get('rating')
         cells.append(f"{rating}" if rating else 'NA')
-    
+
     if title == "Most Concurrent Streams":
         cells.append(row.get('count', 0))
-    
+
     return cells
 
-def fetch_tautulli_data_for_email(tautulli_base_url, tautulli_api_key, date_range, server_name, items_count=10):
+def fetch_tautulli_data_for_email(tautulli_base_url, tautulli_api_key, date_range, server_name, items_count=10, stats_type='plays', recently_added_mode='items', recently_added_sort='date'):
     data = {
         'settings': {'server_name': server_name},
         'stats': [],
@@ -2208,14 +2339,14 @@ def fetch_tautulli_data_for_email(tautulli_base_url, tautulli_api_key, date_rang
     ]
     
     try:
-        stats, _ = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_home_stats', 'Stats', None, str(date_range))
+        stats, _ = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_home_stats', 'Stats', None, str(date_range), stats_type=stats_type)
         if stats:
             data['stats'] = stats
-        
+
         graph_data = []
         for command in graph_commands:
             try:
-                gd, _ = run_tautulli_command(tautulli_base_url, tautulli_api_key, command["command"], command["name"], None, str(date_range))
+                gd, _ = run_tautulli_command(tautulli_base_url, tautulli_api_key, command["command"], command["name"], None, str(date_range), y_axis=stats_type)
                 graph_data.append(gd if gd is not None else {})
             except Exception as e:
                 graph_data.append({})
@@ -2224,7 +2355,7 @@ def fetch_tautulli_data_for_email(tautulli_base_url, tautulli_api_key, date_rang
         data['graph_data'] = graph_data
         data['graph_commands'] = graph_commands
 
-        recent_data = fetch_recently_added_using_plex_sdk(tautulli_base_url, tautulli_api_key, items_count)
+        recent_data = fetch_recently_added_using_plex_sdk(tautulli_base_url, tautulli_api_key, items_count, recently_added_mode=recently_added_mode, recently_added_sort=recently_added_sort)
         data['recent_data'] = recent_data
                 
         print(f"Fetched Tautulli data: {len(data['stats'])} stats, {len(data['graph_data'])} graphs, {len(data['recent_data'])} recent sections")
@@ -2235,8 +2366,8 @@ def fetch_tautulli_data_for_email(tautulli_base_url, tautulli_api_key, date_rang
     
     return data
 
-def fetch_recent_data_for_index(tautulli_base_url, tautulli_api_key, count):
-    return fetch_recently_added_using_plex_sdk(tautulli_base_url, tautulli_api_key, int(count))
+def fetch_recent_data_for_index(tautulli_base_url, tautulli_api_key, count, recently_added_mode="items", recently_added_sort="date"):
+    return fetch_recently_added_using_plex_sdk(tautulli_base_url, tautulli_api_key, int(count), recently_added_mode=recently_added_mode, recently_added_sort=recently_added_sort)
 
 def convert_html_to_plain_text(html_content):
     html_content = re.sub(r'<script.*?</script>', '', html_content, flags=re.DOTALL)
@@ -2255,7 +2386,7 @@ def convert_html_to_plain_text(html_content):
     
     return html_content
 
-def fetch_and_attach_image(image_url, msg_root, cid_name, base_url=""):
+def fetch_and_attach_image(image_url, msg_root, cid_name, base_url="", max_height=None):
     try:
         print(f"fetch_and_attach_image called with: {image_url}")
         
@@ -2325,10 +2456,27 @@ def fetch_and_attach_image(image_url, msg_root, cid_name, base_url=""):
         subtype = content_type.split('/')[-1]
         if subtype == 'jpg':
             subtype = 'jpeg'
-        
+
+        image_bytes = response.content
+        if max_height and isinstance(max_height, int) and max_height > 0:
+            try:
+                img = Image.open(BytesIO(image_bytes))
+                orig_w, orig_h = img.size
+                if orig_h > max_height:
+                    target_w = max(1, int(orig_w * max_height / orig_h))
+                    img = img.resize((target_w, max_height), Image.LANCZOS)
+                    out = BytesIO()
+                    save_fmt = 'JPEG' if subtype == 'jpeg' else 'PNG'
+                    if save_fmt == 'JPEG' and img.mode in ('RGBA', 'P', 'LA'):
+                        img = img.convert('RGB')
+                    img.save(out, format=save_fmt, quality=85)
+                    image_bytes = out.getvalue()
+            except Exception as _e:
+                print(f"PIL resize failed, using original: {_e}")
+
         cid = make_msgid(domain="newsletterr.local")[1:-1]
-        
-        img_part = MIMEImage(response.content, _subtype=subtype)
+
+        img_part = MIMEImage(image_bytes, _subtype=subtype)
         img_part.add_header('Content-ID', f'<{cid}>')
         img_part.add_header('Content-Disposition', 'inline', filename=f'{cid_name}.{subtype}')
         msg_root.attach(img_part)
@@ -2392,12 +2540,59 @@ def fetch_and_attach_blurred_image(image_url, msg_root, cid_name, base_url=""):
         print(f"Error processing blurred image {image_url}: {e}")
         return fetch_and_attach_image(image_url, msg_root, cid_name, base_url)
 
+def fetch_and_attach_small_thumbnail(image_url, msg_root, cid_name, base_url="", height=40):
+    try:
+        if image_url.startswith('/'):
+            full_url = urljoin(base_url or "http://127.0.0.1:6397", image_url)
+        elif image_url.startswith('http'):
+            full_url = image_url
+        else:
+            full_url = urljoin(base_url or "http://127.0.0.1:6397", image_url)
+
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
+            'X-Internal-Token': INTERNAL_TOKEN
+        }
+
+        response = safe_get(full_url, timeout=10, headers=headers)
+        response.raise_for_status()
+
+        if len(response.content) < 100:
+            return None
+
+        image = Image.open(io.BytesIO(response.content))
+        if image.mode in ('RGBA', 'LA', 'P'):
+            image = image.convert('RGB')
+
+        orig_w, orig_h = image.size
+        if orig_h == 0:
+            return None
+        target_w = max(1, int(orig_w * height / orig_h))
+        resized = image.resize((target_w, height), Image.LANCZOS)
+
+        img_bytes = io.BytesIO()
+        resized.save(img_bytes, format='JPEG', quality=65)
+        img_bytes.seek(0)
+
+        cid = make_msgid(domain="newsletterr.local")[1:-1]
+        img_part = MIMEImage(img_bytes.getvalue(), _subtype='jpeg')
+        img_part.add_header('Content-ID', f'<{cid}>')
+        img_part.add_header('Content-Disposition', 'inline', filename=f'{cid_name}.jpg')
+        msg_root.attach(img_part)
+
+        return cid
+
+    except Exception as e:
+        print(f"Error fetching small thumbnail {image_url}: {e}")
+        return None
+
 def truncate_text(text, max_chars=28):
     if len(text) <= max_chars:
         return text
     return text[:max_chars-3] + '...'
 
-def build_stats_html_with_cid_background(stat_data, msg_root, theme_colors, base_url="", date_range=""):
+def build_stats_html_with_cid_background(stat_data, msg_root, theme_colors, base_url="", date_range="", hide_play_counts=False, show_cover_art=False):
     if not stat_data or not stat_data.get('rows'):
         return ""
     
@@ -2416,17 +2611,32 @@ def build_stats_html_with_cid_background(stat_data, msg_root, theme_colors, base
                 base_url
             )
     
-    headers = get_stat_headers(title)
+    headers = get_stat_headers(title, hide_play_counts=hide_play_counts)
     header_cells = "".join([
-        f'<th style="padding: 12px; background-color: rgba(52, 58, 64, 0.9); color: white; font-weight: bold; border: none; font-family: \'IBM Plex Sans\', \'Segoe UI\', Helvetica, Arial, sans-serif; font-size: 14px; text-align: left;">{h}</th>' 
+        f'<th style="padding: 12px; background-color: rgba(52, 58, 64, 0.9); color: white; font-weight: bold; border: none; font-family: \'IBM Plex Sans\', \'Segoe UI\', Helvetica, Arial, sans-serif; font-size: 14px; text-align: left;">{h}</th>'
         for h in headers
     ])
-    
+
+    _COVER_ART_TYPES = {
+        "Most Watched Movies", "Most Watched TV Shows",
+        "Most Popular Movies", "Most Popular TV Shows",
+        "Most Played Artists", "Most Popular Artists",
+        "Recently Watched"
+    }
+    apply_cover_art = show_cover_art and title in _COVER_ART_TYPES
+
     rows_html = ""
     for row in rows:
-        cells = get_stat_cells(title, row)
+        cells = get_stat_cells(title, row, hide_play_counts=hide_play_counts)
+        if apply_cover_art:
+            thumb_path = row.get('thumb', '') or row.get('grandparent_thumb', '')
+            if thumb_path:
+                proxy_path = f"/proxy-art{thumb_path}" if not thumb_path.startswith('/proxy-art') else thumb_path
+                thumb_cid = fetch_and_attach_small_thumbnail(proxy_path, msg_root, f"stat-thumb-{len(msg_root.get_payload())}", base_url)
+                if thumb_cid:
+                    cells[0] = f'<img src="cid:{thumb_cid}" style="height:38px;width:auto;border-radius:3px;margin-right:7px;vertical-align:middle;">{cells[0]}'
         cells_html = "".join([
-            f'<td style="padding: 12px; background-color: rgba(255, 255, 255, 0.5); color: #333; border-bottom: 1px solid rgba(222, 226, 230, 0.8); font-family: \'IBM Plex Sans\', \'Segoe UI\', Helvetica, Arial, sans-serif; font-size: 14px;">{cell}</td>' 
+            f'<td style="padding: 12px; background-color: rgba(255, 255, 255, 0.5); color: #333; border-bottom: 1px solid rgba(222, 226, 230, 0.8); font-family: \'IBM Plex Sans\', \'Segoe UI\', Helvetica, Arial, sans-serif; font-size: 14px;">{cell}</td>'
             for cell in cells
         ])
         rows_html += f'<tr>{cells_html}</tr>'
@@ -2499,7 +2709,7 @@ def build_stats_html_with_cid_background(stat_data, msg_root, theme_colors, base
         </div>
     """
 
-def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, library_filter=None, base_url="", max_items=None):
+def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, library_filter=None, base_url="", max_items=None, recently_added_mode="items", ra_grid_columns=5, poster_max_height=0):
     if not recent_data:
         return f"""
         <div style="background-color: {theme_colors['card_bg']}; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid {theme_colors['border']}; font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;">
@@ -2518,9 +2728,9 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
     if library_filter:
         items = [item for item in items if library_filter.lower() in item.get('library_name', '').lower()]
 
-    if max_items and len(items) > max_items:
+    if recently_added_mode != "days" and max_items and len(items) > max_items:
         items = items[:max_items]
-    
+
     if not items:
         return f"""
         <div style="background-color: {theme_colors['card_bg']}; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid {theme_colors['border']}; font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;">
@@ -2529,8 +2739,9 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
         """
     
     items_html = ""
-    items_per_row = 5
-    
+    items_per_row = max(1, int(ra_grid_columns) if ra_grid_columns else 5)
+    cell_width_pct = f"{100 / items_per_row:.4f}%"
+
     for i in range(0, len(items), items_per_row):
         row_items = items[i:i + items_per_row]
         row_html = '<tr class="recently-added-row">'
@@ -2578,10 +2789,11 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
                 if candidate:
                     poster_url = f"/proxy-art{candidate}" if not candidate.startswith('/proxy-art') else candidate
                     poster_cid = fetch_and_attach_image(
-                        poster_url, 
-                        msg_root, 
-                        f"recent-{i}-{j}", 
-                        base_url
+                        poster_url,
+                        msg_root,
+                        f"recent-{i}-{j}",
+                        base_url,
+                        max_height=poster_max_height if poster_max_height else None
                     )
                     if poster_cid:
                         break
@@ -2658,7 +2870,7 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
                         pass
             
             cell_style = f"""
-                width: 20%;
+                width: {cell_width_pct};
                 padding: 8px;
                 vertical-align: top;
                 font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
@@ -2676,7 +2888,6 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
                         overflow: hidden;
                         border: 1px solid {theme_colors['border']};
                         width: 100%;
-                        max-width: 124px;
                         margin: 0 auto;
                         box-shadow: 0 6px 18px rgba(0, 0, 0, 0.6);
                     ">
@@ -2830,16 +3041,25 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
         table-layout: fixed;
     """
     
+    if recently_added_mode == "days" and max_items:
+        try:
+            since_date = (datetime.now() - timedelta(days=int(max_items))).strftime("%-m/%-d/%y")
+        except Exception:
+            since_date = ""
+        ra_title = (f"Added to {library_filter}" if library_filter else "Recently Added") + (f" since {since_date}" if since_date else "")
+    else:
+        ra_title = f"Recently Added{f' - {library_filter}' if library_filter else ''}"
+
     return f"""
         <div style="{container_style}">
-            <h2 style="{title_style}">Recently Added{f' - {library_filter}' if library_filter else ''}</h2>
+            <h2 style="{title_style}">{ra_title}</h2>
             <table class="recently-added-table" style="{table_style}">
                 {items_html}
             </table>
         </div>
     """
 
-def build_recommendations_html_with_cids(recs_data, msg_root, theme_colors, user_emails=None, base_url="", display_preference='email', users_full_data=None):
+def build_recommendations_html_with_cids(recs_data, msg_root, theme_colors, user_emails=None, base_url="", display_preference='email', users_full_data=None, recs_grid_columns=5, poster_max_height=0):
     if not recs_data:
         return ""
     
@@ -2864,9 +3084,11 @@ def build_recommendations_html_with_cids(recs_data, msg_root, theme_colors, user
             msg_root,
             f"recs-movies-{user_id}",
             theme_colors,
-            base_url
+            base_url,
+            recs_grid_columns=recs_grid_columns,
+            poster_max_height=poster_max_height
         )
-        
+
         shows_html = build_recommendations_section_with_cids(
             user_recs.get('show_posters', []),
             user_recs.get('show_posters_unavailable', []),
@@ -2874,7 +3096,9 @@ def build_recommendations_html_with_cids(recs_data, msg_root, theme_colors, user
             msg_root,
             f"recs-shows-{user_id}",
             theme_colors,
-            base_url
+            base_url,
+            recs_grid_columns=recs_grid_columns,
+            poster_max_height=poster_max_height
         )
         
         if movies_html or shows_html:
@@ -2907,12 +3131,132 @@ def build_recommendations_html_with_cids(recs_data, msg_root, theme_colors, user
     
     return '\n'.join(html_sections)
 
-def build_recommendations_section_with_cids(available_items, unavailable_items, title, msg_root, section_prefix, theme_colors, base_url=""):
+def _wrapped_ranked_list_html(title, items, label_fn, theme_colors):
+    if not items:
+        return ""
+    rows = "".join(
+        f'<li style="margin: 4px 0; color: {theme_colors["text"]};">'
+        f'<strong>#{i + 1}</strong> {label_fn(item)}'
+        f'<span style="color: {theme_colors["muted_text"]}; font-size: 0.85em;"> — {item.get("listen_count", 0)} plays</span>'
+        f'</li>'
+        for i, item in enumerate(items)
+    )
+    return (
+        f'<div style="margin-bottom: 16px;">'
+        f'<h3 style="margin-bottom: 6px; color: {theme_colors["text"]};">{title}</h3>'
+        f'<ol style="padding-left: 20px; margin: 0;">{rows}</ol>'
+        f'</div>'
+    )
+
+def build_musicseerr_wrapped_html_with_cids(wrapped_data, msg_root, theme_colors, user_emails=None, display_preference='email', users_full_data=None):
+    if not wrapped_data:
+        return ""
+
+    html_sections = []
+
+    for user_id, payload in wrapped_data.items():
+        if user_emails and str(user_id) not in [str(k) for k in user_emails.keys()]:
+            continue
+        if not payload or not payload.get('has_data'):
+            continue
+
+        if users_full_data:
+            display_name = get_user_display_name(user_id, users_full_data, display_preference)
+        elif user_emails:
+            display_name = user_emails.get(str(user_id), str(user_id))
+        else:
+            display_name = str(user_id)
+
+        sections = "".join([
+            _wrapped_ranked_list_html('Top Artists', payload.get('top_artists', []), lambda a: a.get('name', ''), theme_colors),
+            _wrapped_ranked_list_html('Top Tracks', payload.get('top_tracks', []), lambda t: f"{t.get('name', '')} — {t.get('artist_name', '')}", theme_colors),
+            _wrapped_ranked_list_html('Top Albums', payload.get('top_albums', []), lambda al: f"{al.get('name', '')} — {al.get('artist_name', '')}", theme_colors),
+            _wrapped_ranked_list_html('Top Genres', payload.get('top_genres', []), lambda g: g.get('genre', ''), theme_colors),
+        ])
+
+        container_style = f"""
+            margin: 30px 0;
+            padding: 20px;
+            background-color: {theme_colors['card_bg']};
+            border-radius: 8px;
+            border: 1px solid {theme_colors['border']};
+            font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
+        """
+        user_title_style = f"""
+            text-align: center;
+            color: {theme_colors['text']};
+            margin: 0 0 10px 0;
+            font-size: 24px;
+            font-weight: bold;
+            font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
+        """
+
+        html_sections.append(f"""
+            <div style="{container_style}" data-wrapped-user="{user_id}">
+                <h2 style="{user_title_style}">{display_name}'s {payload.get('year', '')} Wrapped</h2>
+                <p style="text-align: center; color: {theme_colors['muted_text']}; margin-bottom: 16px;">
+                    ~{payload.get('total_listens_estimated', 0)} plays tracked &bull; {payload.get('loved_tracks_count', 0)} loved tracks
+                </p>
+                {sections}
+            </div>
+        """)
+
+    return '\n'.join(html_sections)
+
+def build_musicseerr_server_stats_html_with_cids(server_data, msg_root, theme_colors):
+    if not server_data:
+        return ""
+
+    leaderboard_html = _wrapped_ranked_list_html(
+        'Top Listeners', server_data.get('leaderboard', []), lambda entry: entry.get('display_name', ''), theme_colors
+    )
+    top_artist = server_data.get('top_artist_sitewide')
+    top_album = server_data.get('top_album_sitewide')
+    top_artist_html = (
+        f'<p style="color: {theme_colors["text"]};"><strong>Top Artist:</strong> {top_artist.get("name", "")} '
+        f'({top_artist.get("listen_count", 0)} plays)</p>'
+    ) if top_artist else ""
+    top_album_html = (
+        f'<p style="color: {theme_colors["text"]};"><strong>Top Album:</strong> {top_album.get("name", "")} — '
+        f'{top_album.get("artist_name", "")} ({top_album.get("listen_count", 0)} plays)</p>'
+    ) if top_album else ""
+
+    container_style = f"""
+        margin: 30px 0;
+        padding: 20px;
+        background-color: {theme_colors['card_bg']};
+        border-radius: 8px;
+        border: 1px solid {theme_colors['border']};
+        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
+    """
+    title_style = f"""
+        text-align: center;
+        color: {theme_colors['text']};
+        margin: 0 0 10px 0;
+        font-size: 24px;
+        font-weight: bold;
+        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
+    """
+
+    return f"""
+        <div style="{container_style}">
+            <h2 style="{title_style}">Server Stats — {server_data.get('year', '')}</h2>
+            <p style="text-align: center; color: {theme_colors['muted_text']}; margin-bottom: 16px;">
+                ~{server_data.get('total_listens_estimated', 0)} plays across {server_data.get('total_users_tracked', 0)} listeners
+            </p>
+            {top_artist_html}
+            {top_album_html}
+            {leaderboard_html}
+        </div>
+    """
+
+def build_recommendations_section_with_cids(available_items, unavailable_items, title, msg_root, section_prefix, theme_colors, base_url="", recs_grid_columns=5, poster_max_height=0):
     if not available_items and not unavailable_items:
         return ""
-    
+
     all_items = available_items + unavailable_items
-    items_per_row = 5
+    items_per_row = max(1, int(recs_grid_columns) if recs_grid_columns else 5)
+    cell_width_pct = f"{100 / items_per_row:.4f}%"
     
     rows_html = ""
     for i in range(0, len(all_items), items_per_row):
@@ -2925,10 +3269,11 @@ def build_recommendations_section_with_cids(available_items, unavailable_items, 
             poster_cid = None
             if item.get('url'):
                 poster_cid = fetch_and_attach_image(
-                    f"/proxy-img?u={item['url']}", 
-                    msg_root, 
-                    f"{section_prefix}-{i}-{j}", 
-                    base_url
+                    f"/proxy-img?u={item['url']}",
+                    msg_root,
+                    f"{section_prefix}-{i}-{j}",
+                    base_url,
+                    max_height=poster_max_height if poster_max_height else None
                 )
             
             title_text = item.get('title', 'Unknown')
@@ -2955,7 +3300,7 @@ def build_recommendations_section_with_cids(available_items, unavailable_items, 
             vote_text = f"★ {vote:.1f}" if isinstance(vote, (int, float)) and vote > 0 else ""
             
             cell_style = f"""
-                width: 20%;
+                width: {cell_width_pct};
                 padding: 6px;
                 vertical-align: top;
                 font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
@@ -2971,7 +3316,7 @@ def build_recommendations_section_with_cids(available_items, unavailable_items, 
                         border-radius: 12px;
                         overflow: hidden;
                         border: 1px solid {theme_colors['border']};
-                        width: 125px;
+                        width: 100%;
                         margin: 0 auto;
                         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
                     ">
@@ -2980,41 +3325,48 @@ def build_recommendations_section_with_cids(available_items, unavailable_items, 
                             background-size: cover;
                             background-position: center;
                             background-repeat: no-repeat;
-                            height: 185px;
+                            padding-top: 148%;
+                            height: 0;
                             position: relative;
                             background-color: #f8f9fa;
                         ">
                             {f'''
                             <div style="
-                                float: left;
+                                position: absolute;
+                                top: 4px;
+                                left: 4px;
                                 background-color: rgba(0, 0, 0, 0.7);
                                 color: white;
                                 padding: 2px 6px;
                                 border-radius: 4px;
                                 font-size: 9px;
-                                margin: 4px;
                                 font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
                                 line-height: 1;
                             ">{year} {vote_text}</div>
                             ''' if year or vote_text else ''}
-                            
+
                             {'''
                             <div style="
-                                float: left;
+                                position: absolute;
+                                top: 4px;
+                                right: 4px;
                                 background-color: rgba(255, 0, 0, 0.8);
                                 color: white;
                                 padding: 2px 6px;
                                 border-radius: 4px;
                                 font-size: 9px;
-                                margin: 0px 10px 0px 4px;
                                 font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
                                 line-height: 1;
                             ">Unavailable</div>
                             ''' if is_unavailable else ''}
-                            
+
                             <div style="
+                                position: absolute;
+                                bottom: 0;
+                                left: 0;
+                                right: 0;
                                 padding: 8px;
-                                height: 60px;
+                                background: linear-gradient(transparent, rgba(0, 0, 0, 0.7));
                             ">
                                 <div style="
                                     font-weight: bold;
@@ -3022,7 +3374,7 @@ def build_recommendations_section_with_cids(available_items, unavailable_items, 
                                     color: white;
                                     line-height: 1.2;
                                     font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
-                                    margin-top: 132px;
+                                    word-wrap: break-word;
                                 ">{title_text}</div>
                                 {f'''
                                 <div style="
@@ -3125,7 +3477,7 @@ def build_recommendations_section_with_cids(available_items, unavailable_items, 
         </div>
     """
 
-def build_individual_item_card_html(item, theme_colors, msg_root, base_url=""):
+def build_individual_item_card_html(item, theme_colors, msg_root, base_url="", poster_max_height=0):
     item_title = item.get('title', 'Unknown Title')
     year = item.get('year')
     item_type = item.get('type', 'unknown')
@@ -3156,29 +3508,30 @@ def build_individual_item_card_html(item, theme_colors, msg_root, base_url=""):
         elif episode_count > 0:
             subtitle = f"{episode_count} episode{'s' if episode_count != 1 else ''}"
     
+    _pmh = poster_max_height if poster_max_height else None
     poster_cid = None
     poster_url = item.get('thumb', '')
     if poster_url:
         print(f"Attempting to fetch thumb image: {poster_url}")
         if poster_url.startswith('http'):
-            poster_cid = fetch_and_attach_image(poster_url, msg_root, f"collection_{item.get('key', 'unknown')}_thumb", base_url)
+            poster_cid = fetch_and_attach_image(poster_url, msg_root, f"collection_{item.get('key', 'unknown')}_thumb", base_url, max_height=_pmh)
         else:
             full_poster_url = f"/proxy-art{poster_url if poster_url.startswith('/') else '/' + poster_url}"
-            poster_cid = fetch_and_attach_image(full_poster_url, msg_root, f"collection_{item.get('key', 'unknown')}_thumb", base_url)
+            poster_cid = fetch_and_attach_image(full_poster_url, msg_root, f"collection_{item.get('key', 'unknown')}_thumb", base_url, max_height=_pmh)
         print(f"Thumb CID result: {poster_cid}")
-    
+
     if not poster_cid:
         print("No thumb CID, trying art URL...")
         art_url = item.get('art', '')
         if art_url:
             print(f"Attempting to fetch art image: {art_url}")
             if art_url.startswith('http'):
-                poster_cid = fetch_and_attach_image(art_url, msg_root, f"collection_{item.get('key', 'unknown')}_art", base_url)
+                poster_cid = fetch_and_attach_image(art_url, msg_root, f"collection_{item.get('key', 'unknown')}_art", base_url, max_height=_pmh)
             else:
                 full_art_url = f"/proxy-art{art_url if art_url.startswith('/') else '/' + art_url}"
-                poster_cid = fetch_and_attach_image(full_art_url, msg_root, f"collection_{item.get('key', 'unknown')}_art", base_url)
+                poster_cid = fetch_and_attach_image(full_art_url, msg_root, f"collection_{item.get('key', 'unknown')}_art", base_url, max_height=_pmh)
             print(f"Art CID result: {poster_cid}")
-    
+
     if poster_cid:
         return f"""
         <table cellpadding="0" cellspacing="0" border="0" style="
@@ -3285,28 +3638,29 @@ def build_individual_item_card_html(item, theme_colors, msg_root, base_url=""):
         </table>
         """
 
-def build_collection_card_html(collection, theme_colors, msg_root, base_url=""):
+def build_collection_card_html(collection, theme_colors, msg_root, base_url="", poster_max_height=0):
+    _pmh = poster_max_height if poster_max_height else None
     poster_cid = None
     poster_url = collection.get('thumb', '')
     if poster_url:
         print(f"Attempting to fetch thumb image: {poster_url}")
         if poster_url.startswith('http'):
-            poster_cid = fetch_and_attach_image(poster_url, msg_root, f"collection_{collection.get('key', 'unknown')}_thumb", base_url)
+            poster_cid = fetch_and_attach_image(poster_url, msg_root, f"collection_{collection.get('key', 'unknown')}_thumb", base_url, max_height=_pmh)
         else:
             full_poster_url = f"/proxy-art{poster_url if poster_url.startswith('/') else '/' + poster_url}"
-            poster_cid = fetch_and_attach_image(full_poster_url, msg_root, f"collection_{collection.get('key', 'unknown')}_thumb", base_url)
+            poster_cid = fetch_and_attach_image(full_poster_url, msg_root, f"collection_{collection.get('key', 'unknown')}_thumb", base_url, max_height=_pmh)
         print(f"Thumb CID result: {poster_cid}")
-    
+
     if not poster_cid:
         print("No thumb CID, trying art URL...")
         art_url = collection.get('art', '')
         if art_url:
             print(f"Attempting to fetch art image: {art_url}")
             if art_url.startswith('http'):
-                poster_cid = fetch_and_attach_image(art_url, msg_root, f"collection_{collection.get('key', 'unknown')}_art", base_url)
+                poster_cid = fetch_and_attach_image(art_url, msg_root, f"collection_{collection.get('key', 'unknown')}_art", base_url, max_height=_pmh)
             else:
                 full_art_url = f"/proxy-art{art_url if art_url.startswith('/') else '/' + art_url}"
-                poster_cid = fetch_and_attach_image(full_art_url, msg_root, f"collection_{collection.get('key', 'unknown')}_art", base_url)
+                poster_cid = fetch_and_attach_image(full_art_url, msg_root, f"collection_{collection.get('key', 'unknown')}_art", base_url, max_height=_pmh)
             print(f"Art CID result: {poster_cid}")
     
     collection_title = collection.get('title', 'Unknown Collection')
@@ -3413,7 +3767,7 @@ def build_collection_card_html(collection, theme_colors, msg_root, base_url=""):
             </table>
         """
 
-def build_collections_html_with_cids(all_collections, msg_root, theme_colors, base_url="", custom_title=None, expanded_collections=None, group_index=0):
+def build_collections_html_with_cids(all_collections, msg_root, theme_colors, base_url="", custom_title=None, expanded_collections=None, group_index=0, poster_max_height=0):
     if not all_collections:
         return f"""
         <div style="background-color: {theme_colors['card_bg']}; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid {theme_colors['border']}; font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;">
@@ -3489,17 +3843,17 @@ def build_collections_html_with_cids(all_collections, msg_root, theme_colors, ba
                     cell_spacing = "8px" if j < items_count - 1 else "0"
 
                 if item.get('is_individual_item'):
-                    card_html = build_individual_item_card_html(item, theme_colors, msg_root, base_url)
+                    card_html = build_individual_item_card_html(item, theme_colors, msg_root, base_url, poster_max_height=poster_max_height)
                 else:
-                    card_html = build_collection_card_html(item, theme_colors, msg_root, base_url)
-                
+                    card_html = build_collection_card_html(item, theme_colors, msg_root, base_url, poster_max_height=poster_max_height)
+
                 row_html += f'<td style="vertical-align: top; padding-right: {cell_spacing};">{card_html}</td>'
-            
+
             row_html += '</tr></table></td></tr>'
             items_html += row_html
         else:
             row_html = "<tr style='text-align: center;'>"
-            
+
             for j, item in enumerate(row_items):
                 cell_style = f"""
                     width: 20%;
@@ -3509,9 +3863,9 @@ def build_collections_html_with_cids(all_collections, msg_root, theme_colors, ba
                 """
 
                 if item.get('is_individual_item'):
-                    card_html = build_individual_item_card_html(item, theme_colors, msg_root, base_url)
+                    card_html = build_individual_item_card_html(item, theme_colors, msg_root, base_url, poster_max_height=poster_max_height)
                 else:
-                    card_html = build_collection_card_html(item, theme_colors, msg_root, base_url)
+                    card_html = build_collection_card_html(item, theme_colors, msg_root, base_url, poster_max_height=poster_max_height)
                 
                 row_html += f'<td style="{cell_style}">{card_html}</td>'
             
@@ -3560,7 +3914,7 @@ def attach_logo_image(msg_root, logo_filename, custom_logo_filename, base_url=""
         logo_url = f"/static/img/{logo_filename}"
     return fetch_and_attach_image(logo_url, msg_root, "logo", base_url)
 
-def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, display_preference, users_data, recommendations_data=None, user_dict=None, base_url="", target_user_key=None, is_scheduled=False, items_count=None, date_range="", expanded_collections=None, email_header_title=None):
+def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, display_preference, users_data, recommendations_data=None, user_dict=None, base_url="", target_user_key=None, is_scheduled=False, items_count=None, date_range="", expanded_collections=None, email_header_title=None, musicseerr_wrapped_data=None, musicseerr_server_data=None):
     custom_html = template_data.get('custom_html', '').strip()
     if custom_html:
         return custom_html
@@ -3571,6 +3925,17 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, displ
     logo_filename = tautulli_data.get('settings', {}).get('logo_filename')
     custom_logo_filename = tautulli_data.get('settings', {}).get('custom_logo_filename')
     logo_width = tautulli_data.get('settings', {}).get('logo_width')
+    logo_position = tautulli_data.get('settings', {}).get('logo_position', 'center')
+    hide_stat_play_counts = tautulli_data.get('settings', {}).get('hide_stat_play_counts', 'disabled') == 'enabled'
+    show_cover_art = tautulli_data.get('settings', {}).get('stat_cover_art', 'disabled') == 'enabled'
+    recently_added_mode = tautulli_data.get('settings', {}).get('recently_added_mode', 'items')
+    ra_grid_columns = int(tautulli_data.get('settings', {}).get('ra_grid_columns', 5) or 5)
+    recs_grid_columns = int(tautulli_data.get('settings', {}).get('recs_grid_columns', 5) or 5)
+    poster_max_height = int(tautulli_data.get('settings', {}).get('poster_max_height') or 0)
+    _default_intro = tautulli_data.get('settings', {}).get('default_intro_text') or ''
+    _default_outro = tautulli_data.get('settings', {}).get('default_outro_text') or ''
+    _resolved_intro = _default_intro or f"You are receiving this email because you are a member of {server_name}."
+    _resolved_outro = _default_outro or 'Thanks for using Plex and for reading this newsletterr email!'
     expanded_collections = expanded_collections or {}
     email_header_title = email_header_title or ''
     
@@ -3599,13 +3964,18 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, displ
     content_html = ""
     
     if email_text.strip():
-        content_html += build_text_block_html(email_text, 'textblock', theme_colors)
-    
+        email_text_resolved = email_text.replace('__DEFAULT_INTRO__', _resolved_intro).replace('__DEFAULT_OUTRO__', _resolved_outro)
+        content_html += build_text_block_html(email_text_resolved, 'textblock', theme_colors)
+
     for group_index, item in enumerate(selected_items):
         item_type = item.get('type', '')
-        
+
         if item_type in ['textblock', 'titleblock', 'headerblock']:
             content = item.get('content', '').strip()
+            if content == '__DEFAULT_INTRO__':
+                content = _resolved_intro
+            elif content == '__DEFAULT_OUTRO__':
+                content = _resolved_outro
             if content:
                 content_html += build_text_block_html(content, item_type, theme_colors)
 
@@ -3622,7 +3992,7 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, displ
             stat_index = int(item['id'].split('-')[1])
             if stat_index < len(tautulli_data.get('stats', [])):
                 stat_data = tautulli_data['stats'][stat_index]
-                content_html += build_stats_html_with_cid_background(stat_data, msg_root, theme_colors, base_url, date_range)
+                content_html += build_stats_html_with_cid_background(stat_data, msg_root, theme_colors, base_url, date_range, hide_play_counts=hide_stat_play_counts, show_cover_art=show_cover_art)
         
         elif item_type == 'graph':
             content_html += build_graph_html_with_frontend_image(item, msg_root)
@@ -3640,7 +4010,7 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, displ
                     except (TypeError, ValueError):
                         max_items = 10
 
-            content_html += build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, library_filter, base_url, max_items)
+            content_html += build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, library_filter, base_url, max_items, recently_added_mode=recently_added_mode, ra_grid_columns=ra_grid_columns, poster_max_height=poster_max_height)
         
         elif item_type == 'recommendations':
             if recommendations_data:
@@ -3648,19 +4018,33 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, displ
                     if item.get('userKey') == str(target_user_key):
                         filtered_recommendations = {target_user_key: recommendations_data.get(target_user_key, {})}
                         filtered_user_dict = {target_user_key: user_dict.get(target_user_key, target_user_key)} if user_dict else {target_user_key: target_user_key}
-                        content_html += build_recommendations_html_with_cids(filtered_recommendations, msg_root, theme_colors, filtered_user_dict, base_url, display_preference, users_data)
+                        content_html += build_recommendations_html_with_cids(filtered_recommendations, msg_root, theme_colors, filtered_user_dict, base_url, display_preference, users_data, recs_grid_columns=recs_grid_columns, poster_max_height=poster_max_height)
                 else:
-                    content_html += build_recommendations_html_with_cids(recommendations_data, msg_root, theme_colors, user_dict, base_url, display_preference, users_data)
-        
+                    content_html += build_recommendations_html_with_cids(recommendations_data, msg_root, theme_colors, user_dict, base_url, display_preference, users_data, recs_grid_columns=recs_grid_columns, poster_max_height=poster_max_height)
+
+        elif item_type == 'musicseerr_wrapped':
+            if musicseerr_wrapped_data:
+                if target_user_key:
+                    if item.get('userKey') == str(target_user_key):
+                        filtered_wrapped = {target_user_key: musicseerr_wrapped_data.get(target_user_key, {})}
+                        filtered_user_dict = {target_user_key: user_dict.get(target_user_key, target_user_key)} if user_dict else {target_user_key: target_user_key}
+                        content_html += build_musicseerr_wrapped_html_with_cids(filtered_wrapped, msg_root, theme_colors, filtered_user_dict, display_preference, users_data)
+                else:
+                    content_html += build_musicseerr_wrapped_html_with_cids(musicseerr_wrapped_data, msg_root, theme_colors, user_dict, display_preference, users_data)
+
+        elif item_type == 'musicseerr_server_stats':
+            if musicseerr_server_data:
+                content_html += build_musicseerr_server_stats_html_with_cids(musicseerr_server_data, msg_root, theme_colors)
+
         elif item_type == 'collection_group':
             group_title = item.get('title', 'Collections')
             group_collections = item.get('collections', [])
             if group_collections:
-                content_html += build_collections_html_with_cids(group_collections, msg_root, theme_colors, base_url, group_title, expanded_collections, group_index)
+                content_html += build_collections_html_with_cids(group_collections, msg_root, theme_colors, base_url, group_title, expanded_collections, group_index, poster_max_height=poster_max_height)
 
-    return build_complete_email_html_with_cid_logo(content_html, server_name, subject, email_header_title, logo_src, logo_width, is_scheduled)
+    return build_complete_email_html_with_cid_logo(content_html, server_name, subject, email_header_title, logo_src, logo_width, is_scheduled, logo_position=logo_position)
 
-def build_complete_email_html_with_cid_logo(content_html, server_name, subject, email_header_title, logo_src, logo_width, is_scheduled=False):
+def build_complete_email_html_with_cid_logo(content_html, server_name, subject, email_header_title, logo_src, logo_width, is_scheduled=False, logo_position='center'):
     theme_colors = get_email_theme_colors()
     
     css = build_email_css_from_theme(theme_colors, logo_width)
@@ -3696,6 +4080,8 @@ def build_complete_email_html_with_cid_logo(content_html, server_name, subject, 
         font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
     """
     
+    _logo_margin_left  = '0'    if logo_position == 'left'  else 'auto'
+    _logo_margin_right = '0'    if logo_position == 'right' else 'auto'
     logo_style = f"""
         max-width: {logo_width}px;
         width: auto;
@@ -3706,8 +4092,8 @@ def build_complete_email_html_with_cid_logo(content_html, server_name, subject, 
         outline: none;
         text-decoration: none;
         display: block;
-        margin-left: auto;
-        margin-right: auto;
+        margin-left: {_logo_margin_left};
+        margin-right: {_logo_margin_right};
     """
     
     title_style = """
@@ -3803,7 +4189,7 @@ def build_complete_email_html_with_cid_logo(content_html, server_name, subject, 
             </body>
         </html>"""
 
-def send_standard_email_with_cids(to_emails, subject, email_header_title, selected_items, from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, settings, from_name, custom_html, expanded_collections=None):
+def send_standard_email_with_cids(to_emails, subject, email_header_title, selected_items, from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, settings, from_name, custom_html, expanded_collections=None, send_mode='bcc'):
     try:
         print(f"SMTP Config: {smtp_server}:{smtp_port} using {smtp_protocol}")
 
@@ -3840,19 +4226,20 @@ def send_standard_email_with_cids(to_emails, subject, email_header_title, select
 
         print("Building email content...")
         tautulli_data = get_current_tautulli_data_for_email(settings)
-        
+        musicseerr_server_data = get_musicseerr_server_stats_cached(use_cache=True)
+
         template_data = {
             'selected_items': json.dumps(selected_items),
             'email_text': '',
             'subject': subject,
             'custom_html': custom_html
         }
-        
+
         base_url = os.environ.get("PUBLIC_BASE_URL", "http://127.0.0.1:6397")
-        
+
         email_html = build_email_html_with_all_cids(
-            template_data, 
-            tautulli_data, 
+            template_data,
+            tautulli_data,
             msg_root,
             None,
             None,
@@ -3864,7 +4251,8 @@ def send_standard_email_with_cids(to_emails, subject, email_header_title, select
             None,
             "",
             expanded_collections,
-            email_header_title
+            email_header_title,
+            musicseerr_server_data=musicseerr_server_data
         )
 
         plain_text = convert_html_to_plain_text(email_html)
@@ -3898,15 +4286,18 @@ def send_standard_email_with_cids(to_emails, subject, email_header_title, select
 
         print("Sending email...")
 
-        if alias_email == '':
-            server.sendmail(from_email, [from_email] + to_emails, email_content)
-            all_recipients = [from_email] + to_emails
+        from_addr = alias_email if alias_email else from_email
+        if send_mode == 'to':
+            for recipient in to_emails:
+                msg_root.replace_header('To', recipient)
+                server.sendmail(from_addr, [recipient], msg_root.as_string())
+            all_recipients = to_emails
         else:
-            server.sendmail(alias_email, [alias_email] + to_emails, email_content)
-            all_recipients = [alias_email] + to_emails
+            server.sendmail(from_addr, [from_addr] + to_emails, email_content)
+            all_recipients = [from_addr] + to_emails
 
         print(f"Email sent successfully!")
-        
+
         try:
             history_conn = sqlite3.connect(DB_PATH)
             history_cursor = history_conn.cursor()
@@ -3925,7 +4316,7 @@ def send_standard_email_with_cids(to_emails, subject, email_header_title, select
             history_conn.close()
         except Exception as history_error:
             print(f"Error saving email history: {history_error}")
-        
+
         server.quit()
         return jsonify({"success": True, "sent_to": ', '.join(all_recipients), "size": content_size_kb})
     except smtplib.SMTPConnectError as e:
@@ -3940,55 +4331,65 @@ def send_standard_email_with_cids(to_emails, subject, email_header_title, select
         print("SMTP send error:", e)
         return jsonify({"error": str(e)}), 500
 
-def send_recommendations_email_with_cids(to_emails, subject, email_header_title, user_dict, selected_items, from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, settings, from_name, custom_html, expanded_collections=None):
+def send_recommendations_email_with_cids(to_emails, subject, email_header_title, user_dict, selected_items, from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, settings, from_name, custom_html, expanded_collections=None, send_mode='bcc'):
     try:
         rec_user_keys = set()
+        wrapped_user_keys = set()
         for item in selected_items:
             if item.get('type') == 'recommendations' and item.get('userKey'):
                 rec_user_keys.add(item['userKey'])
-        
-        if not rec_user_keys:
-            return send_standard_email_with_cids(
-                to_emails, subject, email_header_title, selected_items, from_email, alias_email, 
-                reply_to_email, password, smtp_username, smtp_server, smtp_port,
-                smtp_protocol, settings, from_name, custom_html, expanded_collections
-            )
-        
-        recommendations_data = get_recommendations_for_users(rec_user_keys, to_emails, user_dict, use_cache=True)
+            elif item.get('type') == 'musicseerr_wrapped' and item.get('userKey'):
+                wrapped_user_keys.add(item['userKey'])
 
-        if not recommendations_data:
+        personalized_user_keys = rec_user_keys | wrapped_user_keys
+
+        if not personalized_user_keys:
+            return send_standard_email_with_cids(
+                to_emails, subject, email_header_title, selected_items, from_email, alias_email,
+                reply_to_email, password, smtp_username, smtp_server, smtp_port,
+                smtp_protocol, settings, from_name, custom_html, expanded_collections, send_mode=send_mode
+            )
+
+        recommendations_data = get_recommendations_for_users(rec_user_keys, to_emails, user_dict, use_cache=True) if rec_user_keys else {}
+        musicseerr_wrapped_data = get_musicseerr_wrapped_for_users(wrapped_user_keys, to_emails, user_dict, use_cache=True) if wrapped_user_keys else {}
+        musicseerr_server_data = get_musicseerr_server_stats_cached(use_cache=True)
+
+        if rec_user_keys and not recommendations_data:
             return jsonify({"error": "No recommendations data available. Please pull recommendations first."}), 400
-        
+        if wrapped_user_keys and not musicseerr_wrapped_data:
+            return jsonify({"error": "No Musicseerr wrapped data available. Please pull Musicseerr stats first."}), 400
+
         groups = group_recipients_by_user(to_emails, user_dict)
-        
+
         total_sent = 0
         sent_info = []
-        
+
         for user_key, recipients in groups.items():
-            if user_key is None or user_key not in rec_user_keys:
-                print("Skipping recipients without recommendations:", recipients)
+            if user_key is None or user_key not in personalized_user_keys:
+                print("Skipping recipients without recommendations or wrapped stats:", recipients)
                 continue
 
             success = send_single_user_email_with_cids(
                 recipients, subject, email_header_title, selected_items, user_key, recommendations_data,
-                from_email, alias_email, reply_to_email, password, smtp_username, 
-                smtp_server, smtp_port, smtp_protocol, settings, from_name, custom_html, expanded_collections
+                from_email, alias_email, reply_to_email, password, smtp_username,
+                smtp_server, smtp_port, smtp_protocol, settings, from_name, custom_html, expanded_collections,
+                send_mode=send_mode, musicseerr_wrapped_data=musicseerr_wrapped_data, musicseerr_server_data=musicseerr_server_data
             )
-            
+
             if success:
                 total_sent += len(recipients)
                 sent_info.append(', '.join(recipients))
 
         if total_sent == 0:
-            return jsonify({"error": "No recipients matched a recommendations block. No emails sent."}), 400
+            return jsonify({"error": "No recipients matched a recommendations or wrapped stats block. No emails sent."}), 400
 
         return jsonify({"success": True, "sent_groups": sent_info})
-        
+
     except Exception as e:
         print("Error in send_recommendations_email_with_cids:", e)
         return jsonify({"error": str(e)}), 500
 
-def send_single_user_email_with_cids(recipients, subject, email_header_title, selected_items, user_key, recommendations_data, from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, settings, from_name, custom_html, expanded_collections=None):
+def send_single_user_email_with_cids(recipients, subject, email_header_title, selected_items, user_key, recommendations_data, from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, settings, from_name, custom_html, expanded_collections=None, send_mode='bcc', musicseerr_wrapped_data=None, musicseerr_server_data=None):
     try:
         print(f"SMTP Config: {smtp_server}:{smtp_port} using {smtp_protocol}")
 
@@ -4068,7 +4469,9 @@ def send_single_user_email_with_cids(recipients, subject, email_header_title, se
             items_count=None,
             date_range="",
             expanded_collections=expanded_collections,
-            email_header_title=email_header_title
+            email_header_title=email_header_title,
+            musicseerr_wrapped_data=musicseerr_wrapped_data,
+            musicseerr_server_data=musicseerr_server_data
         )
 
         plain_text = convert_html_to_plain_text(email_html)
@@ -4101,17 +4504,20 @@ def send_single_user_email_with_cids(recipients, subject, email_header_title, se
             print("WARNING: Email exceeds typical size limits")
         
         print("Sending email...")
-        
-        if alias_email:
-            server.sendmail(alias_email, [alias_email] + recipients, email_content)
-            all_recipients = [alias_email] + recipients
+
+        from_addr = alias_email if alias_email else from_email
+        if send_mode == 'to':
+            for recipient in recipients:
+                msg_root.replace_header('To', recipient)
+                server.sendmail(from_addr, [recipient], msg_root.as_string())
+            all_recipients = recipients
         else:
-            server.sendmail(from_email, [from_email] + recipients, email_content)
-            all_recipients = [from_email] + recipients
-        
+            server.sendmail(from_addr, [from_addr] + recipients, email_content)
+            all_recipients = [from_addr] + recipients
+
         server.quit()
         print(f"Email sent successfully!")
-        
+
         try:
             history_conn = sqlite3.connect(DB_PATH)
             history_cursor = history_conn.cursor()
@@ -4240,10 +4646,91 @@ def get_recommendations_for_users(user_keys, to_emails, user_dict, use_cache=Tru
             print("Cached fresh recommendations data")
 
         return recommendations_data or {}
-        
+
     except Exception as e:
         print(f"Error getting recommendations: {e}")
         return {}
+
+def get_musicseerr_wrapped_for_users(user_keys, to_emails, user_dict, use_cache=True):
+    try:
+        if use_cache:
+            cached_wrapped = get_cached_data('musicseerr_wrapped_json', strict=True) or get_cached_data('musicseerr_wrapped_json', strict=False)
+            cached_filtered_users = get_cached_data('musicseerr_filtered_users', strict=True) or get_cached_data('musicseerr_filtered_users', strict=False)
+
+            if cached_wrapped and cached_filtered_users:
+                filtered_users = {k: v for k, v in user_dict.items() if k in user_keys and v in to_emails}
+
+                cached_user_keys = set(str(k) for k in cached_filtered_users.keys())
+                required_user_keys = set(str(k) for k in filtered_users.keys())
+
+                if required_user_keys.issubset(cached_user_keys):
+                    print(f"Using cached Musicseerr wrapped data for users: {list(required_user_keys)}")
+                    return {k: v for k, v in cached_wrapped.items() if str(k) in required_user_keys}
+                else:
+                    print(f"Cache miss - need users {required_user_keys}, cache has {cached_user_keys}")
+            else:
+                print("No cached Musicseerr wrapped data available")
+
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT musicseerr_url, musicseerr_api_key FROM settings WHERE id = 1")
+        row = cursor.fetchone()
+        conn.close()
+
+        if not row or not row[0] or not row[1]:
+            return {}
+
+        musicseerr_url = row[0].strip()
+        musicseerr_api_key = decrypt(row[1])
+
+        filtered_users = {k: v for k, v in user_dict.items() if k in user_keys and v in to_emails}
+
+        if not filtered_users:
+            return {}
+
+        wrapped_data, _ = run_musicseerr_command(musicseerr_url, musicseerr_api_key, filtered_users, None)
+
+        if use_cache and wrapped_data:
+            cache_params = {'timestamp': time.time(), 'manual_fetch': True}
+            set_cached_data('musicseerr_wrapped_json', wrapped_data, cache_params)
+            set_cached_data('musicseerr_filtered_users', filtered_users, cache_params)
+            print("Cached fresh Musicseerr wrapped data")
+
+        return wrapped_data or {}
+
+    except Exception as e:
+        print(f"Error getting Musicseerr wrapped data: {e}")
+        return {}
+
+def get_musicseerr_server_stats_cached(use_cache=True):
+    try:
+        if use_cache:
+            cached = get_cached_data('musicseerr_server_json', strict=True) or get_cached_data('musicseerr_server_json', strict=False)
+            if cached:
+                return cached
+
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT musicseerr_url, musicseerr_api_key FROM settings WHERE id = 1")
+        row = cursor.fetchone()
+        conn.close()
+
+        if not row or not row[0] or not row[1]:
+            return None
+
+        musicseerr_url = row[0].strip()
+        musicseerr_api_key = decrypt(row[1])
+
+        server_data, _ = fetch_musicseerr_server_stats(musicseerr_url, musicseerr_api_key)
+
+        if use_cache and server_data:
+            set_cached_data('musicseerr_server_json', server_data, {'timestamp': time.time(), 'manual_fetch': True})
+
+        return server_data
+
+    except Exception as e:
+        print(f"Error getting Musicseerr server stats: {e}")
+        return None
 
 def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
     try:
@@ -4318,16 +4805,30 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
         
         settings_conn = sqlite3.connect(DB_PATH)
         settings_cursor = settings_conn.cursor()
-        settings_cursor.execute("SELECT from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, tautulli_url, tautulli_api, logo_filename, logo_width, custom_logo_filename, from_name FROM settings WHERE id = 1")
+        settings_cursor.execute("SELECT from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, tautulli_url, tautulli_api, logo_filename, logo_width, custom_logo_filename, from_name, scheduled_subject_prefix, logo_position, default_intro_text, default_outro_text, hide_stat_play_counts, hide_graph_play_counts, stats_type, recently_added_mode, recently_added_sort, ra_grid_columns, recs_grid_columns, stat_cover_art, send_mode, poster_max_height FROM settings WHERE id = 1")
         settings_result = settings_cursor.fetchone()
         settings_conn.close()
-        
+
         if not settings_result:
             print("SMTP settings not found in database")
             return False
-        
-        from_email, alias_email, reply_to_email, encrypted_password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, tautulli_base_url, tautulli_api_key, logo_filename, logo_width, custom_logo_filename, from_name = settings_result
-        
+
+        from_email, alias_email, reply_to_email, encrypted_password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, tautulli_base_url, tautulli_api_key, logo_filename, logo_width, custom_logo_filename, from_name, scheduled_subject_prefix, logo_position, default_intro_text, default_outro_text, hide_stat_play_counts, hide_graph_play_counts, stats_type, recently_added_mode, recently_added_sort, ra_grid_columns, recs_grid_columns, stat_cover_art, send_mode, poster_max_height = settings_result
+        use_prefix = (scheduled_subject_prefix or 'enabled') == 'enabled'
+        logo_position = logo_position or 'center'
+        default_intro_text = default_intro_text or ''
+        default_outro_text = default_outro_text or ''
+        hide_stat_play_counts = hide_stat_play_counts or 'disabled'
+        hide_graph_play_counts = hide_graph_play_counts or 'disabled'
+        stats_type = stats_type or 'plays'
+        recently_added_mode = recently_added_mode or 'items'
+        recently_added_sort = recently_added_sort or 'date'
+        ra_grid_columns = int(ra_grid_columns or 5)
+        recs_grid_columns = int(recs_grid_columns or 5)
+        stat_cover_art = stat_cover_art or 'disabled'
+        send_mode = send_mode or 'bcc'
+        poster_max_height = int(poster_max_height or 0)
+
         public_base = os.environ.get("PUBLIC_BASE_URL", "http://127.0.0.1:6397")
         theme = 'dark'
         
@@ -4342,6 +4843,7 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
                 item['chartSVG'] = chart_data.get('svg', '')
 
         has_recs = any(item.get('type') == 'recommendations' for item in selected_items)
+        has_wrapped = any(item.get('type') == 'musicseerr_wrapped' for item in selected_items)
 
         users_data, _ = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_users', 'Users', None)
         user_dict = {}
@@ -4351,88 +4853,133 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
                 for u in users_data
                 if u.get('email') != None and u.get('email') != '' and u.get('is_active')
             }
-        
-        if has_recs:
-            print("Template contains recommendations, splitting emails by user...")
-            
+
+        musicseerr_conn = sqlite3.connect(DB_PATH)
+        musicseerr_cursor = musicseerr_conn.cursor()
+        musicseerr_cursor.execute("SELECT musicseerr_url, musicseerr_api_key FROM settings WHERE id = 1")
+        musicseerr_result = musicseerr_cursor.fetchone()
+        musicseerr_conn.close()
+        musicseerr_url = (musicseerr_result[0] or "").strip() if musicseerr_result else ""
+        musicseerr_api_key = decrypt(musicseerr_result[1]) if musicseerr_result and musicseerr_result[1] else ""
+        musicseerr_server_data, _ = fetch_musicseerr_server_stats(musicseerr_url, musicseerr_api_key) if (musicseerr_url and musicseerr_api_key) else (None, None)
+
+        if has_recs or has_wrapped:
+            print("Template contains recommendations or Musicseerr wrapped stats, splitting emails by user...")
+
             rec_user_keys = set()
+            wrapped_user_keys = set()
             for item in selected_items:
                 if item.get('type') == 'recommendations' and item.get('userKey'):
                     rec_user_keys.add(item['userKey'])
-            
-            if not rec_user_keys:
-                print("No recommendation user keys found in template")
+                elif item.get('type') == 'musicseerr_wrapped' and item.get('userKey'):
+                    wrapped_user_keys.add(item['userKey'])
+
+            personalized_user_keys = rec_user_keys | wrapped_user_keys
+            if not personalized_user_keys:
+                print("No recommendation or wrapped user keys found in template")
                 return False
-            
-            conjurr_conn = sqlite3.connect(DB_PATH)
-            conjurr_cursor = conjurr_conn.cursor()
-            conjurr_cursor.execute("SELECT conjurr_url FROM settings WHERE id = 1")
-            conjurr_result = conjurr_cursor.fetchone()
-            conjurr_conn.close()
-            
-            if not conjurr_result or not conjurr_result[0]:
-                print("Conjurr URL not configured")
-                return False
-            
-            conjurr_url = conjurr_result[0].strip()
-            filtered_users = {k: v for k, v in user_dict.items() if str(k) in rec_user_keys and v in to_emails_list}
-            
-            if not filtered_users:
-                print("No users found matching recommendation blocks and email recipients")
-                return False
-            
-            recommendations_data, _ = run_conjurr_command(conjurr_url, filtered_users, None)
-            if not recommendations_data:
-                print("Failed to fetch recommendations data")
-                return False
-            
+
+            recommendations_data = {}
+            if rec_user_keys:
+                conjurr_conn = sqlite3.connect(DB_PATH)
+                conjurr_cursor = conjurr_conn.cursor()
+                conjurr_cursor.execute("SELECT conjurr_url FROM settings WHERE id = 1")
+                conjurr_result = conjurr_cursor.fetchone()
+                conjurr_conn.close()
+
+                if not conjurr_result or not conjurr_result[0]:
+                    print("Conjurr URL not configured")
+                    return False
+
+                conjurr_url = conjurr_result[0].strip()
+                filtered_rec_users = {k: v for k, v in user_dict.items() if str(k) in rec_user_keys and v in to_emails_list}
+
+                if not filtered_rec_users:
+                    print("No users found matching recommendation blocks and email recipients")
+                    return False
+
+                recommendations_data, _ = run_conjurr_command(conjurr_url, filtered_rec_users, None)
+                if not recommendations_data:
+                    print("Failed to fetch recommendations data")
+                    return False
+
+            musicseerr_wrapped_data = {}
+            if wrapped_user_keys:
+                if not (musicseerr_url and musicseerr_api_key):
+                    print("Musicseerr URL/API key not configured")
+                    return False
+
+                filtered_wrapped_users = {k: v for k, v in user_dict.items() if str(k) in wrapped_user_keys and v in to_emails_list}
+
+                if not filtered_wrapped_users:
+                    print("No users found matching Musicseerr wrapped blocks and email recipients")
+                    return False
+
+                musicseerr_wrapped_data, _ = run_musicseerr_command(musicseerr_url, musicseerr_api_key, filtered_wrapped_users, None)
+                if not musicseerr_wrapped_data:
+                    print("Failed to fetch Musicseerr wrapped data")
+                    return False
+
             groups = group_recipients_by_user(to_emails_list, user_dict)
-            
+
             total_sent = 0
             sent_info = []
-            
+
             for user_key, recipients in groups.items():
-                if user_key is None or str(user_key) not in rec_user_keys:
-                    print(f"Skipping recipients without recommendations: {recipients}")
+                if user_key is None or str(user_key) not in personalized_user_keys:
+                    print(f"Skipping recipients without recommendations or wrapped stats: {recipients}")
                     continue
-                
+
                 success = send_scheduled_user_email_with_cids(
                     recipients, subject, email_header_title, custom_html, selected_items, user_key,
                     recommendations_data, from_email, alias_email, reply_to_email, encrypted_password,
                     smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, tautulli_base_url,
                     tautulli_api_key, date_range, items_count, template_name, logo_filename, logo_width,
-                    custom_logo_filename, from_name, display_preference, users_data, expanded_collections
+                    custom_logo_filename, from_name, display_preference, users_data, expanded_collections,
+                    use_prefix=use_prefix, logo_position=logo_position, default_intro_text=default_intro_text,
+                    default_outro_text=default_outro_text, hide_stat_play_counts=hide_stat_play_counts,
+                    hide_graph_play_counts=hide_graph_play_counts, stats_type=stats_type,
+                    recently_added_mode=recently_added_mode, recently_added_sort=recently_added_sort,
+                    ra_grid_columns=ra_grid_columns, recs_grid_columns=recs_grid_columns, stat_cover_art=stat_cover_art,
+                    send_mode=send_mode, poster_max_height=poster_max_height,
+                    musicseerr_wrapped_data=musicseerr_wrapped_data, musicseerr_server_data=musicseerr_server_data
                 )
-                
+
                 if success:
                     total_sent += len(recipients)
                     sent_info.append(', '.join(recipients))
                     print(f"Successfully sent scheduled email to user {user_key}: {recipients}")
                 else:
                     print(f"Failed to send scheduled email to user {user_key}: {recipients}")
-            
+
             if total_sent == 0:
                 print("No emails were sent successfully")
                 return False
-            
+
             print(f"Scheduled email sent successfully to {total_sent} total recipients across {len(sent_info)} user groups")
             return True
-            
+
         else:
-            print("Template has no recommendations, sending single email to all recipients...")
+            print("Template has no recommendations or wrapped stats, sending single email to all recipients...")
             return send_scheduled_single_email_with_cids(
                 to_emails_list, subject, email_header_title, custom_html, selected_items, from_email, alias_email,
                 reply_to_email, encrypted_password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name,
                 tautulli_base_url, tautulli_api_key, date_range, items_count, template_name, logo_filename,
-                logo_width, custom_logo_filename, from_name, display_preference, users_data, expanded_collections
+                logo_width, custom_logo_filename, from_name, display_preference, users_data, expanded_collections,
+                use_prefix=use_prefix, logo_position=logo_position, default_intro_text=default_intro_text,
+                default_outro_text=default_outro_text, hide_stat_play_counts=hide_stat_play_counts,
+                hide_graph_play_counts=hide_graph_play_counts, stats_type=stats_type,
+                recently_added_mode=recently_added_mode, recently_added_sort=recently_added_sort,
+                ra_grid_columns=ra_grid_columns, recs_grid_columns=recs_grid_columns, stat_cover_art=stat_cover_art,
+                send_mode=send_mode, poster_max_height=poster_max_height, musicseerr_server_data=musicseerr_server_data
             )
-        
+
     except Exception as e:
         print(f"Error in send_scheduled_email_with_cids: {e}")
         traceback.print_exc()
         return False
 
-def send_scheduled_user_email_with_cids(recipients, subject, email_header_title, custom_html, selected_items, user_key, recommendations_data, from_email, alias_email, reply_to_email, encrypted_password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, tautulli_base_url, tautulli_api_key, date_range, items_count, template_name, logo_filename, logo_width, custom_logo_filename, from_name, display_preference, users_data, expanded_collections):
+def send_scheduled_user_email_with_cids(recipients, subject, email_header_title, custom_html, selected_items, user_key, recommendations_data, from_email, alias_email, reply_to_email, encrypted_password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, tautulli_base_url, tautulli_api_key, date_range, items_count, template_name, logo_filename, logo_width, custom_logo_filename, from_name, display_preference, users_data, expanded_collections, use_prefix=True, logo_position='center', default_intro_text='', default_outro_text='', hide_stat_play_counts='disabled', hide_graph_play_counts='disabled', stats_type='plays', recently_added_mode='items', recently_added_sort='date', ra_grid_columns=5, recs_grid_columns=5, stat_cover_art='disabled', send_mode='bcc', poster_max_height=0, musicseerr_wrapped_data=None, musicseerr_server_data=None):
     try:
         print(f"SMTP Config: {smtp_server}:{smtp_port} using {smtp_protocol}")
 
@@ -4447,7 +4994,7 @@ def send_scheduled_user_email_with_cids(recipients, subject, email_header_title,
             print("Port 587 typically uses TLS (STARTTLS)")
 
         msg_root = MIMEMultipart('related')
-        msg_root['Subject'] = f"[SCHEDULED] {subject}"
+        msg_root['Subject'] = f"[SCHEDULED] {subject}" if use_prefix else subject
         
         if alias_email:
             if from_name == '':
@@ -4469,20 +5016,32 @@ def send_scheduled_user_email_with_cids(recipients, subject, email_header_title,
         msg_root.attach(msg_alternative)
 
         print("Building email content...")
-        tautulli_data = fetch_tautulli_data_for_email(tautulli_base_url, tautulli_api_key, date_range, server_name, items_count)
+        tautulli_data = fetch_tautulli_data_for_email(tautulli_base_url, tautulli_api_key, date_range, server_name, items_count, stats_type=stats_type, recently_added_mode=recently_added_mode, recently_added_sort=recently_added_sort)
         tautulli_data["settings"]["logo_filename"] = logo_filename
         tautulli_data["settings"]["logo_width"] = logo_width
         tautulli_data["settings"]["custom_logo_filename"] = custom_logo_filename
-        
+        tautulli_data["settings"]["logo_position"] = logo_position
+        tautulli_data["settings"]["default_intro_text"] = default_intro_text
+        tautulli_data["settings"]["default_outro_text"] = default_outro_text
+        tautulli_data["settings"]["hide_stat_play_counts"] = hide_stat_play_counts
+        tautulli_data["settings"]["hide_graph_play_counts"] = hide_graph_play_counts
+        tautulli_data["settings"]["stats_type"] = stats_type
+        tautulli_data["settings"]["recently_added_mode"] = recently_added_mode
+        tautulli_data["settings"]["recently_added_sort"] = recently_added_sort
+        tautulli_data["settings"]["ra_grid_columns"] = ra_grid_columns
+        tautulli_data["settings"]["recs_grid_columns"] = recs_grid_columns
+        tautulli_data["settings"]["stat_cover_art"] = stat_cover_art
+        tautulli_data["settings"]["poster_max_height"] = poster_max_height
+
         template_data = {
             'selected_items': json.dumps(selected_items),
             'email_text': '',
             'subject': subject,
             'custom_html': custom_html
         }
-        
+
         base_url = os.environ.get("PUBLIC_BASE_URL", "http://127.0.0.1:6397")
-        
+
         user_dict = {user_key: recipients[0]} if recipients else {}
         
         email_html = build_email_html_with_all_cids(
@@ -4499,7 +5058,9 @@ def send_scheduled_user_email_with_cids(recipients, subject, email_header_title,
             items_count=items_count,
             date_range=date_range,
             expanded_collections=expanded_collections,
-            email_header_title=email_header_title
+            email_header_title=email_header_title,
+            musicseerr_wrapped_data=musicseerr_wrapped_data,
+            musicseerr_server_data=musicseerr_server_data
         )
 
         plain_text = convert_html_to_plain_text(email_html)
@@ -4532,17 +5093,20 @@ def send_scheduled_user_email_with_cids(recipients, subject, email_header_title,
             print("WARNING: Email exceeds typical size limits")
 
         print("Sending email...")
-        
-        if alias_email:
-            server.sendmail(alias_email, [alias_email] + recipients, email_content)
-            all_recipients = [alias_email] + recipients
+
+        from_addr = alias_email if alias_email else from_email
+        if send_mode == 'to':
+            for recipient in recipients:
+                msg_root.replace_header('To', recipient)
+                server.sendmail(from_addr, [recipient], msg_root.as_string())
+            all_recipients = recipients
         else:
-            server.sendmail(from_email, [from_email] + recipients, email_content)
-            all_recipients = [from_email] + recipients
-        
+            server.sendmail(from_addr, [from_addr] + recipients, email_content)
+            all_recipients = [from_addr] + recipients
+
         server.quit()
         print(f"Email sent successfully!")
-        
+
         try:
             history_conn = sqlite3.connect(DB_PATH)
             history_cursor = history_conn.cursor()
@@ -4553,7 +5117,7 @@ def send_scheduled_user_email_with_cids(recipients, subject, email_header_title,
             history_conn.close()
         except Exception as log_err:
             print(f"Error logging scheduled email history: {log_err}")
-        
+
         return True
     except smtplib.SMTPConnectError as e:
         print(f"SMTP Connection Error: {e}")
@@ -4568,7 +5132,7 @@ def send_scheduled_user_email_with_cids(recipients, subject, email_header_title,
         traceback.print_exc()
         return False
 
-def send_scheduled_single_email_with_cids(to_emails_list, subject, email_header_title, custom_html, selected_items, from_email, alias_email, reply_to_email, encrypted_password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, tautulli_base_url, tautulli_api_key, date_range, items_count, template_name, logo_filename, logo_width, custom_logo_filename, from_name, display_preference, users_data, expanded_collections, email_text=""):
+def send_scheduled_single_email_with_cids(to_emails_list, subject, email_header_title, custom_html, selected_items, from_email, alias_email, reply_to_email, encrypted_password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, tautulli_base_url, tautulli_api_key, date_range, items_count, template_name, logo_filename, logo_width, custom_logo_filename, from_name, display_preference, users_data, expanded_collections, email_text="", use_prefix=True, logo_position='center', default_intro_text='', default_outro_text='', hide_stat_play_counts='disabled', hide_graph_play_counts='disabled', stats_type='plays', recently_added_mode='items', recently_added_sort='date', ra_grid_columns=5, recs_grid_columns=5, stat_cover_art='disabled', send_mode='bcc', poster_max_height=0, musicseerr_server_data=None):
     try:
         print(f"SMTP Config: {smtp_server}:{smtp_port} using {smtp_protocol}")
 
@@ -4583,7 +5147,7 @@ def send_scheduled_single_email_with_cids(to_emails_list, subject, email_header_
             print("Port 587 typically uses TLS (STARTTLS)")
 
         msg_root = MIMEMultipart('related')
-        msg_root['Subject'] = f"[SCHEDULED] {subject}"
+        msg_root['Subject'] = f"[SCHEDULED] {subject}" if use_prefix else subject
         
         if alias_email:
             if from_name == '':
@@ -4605,11 +5169,23 @@ def send_scheduled_single_email_with_cids(to_emails_list, subject, email_header_
         msg_root.attach(msg_alternative)
 
         print("Building email content...")
-        tautulli_data = fetch_tautulli_data_for_email(tautulli_base_url, tautulli_api_key, date_range, server_name, items_count)
+        tautulli_data = fetch_tautulli_data_for_email(tautulli_base_url, tautulli_api_key, date_range, server_name, items_count, stats_type=stats_type, recently_added_mode=recently_added_mode, recently_added_sort=recently_added_sort)
         tautulli_data["settings"]["logo_filename"] = logo_filename
         tautulli_data["settings"]["logo_width"] = logo_width
         tautulli_data["settings"]["custom_logo_filename"] = custom_logo_filename
-        
+        tautulli_data["settings"]["logo_position"] = logo_position
+        tautulli_data["settings"]["default_intro_text"] = default_intro_text
+        tautulli_data["settings"]["default_outro_text"] = default_outro_text
+        tautulli_data["settings"]["hide_stat_play_counts"] = hide_stat_play_counts
+        tautulli_data["settings"]["hide_graph_play_counts"] = hide_graph_play_counts
+        tautulli_data["settings"]["stats_type"] = stats_type
+        tautulli_data["settings"]["recently_added_mode"] = recently_added_mode
+        tautulli_data["settings"]["recently_added_sort"] = recently_added_sort
+        tautulli_data["settings"]["ra_grid_columns"] = ra_grid_columns
+        tautulli_data["settings"]["recs_grid_columns"] = recs_grid_columns
+        tautulli_data["settings"]["stat_cover_art"] = stat_cover_art
+        tautulli_data["settings"]["poster_max_height"] = poster_max_height
+
         template_data = {
             'selected_items': json.dumps(selected_items),
             'email_text': email_text,
@@ -4633,7 +5209,8 @@ def send_scheduled_single_email_with_cids(to_emails_list, subject, email_header_
             items_count,
             date_range,
             expanded_collections,
-            email_header_title=email_header_title
+            email_header_title=email_header_title,
+            musicseerr_server_data=musicseerr_server_data
         )
 
         plain_text = convert_html_to_plain_text(email_html)
@@ -4666,17 +5243,20 @@ def send_scheduled_single_email_with_cids(to_emails_list, subject, email_header_
             print("WARNING: Email exceeds typical size limits")
 
         print("Sending email...")
-        
-        if alias_email:
-            server.sendmail(alias_email, [alias_email] + to_emails_list, email_content)
-            all_recipients = [alias_email] + to_emails_list
+
+        from_addr = alias_email if alias_email else from_email
+        if send_mode == 'to':
+            for recipient in to_emails_list:
+                msg_root.replace_header('To', recipient)
+                server.sendmail(from_addr, [recipient], msg_root.as_string())
+            all_recipients = to_emails_list
         else:
-            server.sendmail(from_email, [from_email] + to_emails_list, email_content)
-            all_recipients = [from_email] + to_emails_list
-        
+            server.sendmail(from_addr, [from_addr] + to_emails_list, email_content)
+            all_recipients = [from_addr] + to_emails_list
+
         server.quit()
         print(f"Email sent successfully!")
-        
+
         try:
             history_conn = sqlite3.connect(DB_PATH)
             history_cursor = history_conn.cursor()
@@ -4906,14 +5486,24 @@ def inject_update_info():
         }
     }
 
+def refresh_hsts_setting():
+    global _hsts_enabled
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        result = conn.execute("SELECT hsts_enabled FROM settings WHERE id = 1").fetchone()
+        conn.close()
+        _hsts_enabled = bool(result and result[0] == 'enabled')
+    except Exception:
+        _hsts_enabled = False
+
 @app.after_request
 def set_security_headers(resp: Response):
     try:
         resp.headers.setdefault('X-Frame-Options', 'DENY')
         resp.headers.setdefault('X-Content-Type-Options', 'nosniff')
         resp.headers.setdefault('Referrer-Policy', 'no-referrer')
-        # If running behind HTTPS, HSTS can be enabled by the operator
-        # resp.headers.setdefault('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload')
+        if _hsts_enabled:
+            resp.headers.setdefault('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload')
         return resp
     except Exception:
         return resp
@@ -4949,6 +5539,8 @@ def index():
     recent_data = []
     recommendations_json = {}
     filtered_users = {}
+    musicseerr_wrapped_json = {}
+    musicseerr_server_json = None
     error = None
     alert = None
 
@@ -4968,6 +5560,15 @@ def index():
         email_theme = cursor.execute("SELECT email_theme FROM settings WHERE id = 1").fetchone()[0]
         custom_logo_filename = cursor.execute("SELECT custom_logo_filename FROM settings WHERE id = 1").fetchone()[0]
         recipient_display_name = cursor.execute("SELECT recipient_display_name FROM settings WHERE id = 1").fetchone()[0]
+        default_intro_text = cursor.execute("SELECT default_intro_text FROM settings WHERE id = 1").fetchone()[0]
+        default_outro_text = cursor.execute("SELECT default_outro_text FROM settings WHERE id = 1").fetchone()[0]
+        recently_added_mode = cursor.execute("SELECT recently_added_mode FROM settings WHERE id = 1").fetchone()[0]
+        recently_added_sort = cursor.execute("SELECT recently_added_sort FROM settings WHERE id = 1").fetchone()[0]
+        ra_grid_columns = cursor.execute("SELECT ra_grid_columns FROM settings WHERE id = 1").fetchone()[0]
+        recs_grid_columns = cursor.execute("SELECT recs_grid_columns FROM settings WHERE id = 1").fetchone()[0]
+        stat_cover_art = cursor.execute("SELECT stat_cover_art FROM settings WHERE id = 1").fetchone()[0]
+        poster_max_height = cursor.execute("SELECT poster_max_height FROM settings WHERE id = 1").fetchone()[0]
+        logo_position = cursor.execute("SELECT logo_position FROM settings WHERE id = 1").fetchone()[0]
     except:
         from_email = cursor.execute("SELECT from_email FROM settings WHERE id = 1").fetchone()
         server_name = cursor.execute("SELECT server_name FROM settings WHERE id = 1").fetchone()
@@ -4978,6 +5579,15 @@ def index():
         email_theme = cursor.execute("SELECT email_theme FROM settings WHERE id = 1").fetchone()
         custom_logo_filename = cursor.execute("SELECT custom_logo_filename FROM settings WHERE id = 1").fetchone()
         recipient_display_name = cursor.execute("SELECT recipient_display_name FROM settings WHERE id = 1").fetchone()
+        default_intro_text = cursor.execute("SELECT default_intro_text FROM settings WHERE id = 1").fetchone()
+        default_outro_text = cursor.execute("SELECT default_outro_text FROM settings WHERE id = 1").fetchone()
+        recently_added_mode = cursor.execute("SELECT recently_added_mode FROM settings WHERE id = 1").fetchone()
+        recently_added_sort = cursor.execute("SELECT recently_added_sort FROM settings WHERE id = 1").fetchone()
+        ra_grid_columns = cursor.execute("SELECT ra_grid_columns FROM settings WHERE id = 1").fetchone()
+        recs_grid_columns = cursor.execute("SELECT recs_grid_columns FROM settings WHERE id = 1").fetchone()
+        stat_cover_art = cursor.execute("SELECT stat_cover_art FROM settings WHERE id = 1").fetchone()
+        poster_max_height = cursor.execute("SELECT poster_max_height FROM settings WHERE id = 1").fetchone()
+        logo_position = cursor.execute("SELECT logo_position FROM settings WHERE id = 1").fetchone()
 
     settings = {
         "from_email": from_email or "",
@@ -4986,7 +5596,16 @@ def index():
         "tautulli_api": decrypt(tautulli_api),
         "email_theme": email_theme or "",
         "custom_logo_filename": custom_logo_filename or "",
-        "recipient_display_name": recipient_display_name or "email"
+        "recipient_display_name": recipient_display_name or "email",
+        "default_intro_text": default_intro_text or "",
+        "default_outro_text": default_outro_text or "",
+        "recently_added_mode": recently_added_mode or "items",
+        "recently_added_sort": recently_added_sort or "date",
+        "ra_grid_columns": ra_grid_columns or "5",
+        "recs_grid_columns": recs_grid_columns or "5",
+        "stat_cover_art": stat_cover_art or "disabled",
+        "poster_max_height": poster_max_height or "",
+        "logo_position": logo_position or "center",
     }
     if logo_filename == '' or logo_filename is None:
         if email_theme == 'custom':
@@ -5028,6 +5647,8 @@ def index():
         recent_data = get_cached_data('recent_data', strict=True) or get_cached_data('recent_data', strict=False) or []
         recommendations_json = get_cached_data('recommendations_json', strict=True) or get_cached_data('recommendations_json', strict=False) or {}
         filtered_users = get_cached_data('filtered_users', strict=True) or get_cached_data('filtered_users', strict=False) or {}
+        musicseerr_wrapped_json = get_cached_data('musicseerr_wrapped_json', strict=True) or get_cached_data('musicseerr_wrapped_json', strict=False) or {}
+        musicseerr_server_json = get_cached_data('musicseerr_server_json', strict=True) or get_cached_data('musicseerr_server_json', strict=False)
         
         if users:
             users_full_data = users
@@ -5074,6 +5695,7 @@ def index():
                            libs=libs, error=error, alert=alert, settings=settings, email_lists=email_lists,
                            cache_info=cache_info, recommendations_json=recommendations_json,
                            filtered_users=filtered_users, theme_settings=theme_settings,
+                           musicseerr_wrapped_json=musicseerr_wrapped_json, musicseerr_server_json=musicseerr_server_json,
                            nonce=secrets.token_urlsafe(16), csrf_token=session["csrf_token"], username=username
                         )
 
@@ -5125,7 +5747,7 @@ def pull_stats():
 
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    cursor.execute("SELECT tautulli_url, tautulli_api, server_name FROM settings WHERE id = 1")
+    cursor.execute("SELECT tautulli_url, tautulli_api, server_name, stats_type, recently_added_mode, recently_added_sort FROM settings WHERE id = 1")
     row = cursor.fetchone()
     conn.close()
 
@@ -5134,6 +5756,9 @@ def pull_stats():
 
     tautulli_base_url = row[0].rstrip('/')
     tautulli_api_key = decrypt(row[1])
+    stats_type = row[3] or 'plays'
+    recently_added_mode = row[4] or 'items'
+    recently_added_sort = row[5] or 'date'
 
     cache_params = {
         'time_range': time_range,
@@ -5142,7 +5767,7 @@ def pull_stats():
         'timestamp': time.time()
     }
 
-    stats, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_home_stats', 'Stats', None, time_range)
+    stats, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_home_stats', 'Stats', None, time_range, stats_type=stats_type)
     set_cached_data('stats', stats, cache_params)
 
     users, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_users', 'Users', error)
@@ -5165,7 +5790,7 @@ def pull_stats():
     ]
     for command in graph_commands:
         try:
-            gd, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, command["command"], command["name"], error, time_range)
+            gd, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, command["command"], command["name"], error, time_range, y_axis=stats_type)
             graph_data.append(gd if gd is not None else {})
         except Exception as e:
             graph_data.append({})
@@ -5180,7 +5805,7 @@ def pull_stats():
     for library in libraries:
         library_section_ids[f"{library['section_id']}"] = library["section_name"]
 
-    recent_data = fetch_recent_data_for_index(tautulli_base_url, tautulli_api_key, count)
+    recent_data = fetch_recent_data_for_index(tautulli_base_url, tautulli_api_key, count, recently_added_mode=recently_added_mode, recently_added_sort=recently_added_sort)
     set_cached_data('recent_data', recent_data, cache_params)
 
     user_dict = {}
@@ -5193,7 +5818,7 @@ def pull_stats():
 
     return jsonify({
         "success": True,
-        "alert": f"Fresh data loaded! Stats/graphs for {time_range} days, and {count} recently added items.",
+        "alert": f"Fresh data loaded! Stats/graphs for {time_range} days, and recently added {'within last ' + count + ' days' if recently_added_mode == 'days' else count + ' items'}.",
         "stats": stats or [],
         "graph_data": graph_data,
         "graph_commands": graph_commands,
@@ -5543,6 +6168,73 @@ def pull_recommendations():
                             recommendations_json=recommendations_json, filtered_users=filtered_users, alert=alert,
                             error=error, theme_settings=theme_settings)
 
+@app.route('/pull_musicseerr_stats', methods=['POST'])
+@requires_auth
+def pull_musicseerr_stats():
+    require_csrf_for_json()
+    musicseerr_wrapped_json = {}
+    musicseerr_server_json = None
+    error = None
+    alert = None
+
+    data = request.get_json()
+    stats = data['stats']
+    user_dict = data['user_dict']
+    graph_data = data['graph_data']
+    graph_commands = data['graph_commands']
+    recent_data = data['recent_data']
+    libs = data['libs']
+    settings = data['settings']
+    to_emails = data['to_emails']
+
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("SELECT musicseerr_url, musicseerr_api_key FROM settings WHERE id = 1")
+    row = cursor.fetchone()
+    conn.close()
+
+    musicseerr_url = (row[0] or "").strip() if row else ""
+    musicseerr_api_key = decrypt(row[1]) if row and row[1] else ""
+
+    filtered_users = {k: v for k, v in user_dict.items() if v in to_emails}
+
+    if musicseerr_url == "" or musicseerr_api_key == "":
+        return render_template('index.html', error='Please enter Musicseerr URL and API key on settings page',
+                                stats=stats, user_dict=user_dict, graph_data=graph_data,
+                                graph_commands=graph_commands, recent_data=recent_data,
+                                libs=libs, settings=settings, theme_settings=get_theme_settings())
+
+    musicseerr_wrapped_json, error = run_musicseerr_command(musicseerr_url, musicseerr_api_key, filtered_users, error)
+    musicseerr_server_json, server_error = fetch_musicseerr_server_stats(musicseerr_url, musicseerr_api_key)
+    if server_error:
+        error = (error + ", " if error else "") + server_error
+
+    if error:
+        alert = None
+    else:
+        alert = "Musicseerr stats pulled!"
+
+    cache_params = {'timestamp': time.time()}
+    set_cached_data('musicseerr_filtered_users', filtered_users, cache_params)
+    set_cached_data('musicseerr_wrapped_json', musicseerr_wrapped_json, cache_params)
+    set_cached_data('musicseerr_server_json', musicseerr_server_json, cache_params)
+
+    cache_info = {
+        'stats': get_cache_info('stats'),
+        'users': get_cache_info('users'),
+        'graph_data': get_cache_info('graph_data'),
+        'recent_data': get_cache_info('recent_data'),
+        'recommendations_json': get_cache_info('recommendations_json'),
+        'filtered_users': get_cache_info('filtered_users')
+    }
+
+    theme_settings = get_theme_settings()
+
+    return render_template('index.html', stats=stats, user_dict=user_dict, graph_data=graph_data, cache_info=cache_info,
+                            graph_commands=graph_commands, recent_data=recent_data, libs=libs, settings=settings,
+                            musicseerr_wrapped_json=musicseerr_wrapped_json, musicseerr_server_json=musicseerr_server_json,
+                            alert=alert, error=error, theme_settings=theme_settings)
+
 @app.route('/send_email', methods=['POST'])
 @requires_auth
 def send_email():
@@ -5551,7 +6243,7 @@ def send_email():
     cursor = conn.cursor()
     cursor.execute("""
         SELECT
-        from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, logo_filename, logo_width, from_name, custom_logo_filename
+        from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, logo_filename, logo_width, from_name, custom_logo_filename, send_mode, poster_max_height
         FROM settings WHERE id = 1
     """)
     row = cursor.fetchone()
@@ -5571,7 +6263,9 @@ def send_email():
             "logo_filename": row[9],
             "logo_width": row[10],
             "from_name": row[11] or "",
-            "custom_logo_filename": row[12] or ""
+            "custom_logo_filename": row[12] or "",
+            "send_mode": row[13] or "bcc",
+            "poster_max_height": int(row[14] or 0)
         }
     else:
         return jsonify({"error": "Please enter email info on settings page"}), 500
@@ -5596,20 +6290,23 @@ def send_email():
     custom_html = data.get('custom_html', '')
 
     has_recommendations = any(item.get('type') == 'recommendations' for item in selected_items)
+    has_musicseerr_wrapped = any(item.get('type') == 'musicseerr_wrapped' for item in selected_items)
 
-    if has_recommendations and user_dict:
+    send_mode = settings.get('send_mode', 'bcc')
+
+    if (has_recommendations or has_musicseerr_wrapped) and user_dict:
         return send_recommendations_email_with_cids(
             to_emails, subject, email_header_title, user_dict, selected_items,
-            from_email, alias_email, reply_to_email, password, smtp_username, 
+            from_email, alias_email, reply_to_email, password, smtp_username,
             smtp_server, smtp_port, smtp_protocol, settings, from_name, custom_html,
-            expanded_collections
+            expanded_collections, send_mode=send_mode
         )
     else:
         return send_standard_email_with_cids(
             to_emails, subject, email_header_title, selected_items,
             from_email, alias_email, reply_to_email, password, smtp_username,
             smtp_server, smtp_port, smtp_protocol, settings, from_name, custom_html,
-            expanded_collections
+            expanded_collections, send_mode=send_mode
         )
 
 @app.route('/settings', methods=['GET', 'POST'])
@@ -5651,136 +6348,240 @@ def settings():
         if not token or token != session.get("csrf_token"):
             abort(400)
 
-        cursor.execute("SELECT custom_logo_filename FROM settings WHERE id = 1")
-        db_custom_logo = cursor.fetchone()
-        existing_custom_logo = db_custom_logo[0] if db_custom_logo and db_custom_logo[0] else ""
+        try:
+            cursor.execute("SELECT custom_logo_filename FROM settings WHERE id = 1")
+            db_custom_logo = cursor.fetchone()
+            existing_custom_logo = db_custom_logo[0] if db_custom_logo and db_custom_logo[0] else ""
 
-        cursor.execute("SELECT login_toggle, nl_username, nl_password FROM settings WHERE id = 1")
-        db_login_info = cursor.fetchone()
-        existing_login_toggle = db_login_info[0] if db_login_info and db_login_info[0] else ""
-        existing_nl_username = db_login_info[1] if db_login_info and db_login_info[1] else ""
-        existing_nl_password = db_login_info[2] if db_login_info and db_login_info[2] else ""
+            cursor.execute("SELECT login_toggle, nl_username, nl_password FROM settings WHERE id = 1")
+            db_login_info = cursor.fetchone()
+            existing_login_toggle = db_login_info[0] if db_login_info and db_login_info[0] else ""
+            existing_nl_username = db_login_info[1] if db_login_info and db_login_info[1] else ""
+            existing_nl_password = db_login_info[2] if db_login_info and db_login_info[2] else ""
 
-        from_email = request.form.get("from_email")
-        alias_email = request.form.get("alias_email")
-        reply_to_email = request.form.get("reply_to_email")
-        password = encrypt(request.form.get("password"))
-        smtp_username = request.form.get("smtp_username")
-        smtp_server = request.form.get("smtp_server")
-        smtp_port = int(request.form.get("smtp_port"))
-        smtp_protocol = request.form.get("smtp_protocol")
-        server_name = request.form.get("server_name")
-        plex_url = request.form.get("plex_url")
-        tautulli_url = request.form.get("tautulli_url")
-        tautulli_api = encrypt(request.form.get("tautulli_api"))
-        conjurr_url = request.form.get("conjurr_url")
-        recipient_display_name = request.form.get("recipient_display_name", "email")
-        logo_filename = request.form.get("logo_filename")
-        logo_width = request.form.get("logo_width")
-        email_theme = request.form.get("email_theme", "newsletterr_blue")
-        from_name = request.form.get("from_name")
-        custom_logo_filename = request.form.get("custom_logo_filename", "")
-        login_toggle = request.form.get("login_toggle")
-        nl_username = request.form.get("nl_username")
-        nl_password = encrypt(request.form.get("nl_password"))
+            from_email = request.form.get("from_email")
+            alias_email = request.form.get("alias_email")
+            reply_to_email = request.form.get("reply_to_email")
+            password = encrypt(request.form.get("password"))
+            smtp_username = request.form.get("smtp_username")
+            smtp_server = request.form.get("smtp_server")
+            smtp_port = int(request.form.get("smtp_port"))
+            smtp_protocol = request.form.get("smtp_protocol")
+            server_name = request.form.get("server_name")
+            plex_url = request.form.get("plex_url")
+            tautulli_url = request.form.get("tautulli_url")
+            tautulli_api = encrypt(request.form.get("tautulli_api"))
+            conjurr_url = request.form.get("conjurr_url")
+            musicseerr_url = request.form.get("musicseerr_url")
+            musicseerr_api_key = encrypt(request.form.get("musicseerr_api_key"))
+            recipient_display_name = request.form.get("recipient_display_name", "email")
+            logo_filename = request.form.get("logo_filename")
+            logo_width = request.form.get("logo_width")
+            email_theme = request.form.get("email_theme", "newsletterr_blue")
+            from_name = request.form.get("from_name")
+            custom_logo_filename = request.form.get("custom_logo_filename", "")
+            login_toggle = request.form.get("login_toggle")
+            nl_username = request.form.get("nl_username")
+            nl_password = encrypt(request.form.get("nl_password"))
+            default_intro_text = request.form.get("default_intro_text", "")
+            default_outro_text = request.form.get("default_outro_text", "")
+            hsts_enabled = request.form.get("hsts_enabled", "disabled")
+            scheduled_subject_prefix = request.form.get("scheduled_subject_prefix", "enabled")
+            logo_position = request.form.get("logo_position", "center")
+            hide_stat_play_counts = request.form.get("hide_stat_play_counts", "disabled")
+            hide_graph_play_counts = request.form.get("hide_graph_play_counts", "disabled")
+            stats_type = request.form.get("stats_type", "plays")
+            recently_added_mode = request.form.get("recently_added_mode", "items")
+            recently_added_sort = request.form.get("recently_added_sort", "date")
+            ra_grid_columns = request.form.get("ra_grid_columns", "5")
+            recs_grid_columns = request.form.get("recs_grid_columns", "5")
+            stat_cover_art = request.form.get("stat_cover_art", "disabled")
+            send_mode = request.form.get("send_mode", "bcc")
+            poster_max_height = request.form.get("poster_max_height", "")
 
-        if not custom_logo_filename and existing_custom_logo:
-            custom_logo_filename = existing_custom_logo
+            if not custom_logo_filename and existing_custom_logo:
+                custom_logo_filename = existing_custom_logo
 
-        if logo_filename == 'custom':
-            pass
-        elif logo_filename in preset_logo_name_to_file:
-            logo_filename = preset_logo_name_to_file[logo_filename]
-        elif logo_filename == 'none':
-            logo_filename = ""
+            if logo_filename == 'custom':
+                pass
+            elif logo_filename in preset_logo_name_to_file:
+                logo_filename = preset_logo_name_to_file[logo_filename]
+            elif logo_filename == 'none':
+                logo_filename = ""
 
-        if email_theme in theme_presets:
-            preset = theme_presets[email_theme]
-            primary_color = preset["primary_color"]
-            secondary_color = preset["secondary_color"]
-            accent_color = preset["accent_color"]
-            background_color = preset["background_color"]
-            text_color = preset["text_color"]
-            logo_filename = preset["logo_filename"]
-        else:
-            primary_color = request.form.get("primary_color", "#8acbd4")
-            secondary_color = request.form.get("secondary_color", "#222222")
-            accent_color = request.form.get("accent_color", "#62a1a4")
-            background_color = request.form.get("background_color", "#333333")
-            text_color = request.form.get("text_color", "#62a1a4")
+            if email_theme in theme_presets:
+                preset = theme_presets[email_theme]
+                primary_color = preset["primary_color"]
+                secondary_color = preset["secondary_color"]
+                accent_color = preset["accent_color"]
+                background_color = preset["background_color"]
+                text_color = preset["text_color"]
+                logo_filename = preset["logo_filename"]
+            else:
+                primary_color = request.form.get("primary_color", "#8acbd4")
+                secondary_color = request.form.get("secondary_color", "#222222")
+                accent_color = request.form.get("accent_color", "#62a1a4")
+                background_color = request.form.get("background_color", "#333333")
+                text_color = request.form.get("text_color", "#62a1a4")
 
-        cursor.execute("""
-            INSERT INTO settings
-            (id, from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, plex_url, tautulli_url,
-                tautulli_api, conjurr_url, recipient_display_name, logo_filename, logo_width, email_theme, primary_color, secondary_color, accent_color, background_color,
-                text_color, from_name, custom_logo_filename, login_toggle, nl_username, nl_password)
-            VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT (id) DO UPDATE
-            SET from_email = excluded.from_email, alias_email = excluded.alias_email, reply_to_email = excluded.reply_to_email, password = excluded.password,
-                smtp_username = excluded.smtp_username, smtp_server = excluded.smtp_server, smtp_port = excluded.smtp_port, smtp_protocol = excluded.smtp_protocol,
-                server_name = excluded.server_name, plex_url = excluded.plex_url, tautulli_url = excluded.tautulli_url, tautulli_api = excluded.tautulli_api,
-                conjurr_url = excluded.conjurr_url, recipient_display_name = excluded.recipient_display_name, logo_filename = excluded.logo_filename, logo_width = excluded.logo_width,
-                email_theme = excluded.email_theme, primary_color = excluded.primary_color, secondary_color = excluded.secondary_color, accent_color = excluded.accent_color,
-                background_color = excluded.background_color, text_color = excluded.text_color, from_name = excluded.from_name, custom_logo_filename = excluded.custom_logo_filename,
-                login_toggle = excluded.login_toggle, nl_username = excluded.nl_username, nl_password = excluded.nl_password
-        """, (from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, plex_url, tautulli_url, tautulli_api,
-              conjurr_url, recipient_display_name, logo_filename, logo_width, email_theme, primary_color, secondary_color, accent_color, background_color, text_color, from_name,
-              custom_logo_filename, login_toggle, nl_username, nl_password))
-        conn.commit()
-        cursor.execute("SELECT plex_token FROM settings WHERE id = 1")
-        plex_token = cursor.fetchone()[0]
-        conn.close()
+            cursor.execute("""
+                INSERT INTO settings
+                (id, from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, plex_url, tautulli_url,
+                    tautulli_api, conjurr_url, musicseerr_url, musicseerr_api_key, recipient_display_name, logo_filename, logo_width, email_theme, primary_color, secondary_color, accent_color, background_color,
+                    text_color, from_name, custom_logo_filename, login_toggle, nl_username, nl_password, default_intro_text, default_outro_text, hsts_enabled, scheduled_subject_prefix, logo_position, hide_stat_play_counts, hide_graph_play_counts, stats_type, recently_added_mode, recently_added_sort, ra_grid_columns, recs_grid_columns, stat_cover_art, send_mode, poster_max_height)
+                VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (id) DO UPDATE
+                SET from_email = excluded.from_email, alias_email = excluded.alias_email, reply_to_email = excluded.reply_to_email, password = excluded.password,
+                    smtp_username = excluded.smtp_username, smtp_server = excluded.smtp_server, smtp_port = excluded.smtp_port, smtp_protocol = excluded.smtp_protocol,
+                    server_name = excluded.server_name, plex_url = excluded.plex_url, tautulli_url = excluded.tautulli_url, tautulli_api = excluded.tautulli_api,
+                    conjurr_url = excluded.conjurr_url, musicseerr_url = excluded.musicseerr_url, musicseerr_api_key = excluded.musicseerr_api_key, recipient_display_name = excluded.recipient_display_name, logo_filename = excluded.logo_filename, logo_width = excluded.logo_width,
+                    email_theme = excluded.email_theme, primary_color = excluded.primary_color, secondary_color = excluded.secondary_color, accent_color = excluded.accent_color,
+                    background_color = excluded.background_color, text_color = excluded.text_color, from_name = excluded.from_name, custom_logo_filename = excluded.custom_logo_filename,
+                    login_toggle = excluded.login_toggle, nl_username = excluded.nl_username, nl_password = excluded.nl_password,
+                    default_intro_text = excluded.default_intro_text, default_outro_text = excluded.default_outro_text,
+                    hsts_enabled = excluded.hsts_enabled, scheduled_subject_prefix = excluded.scheduled_subject_prefix, logo_position = excluded.logo_position,
+                    hide_stat_play_counts = excluded.hide_stat_play_counts, hide_graph_play_counts = excluded.hide_graph_play_counts,
+                    stats_type = excluded.stats_type, recently_added_mode = excluded.recently_added_mode, recently_added_sort = excluded.recently_added_sort,
+                    ra_grid_columns = excluded.ra_grid_columns, recs_grid_columns = excluded.recs_grid_columns,
+                    stat_cover_art = excluded.stat_cover_art,
+                    send_mode = excluded.send_mode,
+                    poster_max_height = excluded.poster_max_height
+            """, (from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, plex_url, tautulli_url, tautulli_api,
+                  conjurr_url, musicseerr_url, musicseerr_api_key, recipient_display_name, logo_filename, logo_width, email_theme, primary_color, secondary_color, accent_color, background_color, text_color, from_name,
+                  custom_logo_filename, login_toggle, nl_username, nl_password, default_intro_text, default_outro_text, hsts_enabled, scheduled_subject_prefix, logo_position,
+                  hide_stat_play_counts, hide_graph_play_counts, stats_type, recently_added_mode, recently_added_sort, ra_grid_columns, recs_grid_columns, stat_cover_art, send_mode, poster_max_height))
+            conn.commit()
+            cursor.execute("SELECT plex_token FROM settings WHERE id = 1")
+            plex_token = cursor.fetchone()[0]
+            conn.close()
 
-        settings = {
-            "from_email": from_email,
-            "alias_email": alias_email,
-            "reply_to_email": reply_to_email,
-            "password": decrypt(password),
-            "smtp_username": smtp_username,
-            "smtp_server": smtp_server,
-            "smtp_port": smtp_port,
-            "smtp_protocol": smtp_protocol,
-            "server_name": server_name,
-            "plex_url": plex_url,
-            "plex_token": plex_token,
-            "tautulli_url": tautulli_url,
-            "tautulli_api": decrypt(tautulli_api),
-            "conjurr_url": conjurr_url,
-            "recipient_display_name": recipient_display_name,
-            "logo_filename": logo_filename,
-            "logo_width": logo_width,
-            "email_theme": email_theme,
-            "primary_color": primary_color,
-            "secondary_color": secondary_color,
-            "accent_color": accent_color,
-            "background_color": background_color,
-            "text_color": text_color,
-            "from_name": from_name,
-            "custom_logo_filename": custom_logo_filename,
-            "login_toggle": login_toggle,
-            "nl_username": nl_username,
-            "nl_password": decrypt(nl_password)
-        }
+            settings = {
+                "from_email": from_email,
+                "alias_email": alias_email,
+                "reply_to_email": reply_to_email,
+                "password": decrypt(password),
+                "smtp_username": smtp_username,
+                "smtp_server": smtp_server,
+                "smtp_port": smtp_port,
+                "smtp_protocol": smtp_protocol,
+                "server_name": server_name,
+                "plex_url": plex_url,
+                "plex_token": plex_token,
+                "tautulli_url": tautulli_url,
+                "tautulli_api": decrypt(tautulli_api),
+                "conjurr_url": conjurr_url,
+                "musicseerr_url": musicseerr_url,
+                "musicseerr_api_key": decrypt(musicseerr_api_key),
+                "recipient_display_name": recipient_display_name,
+                "logo_filename": logo_filename,
+                "logo_width": logo_width,
+                "email_theme": email_theme,
+                "primary_color": primary_color,
+                "secondary_color": secondary_color,
+                "accent_color": accent_color,
+                "background_color": background_color,
+                "text_color": text_color,
+                "from_name": from_name,
+                "custom_logo_filename": custom_logo_filename,
+                "login_toggle": login_toggle,
+                "nl_username": nl_username,
+                "nl_password": decrypt(nl_password),
+                "default_intro_text": default_intro_text,
+                "default_outro_text": default_outro_text,
+                "hsts_enabled": hsts_enabled,
+                "scheduled_subject_prefix": scheduled_subject_prefix,
+                "logo_position": logo_position,
+                "hide_stat_play_counts": hide_stat_play_counts,
+                "hide_graph_play_counts": hide_graph_play_counts,
+                "stats_type": stats_type,
+                "recently_added_mode": recently_added_mode,
+                "recently_added_sort": recently_added_sort,
+                "ra_grid_columns": ra_grid_columns,
+                "recs_grid_columns": recs_grid_columns,
+                "stat_cover_art": stat_cover_art,
+                "send_mode": send_mode,
+                "poster_max_height": poster_max_height,
+            }
 
-        if login_toggle == 'disabled':
-            session.pop('username', None)
+            refresh_hsts_setting()
 
-        if existing_nl_username != nl_username:
-            session.pop('username', None)
-            session.pop('authenticated', None)
-            return redirect(url_for('login', alert="Settings saved successfully!"))
-        
-        if decrypt(existing_nl_password) != decrypt(nl_password):
-            session.pop('username', None)
-            session.pop('authenticated', None)
-            return redirect(url_for('login', alert="Settings saved successfully!"))
+            if login_toggle == 'disabled':
+                session.pop('username', None)
 
-        if existing_login_toggle != login_toggle:
-            session.pop('username', None)
-            session.pop('authenticated', None)
-            return redirect(url_for('login', alert="Settings saved successfully!"))
+            if existing_nl_username != nl_username:
+                session.pop('username', None)
+                session.pop('authenticated', None)
+                return redirect(url_for('login', alert="Settings saved successfully!"))
 
-        return redirect(url_for('settings', alert="Settings saved successfully!", settings=settings))
+            if decrypt(existing_nl_password) != decrypt(nl_password):
+                session.pop('username', None)
+                session.pop('authenticated', None)
+                return redirect(url_for('login', alert="Settings saved successfully!"))
+
+            if existing_login_toggle != login_toggle:
+                session.pop('username', None)
+                session.pop('authenticated', None)
+                return redirect(url_for('login', alert="Settings saved successfully!"))
+
+            return redirect(url_for('settings', alert="Settings saved successfully!", settings=settings))
+
+        except Exception as e:
+            try:
+                cursor.execute("SELECT plex_token FROM settings WHERE id = 1")
+                plex_token = cursor.fetchone()[0]
+                conn.close()
+            except Exception:
+                pass
+            error_settings = {
+                "from_email": request.form.get("from_email", ""),
+                "alias_email": request.form.get("alias_email", ""),
+                "reply_to_email": request.form.get("reply_to_email", ""),
+                "password": request.form.get("password", ""),
+                "smtp_username": request.form.get("smtp_username", ""),
+                "smtp_server": request.form.get("smtp_server", ""),
+                "smtp_port": request.form.get("smtp_port", ""),
+                "smtp_protocol": request.form.get("smtp_protocol", "SSL"),
+                "server_name": request.form.get("server_name", ""),
+                "plex_url": request.form.get("plex_url", ""),
+                "plex_token": plex_token,
+                "tautulli_url": request.form.get("tautulli_url", ""),
+                "tautulli_api": request.form.get("tautulli_api", ""),
+                "conjurr_url": request.form.get("conjurr_url", ""),
+                "musicseerr_url": request.form.get("musicseerr_url", ""),
+                "musicseerr_api_key": request.form.get("musicseerr_api_key", ""),
+                "recipient_display_name": request.form.get("recipient_display_name", "email"),
+                "logo_filename": request.form.get("logo_filename", ""),
+                "logo_width": request.form.get("logo_width", ""),
+                "email_theme": request.form.get("email_theme", "newsletterr_blue"),
+                "primary_color": request.form.get("primary_color", "#8acbd4"),
+                "secondary_color": request.form.get("secondary_color", "#222222"),
+                "accent_color": request.form.get("accent_color", "#62a1a4"),
+                "background_color": request.form.get("background_color", "#333333"),
+                "text_color": request.form.get("text_color", "#62a1a4"),
+                "from_name": request.form.get("from_name", ""),
+                "custom_logo_filename": request.form.get("custom_logo_filename", ""),
+                "login_toggle": request.form.get("login_toggle", "disabled"),
+                "nl_username": request.form.get("nl_username", ""),
+                "nl_password": request.form.get("nl_password", ""),
+                "default_intro_text": request.form.get("default_intro_text", ""),
+                "default_outro_text": request.form.get("default_outro_text", ""),
+                "hsts_enabled": request.form.get("hsts_enabled", "disabled"),
+                "scheduled_subject_prefix": request.form.get("scheduled_subject_prefix", "enabled"),
+                "logo_position": request.form.get("logo_position", "center"),
+                "hide_stat_play_counts": request.form.get("hide_stat_play_counts", "disabled"),
+                "hide_graph_play_counts": request.form.get("hide_graph_play_counts", "disabled"),
+                "stats_type": request.form.get("stats_type", "plays"),
+                "recently_added_mode": request.form.get("recently_added_mode", "items"),
+                "recently_added_sort": request.form.get("recently_added_sort", "date"),
+                "ra_grid_columns": request.form.get("ra_grid_columns", "5"),
+                "recs_grid_columns": request.form.get("recs_grid_columns", "5"),
+                "stat_cover_art": request.form.get("stat_cover_art", "disabled"),
+                "send_mode": request.form.get("send_mode", "bcc"),
+                "poster_max_height": request.form.get("poster_max_height", ""),
+            }
+            if not session.get("csrf_token"):
+                session["csrf_token"] = secrets.token_urlsafe(32)
+            return render_template('settings.html', settings=error_settings, error=f"Error saving settings: {str(e)}", nonce=secrets.token_urlsafe(16), csrf_token=session["csrf_token"])
 
     try:
         from_email = cursor.execute("SELECT from_email FROM settings WHERE id = 1").fetchone()[0]
@@ -5797,6 +6598,8 @@ def settings():
         tautulli_url = cursor.execute("SELECT tautulli_url FROM settings WHERE id = 1").fetchone()[0]
         tautulli_api = cursor.execute("SELECT tautulli_api FROM settings WHERE id = 1").fetchone()[0]
         conjurr_url = cursor.execute("SELECT conjurr_url FROM settings WHERE id = 1").fetchone()[0]
+        musicseerr_url = cursor.execute("SELECT musicseerr_url FROM settings WHERE id = 1").fetchone()[0]
+        musicseerr_api_key = cursor.execute("SELECT musicseerr_api_key FROM settings WHERE id = 1").fetchone()[0]
         recipient_display_name = cursor.execute("SELECT recipient_display_name FROM settings WHERE id = 1").fetchone()[0]
         logo_filename = cursor.execute("SELECT logo_filename FROM settings WHERE id = 1").fetchone()[0]
         logo_width = cursor.execute("SELECT logo_width FROM settings WHERE id = 1").fetchone()[0]
@@ -5811,6 +6614,21 @@ def settings():
         login_toggle = cursor.execute("SELECT login_toggle FROM settings WHERE id = 1").fetchone()[0]
         nl_username = cursor.execute("SELECT nl_username FROM settings WHERE id = 1").fetchone()[0]
         nl_password = cursor.execute("SELECT nl_password FROM settings WHERE id = 1").fetchone()[0]
+        default_intro_text = cursor.execute("SELECT default_intro_text FROM settings WHERE id = 1").fetchone()[0]
+        default_outro_text = cursor.execute("SELECT default_outro_text FROM settings WHERE id = 1").fetchone()[0]
+        hsts_enabled = cursor.execute("SELECT hsts_enabled FROM settings WHERE id = 1").fetchone()[0]
+        scheduled_subject_prefix = cursor.execute("SELECT scheduled_subject_prefix FROM settings WHERE id = 1").fetchone()[0]
+        logo_position = cursor.execute("SELECT logo_position FROM settings WHERE id = 1").fetchone()[0]
+        hide_stat_play_counts = cursor.execute("SELECT hide_stat_play_counts FROM settings WHERE id = 1").fetchone()[0]
+        hide_graph_play_counts = cursor.execute("SELECT hide_graph_play_counts FROM settings WHERE id = 1").fetchone()[0]
+        stats_type = cursor.execute("SELECT stats_type FROM settings WHERE id = 1").fetchone()[0]
+        recently_added_mode = cursor.execute("SELECT recently_added_mode FROM settings WHERE id = 1").fetchone()[0]
+        recently_added_sort = cursor.execute("SELECT recently_added_sort FROM settings WHERE id = 1").fetchone()[0]
+        ra_grid_columns = cursor.execute("SELECT ra_grid_columns FROM settings WHERE id = 1").fetchone()[0]
+        recs_grid_columns = cursor.execute("SELECT recs_grid_columns FROM settings WHERE id = 1").fetchone()[0]
+        stat_cover_art = cursor.execute("SELECT stat_cover_art FROM settings WHERE id = 1").fetchone()[0]
+        send_mode = cursor.execute("SELECT send_mode FROM settings WHERE id = 1").fetchone()[0]
+        poster_max_height = cursor.execute("SELECT poster_max_height FROM settings WHERE id = 1").fetchone()[0]
     except:
         from_email = cursor.execute("SELECT from_email FROM settings WHERE id = 1").fetchone()
         alias_email = cursor.execute("SELECT alias_email FROM settings WHERE id = 1").fetchone()
@@ -5826,6 +6644,8 @@ def settings():
         tautulli_url = cursor.execute("SELECT tautulli_url FROM settings WHERE id = 1").fetchone()
         tautulli_api = cursor.execute("SELECT tautulli_api FROM settings WHERE id = 1").fetchone()
         conjurr_url = cursor.execute("SELECT conjurr_url FROM settings WHERE id = 1").fetchone()
+        musicseerr_url = cursor.execute("SELECT musicseerr_url FROM settings WHERE id = 1").fetchone()
+        musicseerr_api_key = cursor.execute("SELECT musicseerr_api_key FROM settings WHERE id = 1").fetchone()
         recipient_display_name = cursor.execute("SELECT recipient_display_name FROM settings WHERE id = 1").fetchone()
         logo_filename = cursor.execute("SELECT logo_filename FROM settings WHERE id = 1").fetchone()
         logo_width = cursor.execute("SELECT logo_width FROM settings WHERE id = 1").fetchone()
@@ -5840,6 +6660,21 @@ def settings():
         login_toggle = cursor.execute("SELECT login_toggle FROM settings WHERE id = 1").fetchone()
         nl_username = cursor.execute("SELECT nl_username FROM settings WHERE id = 1").fetchone()
         nl_password = cursor.execute("SELECT nl_password FROM settings WHERE id = 1").fetchone()
+        default_intro_text = cursor.execute("SELECT default_intro_text FROM settings WHERE id = 1").fetchone()
+        default_outro_text = cursor.execute("SELECT default_outro_text FROM settings WHERE id = 1").fetchone()
+        hsts_enabled = cursor.execute("SELECT hsts_enabled FROM settings WHERE id = 1").fetchone()
+        scheduled_subject_prefix = cursor.execute("SELECT scheduled_subject_prefix FROM settings WHERE id = 1").fetchone()
+        logo_position = cursor.execute("SELECT logo_position FROM settings WHERE id = 1").fetchone()
+        hide_stat_play_counts = cursor.execute("SELECT hide_stat_play_counts FROM settings WHERE id = 1").fetchone()
+        hide_graph_play_counts = cursor.execute("SELECT hide_graph_play_counts FROM settings WHERE id = 1").fetchone()
+        stats_type = cursor.execute("SELECT stats_type FROM settings WHERE id = 1").fetchone()
+        recently_added_mode = cursor.execute("SELECT recently_added_mode FROM settings WHERE id = 1").fetchone()
+        recently_added_sort = cursor.execute("SELECT recently_added_sort FROM settings WHERE id = 1").fetchone()
+        ra_grid_columns = cursor.execute("SELECT ra_grid_columns FROM settings WHERE id = 1").fetchone()
+        recs_grid_columns = cursor.execute("SELECT recs_grid_columns FROM settings WHERE id = 1").fetchone()
+        stat_cover_art = cursor.execute("SELECT stat_cover_art FROM settings WHERE id = 1").fetchone()
+        send_mode = cursor.execute("SELECT send_mode FROM settings WHERE id = 1").fetchone()
+        poster_max_height = cursor.execute("SELECT poster_max_height FROM settings WHERE id = 1").fetchone()
 
     current_theme = email_theme or "newsletterr_blue"
     if current_theme in theme_presets and current_theme != "custom":
@@ -5862,6 +6697,7 @@ def settings():
         "plex_token": plex_token or "",
         "tautulli_url": tautulli_url or "",
         "conjurr_url": conjurr_url or "",
+        "musicseerr_url": musicseerr_url or "",
         "recipient_display_name": recipient_display_name or "email",
         "logo_filename": logo_filename or "",
         "email_theme": email_theme or "newsletterr_blue",
@@ -5873,7 +6709,22 @@ def settings():
         "from_name": from_name or "",
         "custom_logo_filename": custom_logo_filename or "",
         "login_toggle": login_toggle or "disabled",
-        "nl_username": nl_username or ""
+        "nl_username": nl_username or "",
+        "default_intro_text": default_intro_text or "",
+        "default_outro_text": default_outro_text or "",
+        "hsts_enabled": hsts_enabled or "disabled",
+        "scheduled_subject_prefix": scheduled_subject_prefix or "enabled",
+        "logo_position": logo_position or "center",
+        "hide_stat_play_counts": hide_stat_play_counts or "disabled",
+        "hide_graph_play_counts": hide_graph_play_counts or "disabled",
+        "stats_type": stats_type or "plays",
+        "recently_added_mode": recently_added_mode or "items",
+        "recently_added_sort": recently_added_sort or "date",
+        "ra_grid_columns": ra_grid_columns or "5",
+        "recs_grid_columns": recs_grid_columns or "5",
+        "stat_cover_art": stat_cover_art or "disabled",
+        "send_mode": send_mode or "bcc",
+        "poster_max_height": poster_max_height or "",
     }
     if password == '' or password is None:
         settings["password"] = ""
@@ -6060,6 +6911,69 @@ def upload_media():
     except Exception as e:
         print(f"Error uploading media: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/api/test/tautulli', methods=['POST'])
+@requires_auth
+def test_tautulli():
+    data = request.get_json()
+    url = (data.get('url') or '').rstrip('/')
+    api_key = (data.get('api_key') or '').strip()
+    if not url:
+        return jsonify({'status': 'error', 'message': 'Tautulli URL is required'})
+    if not api_key:
+        return jsonify({'status': 'error', 'message': 'Tautulli API key is required'})
+    try:
+        r = requests.get(f"{url}/api/v2", params={'apikey': api_key, 'cmd': 'arnold'}, timeout=10)
+        resp = r.json()
+        if resp.get('response', {}).get('result') == 'success':
+            return jsonify({'status': 'ok', 'message': 'Connected to Tautulli'})
+        msg = resp.get('response', {}).get('message') or 'Unexpected response, check your API key'
+        return jsonify({'status': 'error', 'message': msg})
+    except requests.exceptions.ConnectionError:
+        return jsonify({'status': 'error', 'message': 'Tautulli is unreachable at that URL'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)})
+
+
+@app.route('/api/test/conjurr', methods=['POST'])
+@requires_auth
+def test_conjurr():
+    data = request.get_json()
+    url = (data.get('url') or '').rstrip('/')
+    if not url:
+        return jsonify({'status': 'error', 'message': 'Conjurr URL is required'})
+    try:
+        r = requests.get(f"{url}/", timeout=10, allow_redirects=True)
+        if urlparse(r.url).path.rstrip('/') == '/settings':
+            return jsonify({'status': 'warning', 'message': 'Conjurr is reachable but not configured, complete setup in Conjurr settings'})
+        return jsonify({'status': 'ok', 'message': 'Connected to Conjurr'})
+    except requests.exceptions.ConnectionError:
+        return jsonify({'status': 'error', 'message': 'Conjurr is unreachable at that URL'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)})
+
+
+@app.route('/api/test/musicseerr', methods=['POST'])
+@requires_auth
+def test_musicseerr():
+    data = request.get_json()
+    url = (data.get('url') or '').rstrip('/')
+    api_key = data.get('api_key') or ''
+    if not url:
+        return jsonify({'status': 'error', 'message': 'Musicseerr URL is required'})
+    if not api_key:
+        return jsonify({'status': 'error', 'message': 'Musicseerr Wrapped API key is required'})
+    try:
+        r = safe_get(f"{url}/api/v1/wrapped/users", timeout=10, headers={'X-Wrapped-Api-Key': api_key})
+        if r.status_code == 401:
+            return jsonify({'status': 'error', 'message': 'Musicseerr rejected the API key'})
+        r.raise_for_status()
+        return jsonify({'status': 'ok', 'message': 'Connected to Musicseerr'})
+    except requests.exceptions.ConnectionError:
+        return jsonify({'status': 'error', 'message': 'Musicseerr is unreachable at that URL'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)})
+
 
 @app.route('/api/gif/search', methods=['GET'])
 @requires_auth
@@ -6516,10 +7430,10 @@ def preview_schedule(schedule_id):
         
         settings_conn = sqlite3.connect(DB_PATH)
         settings_cursor = settings_conn.cursor()
-        settings_cursor.execute("SELECT server_name, tautulli_url, tautulli_api, logo_filename, logo_width, custom_logo_filename FROM settings WHERE id = 1")
+        settings_cursor.execute("SELECT server_name, tautulli_url, tautulli_api, logo_filename, logo_width, custom_logo_filename, logo_position, default_intro_text, default_outro_text, hide_stat_play_counts, hide_graph_play_counts, stats_type, recently_added_mode, recently_added_sort, ra_grid_columns, recs_grid_columns, stat_cover_art, poster_max_height FROM settings WHERE id = 1")
         settings_row = settings_cursor.fetchone()
         settings_conn.close()
-        
+
         if settings_row:
             settings = {
                 "server_name": settings_row[0],
@@ -6527,7 +7441,19 @@ def preview_schedule(schedule_id):
                 "tautulli_api": settings_row[2],
                 "logo_filename": settings_row[3],
                 "logo_width": settings_row[4],
-                "custom_logo_filename": settings_row[5] or ''
+                "custom_logo_filename": settings_row[5] or '',
+                "logo_position": settings_row[6] or 'center',
+                "default_intro_text": settings_row[7] or '',
+                "default_outro_text": settings_row[8] or '',
+                "hide_stat_play_counts": settings_row[9] or 'disabled',
+                "hide_graph_play_counts": settings_row[10] or 'disabled',
+                "stats_type": settings_row[11] or 'plays',
+                "recently_added_mode": settings_row[12] or 'items',
+                "recently_added_sort": settings_row[13] or 'date',
+                "ra_grid_columns": settings_row[14] or '5',
+                "recs_grid_columns": settings_row[15] or '5',
+                "stat_cover_art": settings_row[16] or 'disabled',
+                "poster_max_height": int(settings_row[17] or 0) if settings_row[17] else 0,
             }
         else:
             settings = {"server_name": ""}
@@ -6548,11 +7474,14 @@ def preview_schedule(schedule_id):
                 print(f"Error fetching user_dict for preview API: {e}")
         
         tautulli_data = fetch_tautulli_data_for_email(
-            settings['tautulli_url'].rstrip('/'), 
-            settings['tautulli_api'], 
-            date_range, 
+            settings['tautulli_url'].rstrip('/'),
+            settings['tautulli_api'],
+            date_range,
             settings['server_name'],
-            items_count
+            items_count,
+            stats_type=settings.get('stats_type', 'plays'),
+            recently_added_mode=settings.get('recently_added_mode', 'items'),
+            recently_added_sort=settings.get('recently_added_sort', 'date')
         ) if settings.get('tautulli_url') and settings.get('tautulli_api') else {
             'settings': settings,
             'stats': [],
@@ -6562,7 +7491,19 @@ def preview_schedule(schedule_id):
         }
         tautulli_data["settings"]["logo_filename"] = settings["logo_filename"]
         tautulli_data["settings"]["logo_width"] = settings["logo_width"]
-        
+        tautulli_data["settings"]["logo_position"] = settings.get("logo_position", "center")
+        tautulli_data["settings"]["default_intro_text"] = settings.get("default_intro_text", "")
+        tautulli_data["settings"]["default_outro_text"] = settings.get("default_outro_text", "")
+        tautulli_data["settings"]["hide_stat_play_counts"] = settings.get("hide_stat_play_counts", "disabled")
+        tautulli_data["settings"]["hide_graph_play_counts"] = settings.get("hide_graph_play_counts", "disabled")
+        tautulli_data["settings"]["stats_type"] = settings.get("stats_type", "plays")
+        tautulli_data["settings"]["recently_added_mode"] = settings.get("recently_added_mode", "items")
+        tautulli_data["settings"]["recently_added_sort"] = settings.get("recently_added_sort", "date")
+        tautulli_data["settings"]["ra_grid_columns"] = int(settings.get("ra_grid_columns") or 5)
+        tautulli_data["settings"]["recs_grid_columns"] = int(settings.get("recs_grid_columns") or 5)
+        tautulli_data["settings"]["stat_cover_art"] = settings.get("stat_cover_art", "disabled")
+        tautulli_data["settings"]["poster_max_height"] = settings.get("poster_max_height", 0)
+
         recommendations_data = None
         has_recs = any(item.get('type') == 'recs' for item in selected_items)
         
@@ -6624,7 +7565,7 @@ def preview_schedule_page(schedule_id):
     except:
         date_range = 7
 
-    cursor.execute("SELECT logo_filename, logo_width, tautulli_url, tautulli_api, custom_logo_filename, recipient_display_name FROM settings WHERE id = 1")
+    cursor.execute("SELECT logo_filename, logo_width, tautulli_url, tautulli_api, custom_logo_filename, recipient_display_name, hide_graph_play_counts, stats_type, recently_added_mode, recently_added_sort, ra_grid_columns, recs_grid_columns, stat_cover_art, poster_max_height, logo_position FROM settings WHERE id = 1")
     settings_row = cursor.fetchone()
     logo_filename = settings_row[0] if settings_row else 'Asset_94x.png'
     logo_width = settings_row[1] if settings_row else 80
@@ -6632,12 +7573,30 @@ def preview_schedule_page(schedule_id):
     tautulli_api = settings_row[3] if settings_row else ''
     custom_logo_filename = settings_row[4] if settings_row else ''
     recipient_display_name = settings_row[5] if settings_row else 'email'
+    hide_graph_play_counts = settings_row[6] if settings_row else 'disabled'
+    stats_type = settings_row[7] if settings_row else 'plays'
+    recently_added_mode = settings_row[8] if settings_row else 'items'
+    recently_added_sort = settings_row[9] if settings_row else 'date'
+    ra_grid_columns = settings_row[10] if settings_row else '5'
+    recs_grid_columns = settings_row[11] if settings_row else '5'
+    stat_cover_art = settings_row[12] if settings_row else 'disabled'
+    poster_max_height = int(settings_row[13] or 0) if settings_row and settings_row[13] else 0
+    logo_position = settings_row[14] if settings_row else 'center'
 
     settings = {
         "logo_filename": logo_filename,
         "logo_width": logo_width,
         "custom_logo_filename": custom_logo_filename,
-        "recipient_display_name": recipient_display_name
+        "recipient_display_name": recipient_display_name,
+        "hide_graph_play_counts": hide_graph_play_counts or 'disabled',
+        "stats_type": stats_type or 'plays',
+        "recently_added_mode": recently_added_mode or 'items',
+        "recently_added_sort": recently_added_sort or 'date',
+        "ra_grid_columns": ra_grid_columns or '5',
+        "recs_grid_columns": recs_grid_columns or '5',
+        "stat_cover_art": stat_cover_art or 'disabled',
+        "poster_max_height": poster_max_height,
+        "logo_position": logo_position or 'center',
     }
     conn.close()
 
@@ -7083,8 +8042,8 @@ def delete_email_template(template_id):
         return jsonify({"status": "error", "message": str(e)}), 500
 
 if __name__ == '__main__':
-    app.jinja_env.globals["version"] = "v2026.1"
-    app.jinja_env.globals["publish_date"] = "March 22, 2026"
+    app.jinja_env.globals["version"] = "v2026.2"
+    app.jinja_env.globals["publish_date"] = "May 27, 2026"
 
     app.jinja_env.globals["get_cache_status"] = get_global_cache_status
 
@@ -7154,6 +8113,7 @@ if __name__ == '__main__':
     
     migrate_data_from_separate_dbs()
     init_db(DB_PATH)
+    refresh_hsts_setting()
     migrate_schema("logo_filename TEXT")
     migrate_schema("logo_width INTEGER")
     migrate_schema("recipient_display_name TEXT DEFAULT 'email'")

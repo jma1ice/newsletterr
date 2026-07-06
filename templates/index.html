@@ -5,7 +5,7 @@
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h1 id="welcome-message">{% if username != "" %}welcome, {{ username }}!{% else %}newsletterr dashboard{% endif %}</h1>
         <button id="sendEmailBtn" class="btn btn-success btn-lg px-5 py-3" style="font-size: 1.6rem; font-weight: 700; min-width: 220px; box-shadow: 0 4px 8px rgba(0,0,0,0.2);">
-            📧 Send Email
+            Send Email
         </button>
     </div>
     <p id="alert_p" style="display: none; color: #01b301; text-shadow: 1px 0 #000, 0 1px #000, -1px 0 #000, 0 -1px #000;">{{ alert or '' }}</p>
@@ -17,7 +17,7 @@
                     <td id="config-row" style="width: 20%; padding: 10px; vertical-align: top;">
                         <form method="POST" id="stats_form">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token }} " />
-                            <label for="items_to_pull">Recently Added Items (#):</label>
+                            <label for="items_to_pull" id="items_to_pull_label">Recently Added Items {% if settings.get('recently_added_mode') == 'days' %}(days){% else %}(items){% endif %}:</label>
                             <input type="number" id="items_to_pull" name="items_to_pull" value="10" style="width: 8.5rem; margin-bottom: 8px;" /><br>
                             <label for="days_to_pull">Time Range (days):</label>
                             <input type="number" id="days_to_pull" name="days_to_pull" value="30" /><br>
@@ -117,6 +117,13 @@
                             <button id="pullRecsBtn" class="button">Get Recommendations</button>
                         {% endif %}
                         <p>Note, recommendations take 20-25 seconds per user. After getting stats/users with the top button, recommendations will be pulled for users in the BCC list.</p>
+
+                        {% if not user_dict %}
+                            <button id="pullMusicseerrBtn" class="button opacity-50 cursor-not-allowed" disabled>Get Musicseerr Stats</button>
+                        {% else %}
+                            <button id="pullMusicseerrBtn" class="button">Get Musicseerr Stats</button>
+                        {% endif %}
+                        <p>Pulls per-user "year in music" wrapped stats and server-wide stats from Musicseerr for users in the BCC list.</p>
 
                         <form method="POST" action="/send_email" style="margin-top: 0;">
                             Subject: <input type="text" name="subject" id="subject" placeholder="Subject"
@@ -233,6 +240,19 @@
                                     <div id="recs-user-list" class="row"></div>
                                 {% endif %}
                             </div>
+                        </div>
+
+                        <div class="row mt-3" id="musicseerr-col">
+                            {% if musicseerr_wrapped_json or musicseerr_server_json %}
+                                <div class="col-md-6">
+                                    <h2>Musicseerr Wrapped</h2>
+                                    <div id="musicseerr-user-list" class="row"></div>
+                                </div>
+                                <div class="col-md-6">
+                                    <h2>Musicseerr Server Stats</h2>
+                                    <div id="musicseerr-server-list" class="row"></div>
+                                </div>
+                            {% endif %}
                         </div>
 
                         <div class="row mt-4">
@@ -426,7 +446,12 @@
                                                                     {% elif stat.stat_title == "Most Active Platforms" %}
                                                                         <td>{{ row.platform }}</td>
                                                                     {% else %}
-                                                                        <td>{{ row.title }}</td>
+                                                                        <td>
+                                                                            {% if settings.get('stat_cover_art') == 'enabled' and row.thumb %}
+                                                                                <img src="/proxy-art{{ row.thumb }}" style="height:38px;width:auto;border-radius:3px;margin-right:7px;vertical-align:middle;">
+                                                                            {% endif %}
+                                                                            {{ row.title }}
+                                                                        </td>
                                                                     {% endif %}
 
                                                                     {% if stat.stat_title == "Most Active Libraries" or stat.stat_title == "Most Active Users" or stat.stat_title == "Most Active Platforms" or stat.stat_title == "Most Concurrent Streams" %}
@@ -492,6 +517,15 @@
                             {% if recommendations_json %}
                                 <div class="card my-4">
                                     <div class="card-header bg-primary">Recommendations</div>
+                                    <div class="card-body"></div>
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <div id="musicseerr-preview" class="mt-3" style="display: none;">
+                            {% if musicseerr_wrapped_json or musicseerr_server_json %}
+                                <div class="card my-4">
+                                    <div class="card-header bg-primary">Musicseerr Wrapped</div>
                                     <div class="card-body"></div>
                                 </div>
                             {% endif %}
@@ -794,6 +828,7 @@
                     const logoFilename = "{{ settings.logo_filename }}";
                     const logoWidth = "{{ settings.logo_width }}";
                     const customLogoFilename = "{{ settings.custom_logo_filename }}"
+                    const logoPosition = "{{ settings.get('logo_position', 'center') }}";
                     const themedCSS = getThemedEmailCSS();
 
                     let contentHTML = "";
@@ -852,6 +887,10 @@
                             contentHTML += buildRecentlyAddedPreviewHTML(item.raLibrary);
                         } else if (item.type === 'recommendations') {
                             contentHTML += buildRecommendationsPreviewHTML(item.userKey);
+                        } else if (item.type === 'musicseerr_wrapped') {
+                            contentHTML += buildMusicseerrWrappedPreviewHTML(item.userKey);
+                        } else if (item.type === 'musicseerr_server_stats') {
+                            contentHTML += buildMusicseerrServerStatsPreviewHTML();
                         } else if (item.type === 'collection_group') {
                             if (item.collections && item.collections.length > 0) {
                                 const stableGroupId = item.id || `group-${itemIndex}`;
@@ -864,7 +903,7 @@
                         }
                     }
 
-                    const completeHTML = buildPreviewEmailHTML(contentHTML, serverName, subject, emailHeaderTitle, logoFilename, logoWidth, customLogoFilename, themedCSS);
+                    const completeHTML = buildPreviewEmailHTML(contentHTML, serverName, subject, emailHeaderTitle, logoFilename, logoWidth, customLogoFilename, themedCSS, logoPosition);
                     
                     const frame = document.getElementById('preview');
                     if (!frame) {
@@ -1231,6 +1270,17 @@
         </script>
         <script nonce="{{ nonce }}">
             let selectedItems = [];
+            const hideGraphPlayCounts = {{ 'true' if settings.get('hide_graph_play_counts') == 'enabled' else 'false' }};
+            const statType = "{{ settings.get('stats_type', 'plays') }}";
+            const recentlyAddedMode = "{{ settings.get('recently_added_mode', 'items') }}";
+            const raGridColumns = parseInt("{{ settings.get('ra_grid_columns', '5') }}") || 5;
+            const recsGridColumns = parseInt("{{ settings.get('recs_grid_columns', '5') }}") || 5;
+            const showStatCoverArt = "{{ settings.get('stat_cover_art', 'disabled') }}" === "enabled";
+            const _defaultIntroText = {{ settings.default_intro_text | tojson }} || '';
+            const _defaultOutroText = {{ settings.default_outro_text | tojson }} || '';
+            const _serverNameForDefaults = "{{ settings.server_name }}";
+            const _resolvedIntroDefault = _defaultIntroText || `You are receiving this email because you are a member of ${_serverNameForDefaults}.`;
+            const _resolvedOutroDefault = _defaultOutroText || 'Thanks for using Plex and for reading this newsletterr email!';
             let statsList = [];
             try {
                 statsList = JSON.parse('{{ stats | tojson | safe if stats else "[]" }}');
@@ -1293,7 +1343,8 @@
                 
                 function getStatCells(title, row) {
                     const cells = [];
-                    
+                    const coverArtTypes = ["Most Watched Movies", "Most Watched TV Shows", "Most Popular Movies", "Most Popular TV Shows", "Most Played Artists", "Most Popular Artists", "Recently Watched"];
+
                     if (title === "Most Active Libraries") {
                         cells.push(row.section_name || '');
                     } else if (title === "Most Active Users") {
@@ -1301,7 +1352,12 @@
                     } else if (title === "Most Active Platforms") {
                         cells.push(row.platform || '');
                     } else {
-                        cells.push(row.title || '');
+                        let titleCell = row.title || '';
+                        if (showStatCoverArt && coverArtTypes.includes(title) && (row.thumb || row.grandparent_thumb)) {
+                            const thumbPath = row.thumb || row.grandparent_thumb;
+                            titleCell = `<img src="/proxy-art${thumbPath}" style="height:38px;width:auto;border-radius:3px;margin-right:7px;vertical-align:middle;">${titleCell}`;
+                        }
+                        cells.push(titleCell);
                     }
                     
                     const skipYearStats = ["Most Active Libraries", "Most Active Users", "Most Active Platforms", "Most Concurrent Streams"];
@@ -1422,7 +1478,8 @@
                             title: { text: commandInfo.name + ' - Last ' + currentTimeRange + ' days' },
                             exporting: { enabled: true },
                             xAxis: { categories: graphData.categories },
-                            yAxis: { title: { text: 'Plays' } },
+                            yAxis: { title: { text: hideGraphPlayCounts ? null : (statType === 'duration' ? 'Duration' : 'Plays') }, labels: { enabled: !hideGraphPlayCounts } },
+                            tooltip: hideGraphPlayCounts ? { enabled: false } : {},
                             series: graphData.series
                         });
                         
@@ -1626,12 +1683,21 @@
                     return cardContent;
                 }).join('');
                 
+                const raCount = parseInt(document.getElementById('items_to_pull')?.value || '10');
+                let raTitle;
+                if (recentlyAddedMode === 'days' && raCount) {
+                    const sinceDate = new Date(Date.now() - raCount * 864e5);
+                    const mm = sinceDate.getMonth() + 1, dd = sinceDate.getDate(), yy = String(sinceDate.getFullYear()).slice(-2);
+                    raTitle = (libraryFilter ? `Added to ${libraryFilter}` : 'Recently Added') + ` since ${mm}/${dd}/${yy}`;
+                } else {
+                    raTitle = `Recently Added${libraryFilter ? ` - ${libraryFilter}` : ''}`;
+                }
                 return `
                     <div class="recently-added">
-                        <h2>Recently Added${libraryFilter ? ` - ${libraryFilter}` : ''}</h2>
+                        <h2>${raTitle}</h2>
                         <div style="
                             display: grid;
-                            grid-template-columns: repeat(5, 1fr);
+                            grid-template-columns: repeat(${raGridColumns}, 1fr);
                             gap: 12px;
                             margin: 15px auto 0 auto;
                             padding: 0;
@@ -1679,6 +1745,74 @@
                         ${sectionsHTML}
                     </div>
                 `;
+            }
+
+            function buildWrappedRankedListHTML(title, items, labelFn) {
+                if (!items || !items.length) return '';
+                const rows = items.map((item, i) => `
+                    <li style="margin: 4px 0; color: var(--email-text);">
+                        <strong>#${i + 1}</strong> ${labelFn(item)}
+                        <span style="color: var(--email-muted); font-size: 0.85em;"> — ${item.listen_count} plays</span>
+                    </li>`).join('');
+                return `
+                    <div style="margin-bottom: 16px;">
+                        <h3 style="margin-bottom: 6px; color: var(--email-text);">${title}</h3>
+                        <ol style="padding-left: 20px; margin: 0;">${rows}</ol>
+                    </div>`;
+            }
+
+            function buildMusicseerrWrappedPreviewHTML(userKey) {
+                const data = musicseerrWrappedPayload && userKey ? musicseerrWrappedPayload[userKey] : null;
+                if (!data || !data.has_data) {
+                    return `<div class="musicseerr-wrapped-block"><p style="text-align: center; color: var(--email-muted); padding: 20px;">No Musicseerr wrapped stats available for this user</p></div>`;
+                }
+
+                const userDisplay = getUserDisplayName(userKey);
+                const sections = [
+                    buildWrappedRankedListHTML('Top Artists', data.top_artists, a => a.name),
+                    buildWrappedRankedListHTML('Top Tracks', data.top_tracks, t => `${t.name} — ${t.artist_name}`),
+                    buildWrappedRankedListHTML('Top Albums', data.top_albums, al => `${al.name} — ${al.artist_name}`),
+                    buildWrappedRankedListHTML('Top Genres', data.top_genres, g => g.genre),
+                ].join('');
+
+                return `
+                    <div class="musicseerr-wrapped-block" style="padding: 0;" data-wrapped-user="${userKey}">
+                        <h2 style="text-align: center; margin-top: 0; margin-bottom: 10px; color: var(--email-text);">
+                            ${userDisplay}'s ${data.year} Wrapped
+                        </h2>
+                        <p style="text-align: center; color: var(--email-muted); margin-bottom: 16px;">
+                            ~${data.total_listens_estimated} plays tracked &bull; ${data.loved_tracks_count} loved tracks
+                        </p>
+                        ${sections}
+                    </div>`;
+            }
+
+            function buildMusicseerrServerStatsPreviewHTML() {
+                const data = musicseerrServerPayload;
+                if (!data) {
+                    return `<div class="musicseerr-server-block"><p style="text-align: center; color: var(--email-muted); padding: 20px;">No Musicseerr server stats available</p></div>`;
+                }
+
+                const leaderboardHTML = buildWrappedRankedListHTML(
+                    'Top Listeners', data.leaderboard, entry => entry.display_name
+                );
+                const topArtist = data.top_artist_sitewide
+                    ? `<p style="color: var(--email-text);"><strong>Top Artist:</strong> ${data.top_artist_sitewide.name} (${data.top_artist_sitewide.listen_count} plays)</p>` : '';
+                const topAlbum = data.top_album_sitewide
+                    ? `<p style="color: var(--email-text);"><strong>Top Album:</strong> ${data.top_album_sitewide.name} — ${data.top_album_sitewide.artist_name} (${data.top_album_sitewide.listen_count} plays)</p>` : '';
+
+                return `
+                    <div class="musicseerr-server-block" style="padding: 0;">
+                        <h2 style="text-align: center; margin-top: 0; margin-bottom: 10px; color: var(--email-text);">
+                            Server Stats — ${data.year}
+                        </h2>
+                        <p style="text-align: center; color: var(--email-muted); margin-bottom: 16px;">
+                            ~${data.total_listens_estimated} plays across ${data.total_users_tracked} listeners
+                        </p>
+                        ${topArtist}
+                        ${topAlbum}
+                        ${leaderboardHTML}
+                    </div>`;
             }
 
             function buildRecommendationsSectionHTML(availableItems, unavailableItems, title) {
@@ -1807,7 +1941,7 @@
                         <h3 style="color: var(--email-text); margin-bottom: 5px; padding-bottom: 0;">${title}</h3>
                         <div style="
                             display: grid;
-                            grid-template-columns: repeat(5, 1fr);
+                            grid-template-columns: repeat(${recsGridColumns}, 1fr);
                             gap: 12px;
                             padding: 0;
                             margin: 0 auto 0 auto;
@@ -2255,7 +2389,7 @@
                 `;
             }
 
-            function buildPreviewEmailHTML(contentHTML, serverName, subject, emailHeaderTitle, logoFilename, logoWidth, customLogoFilename, themedCSS) {
+            function buildPreviewEmailHTML(contentHTML, serverName, subject, emailHeaderTitle, logoFilename, logoWidth, customLogoFilename, themedCSS, logoPosition) {
                 let logoHTML = "";
                 let logoSrc = "";
                 if (logoFilename && logoWidth) {
@@ -2264,7 +2398,9 @@
                     } else {
                         logoSrc = `/static/img/${logoFilename}`;
                     }
-                    logoHTML = `<img src="${logoSrc}" alt="${serverName}" class="email-logo" style="max-width: ${logoWidth}px; width: auto; height: auto;">`;
+                    const _ml = logoPosition === 'left' ? '0' : 'auto';
+                    const _mr = logoPosition === 'right' ? '0' : 'auto';
+                    logoHTML = `<img src="${logoSrc}" alt="${serverName}" class="email-logo" style="max-width: ${logoWidth}px; width: auto; height: auto; display: block; margin-left: ${_ml}; margin-right: ${_mr};">`;
                 }
 
                 return `<!DOCTYPE html>
@@ -2375,7 +2511,8 @@
                                 enabled: true
                             },
                             xAxis: { categories: graphData.categories },
-                            yAxis: { title: { text: 'Plays' } },
+                            yAxis: { title: { text: hideGraphPlayCounts ? null : (statType === 'duration' ? 'Duration' : 'Plays') }, labels: { enabled: !hideGraphPlayCounts } },
+                            tooltip: hideGraphPlayCounts ? { enabled: false } : {},
                             series: graphData.series
                         });
 
@@ -3138,7 +3275,8 @@
                                 title: { text: graphCommands[index].name + ' - Last ' + currentTimeRange + ' days' },
                                 exporting: { enabled: true },
                                 xAxis: { categories: graphData.categories },
-                                yAxis: { title: { text: 'Plays' } },
+                                yAxis: { title: { text: hideGraphPlayCounts ? null : (statType === 'duration' ? 'Duration' : 'Plays') }, labels: { enabled: !hideGraphPlayCounts } },
+                                tooltip: hideGraphPlayCounts ? { enabled: false } : {},
                                 series: graphData.series
                             });
 
@@ -3188,7 +3326,8 @@
                             title: { text: graphCommands[index].name },
                             exporting: { enabled: true },
                             xAxis: { categories: graphData.categories },
-                            yAxis: { title: { text: 'Plays' } },
+                            yAxis: { title: { text: hideGraphPlayCounts ? null : (statType === 'duration' ? 'Duration' : 'Plays') }, labels: { enabled: !hideGraphPlayCounts } },
+                            tooltip: hideGraphPlayCounts ? { enabled: false } : {},
                             series: graphData.series
                         });
 
@@ -3362,7 +3501,7 @@
                 textBlockCounter++;
                 const textBlockId = `intro-block-${textBlockCounter}`;
                 const serverName = "{{ settings.server_name }}";
-                const introContent = `You are receiving this email because you are a member of ${serverName}.`;
+                const introContent = {{ settings.default_intro_text | tojson }} || `You are receiving this email because you are a member of ${serverName}.`;
                 const displayName = 'Intro: Member message';
                 
                 if (addItem(textBlockId, displayName, 'textblock')) {
@@ -3378,7 +3517,7 @@
             function createOutroBlock() {
                 textBlockCounter++;
                 const textBlockId = `outro-block-${textBlockCounter}`;
-                const outroContent = 'Thanks for using Plex and for reading this newsletterr email!';
+                const outroContent = {{ settings.default_outro_text | tojson }} || 'Thanks for using Plex and for reading this newsletterr email!';
                 const displayName = 'Outro: Thank you message';
                 
                 if (addItem(textBlockId, displayName, 'textblock')) {
@@ -3459,7 +3598,9 @@
                     btn.classList.contains('add-stat-btn') ||
                     btn.classList.contains('add-graph-btn') ||
                     btn.classList.contains('ra-add-btn') ||
-                    btn.classList.contains('recs-add-btn');
+                    btn.classList.contains('recs-add-btn') ||
+                    btn.classList.contains('musicseerr-add-btn') ||
+                    btn.classList.contains('musicseerr-server-add-btn');
 
                 if (!isAdd) return;
 
@@ -3473,7 +3614,7 @@
                 if (type === 'recently added' && btn.dataset.lib) {
                     extra.raLibrary = btn.dataset.lib;
                 }
-                if (type === 'recommendations') {
+                if (type === 'recommendations' || type === 'musicseerr_wrapped') {
                     if (btn.dataset.userKey) extra.userKey = btn.dataset.userKey;
                 }
                 if (type === 'graph') {
@@ -3502,6 +3643,12 @@
         <script id="recommendations-json" type="application/json" nonce="{{ nonce }}">
             {{ recommendations_json | tojson | safe }}
         </script>
+        <script id="musicseerr-wrapped-json" type="application/json" nonce="{{ nonce }}">
+            {{ (musicseerr_wrapped_json or {}) | tojson | safe }}
+        </script>
+        <script id="musicseerr-server-json" type="application/json" nonce="{{ nonce }}">
+            {{ (musicseerr_server_json or none) | tojson | safe }}
+        </script>
         <script nonce="{{ nonce }}">
             function readJSONFromScript(id) {
                 const el = document.getElementById(id);
@@ -3517,6 +3664,8 @@
             }
 
             let recsPayload = readJSONFromScript('recommendations-json');
+            let musicseerrWrappedPayload = readJSONFromScript('musicseerr-wrapped-json');
+            let musicseerrServerPayload = readJSONFromScript('musicseerr-server-json');
             let userDict = JSON.parse('{{ user_dict | tojson | safe }}') || {};
 
             let usersFullData = JSON.parse('{{ users_full_data | tojson | safe if users_full_data else "[]" }}');
@@ -3741,6 +3890,61 @@
                 });
             };
             buildRecsUserRows();
+
+            function buildWrappedUserRows() {
+                musicseerrWrappedPayload = readJSONFromScript('musicseerr-wrapped-json');
+                const host = document.getElementById('musicseerr-user-list');
+                if (!host) return;
+                host.innerHTML = '';
+
+                const users = Object.keys(musicseerrWrappedPayload || {}).filter(Boolean).sort();
+
+                users.forEach(userKey => {
+                    const display = userDict[userKey] || userKey;
+                    const id = `musicseerr-user-${slug(display)}`;
+
+                    const row = document.createElement('div');
+                    row.className = 'col-12 mb-2';
+                    row.innerHTML = `
+                        <div class="d-flex justify-content-between align-items-center p-2 border rounded">
+                            <span style="font-size: .9rem;">${display}</span>
+                            <div>
+                                <button type="button"
+                                        class="btn button btn-sm musicseerr-add-btn"
+                                        data-type="musicseerr_wrapped" data-id="${id}"
+                                        data-name="Wrapped: ${display}"
+                                        data-user-key="${userKey}"
+                                        style="font-size: .8rem; padding: .25rem .5rem;">Add</button>
+                            </div>
+                        </div>`;
+                    host.appendChild(row);
+                });
+            };
+            buildWrappedUserRows();
+
+            function buildMusicseerrServerRow() {
+                musicseerrServerPayload = readJSONFromScript('musicseerr-server-json');
+                const host = document.getElementById('musicseerr-server-list');
+                if (!host) return;
+                host.innerHTML = '';
+                if (!musicseerrServerPayload) return;
+
+                const row = document.createElement('div');
+                row.className = 'col-12 mb-2';
+                row.innerHTML = `
+                    <div class="d-flex justify-content-between align-items-center p-2 border rounded">
+                        <span style="font-size: .9rem;">Server Stats (${musicseerrServerPayload.year || ''})</span>
+                        <div>
+                            <button type="button"
+                                    class="btn button btn-sm musicseerr-server-add-btn"
+                                    data-type="musicseerr_server_stats" data-id="musicseerr-server-stats"
+                                    data-name="Musicseerr Server Stats"
+                                    style="font-size: .8rem; padding: .25rem .5rem;">Add</button>
+                        </div>
+                    </div>`;
+                host.appendChild(row);
+            };
+            buildMusicseerrServerRow();
         </script>
         <script nonce="{{ nonce }}">
             document.getElementById('pullRecsBtn').addEventListener('click', async () => {
@@ -3833,6 +4037,103 @@
                     const error_p= document.getElementById('error_p');
                     error_p.textContent = err;
                     alert("Something went wrong while pulling recommendations.");
+                } finally {
+                    try { hideSpinner(); } catch(_) {}
+                }
+            });
+        </script>
+        <script nonce="{{ nonce }}">
+            document.getElementById('pullMusicseerrBtn').addEventListener('click', async () => {
+                showSpinner('Pulling Musicseerr stats...');
+
+                function collectEmailsFromChips() {
+                    return Array.from(document.querySelectorAll('#bcc_chips .nl-chip'))
+                        .map(ch => ch.dataset.email)
+                        .filter(Boolean);
+                }
+
+                const chipInput = document.getElementById('email_chip_input');
+                    if (chipInput && chipInput.value.trim()) {
+                        chipInput.dispatchEvent(new Event('blur'));
+                }
+
+                const toList = collectEmailsFromChips();
+                    if (!toList.length) {
+                        alert('Please add at least one recipient.');
+                        return;
+                }
+
+                const to_emails = toList.join(', ');
+
+                const payload = {
+                    stats: statsList,
+                    user_dict: userDict,
+                    graph_data: graphDataList,
+                    graph_commands: graphCommands,
+                    recent_data: recentPayload,
+                    libs: JSON.parse('{{ libs | tojson | safe }}'),
+                    settings: JSON.parse('{{ settings | tojson | safe }}'),
+                    to_emails
+                };
+
+                try {
+                    const resp = await fetch('/pull_musicseerr_stats', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'text/html',
+                            'X-CSRF-Token': '{{ csrf_token }}',
+                        },
+                        body: JSON.stringify(payload),
+                        credentials: 'same-origin'
+                    });
+
+                    if (!resp.ok) throw new Error('Error pulling Musicseerr stats.');
+
+                    const html = await resp.text();
+                    const doc = new DOMParser().parseFromString(html, 'text/html');
+
+                    const oldCacheCard = document.getElementById('cache-card');
+                    const newCacheCard = doc.getElementById('cache-card');
+                    oldCacheCard.replaceWith(newCacheCard);
+
+                    const oldMsCol = document.getElementById('musicseerr-col');
+                    const newMsCol = doc.getElementById('musicseerr-col');
+                    oldMsCol.replaceWith(newMsCol);
+
+                    const oldMsPreview = document.getElementById('musicseerr-preview');
+                    const newMsPreview = doc.getElementById('musicseerr-preview');
+                    oldMsPreview.replaceWith(newMsPreview);
+
+                    const oldAlertP = document.getElementById('alert_p');
+                    const newAlertP = doc.getElementById('alert_p');
+                    if (oldAlertP && newAlertP) {
+                        newAlertP.style.display = '';
+                        oldAlertP.replaceWith(newAlertP);
+                    }
+
+                    const oldErrorP = document.getElementById('error_p');
+                    const newErrorP = doc.getElementById('error_p');
+                    if (oldErrorP && newErrorP) {
+                        newErrorP.style.display = '';
+                        oldErrorP.replaceWith(newErrorP);
+                    }
+
+                    const oldWrappedData = document.getElementById('musicseerr-wrapped-json');
+                    const newWrappedData = doc.getElementById('musicseerr-wrapped-json');
+                    if (newWrappedData && oldWrappedData) oldWrappedData.replaceWith(newWrappedData);
+
+                    const oldServerData = document.getElementById('musicseerr-server-json');
+                    const newServerData = doc.getElementById('musicseerr-server-json');
+                    if (newServerData && oldServerData) oldServerData.replaceWith(newServerData);
+
+                    buildWrappedUserRows();
+                    buildMusicseerrServerRow();
+                } catch (err) {
+                    console.error("Error pulling Musicseerr stats:", err);
+                    const error_p = document.getElementById('error_p');
+                    error_p.textContent = err;
+                    alert("Something went wrong while pulling Musicseerr stats.");
                 } finally {
                     try { hideSpinner(); } catch(_) {}
                 }
@@ -4454,7 +4755,7 @@
                     
                     document.getElementById('delete-template-btn').style.display = 'none';
                     
-                    document.querySelectorAll('.add-stat-btn, .add-graph-btn, .ra-add-btn, .recs-add-btn').forEach(btn => {
+                    document.querySelectorAll('.add-stat-btn, .add-graph-btn, .ra-add-btn, .recs-add-btn, .musicseerr-add-btn, .musicseerr-server-add-btn').forEach(btn => {
                         btn.textContent = 'Add';
                         btn.classList.remove('btn-success');
                         btn.classList.add('button');
@@ -4474,17 +4775,21 @@
 
             async function saveCurrentTemplate(name) {
                 try {
+                    const _sentinelContent = (item) => {
+                        const raw = getTextBlockContent(item.id) || '';
+                        if (item.id.startsWith('intro-block-') && raw === _resolvedIntroDefault) return '__DEFAULT_INTRO__';
+                        if (item.id.startsWith('outro-block-') && raw === _resolvedOutroDefault) return '__DEFAULT_OUTRO__';
+                        return raw;
+                    };
+
                     const textBlocks = selectedItems
                         .filter(item => item.type === 'textblock' || item.type === 'titleblock' || item.type === 'headerblock')
-                        .map(item => getTextBlockContent(item.id))
+                        .map(item => _sentinelContent(item))
                         .filter(content => content.trim().length > 0);
-                    
+
                     const itemsWithContent = selectedItems.map(item => {
                         if (item.type === 'textblock' || item.type === 'titleblock' || item.type === 'headerblock') {
-                            return {
-                                ...item,
-                                content: getTextBlockContent(item.id) || ''
-                            };
+                            return { ...item, content: _sentinelContent(item) };
                         }
                         return item;
                     });
@@ -4543,7 +4848,7 @@
 
                     selectedItems = [];
                     
-                    document.querySelectorAll('.add-stat-btn, .add-graph-btn, .ra-add-btn, .recs-add-btn').forEach(btn => {
+                    document.querySelectorAll('.add-stat-btn, .add-graph-btn, .ra-add-btn, .recs-add-btn, .musicseerr-add-btn, .musicseerr-server-add-btn').forEach(btn => {
                         btn.textContent = 'Add';
                         btn.classList.remove('btn-success');
                         btn.classList.add('button');
@@ -4611,7 +4916,8 @@
                                             enabled: true
                                         },
                                         xAxis: { categories: graphData.categories },
-                                        yAxis: { title: { text: 'Plays' } },
+                                        yAxis: { title: { text: hideGraphPlayCounts ? null : (statType === 'duration' ? 'Duration' : 'Plays') }, labels: { enabled: !hideGraphPlayCounts } },
+                                        tooltip: hideGraphPlayCounts ? { enabled: false } : {},
                                         series: graphData.series
                                     });
 
@@ -4646,7 +4952,10 @@
                     setTimeout(() => {
                         selectedItems.forEach(item => {
                             if ((item.type === 'textblock' || item.type === 'titleblock' || item.type === 'headerblock') && item.content) {
-                                setTextBlockContent(item.id, item.content);
+                                let content = item.content;
+                                if (content === '__DEFAULT_INTRO__') content = _resolvedIntroDefault;
+                                else if (content === '__DEFAULT_OUTRO__') content = _resolvedOutroDefault;
+                                setTextBlockContent(item.id, content);
                             }
                         });
                         updatePreview();

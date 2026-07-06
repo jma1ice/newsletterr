@@ -160,32 +160,21 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 
 ## Planned Changes
 
-### For the v2026.2 sprint, these items are to be addressed:
+### For the v2026.3 sprint, these items are to be addressed:
+* Fix ra/recs card differing width issues
+* Add a 'pop-up blocked' to index for `save_template()` and similar
 * Some email clients show posters as small slivers instead of whole poster
 * Contributor area on about page can start clipping out on lower size screens
 * API fields in settings should be a password field
 * Update Plex authentication for PlexAPI v0.31.1 (plexapi.plex no longer supported)
 * Email click for recently added/available recommendations is going to browser on mobile instead of Plex app - this is an issue with the new Plex client, have not seen a fix yet and no info released by Plex at this time
 
-#### And these items are feature requests:
+### And these items are feature requests:
 --- Settings ---
-* Add sections to settings page (email server | external services | email styling | login page)
-* Keep settings details on error so user won't have to re-enter them
-* Test api button
-* Setting for custom intro/outro text so custom does not have to be set every time
-* Add HSTS option in settings
-* Option for small cover art of each item in a stat table
-* Setting to choose duration or play counts for stats/graphs
-* Setting to hide play counts in stats/graphs
-* Option to pull recently added by # of days - when this is in should be able to show 'new items since x date' in email
-* Option to sort recently added by IMDb rating (when pulled by days)
-* Option in settings for width of RA/Recs grids
-* Logo positioning setting
-* Add in To: vs BCC: option
-* Option to use or not use [SCHEDULED] in scheduled email subject
+* RA by days not implemented in 'new schedule creator'
 
 --- Integrations ---
- -- GitHub / Discord --
+ -- newsletterr GitHub / Discord --
 * GitHub webhook to pull submitted issues to Discord channel
 * Ko-fi -> Discord integration for contributor role
 * Export logs button | link to discord
@@ -206,10 +195,36 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Make collections clickable - is this possible?
 * More mobile CSS optimizations
 * Discord text should be stylized logo to match GitHub
+* Can Snap-Ins work with custom HTML?
+* Settings submit should audit the external tools api test
+* Does this work with Emby/Jellyfin?
 
 ---
 
 ## Recent Changes
+
+### v2026.2:
+
+#### Fixed:
+* Fixed issue where fresh setup `migrate_email_templates_for_header_title()` calls for `server_name` failed creating a missing `email_header_title` column
+
+#### New Features:
+* Added sections to settings page (email server | external services | data settings | email styling | email body defaults | security)
+* Settings changes are now kept on error so user won't have to re-enter them
+* Added test api buttons for conjurr and tautulli
+* Added setting for custom intro/outro text
+* Added HSTS option in security settings
+* Added option to use or not use [SCHEDULED] in scheduled email subject
+* Added setting for logo positioning
+* Added setting to hide play counts in stats and graphs
+* Added setting to choose if duration or play counts is used for stats/graphs
+* Added an option to pull recently added by # of days. When this is used, "Recently Added" snap-in header now shows 'Added since X date'
+* Added option to sort recently added by rating
+* Added option for item width of recently added and recommendations grids
+* Added option for small cover art of each item in stats tables
+* Added To: vs BCC: option for email send
+* Added option for setting max image heights to reduce email size
+
 
 ### v2026.1:
 
@@ -240,36 +255,6 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Added snap-ins for images/gifs
 * Added emoji support to various Text Block Snap-ins
 * Pop out preview now updates with changes to the email
-
-
-### v2025.2.1:
-
-#### Fixed:
-* Fixed small issue with expanded collections not showing in received email if the Collection Group name is changed
-
-#### New Features:
-* Added a collapse UI button to expanded collections that leaves the collection expanded in the email but preserves space in the Snap-Ins UI
-
-
-### v2025.2:
-
-#### Fixed:
-
-#### New Features:
-* Added 'Expand' option on collections to switch to showing items in collection
-* Require CSRF token when POSTing to routes
-* Login page for self hosting
-* Safe 'get' function replaced requests.get
-
-
-### v2025.1
-
-#### Fixed:
-* Added a wait for certain variables in schedule sender that was affecting some users
-* A lot of logic moved into if/main to prep for exe release
-
-#### New Features:
-* Compiled EXE and ELF files
 
 ---
 

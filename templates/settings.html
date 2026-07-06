@@ -161,19 +161,19 @@
                         </div>
 
                         <hr>
-                        <h6 class="text-uppercase" style="font-size: 0.75rem; letter-spacing: 0.05em;">Musicseerr</h6>
-                        <label for="musicseerr_url">Musicseerr Base URL (Optional - for year-in-review stats):</label><br>
-                        <input type="text" id="musicseerr_url" name="musicseerr_url"
-                            {% if settings.musicseerr_url != "" %}value="{{ settings.musicseerr_url }}"{% endif %}
+                        <h6 class="text-uppercase" style="font-size: 0.75rem; letter-spacing: 0.05em;">DroppedNeedle</h6>
+                        <label for="droppedneedle_url">DroppedNeedle Base URL (Optional - for year-in-review stats):</label><br>
+                        <input type="text" id="droppedneedle_url" name="droppedneedle_url"
+                            {% if settings.droppedneedle_url != "" %}value="{{ settings.droppedneedle_url }}"{% endif %}
                             placeholder="http://localhost:8688"><br><br>
 
-                        <label for="musicseerr_api_key">Musicseerr Wrapped API Key:</label><br>
-                        <input type="text" id="musicseerr_api_key" name="musicseerr_api_key"
-                            {% if settings.musicseerr_api_key != "" %}value="{{ settings.musicseerr_api_key }}"{% endif %}
-                            placeholder="Matches WRAPPED_API_KEY in Musicseerr"><br>
+                        <label for="droppedneedle_api_key">DroppedNeedle Wrapped API Key:</label><br>
+                        <input type="text" id="droppedneedle_api_key" name="droppedneedle_api_key"
+                            {% if settings.droppedneedle_api_key != "" %}value="{{ settings.droppedneedle_api_key }}"{% endif %}
+                            placeholder="Matches WRAPPED_API_KEY in DroppedNeedle"><br>
                         <div style="margin-top: 6px; margin-bottom: 16px; display: flex; align-items: center; gap: 10px;">
-                            <button type="button" id="test_musicseerr" class="btn button btn-sm">Test Connection</button>
-                            <span id="musicseerr_test_result" style="font-size: 0.875rem;"></span>
+                            <button type="button" id="test_droppedneedle" class="btn button btn-sm">Test Connection</button>
+                            <span id="droppedneedle_test_result" style="font-size: 0.875rem;"></span>
                         </div>
 
                         <label for="recipient_display_name">Recipient Display Name (used in recommendation emails):</label><br>
@@ -892,11 +892,11 @@
         }, 'conjurr_test_result', 'test_conjurr');
     });
 
-    document.getElementById('test_musicseerr')?.addEventListener('click', () => {
-        runConnectionTest('/api/test/musicseerr', {
-            url: document.getElementById('musicseerr_url').value.trim(),
-            api_key: document.getElementById('musicseerr_api_key').value.trim()
-        }, 'musicseerr_test_result', 'test_musicseerr');
+    document.getElementById('test_droppedneedle')?.addEventListener('click', () => {
+        runConnectionTest('/api/test/droppedneedle', {
+            url: document.getElementById('droppedneedle_url').value.trim(),
+            api_key: document.getElementById('droppedneedle_api_key').value.trim()
+        }, 'droppedneedle_test_result', 'test_droppedneedle');
     });
 </script>
 

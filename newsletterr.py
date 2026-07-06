@@ -355,7 +355,7 @@ def init_db(db_path):
 
     cursor.execute("PRAGMA table_info(settings)")
     columns = [column[1] for column in cursor.fetchall()]
-    for col_name, col_def in [('default_intro_text', 'TEXT DEFAULT ""'), ('default_outro_text', 'TEXT DEFAULT ""'), ('hsts_enabled', 'TEXT DEFAULT "disabled"'), ('scheduled_subject_prefix', 'TEXT DEFAULT "enabled"'), ('logo_position', 'TEXT DEFAULT "center"'), ('hide_stat_play_counts', 'TEXT DEFAULT "disabled"'), ('hide_graph_play_counts', 'TEXT DEFAULT "disabled"'), ('stats_type', 'TEXT DEFAULT "plays"'), ('recently_added_mode', 'TEXT DEFAULT "items"'), ('recently_added_sort', 'TEXT DEFAULT "date"'), ('ra_grid_columns', 'TEXT DEFAULT "5"'), ('recs_grid_columns', 'TEXT DEFAULT "5"'), ('stat_cover_art', 'TEXT DEFAULT "disabled"'), ('send_mode', 'TEXT DEFAULT "bcc"'), ('poster_max_height', 'TEXT DEFAULT ""'), ('musicseerr_url', 'TEXT DEFAULT ""'), ('musicseerr_api_key', 'TEXT DEFAULT ""')]:
+    for col_name, col_def in [('default_intro_text', 'TEXT DEFAULT ""'), ('default_outro_text', 'TEXT DEFAULT ""'), ('hsts_enabled', 'TEXT DEFAULT "disabled"'), ('scheduled_subject_prefix', 'TEXT DEFAULT "enabled"'), ('logo_position', 'TEXT DEFAULT "center"'), ('hide_stat_play_counts', 'TEXT DEFAULT "disabled"'), ('hide_graph_play_counts', 'TEXT DEFAULT "disabled"'), ('stats_type', 'TEXT DEFAULT "plays"'), ('recently_added_mode', 'TEXT DEFAULT "items"'), ('recently_added_sort', 'TEXT DEFAULT "date"'), ('ra_grid_columns', 'TEXT DEFAULT "5"'), ('recs_grid_columns', 'TEXT DEFAULT "5"'), ('stat_cover_art', 'TEXT DEFAULT "disabled"'), ('send_mode', 'TEXT DEFAULT "bcc"'), ('poster_max_height', 'TEXT DEFAULT ""'), ('droppedneedle_url', 'TEXT DEFAULT ""'), ('droppedneedle_api_key', 'TEXT DEFAULT ""')]:
         if col_name not in columns:
             print(f"Adding {col_name} column to settings table...")
             cursor.execute(f'ALTER TABLE settings ADD COLUMN {col_name} {col_def}')
@@ -740,6 +740,38 @@ def migrate_schema(column_def):
         if not has_column:
             conn.execute(f"ALTER TABLE settings ADD COLUMN {column_def}")
             conn.commit()
+    finally:
+        conn.close()
+
+def migrate_musicseerr_to_droppedneedle():
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        cursor = conn.execute("PRAGMA table_info('settings')")
+        columns = [row[1] for row in cursor.fetchall()]
+        for old_col, new_col in [('musicseerr_url', 'droppedneedle_url'), ('musicseerr_api_key', 'droppedneedle_api_key')]:
+            if old_col in columns and new_col not in columns:
+                conn.execute(f"ALTER TABLE settings RENAME COLUMN {old_col} TO {new_col}")
+        conn.commit()
+
+        cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='email_templates'")
+        if cursor.fetchone():
+            cursor = conn.execute("SELECT id, selected_items FROM email_templates WHERE selected_items LIKE '%musicseerr%'")
+            for template_id, selected_json in cursor.fetchall():
+                try:
+                    items = json.loads(selected_json)
+                except json.JSONDecodeError:
+                    continue
+                changed = False
+                for item in items:
+                    if isinstance(item, dict) and item.get("type") in ("musicseerr_wrapped", "musicseerr_server_stats"):
+                        item["type"] = item["type"].replace("musicseerr", "droppedneedle")
+                        changed = True
+                if changed:
+                    conn.execute("UPDATE email_templates SET selected_items = ? WHERE id = ?", (json.dumps(items, ensure_ascii=False), template_id))
+            conn.commit()
+    except Exception as e:
+        print(f"Error migrating musicseerr columns to droppedneedle: {e}")
+        traceback.print_exc()
     finally:
         conn.close()
 
@@ -2107,8 +2139,8 @@ def run_conjurr_command(base_url, user_dict, error):
     return [recommendations_dict, error]
 
 
-def fetch_musicseerr_users(base_url, api_key):
-    """Returns {email_lower: musicseerr_user_id} for Musicseerr users with ListenBrainz linked."""
+def fetch_droppedneedle_users(base_url, api_key):
+    """Returns {email_lower: droppedneedle_user_id} for DroppedNeedle users with ListenBrainz linked."""
     try:
         response = safe_get(f"{base_url}/api/v1/wrapped/users", headers={'X-Wrapped-Api-Key': api_key})
         response.raise_for_status()
@@ -2122,27 +2154,22 @@ def fetch_musicseerr_users(base_url, api_key):
     }
 
 
-def run_musicseerr_command(base_url, api_key, user_dict, error):
-    """Mirrors run_conjurr_command's shape: fetches per-user Musicseerr wrapped stats,
-    matching newsletterr's {user_id: email} dict to Musicseerr users by email, and
-    returns {user_id: wrapped_payload} keyed the same way recommendations_dict is keyed
-    so it plugs into group_recipients_by_user() unmodified.
-    """
+def run_droppedneedle_command(base_url, api_key, user_dict, error):
     if not base_url:
-        return [{}, (error + ", " if error else "") + "Musicseerr Error: No Base URL provided"]
+        return [{}, (error + ", " if error else "") + "DroppedNeedle Error: No Base URL provided"]
     if not api_key:
-        return [{}, (error + ", " if error else "") + "Musicseerr Error: No API key provided"]
+        return [{}, (error + ", " if error else "") + "DroppedNeedle Error: No API key provided"]
 
-    email_to_musicseerr_id = fetch_musicseerr_users(base_url, api_key)
+    email_to_droppedneedle_id = fetch_droppedneedle_users(base_url, api_key)
     wrapped_dict = {}
 
     for user, email in user_dict.items():
-        musicseerr_id = email_to_musicseerr_id.get((email or '').strip().lower())
-        if not musicseerr_id:
+        droppedneedle_id = email_to_droppedneedle_id.get((email or '').strip().lower())
+        if not droppedneedle_id:
             continue
         try:
             response = safe_get(
-                f"{base_url}/api/v1/wrapped/user/{musicseerr_id}",
+                f"{base_url}/api/v1/wrapped/user/{droppedneedle_id}",
                 headers={'X-Wrapped-Api-Key': api_key},
             )
             response.raise_for_status()
@@ -2150,20 +2177,20 @@ def run_musicseerr_command(base_url, api_key, user_dict, error):
             if data.get('has_data'):
                 wrapped_dict[user] = data
         except requests.exceptions.RequestException as e:
-            error = (error + ", " if error else "") + f"Musicseerr Error: {e}"
+            error = (error + ", " if error else "") + f"DroppedNeedle Error: {e}"
 
     return [wrapped_dict, error]
 
 
-def fetch_musicseerr_server_stats(base_url, api_key):
+def fetch_droppedneedle_server_stats(base_url, api_key):
     if not base_url or not api_key:
-        return None, "Musicseerr Error: URL and API key are required"
+        return None, "DroppedNeedle Error: URL and API key are required"
     try:
         response = safe_get(f"{base_url}/api/v1/wrapped/server", headers={'X-Wrapped-Api-Key': api_key})
         response.raise_for_status()
         return response.json(), None
     except requests.exceptions.RequestException as e:
-        return None, f"Musicseerr Error: {e}"
+        return None, f"DroppedNeedle Error: {e}"
 
 
 def _norm(v: str):
@@ -3148,7 +3175,7 @@ def _wrapped_ranked_list_html(title, items, label_fn, theme_colors):
         f'</div>'
     )
 
-def build_musicseerr_wrapped_html_with_cids(wrapped_data, msg_root, theme_colors, user_emails=None, display_preference='email', users_full_data=None):
+def build_droppedneedle_wrapped_html_with_cids(wrapped_data, msg_root, theme_colors, user_emails=None, display_preference='email', users_full_data=None):
     if not wrapped_data:
         return ""
 
@@ -3203,7 +3230,7 @@ def build_musicseerr_wrapped_html_with_cids(wrapped_data, msg_root, theme_colors
 
     return '\n'.join(html_sections)
 
-def build_musicseerr_server_stats_html_with_cids(server_data, msg_root, theme_colors):
+def build_droppedneedle_server_stats_html_with_cids(server_data, msg_root, theme_colors):
     if not server_data:
         return ""
 
@@ -3914,7 +3941,7 @@ def attach_logo_image(msg_root, logo_filename, custom_logo_filename, base_url=""
         logo_url = f"/static/img/{logo_filename}"
     return fetch_and_attach_image(logo_url, msg_root, "logo", base_url)
 
-def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, display_preference, users_data, recommendations_data=None, user_dict=None, base_url="", target_user_key=None, is_scheduled=False, items_count=None, date_range="", expanded_collections=None, email_header_title=None, musicseerr_wrapped_data=None, musicseerr_server_data=None):
+def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, display_preference, users_data, recommendations_data=None, user_dict=None, base_url="", target_user_key=None, is_scheduled=False, items_count=None, date_range="", expanded_collections=None, email_header_title=None, droppedneedle_wrapped_data=None, droppedneedle_server_data=None):
     custom_html = template_data.get('custom_html', '').strip()
     if custom_html:
         return custom_html
@@ -4022,19 +4049,19 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, displ
                 else:
                     content_html += build_recommendations_html_with_cids(recommendations_data, msg_root, theme_colors, user_dict, base_url, display_preference, users_data, recs_grid_columns=recs_grid_columns, poster_max_height=poster_max_height)
 
-        elif item_type == 'musicseerr_wrapped':
-            if musicseerr_wrapped_data:
+        elif item_type == 'droppedneedle_wrapped':
+            if droppedneedle_wrapped_data:
                 if target_user_key:
                     if item.get('userKey') == str(target_user_key):
-                        filtered_wrapped = {target_user_key: musicseerr_wrapped_data.get(target_user_key, {})}
+                        filtered_wrapped = {target_user_key: droppedneedle_wrapped_data.get(target_user_key, {})}
                         filtered_user_dict = {target_user_key: user_dict.get(target_user_key, target_user_key)} if user_dict else {target_user_key: target_user_key}
-                        content_html += build_musicseerr_wrapped_html_with_cids(filtered_wrapped, msg_root, theme_colors, filtered_user_dict, display_preference, users_data)
+                        content_html += build_droppedneedle_wrapped_html_with_cids(filtered_wrapped, msg_root, theme_colors, filtered_user_dict, display_preference, users_data)
                 else:
-                    content_html += build_musicseerr_wrapped_html_with_cids(musicseerr_wrapped_data, msg_root, theme_colors, user_dict, display_preference, users_data)
+                    content_html += build_droppedneedle_wrapped_html_with_cids(droppedneedle_wrapped_data, msg_root, theme_colors, user_dict, display_preference, users_data)
 
-        elif item_type == 'musicseerr_server_stats':
-            if musicseerr_server_data:
-                content_html += build_musicseerr_server_stats_html_with_cids(musicseerr_server_data, msg_root, theme_colors)
+        elif item_type == 'droppedneedle_server_stats':
+            if droppedneedle_server_data:
+                content_html += build_droppedneedle_server_stats_html_with_cids(droppedneedle_server_data, msg_root, theme_colors)
 
         elif item_type == 'collection_group':
             group_title = item.get('title', 'Collections')
@@ -4226,7 +4253,7 @@ def send_standard_email_with_cids(to_emails, subject, email_header_title, select
 
         print("Building email content...")
         tautulli_data = get_current_tautulli_data_for_email(settings)
-        musicseerr_server_data = get_musicseerr_server_stats_cached(use_cache=True)
+        droppedneedle_server_data = get_droppedneedle_server_stats_cached(use_cache=True)
 
         template_data = {
             'selected_items': json.dumps(selected_items),
@@ -4252,7 +4279,7 @@ def send_standard_email_with_cids(to_emails, subject, email_header_title, select
             "",
             expanded_collections,
             email_header_title,
-            musicseerr_server_data=musicseerr_server_data
+            droppedneedle_server_data=droppedneedle_server_data
         )
 
         plain_text = convert_html_to_plain_text(email_html)
@@ -4338,7 +4365,7 @@ def send_recommendations_email_with_cids(to_emails, subject, email_header_title,
         for item in selected_items:
             if item.get('type') == 'recommendations' and item.get('userKey'):
                 rec_user_keys.add(item['userKey'])
-            elif item.get('type') == 'musicseerr_wrapped' and item.get('userKey'):
+            elif item.get('type') == 'droppedneedle_wrapped' and item.get('userKey'):
                 wrapped_user_keys.add(item['userKey'])
 
         personalized_user_keys = rec_user_keys | wrapped_user_keys
@@ -4351,13 +4378,13 @@ def send_recommendations_email_with_cids(to_emails, subject, email_header_title,
             )
 
         recommendations_data = get_recommendations_for_users(rec_user_keys, to_emails, user_dict, use_cache=True) if rec_user_keys else {}
-        musicseerr_wrapped_data = get_musicseerr_wrapped_for_users(wrapped_user_keys, to_emails, user_dict, use_cache=True) if wrapped_user_keys else {}
-        musicseerr_server_data = get_musicseerr_server_stats_cached(use_cache=True)
+        droppedneedle_wrapped_data = get_droppedneedle_wrapped_for_users(wrapped_user_keys, to_emails, user_dict, use_cache=True) if wrapped_user_keys else {}
+        droppedneedle_server_data = get_droppedneedle_server_stats_cached(use_cache=True)
 
         if rec_user_keys and not recommendations_data:
             return jsonify({"error": "No recommendations data available. Please pull recommendations first."}), 400
-        if wrapped_user_keys and not musicseerr_wrapped_data:
-            return jsonify({"error": "No Musicseerr wrapped data available. Please pull Musicseerr stats first."}), 400
+        if wrapped_user_keys and not droppedneedle_wrapped_data:
+            return jsonify({"error": "No DroppedNeedle wrapped data available. Please pull DroppedNeedle stats first."}), 400
 
         groups = group_recipients_by_user(to_emails, user_dict)
 
@@ -4373,7 +4400,7 @@ def send_recommendations_email_with_cids(to_emails, subject, email_header_title,
                 recipients, subject, email_header_title, selected_items, user_key, recommendations_data,
                 from_email, alias_email, reply_to_email, password, smtp_username,
                 smtp_server, smtp_port, smtp_protocol, settings, from_name, custom_html, expanded_collections,
-                send_mode=send_mode, musicseerr_wrapped_data=musicseerr_wrapped_data, musicseerr_server_data=musicseerr_server_data
+                send_mode=send_mode, droppedneedle_wrapped_data=droppedneedle_wrapped_data, droppedneedle_server_data=droppedneedle_server_data
             )
 
             if success:
@@ -4389,7 +4416,7 @@ def send_recommendations_email_with_cids(to_emails, subject, email_header_title,
         print("Error in send_recommendations_email_with_cids:", e)
         return jsonify({"error": str(e)}), 500
 
-def send_single_user_email_with_cids(recipients, subject, email_header_title, selected_items, user_key, recommendations_data, from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, settings, from_name, custom_html, expanded_collections=None, send_mode='bcc', musicseerr_wrapped_data=None, musicseerr_server_data=None):
+def send_single_user_email_with_cids(recipients, subject, email_header_title, selected_items, user_key, recommendations_data, from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, settings, from_name, custom_html, expanded_collections=None, send_mode='bcc', droppedneedle_wrapped_data=None, droppedneedle_server_data=None):
     try:
         print(f"SMTP Config: {smtp_server}:{smtp_port} using {smtp_protocol}")
 
@@ -4470,8 +4497,8 @@ def send_single_user_email_with_cids(recipients, subject, email_header_title, se
             date_range="",
             expanded_collections=expanded_collections,
             email_header_title=email_header_title,
-            musicseerr_wrapped_data=musicseerr_wrapped_data,
-            musicseerr_server_data=musicseerr_server_data
+            droppedneedle_wrapped_data=droppedneedle_wrapped_data,
+            droppedneedle_server_data=droppedneedle_server_data
         )
 
         plain_text = convert_html_to_plain_text(email_html)
@@ -4651,11 +4678,11 @@ def get_recommendations_for_users(user_keys, to_emails, user_dict, use_cache=Tru
         print(f"Error getting recommendations: {e}")
         return {}
 
-def get_musicseerr_wrapped_for_users(user_keys, to_emails, user_dict, use_cache=True):
+def get_droppedneedle_wrapped_for_users(user_keys, to_emails, user_dict, use_cache=True):
     try:
         if use_cache:
-            cached_wrapped = get_cached_data('musicseerr_wrapped_json', strict=True) or get_cached_data('musicseerr_wrapped_json', strict=False)
-            cached_filtered_users = get_cached_data('musicseerr_filtered_users', strict=True) or get_cached_data('musicseerr_filtered_users', strict=False)
+            cached_wrapped = get_cached_data('droppedneedle_wrapped_json', strict=True) or get_cached_data('droppedneedle_wrapped_json', strict=False)
+            cached_filtered_users = get_cached_data('droppedneedle_filtered_users', strict=True) or get_cached_data('droppedneedle_filtered_users', strict=False)
 
             if cached_wrapped and cached_filtered_users:
                 filtered_users = {k: v for k, v in user_dict.items() if k in user_keys and v in to_emails}
@@ -4664,72 +4691,72 @@ def get_musicseerr_wrapped_for_users(user_keys, to_emails, user_dict, use_cache=
                 required_user_keys = set(str(k) for k in filtered_users.keys())
 
                 if required_user_keys.issubset(cached_user_keys):
-                    print(f"Using cached Musicseerr wrapped data for users: {list(required_user_keys)}")
+                    print(f"Using cached DroppedNeedle wrapped data for users: {list(required_user_keys)}")
                     return {k: v for k, v in cached_wrapped.items() if str(k) in required_user_keys}
                 else:
                     print(f"Cache miss - need users {required_user_keys}, cache has {cached_user_keys}")
             else:
-                print("No cached Musicseerr wrapped data available")
+                print("No cached DroppedNeedle wrapped data available")
 
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
-        cursor.execute("SELECT musicseerr_url, musicseerr_api_key FROM settings WHERE id = 1")
+        cursor.execute("SELECT droppedneedle_url, droppedneedle_api_key FROM settings WHERE id = 1")
         row = cursor.fetchone()
         conn.close()
 
         if not row or not row[0] or not row[1]:
             return {}
 
-        musicseerr_url = row[0].strip()
-        musicseerr_api_key = decrypt(row[1])
+        droppedneedle_url = row[0].strip()
+        droppedneedle_api_key = decrypt(row[1])
 
         filtered_users = {k: v for k, v in user_dict.items() if k in user_keys and v in to_emails}
 
         if not filtered_users:
             return {}
 
-        wrapped_data, _ = run_musicseerr_command(musicseerr_url, musicseerr_api_key, filtered_users, None)
+        wrapped_data, _ = run_droppedneedle_command(droppedneedle_url, droppedneedle_api_key, filtered_users, None)
 
         if use_cache and wrapped_data:
             cache_params = {'timestamp': time.time(), 'manual_fetch': True}
-            set_cached_data('musicseerr_wrapped_json', wrapped_data, cache_params)
-            set_cached_data('musicseerr_filtered_users', filtered_users, cache_params)
-            print("Cached fresh Musicseerr wrapped data")
+            set_cached_data('droppedneedle_wrapped_json', wrapped_data, cache_params)
+            set_cached_data('droppedneedle_filtered_users', filtered_users, cache_params)
+            print("Cached fresh DroppedNeedle wrapped data")
 
         return wrapped_data or {}
 
     except Exception as e:
-        print(f"Error getting Musicseerr wrapped data: {e}")
+        print(f"Error getting DroppedNeedle wrapped data: {e}")
         return {}
 
-def get_musicseerr_server_stats_cached(use_cache=True):
+def get_droppedneedle_server_stats_cached(use_cache=True):
     try:
         if use_cache:
-            cached = get_cached_data('musicseerr_server_json', strict=True) or get_cached_data('musicseerr_server_json', strict=False)
+            cached = get_cached_data('droppedneedle_server_json', strict=True) or get_cached_data('droppedneedle_server_json', strict=False)
             if cached:
                 return cached
 
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
-        cursor.execute("SELECT musicseerr_url, musicseerr_api_key FROM settings WHERE id = 1")
+        cursor.execute("SELECT droppedneedle_url, droppedneedle_api_key FROM settings WHERE id = 1")
         row = cursor.fetchone()
         conn.close()
 
         if not row or not row[0] or not row[1]:
             return None
 
-        musicseerr_url = row[0].strip()
-        musicseerr_api_key = decrypt(row[1])
+        droppedneedle_url = row[0].strip()
+        droppedneedle_api_key = decrypt(row[1])
 
-        server_data, _ = fetch_musicseerr_server_stats(musicseerr_url, musicseerr_api_key)
+        server_data, _ = fetch_droppedneedle_server_stats(droppedneedle_url, droppedneedle_api_key)
 
         if use_cache and server_data:
-            set_cached_data('musicseerr_server_json', server_data, {'timestamp': time.time(), 'manual_fetch': True})
+            set_cached_data('droppedneedle_server_json', server_data, {'timestamp': time.time(), 'manual_fetch': True})
 
         return server_data
 
     except Exception as e:
-        print(f"Error getting Musicseerr server stats: {e}")
+        print(f"Error getting DroppedNeedle server stats: {e}")
         return None
 
 def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
@@ -4843,7 +4870,7 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
                 item['chartSVG'] = chart_data.get('svg', '')
 
         has_recs = any(item.get('type') == 'recommendations' for item in selected_items)
-        has_wrapped = any(item.get('type') == 'musicseerr_wrapped' for item in selected_items)
+        has_wrapped = any(item.get('type') == 'droppedneedle_wrapped' for item in selected_items)
 
         users_data, _ = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_users', 'Users', None)
         user_dict = {}
@@ -4854,24 +4881,24 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
                 if u.get('email') != None and u.get('email') != '' and u.get('is_active')
             }
 
-        musicseerr_conn = sqlite3.connect(DB_PATH)
-        musicseerr_cursor = musicseerr_conn.cursor()
-        musicseerr_cursor.execute("SELECT musicseerr_url, musicseerr_api_key FROM settings WHERE id = 1")
-        musicseerr_result = musicseerr_cursor.fetchone()
-        musicseerr_conn.close()
-        musicseerr_url = (musicseerr_result[0] or "").strip() if musicseerr_result else ""
-        musicseerr_api_key = decrypt(musicseerr_result[1]) if musicseerr_result and musicseerr_result[1] else ""
-        musicseerr_server_data, _ = fetch_musicseerr_server_stats(musicseerr_url, musicseerr_api_key) if (musicseerr_url and musicseerr_api_key) else (None, None)
+        droppedneedle_conn = sqlite3.connect(DB_PATH)
+        droppedneedle_cursor = droppedneedle_conn.cursor()
+        droppedneedle_cursor.execute("SELECT droppedneedle_url, droppedneedle_api_key FROM settings WHERE id = 1")
+        droppedneedle_result = droppedneedle_cursor.fetchone()
+        droppedneedle_conn.close()
+        droppedneedle_url = (droppedneedle_result[0] or "").strip() if droppedneedle_result else ""
+        droppedneedle_api_key = decrypt(droppedneedle_result[1]) if droppedneedle_result and droppedneedle_result[1] else ""
+        droppedneedle_server_data, _ = fetch_droppedneedle_server_stats(droppedneedle_url, droppedneedle_api_key) if (droppedneedle_url and droppedneedle_api_key) else (None, None)
 
         if has_recs or has_wrapped:
-            print("Template contains recommendations or Musicseerr wrapped stats, splitting emails by user...")
+            print("Template contains recommendations or DroppedNeedle wrapped stats, splitting emails by user...")
 
             rec_user_keys = set()
             wrapped_user_keys = set()
             for item in selected_items:
                 if item.get('type') == 'recommendations' and item.get('userKey'):
                     rec_user_keys.add(item['userKey'])
-                elif item.get('type') == 'musicseerr_wrapped' and item.get('userKey'):
+                elif item.get('type') == 'droppedneedle_wrapped' and item.get('userKey'):
                     wrapped_user_keys.add(item['userKey'])
 
             personalized_user_keys = rec_user_keys | wrapped_user_keys
@@ -4903,21 +4930,21 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
                     print("Failed to fetch recommendations data")
                     return False
 
-            musicseerr_wrapped_data = {}
+            droppedneedle_wrapped_data = {}
             if wrapped_user_keys:
-                if not (musicseerr_url and musicseerr_api_key):
-                    print("Musicseerr URL/API key not configured")
+                if not (droppedneedle_url and droppedneedle_api_key):
+                    print("DroppedNeedle URL/API key not configured")
                     return False
 
                 filtered_wrapped_users = {k: v for k, v in user_dict.items() if str(k) in wrapped_user_keys and v in to_emails_list}
 
                 if not filtered_wrapped_users:
-                    print("No users found matching Musicseerr wrapped blocks and email recipients")
+                    print("No users found matching DroppedNeedle wrapped blocks and email recipients")
                     return False
 
-                musicseerr_wrapped_data, _ = run_musicseerr_command(musicseerr_url, musicseerr_api_key, filtered_wrapped_users, None)
-                if not musicseerr_wrapped_data:
-                    print("Failed to fetch Musicseerr wrapped data")
+                droppedneedle_wrapped_data, _ = run_droppedneedle_command(droppedneedle_url, droppedneedle_api_key, filtered_wrapped_users, None)
+                if not droppedneedle_wrapped_data:
+                    print("Failed to fetch DroppedNeedle wrapped data")
                     return False
 
             groups = group_recipients_by_user(to_emails_list, user_dict)
@@ -4942,7 +4969,7 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
                     recently_added_mode=recently_added_mode, recently_added_sort=recently_added_sort,
                     ra_grid_columns=ra_grid_columns, recs_grid_columns=recs_grid_columns, stat_cover_art=stat_cover_art,
                     send_mode=send_mode, poster_max_height=poster_max_height,
-                    musicseerr_wrapped_data=musicseerr_wrapped_data, musicseerr_server_data=musicseerr_server_data
+                    droppedneedle_wrapped_data=droppedneedle_wrapped_data, droppedneedle_server_data=droppedneedle_server_data
                 )
 
                 if success:
@@ -4971,7 +4998,7 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
                 hide_graph_play_counts=hide_graph_play_counts, stats_type=stats_type,
                 recently_added_mode=recently_added_mode, recently_added_sort=recently_added_sort,
                 ra_grid_columns=ra_grid_columns, recs_grid_columns=recs_grid_columns, stat_cover_art=stat_cover_art,
-                send_mode=send_mode, poster_max_height=poster_max_height, musicseerr_server_data=musicseerr_server_data
+                send_mode=send_mode, poster_max_height=poster_max_height, droppedneedle_server_data=droppedneedle_server_data
             )
 
     except Exception as e:
@@ -4979,7 +5006,7 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
         traceback.print_exc()
         return False
 
-def send_scheduled_user_email_with_cids(recipients, subject, email_header_title, custom_html, selected_items, user_key, recommendations_data, from_email, alias_email, reply_to_email, encrypted_password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, tautulli_base_url, tautulli_api_key, date_range, items_count, template_name, logo_filename, logo_width, custom_logo_filename, from_name, display_preference, users_data, expanded_collections, use_prefix=True, logo_position='center', default_intro_text='', default_outro_text='', hide_stat_play_counts='disabled', hide_graph_play_counts='disabled', stats_type='plays', recently_added_mode='items', recently_added_sort='date', ra_grid_columns=5, recs_grid_columns=5, stat_cover_art='disabled', send_mode='bcc', poster_max_height=0, musicseerr_wrapped_data=None, musicseerr_server_data=None):
+def send_scheduled_user_email_with_cids(recipients, subject, email_header_title, custom_html, selected_items, user_key, recommendations_data, from_email, alias_email, reply_to_email, encrypted_password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, tautulli_base_url, tautulli_api_key, date_range, items_count, template_name, logo_filename, logo_width, custom_logo_filename, from_name, display_preference, users_data, expanded_collections, use_prefix=True, logo_position='center', default_intro_text='', default_outro_text='', hide_stat_play_counts='disabled', hide_graph_play_counts='disabled', stats_type='plays', recently_added_mode='items', recently_added_sort='date', ra_grid_columns=5, recs_grid_columns=5, stat_cover_art='disabled', send_mode='bcc', poster_max_height=0, droppedneedle_wrapped_data=None, droppedneedle_server_data=None):
     try:
         print(f"SMTP Config: {smtp_server}:{smtp_port} using {smtp_protocol}")
 
@@ -5059,8 +5086,8 @@ def send_scheduled_user_email_with_cids(recipients, subject, email_header_title,
             date_range=date_range,
             expanded_collections=expanded_collections,
             email_header_title=email_header_title,
-            musicseerr_wrapped_data=musicseerr_wrapped_data,
-            musicseerr_server_data=musicseerr_server_data
+            droppedneedle_wrapped_data=droppedneedle_wrapped_data,
+            droppedneedle_server_data=droppedneedle_server_data
         )
 
         plain_text = convert_html_to_plain_text(email_html)
@@ -5132,7 +5159,7 @@ def send_scheduled_user_email_with_cids(recipients, subject, email_header_title,
         traceback.print_exc()
         return False
 
-def send_scheduled_single_email_with_cids(to_emails_list, subject, email_header_title, custom_html, selected_items, from_email, alias_email, reply_to_email, encrypted_password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, tautulli_base_url, tautulli_api_key, date_range, items_count, template_name, logo_filename, logo_width, custom_logo_filename, from_name, display_preference, users_data, expanded_collections, email_text="", use_prefix=True, logo_position='center', default_intro_text='', default_outro_text='', hide_stat_play_counts='disabled', hide_graph_play_counts='disabled', stats_type='plays', recently_added_mode='items', recently_added_sort='date', ra_grid_columns=5, recs_grid_columns=5, stat_cover_art='disabled', send_mode='bcc', poster_max_height=0, musicseerr_server_data=None):
+def send_scheduled_single_email_with_cids(to_emails_list, subject, email_header_title, custom_html, selected_items, from_email, alias_email, reply_to_email, encrypted_password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, tautulli_base_url, tautulli_api_key, date_range, items_count, template_name, logo_filename, logo_width, custom_logo_filename, from_name, display_preference, users_data, expanded_collections, email_text="", use_prefix=True, logo_position='center', default_intro_text='', default_outro_text='', hide_stat_play_counts='disabled', hide_graph_play_counts='disabled', stats_type='plays', recently_added_mode='items', recently_added_sort='date', ra_grid_columns=5, recs_grid_columns=5, stat_cover_art='disabled', send_mode='bcc', poster_max_height=0, droppedneedle_server_data=None):
     try:
         print(f"SMTP Config: {smtp_server}:{smtp_port} using {smtp_protocol}")
 
@@ -5210,7 +5237,7 @@ def send_scheduled_single_email_with_cids(to_emails_list, subject, email_header_
             date_range,
             expanded_collections,
             email_header_title=email_header_title,
-            musicseerr_server_data=musicseerr_server_data
+            droppedneedle_server_data=droppedneedle_server_data
         )
 
         plain_text = convert_html_to_plain_text(email_html)
@@ -5539,8 +5566,8 @@ def index():
     recent_data = []
     recommendations_json = {}
     filtered_users = {}
-    musicseerr_wrapped_json = {}
-    musicseerr_server_json = None
+    droppedneedle_wrapped_json = {}
+    droppedneedle_server_json = None
     error = None
     alert = None
 
@@ -5647,8 +5674,8 @@ def index():
         recent_data = get_cached_data('recent_data', strict=True) or get_cached_data('recent_data', strict=False) or []
         recommendations_json = get_cached_data('recommendations_json', strict=True) or get_cached_data('recommendations_json', strict=False) or {}
         filtered_users = get_cached_data('filtered_users', strict=True) or get_cached_data('filtered_users', strict=False) or {}
-        musicseerr_wrapped_json = get_cached_data('musicseerr_wrapped_json', strict=True) or get_cached_data('musicseerr_wrapped_json', strict=False) or {}
-        musicseerr_server_json = get_cached_data('musicseerr_server_json', strict=True) or get_cached_data('musicseerr_server_json', strict=False)
+        droppedneedle_wrapped_json = get_cached_data('droppedneedle_wrapped_json', strict=True) or get_cached_data('droppedneedle_wrapped_json', strict=False) or {}
+        droppedneedle_server_json = get_cached_data('droppedneedle_server_json', strict=True) or get_cached_data('droppedneedle_server_json', strict=False)
         
         if users:
             users_full_data = users
@@ -5695,7 +5722,7 @@ def index():
                            libs=libs, error=error, alert=alert, settings=settings, email_lists=email_lists,
                            cache_info=cache_info, recommendations_json=recommendations_json,
                            filtered_users=filtered_users, theme_settings=theme_settings,
-                           musicseerr_wrapped_json=musicseerr_wrapped_json, musicseerr_server_json=musicseerr_server_json,
+                           droppedneedle_wrapped_json=droppedneedle_wrapped_json, droppedneedle_server_json=droppedneedle_server_json,
                            nonce=secrets.token_urlsafe(16), csrf_token=session["csrf_token"], username=username
                         )
 
@@ -6168,12 +6195,12 @@ def pull_recommendations():
                             recommendations_json=recommendations_json, filtered_users=filtered_users, alert=alert,
                             error=error, theme_settings=theme_settings)
 
-@app.route('/pull_musicseerr_stats', methods=['POST'])
+@app.route('/pull_droppedneedle_stats', methods=['POST'])
 @requires_auth
-def pull_musicseerr_stats():
+def pull_droppedneedle_stats():
     require_csrf_for_json()
-    musicseerr_wrapped_json = {}
-    musicseerr_server_json = None
+    droppedneedle_wrapped_json = {}
+    droppedneedle_server_json = None
     error = None
     alert = None
 
@@ -6189,35 +6216,35 @@ def pull_musicseerr_stats():
 
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    cursor.execute("SELECT musicseerr_url, musicseerr_api_key FROM settings WHERE id = 1")
+    cursor.execute("SELECT droppedneedle_url, droppedneedle_api_key FROM settings WHERE id = 1")
     row = cursor.fetchone()
     conn.close()
 
-    musicseerr_url = (row[0] or "").strip() if row else ""
-    musicseerr_api_key = decrypt(row[1]) if row and row[1] else ""
+    droppedneedle_url = (row[0] or "").strip() if row else ""
+    droppedneedle_api_key = decrypt(row[1]) if row and row[1] else ""
 
     filtered_users = {k: v for k, v in user_dict.items() if v in to_emails}
 
-    if musicseerr_url == "" or musicseerr_api_key == "":
-        return render_template('index.html', error='Please enter Musicseerr URL and API key on settings page',
+    if droppedneedle_url == "" or droppedneedle_api_key == "":
+        return render_template('index.html', error='Please enter DroppedNeedle URL and API key on settings page',
                                 stats=stats, user_dict=user_dict, graph_data=graph_data,
                                 graph_commands=graph_commands, recent_data=recent_data,
                                 libs=libs, settings=settings, theme_settings=get_theme_settings())
 
-    musicseerr_wrapped_json, error = run_musicseerr_command(musicseerr_url, musicseerr_api_key, filtered_users, error)
-    musicseerr_server_json, server_error = fetch_musicseerr_server_stats(musicseerr_url, musicseerr_api_key)
+    droppedneedle_wrapped_json, error = run_droppedneedle_command(droppedneedle_url, droppedneedle_api_key, filtered_users, error)
+    droppedneedle_server_json, server_error = fetch_droppedneedle_server_stats(droppedneedle_url, droppedneedle_api_key)
     if server_error:
         error = (error + ", " if error else "") + server_error
 
     if error:
         alert = None
     else:
-        alert = "Musicseerr stats pulled!"
+        alert = "DroppedNeedle stats pulled!"
 
     cache_params = {'timestamp': time.time()}
-    set_cached_data('musicseerr_filtered_users', filtered_users, cache_params)
-    set_cached_data('musicseerr_wrapped_json', musicseerr_wrapped_json, cache_params)
-    set_cached_data('musicseerr_server_json', musicseerr_server_json, cache_params)
+    set_cached_data('droppedneedle_filtered_users', filtered_users, cache_params)
+    set_cached_data('droppedneedle_wrapped_json', droppedneedle_wrapped_json, cache_params)
+    set_cached_data('droppedneedle_server_json', droppedneedle_server_json, cache_params)
 
     cache_info = {
         'stats': get_cache_info('stats'),
@@ -6232,7 +6259,7 @@ def pull_musicseerr_stats():
 
     return render_template('index.html', stats=stats, user_dict=user_dict, graph_data=graph_data, cache_info=cache_info,
                             graph_commands=graph_commands, recent_data=recent_data, libs=libs, settings=settings,
-                            musicseerr_wrapped_json=musicseerr_wrapped_json, musicseerr_server_json=musicseerr_server_json,
+                            droppedneedle_wrapped_json=droppedneedle_wrapped_json, droppedneedle_server_json=droppedneedle_server_json,
                             alert=alert, error=error, theme_settings=theme_settings)
 
 @app.route('/send_email', methods=['POST'])
@@ -6290,11 +6317,11 @@ def send_email():
     custom_html = data.get('custom_html', '')
 
     has_recommendations = any(item.get('type') == 'recommendations' for item in selected_items)
-    has_musicseerr_wrapped = any(item.get('type') == 'musicseerr_wrapped' for item in selected_items)
+    has_droppedneedle_wrapped = any(item.get('type') == 'droppedneedle_wrapped' for item in selected_items)
 
     send_mode = settings.get('send_mode', 'bcc')
 
-    if (has_recommendations or has_musicseerr_wrapped) and user_dict:
+    if (has_recommendations or has_droppedneedle_wrapped) and user_dict:
         return send_recommendations_email_with_cids(
             to_emails, subject, email_header_title, user_dict, selected_items,
             from_email, alias_email, reply_to_email, password, smtp_username,
@@ -6372,8 +6399,8 @@ def settings():
             tautulli_url = request.form.get("tautulli_url")
             tautulli_api = encrypt(request.form.get("tautulli_api"))
             conjurr_url = request.form.get("conjurr_url")
-            musicseerr_url = request.form.get("musicseerr_url")
-            musicseerr_api_key = encrypt(request.form.get("musicseerr_api_key"))
+            droppedneedle_url = request.form.get("droppedneedle_url")
+            droppedneedle_api_key = encrypt(request.form.get("droppedneedle_api_key"))
             recipient_display_name = request.form.get("recipient_display_name", "email")
             logo_filename = request.form.get("logo_filename")
             logo_width = request.form.get("logo_width")
@@ -6427,14 +6454,14 @@ def settings():
             cursor.execute("""
                 INSERT INTO settings
                 (id, from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, plex_url, tautulli_url,
-                    tautulli_api, conjurr_url, musicseerr_url, musicseerr_api_key, recipient_display_name, logo_filename, logo_width, email_theme, primary_color, secondary_color, accent_color, background_color,
+                    tautulli_api, conjurr_url, droppedneedle_url, droppedneedle_api_key, recipient_display_name, logo_filename, logo_width, email_theme, primary_color, secondary_color, accent_color, background_color,
                     text_color, from_name, custom_logo_filename, login_toggle, nl_username, nl_password, default_intro_text, default_outro_text, hsts_enabled, scheduled_subject_prefix, logo_position, hide_stat_play_counts, hide_graph_play_counts, stats_type, recently_added_mode, recently_added_sort, ra_grid_columns, recs_grid_columns, stat_cover_art, send_mode, poster_max_height)
                 VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT (id) DO UPDATE
                 SET from_email = excluded.from_email, alias_email = excluded.alias_email, reply_to_email = excluded.reply_to_email, password = excluded.password,
                     smtp_username = excluded.smtp_username, smtp_server = excluded.smtp_server, smtp_port = excluded.smtp_port, smtp_protocol = excluded.smtp_protocol,
                     server_name = excluded.server_name, plex_url = excluded.plex_url, tautulli_url = excluded.tautulli_url, tautulli_api = excluded.tautulli_api,
-                    conjurr_url = excluded.conjurr_url, musicseerr_url = excluded.musicseerr_url, musicseerr_api_key = excluded.musicseerr_api_key, recipient_display_name = excluded.recipient_display_name, logo_filename = excluded.logo_filename, logo_width = excluded.logo_width,
+                    conjurr_url = excluded.conjurr_url, droppedneedle_url = excluded.droppedneedle_url, droppedneedle_api_key = excluded.droppedneedle_api_key, recipient_display_name = excluded.recipient_display_name, logo_filename = excluded.logo_filename, logo_width = excluded.logo_width,
                     email_theme = excluded.email_theme, primary_color = excluded.primary_color, secondary_color = excluded.secondary_color, accent_color = excluded.accent_color,
                     background_color = excluded.background_color, text_color = excluded.text_color, from_name = excluded.from_name, custom_logo_filename = excluded.custom_logo_filename,
                     login_toggle = excluded.login_toggle, nl_username = excluded.nl_username, nl_password = excluded.nl_password,
@@ -6447,7 +6474,7 @@ def settings():
                     send_mode = excluded.send_mode,
                     poster_max_height = excluded.poster_max_height
             """, (from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, plex_url, tautulli_url, tautulli_api,
-                  conjurr_url, musicseerr_url, musicseerr_api_key, recipient_display_name, logo_filename, logo_width, email_theme, primary_color, secondary_color, accent_color, background_color, text_color, from_name,
+                  conjurr_url, droppedneedle_url, droppedneedle_api_key, recipient_display_name, logo_filename, logo_width, email_theme, primary_color, secondary_color, accent_color, background_color, text_color, from_name,
                   custom_logo_filename, login_toggle, nl_username, nl_password, default_intro_text, default_outro_text, hsts_enabled, scheduled_subject_prefix, logo_position,
                   hide_stat_play_counts, hide_graph_play_counts, stats_type, recently_added_mode, recently_added_sort, ra_grid_columns, recs_grid_columns, stat_cover_art, send_mode, poster_max_height))
             conn.commit()
@@ -6470,8 +6497,8 @@ def settings():
                 "tautulli_url": tautulli_url,
                 "tautulli_api": decrypt(tautulli_api),
                 "conjurr_url": conjurr_url,
-                "musicseerr_url": musicseerr_url,
-                "musicseerr_api_key": decrypt(musicseerr_api_key),
+                "droppedneedle_url": droppedneedle_url,
+                "droppedneedle_api_key": decrypt(droppedneedle_api_key),
                 "recipient_display_name": recipient_display_name,
                 "logo_filename": logo_filename,
                 "logo_width": logo_width,
@@ -6547,8 +6574,8 @@ def settings():
                 "tautulli_url": request.form.get("tautulli_url", ""),
                 "tautulli_api": request.form.get("tautulli_api", ""),
                 "conjurr_url": request.form.get("conjurr_url", ""),
-                "musicseerr_url": request.form.get("musicseerr_url", ""),
-                "musicseerr_api_key": request.form.get("musicseerr_api_key", ""),
+                "droppedneedle_url": request.form.get("droppedneedle_url", ""),
+                "droppedneedle_api_key": request.form.get("droppedneedle_api_key", ""),
                 "recipient_display_name": request.form.get("recipient_display_name", "email"),
                 "logo_filename": request.form.get("logo_filename", ""),
                 "logo_width": request.form.get("logo_width", ""),
@@ -6598,8 +6625,8 @@ def settings():
         tautulli_url = cursor.execute("SELECT tautulli_url FROM settings WHERE id = 1").fetchone()[0]
         tautulli_api = cursor.execute("SELECT tautulli_api FROM settings WHERE id = 1").fetchone()[0]
         conjurr_url = cursor.execute("SELECT conjurr_url FROM settings WHERE id = 1").fetchone()[0]
-        musicseerr_url = cursor.execute("SELECT musicseerr_url FROM settings WHERE id = 1").fetchone()[0]
-        musicseerr_api_key = cursor.execute("SELECT musicseerr_api_key FROM settings WHERE id = 1").fetchone()[0]
+        droppedneedle_url = cursor.execute("SELECT droppedneedle_url FROM settings WHERE id = 1").fetchone()[0]
+        droppedneedle_api_key = cursor.execute("SELECT droppedneedle_api_key FROM settings WHERE id = 1").fetchone()[0]
         recipient_display_name = cursor.execute("SELECT recipient_display_name FROM settings WHERE id = 1").fetchone()[0]
         logo_filename = cursor.execute("SELECT logo_filename FROM settings WHERE id = 1").fetchone()[0]
         logo_width = cursor.execute("SELECT logo_width FROM settings WHERE id = 1").fetchone()[0]
@@ -6644,8 +6671,8 @@ def settings():
         tautulli_url = cursor.execute("SELECT tautulli_url FROM settings WHERE id = 1").fetchone()
         tautulli_api = cursor.execute("SELECT tautulli_api FROM settings WHERE id = 1").fetchone()
         conjurr_url = cursor.execute("SELECT conjurr_url FROM settings WHERE id = 1").fetchone()
-        musicseerr_url = cursor.execute("SELECT musicseerr_url FROM settings WHERE id = 1").fetchone()
-        musicseerr_api_key = cursor.execute("SELECT musicseerr_api_key FROM settings WHERE id = 1").fetchone()
+        droppedneedle_url = cursor.execute("SELECT droppedneedle_url FROM settings WHERE id = 1").fetchone()
+        droppedneedle_api_key = cursor.execute("SELECT droppedneedle_api_key FROM settings WHERE id = 1").fetchone()
         recipient_display_name = cursor.execute("SELECT recipient_display_name FROM settings WHERE id = 1").fetchone()
         logo_filename = cursor.execute("SELECT logo_filename FROM settings WHERE id = 1").fetchone()
         logo_width = cursor.execute("SELECT logo_width FROM settings WHERE id = 1").fetchone()
@@ -6697,7 +6724,7 @@ def settings():
         "plex_token": plex_token or "",
         "tautulli_url": tautulli_url or "",
         "conjurr_url": conjurr_url or "",
-        "musicseerr_url": musicseerr_url or "",
+        "droppedneedle_url": droppedneedle_url or "",
         "recipient_display_name": recipient_display_name or "email",
         "logo_filename": logo_filename or "",
         "email_theme": email_theme or "newsletterr_blue",
@@ -6953,24 +6980,24 @@ def test_conjurr():
         return jsonify({'status': 'error', 'message': str(e)})
 
 
-@app.route('/api/test/musicseerr', methods=['POST'])
+@app.route('/api/test/droppedneedle', methods=['POST'])
 @requires_auth
-def test_musicseerr():
+def test_droppedneedle():
     data = request.get_json()
     url = (data.get('url') or '').rstrip('/')
     api_key = data.get('api_key') or ''
     if not url:
-        return jsonify({'status': 'error', 'message': 'Musicseerr URL is required'})
+        return jsonify({'status': 'error', 'message': 'DroppedNeedle URL is required'})
     if not api_key:
-        return jsonify({'status': 'error', 'message': 'Musicseerr Wrapped API key is required'})
+        return jsonify({'status': 'error', 'message': 'DroppedNeedle Wrapped API key is required'})
     try:
         r = safe_get(f"{url}/api/v1/wrapped/users", timeout=10, headers={'X-Wrapped-Api-Key': api_key})
         if r.status_code == 401:
-            return jsonify({'status': 'error', 'message': 'Musicseerr rejected the API key'})
+            return jsonify({'status': 'error', 'message': 'DroppedNeedle rejected the API key'})
         r.raise_for_status()
-        return jsonify({'status': 'ok', 'message': 'Connected to Musicseerr'})
+        return jsonify({'status': 'ok', 'message': 'Connected to DroppedNeedle'})
     except requests.exceptions.ConnectionError:
-        return jsonify({'status': 'error', 'message': 'Musicseerr is unreachable at that URL'})
+        return jsonify({'status': 'error', 'message': 'DroppedNeedle is unreachable at that URL'})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)})
 
@@ -8112,6 +8139,7 @@ if __name__ == '__main__':
     os.makedirs("database", exist_ok=True)
     
     migrate_data_from_separate_dbs()
+    migrate_musicseerr_to_droppedneedle()
     init_db(DB_PATH)
     refresh_hsts_setting()
     migrate_schema("logo_filename TEXT")

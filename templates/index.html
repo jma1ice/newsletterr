@@ -119,11 +119,11 @@
                         <p>Note, recommendations take 20-25 seconds per user. After getting stats/users with the top button, recommendations will be pulled for users in the BCC list.</p>
 
                         {% if not user_dict %}
-                            <button id="pullMusicseerrBtn" class="button opacity-50 cursor-not-allowed" disabled>Get Musicseerr Stats</button>
+                            <button id="pullDroppedNeedleBtn" class="button opacity-50 cursor-not-allowed" disabled>Get DroppedNeedle Stats</button>
                         {% else %}
-                            <button id="pullMusicseerrBtn" class="button">Get Musicseerr Stats</button>
+                            <button id="pullDroppedNeedleBtn" class="button">Get DroppedNeedle Stats</button>
                         {% endif %}
-                        <p>Pulls per-user "year in music" wrapped stats and server-wide stats from Musicseerr for users in the BCC list.</p>
+                        <p>Pulls per-user "year in music" wrapped stats and server-wide stats from DroppedNeedle for users in the BCC list.</p>
 
                         <form method="POST" action="/send_email" style="margin-top: 0;">
                             Subject: <input type="text" name="subject" id="subject" placeholder="Subject"
@@ -242,15 +242,15 @@
                             </div>
                         </div>
 
-                        <div class="row mt-3" id="musicseerr-col">
-                            {% if musicseerr_wrapped_json or musicseerr_server_json %}
+                        <div class="row mt-3" id="droppedneedle-col">
+                            {% if droppedneedle_wrapped_json or droppedneedle_server_json %}
                                 <div class="col-md-6">
-                                    <h2>Musicseerr Wrapped</h2>
-                                    <div id="musicseerr-user-list" class="row"></div>
+                                    <h2>DroppedNeedle Wrapped</h2>
+                                    <div id="droppedneedle-user-list" class="row"></div>
                                 </div>
                                 <div class="col-md-6">
-                                    <h2>Musicseerr Server Stats</h2>
-                                    <div id="musicseerr-server-list" class="row"></div>
+                                    <h2>DroppedNeedle Server Stats</h2>
+                                    <div id="droppedneedle-server-list" class="row"></div>
                                 </div>
                             {% endif %}
                         </div>
@@ -522,10 +522,10 @@
                             {% endif %}
                         </div>
 
-                        <div id="musicseerr-preview" class="mt-3" style="display: none;">
-                            {% if musicseerr_wrapped_json or musicseerr_server_json %}
+                        <div id="droppedneedle-preview" class="mt-3" style="display: none;">
+                            {% if droppedneedle_wrapped_json or droppedneedle_server_json %}
                                 <div class="card my-4">
-                                    <div class="card-header bg-primary">Musicseerr Wrapped</div>
+                                    <div class="card-header bg-primary">DroppedNeedle Wrapped</div>
                                     <div class="card-body"></div>
                                 </div>
                             {% endif %}
@@ -887,10 +887,10 @@
                             contentHTML += buildRecentlyAddedPreviewHTML(item.raLibrary);
                         } else if (item.type === 'recommendations') {
                             contentHTML += buildRecommendationsPreviewHTML(item.userKey);
-                        } else if (item.type === 'musicseerr_wrapped') {
-                            contentHTML += buildMusicseerrWrappedPreviewHTML(item.userKey);
-                        } else if (item.type === 'musicseerr_server_stats') {
-                            contentHTML += buildMusicseerrServerStatsPreviewHTML();
+                        } else if (item.type === 'droppedneedle_wrapped') {
+                            contentHTML += buildDroppedNeedleWrappedPreviewHTML(item.userKey);
+                        } else if (item.type === 'droppedneedle_server_stats') {
+                            contentHTML += buildDroppedNeedleServerStatsPreviewHTML();
                         } else if (item.type === 'collection_group') {
                             if (item.collections && item.collections.length > 0) {
                                 const stableGroupId = item.id || `group-${itemIndex}`;
@@ -1761,10 +1761,10 @@
                     </div>`;
             }
 
-            function buildMusicseerrWrappedPreviewHTML(userKey) {
-                const data = musicseerrWrappedPayload && userKey ? musicseerrWrappedPayload[userKey] : null;
+            function buildDroppedNeedleWrappedPreviewHTML(userKey) {
+                const data = droppedneedleWrappedPayload && userKey ? droppedneedleWrappedPayload[userKey] : null;
                 if (!data || !data.has_data) {
-                    return `<div class="musicseerr-wrapped-block"><p style="text-align: center; color: var(--email-muted); padding: 20px;">No Musicseerr wrapped stats available for this user</p></div>`;
+                    return `<div class="droppedneedle-wrapped-block"><p style="text-align: center; color: var(--email-muted); padding: 20px;">No DroppedNeedle wrapped stats available for this user</p></div>`;
                 }
 
                 const userDisplay = getUserDisplayName(userKey);
@@ -1776,7 +1776,7 @@
                 ].join('');
 
                 return `
-                    <div class="musicseerr-wrapped-block" style="padding: 0;" data-wrapped-user="${userKey}">
+                    <div class="droppedneedle-wrapped-block" style="padding: 0;" data-wrapped-user="${userKey}">
                         <h2 style="text-align: center; margin-top: 0; margin-bottom: 10px; color: var(--email-text);">
                             ${userDisplay}'s ${data.year} Wrapped
                         </h2>
@@ -1787,10 +1787,10 @@
                     </div>`;
             }
 
-            function buildMusicseerrServerStatsPreviewHTML() {
-                const data = musicseerrServerPayload;
+            function buildDroppedNeedleServerStatsPreviewHTML() {
+                const data = droppedneedleServerPayload;
                 if (!data) {
-                    return `<div class="musicseerr-server-block"><p style="text-align: center; color: var(--email-muted); padding: 20px;">No Musicseerr server stats available</p></div>`;
+                    return `<div class="droppedneedle-server-block"><p style="text-align: center; color: var(--email-muted); padding: 20px;">No DroppedNeedle server stats available</p></div>`;
                 }
 
                 const leaderboardHTML = buildWrappedRankedListHTML(
@@ -1802,7 +1802,7 @@
                     ? `<p style="color: var(--email-text);"><strong>Top Album:</strong> ${data.top_album_sitewide.name} — ${data.top_album_sitewide.artist_name} (${data.top_album_sitewide.listen_count} plays)</p>` : '';
 
                 return `
-                    <div class="musicseerr-server-block" style="padding: 0;">
+                    <div class="droppedneedle-server-block" style="padding: 0;">
                         <h2 style="text-align: center; margin-top: 0; margin-bottom: 10px; color: var(--email-text);">
                             Server Stats — ${data.year}
                         </h2>
@@ -3599,8 +3599,8 @@
                     btn.classList.contains('add-graph-btn') ||
                     btn.classList.contains('ra-add-btn') ||
                     btn.classList.contains('recs-add-btn') ||
-                    btn.classList.contains('musicseerr-add-btn') ||
-                    btn.classList.contains('musicseerr-server-add-btn');
+                    btn.classList.contains('droppedneedle-add-btn') ||
+                    btn.classList.contains('droppedneedle-server-add-btn');
 
                 if (!isAdd) return;
 
@@ -3614,7 +3614,7 @@
                 if (type === 'recently added' && btn.dataset.lib) {
                     extra.raLibrary = btn.dataset.lib;
                 }
-                if (type === 'recommendations' || type === 'musicseerr_wrapped') {
+                if (type === 'recommendations' || type === 'droppedneedle_wrapped') {
                     if (btn.dataset.userKey) extra.userKey = btn.dataset.userKey;
                 }
                 if (type === 'graph') {
@@ -3643,11 +3643,11 @@
         <script id="recommendations-json" type="application/json" nonce="{{ nonce }}">
             {{ recommendations_json | tojson | safe }}
         </script>
-        <script id="musicseerr-wrapped-json" type="application/json" nonce="{{ nonce }}">
-            {{ (musicseerr_wrapped_json or {}) | tojson | safe }}
+        <script id="droppedneedle-wrapped-json" type="application/json" nonce="{{ nonce }}">
+            {{ (droppedneedle_wrapped_json or {}) | tojson | safe }}
         </script>
-        <script id="musicseerr-server-json" type="application/json" nonce="{{ nonce }}">
-            {{ (musicseerr_server_json or none) | tojson | safe }}
+        <script id="droppedneedle-server-json" type="application/json" nonce="{{ nonce }}">
+            {{ (droppedneedle_server_json or none) | tojson | safe }}
         </script>
         <script nonce="{{ nonce }}">
             function readJSONFromScript(id) {
@@ -3664,8 +3664,8 @@
             }
 
             let recsPayload = readJSONFromScript('recommendations-json');
-            let musicseerrWrappedPayload = readJSONFromScript('musicseerr-wrapped-json');
-            let musicseerrServerPayload = readJSONFromScript('musicseerr-server-json');
+            let droppedneedleWrappedPayload = readJSONFromScript('droppedneedle-wrapped-json');
+            let droppedneedleServerPayload = readJSONFromScript('droppedneedle-server-json');
             let userDict = JSON.parse('{{ user_dict | tojson | safe }}') || {};
 
             let usersFullData = JSON.parse('{{ users_full_data | tojson | safe if users_full_data else "[]" }}');
@@ -3892,16 +3892,16 @@
             buildRecsUserRows();
 
             function buildWrappedUserRows() {
-                musicseerrWrappedPayload = readJSONFromScript('musicseerr-wrapped-json');
-                const host = document.getElementById('musicseerr-user-list');
+                droppedneedleWrappedPayload = readJSONFromScript('droppedneedle-wrapped-json');
+                const host = document.getElementById('droppedneedle-user-list');
                 if (!host) return;
                 host.innerHTML = '';
 
-                const users = Object.keys(musicseerrWrappedPayload || {}).filter(Boolean).sort();
+                const users = Object.keys(droppedneedleWrappedPayload || {}).filter(Boolean).sort();
 
                 users.forEach(userKey => {
                     const display = userDict[userKey] || userKey;
-                    const id = `musicseerr-user-${slug(display)}`;
+                    const id = `droppedneedle-user-${slug(display)}`;
 
                     const row = document.createElement('div');
                     row.className = 'col-12 mb-2';
@@ -3910,8 +3910,8 @@
                             <span style="font-size: .9rem;">${display}</span>
                             <div>
                                 <button type="button"
-                                        class="btn button btn-sm musicseerr-add-btn"
-                                        data-type="musicseerr_wrapped" data-id="${id}"
+                                        class="btn button btn-sm droppedneedle-add-btn"
+                                        data-type="droppedneedle_wrapped" data-id="${id}"
                                         data-name="Wrapped: ${display}"
                                         data-user-key="${userKey}"
                                         style="font-size: .8rem; padding: .25rem .5rem;">Add</button>
@@ -3922,29 +3922,29 @@
             };
             buildWrappedUserRows();
 
-            function buildMusicseerrServerRow() {
-                musicseerrServerPayload = readJSONFromScript('musicseerr-server-json');
-                const host = document.getElementById('musicseerr-server-list');
+            function buildDroppedNeedleServerRow() {
+                droppedneedleServerPayload = readJSONFromScript('droppedneedle-server-json');
+                const host = document.getElementById('droppedneedle-server-list');
                 if (!host) return;
                 host.innerHTML = '';
-                if (!musicseerrServerPayload) return;
+                if (!droppedneedleServerPayload) return;
 
                 const row = document.createElement('div');
                 row.className = 'col-12 mb-2';
                 row.innerHTML = `
                     <div class="d-flex justify-content-between align-items-center p-2 border rounded">
-                        <span style="font-size: .9rem;">Server Stats (${musicseerrServerPayload.year || ''})</span>
+                        <span style="font-size: .9rem;">Server Stats (${droppedneedleServerPayload.year || ''})</span>
                         <div>
                             <button type="button"
-                                    class="btn button btn-sm musicseerr-server-add-btn"
-                                    data-type="musicseerr_server_stats" data-id="musicseerr-server-stats"
-                                    data-name="Musicseerr Server Stats"
+                                    class="btn button btn-sm droppedneedle-server-add-btn"
+                                    data-type="droppedneedle_server_stats" data-id="droppedneedle-server-stats"
+                                    data-name="DroppedNeedle Server Stats"
                                     style="font-size: .8rem; padding: .25rem .5rem;">Add</button>
                         </div>
                     </div>`;
                 host.appendChild(row);
             };
-            buildMusicseerrServerRow();
+            buildDroppedNeedleServerRow();
         </script>
         <script nonce="{{ nonce }}">
             document.getElementById('pullRecsBtn').addEventListener('click', async () => {
@@ -4043,8 +4043,8 @@
             });
         </script>
         <script nonce="{{ nonce }}">
-            document.getElementById('pullMusicseerrBtn').addEventListener('click', async () => {
-                showSpinner('Pulling Musicseerr stats...');
+            document.getElementById('pullDroppedNeedleBtn').addEventListener('click', async () => {
+                showSpinner('Pulling DroppedNeedle stats...');
 
                 function collectEmailsFromChips() {
                     return Array.from(document.querySelectorAll('#bcc_chips .nl-chip'))
@@ -4077,7 +4077,7 @@
                 };
 
                 try {
-                    const resp = await fetch('/pull_musicseerr_stats', {
+                    const resp = await fetch('/pull_droppedneedle_stats', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -4088,7 +4088,7 @@
                         credentials: 'same-origin'
                     });
 
-                    if (!resp.ok) throw new Error('Error pulling Musicseerr stats.');
+                    if (!resp.ok) throw new Error('Error pulling DroppedNeedle stats.');
 
                     const html = await resp.text();
                     const doc = new DOMParser().parseFromString(html, 'text/html');
@@ -4097,12 +4097,12 @@
                     const newCacheCard = doc.getElementById('cache-card');
                     oldCacheCard.replaceWith(newCacheCard);
 
-                    const oldMsCol = document.getElementById('musicseerr-col');
-                    const newMsCol = doc.getElementById('musicseerr-col');
+                    const oldMsCol = document.getElementById('droppedneedle-col');
+                    const newMsCol = doc.getElementById('droppedneedle-col');
                     oldMsCol.replaceWith(newMsCol);
 
-                    const oldMsPreview = document.getElementById('musicseerr-preview');
-                    const newMsPreview = doc.getElementById('musicseerr-preview');
+                    const oldMsPreview = document.getElementById('droppedneedle-preview');
+                    const newMsPreview = doc.getElementById('droppedneedle-preview');
                     oldMsPreview.replaceWith(newMsPreview);
 
                     const oldAlertP = document.getElementById('alert_p');
@@ -4119,21 +4119,21 @@
                         oldErrorP.replaceWith(newErrorP);
                     }
 
-                    const oldWrappedData = document.getElementById('musicseerr-wrapped-json');
-                    const newWrappedData = doc.getElementById('musicseerr-wrapped-json');
+                    const oldWrappedData = document.getElementById('droppedneedle-wrapped-json');
+                    const newWrappedData = doc.getElementById('droppedneedle-wrapped-json');
                     if (newWrappedData && oldWrappedData) oldWrappedData.replaceWith(newWrappedData);
 
-                    const oldServerData = document.getElementById('musicseerr-server-json');
-                    const newServerData = doc.getElementById('musicseerr-server-json');
+                    const oldServerData = document.getElementById('droppedneedle-server-json');
+                    const newServerData = doc.getElementById('droppedneedle-server-json');
                     if (newServerData && oldServerData) oldServerData.replaceWith(newServerData);
 
                     buildWrappedUserRows();
-                    buildMusicseerrServerRow();
+                    buildDroppedNeedleServerRow();
                 } catch (err) {
-                    console.error("Error pulling Musicseerr stats:", err);
+                    console.error("Error pulling DroppedNeedle stats:", err);
                     const error_p = document.getElementById('error_p');
                     error_p.textContent = err;
-                    alert("Something went wrong while pulling Musicseerr stats.");
+                    alert("Something went wrong while pulling DroppedNeedle stats.");
                 } finally {
                     try { hideSpinner(); } catch(_) {}
                 }
@@ -4755,7 +4755,7 @@
                     
                     document.getElementById('delete-template-btn').style.display = 'none';
                     
-                    document.querySelectorAll('.add-stat-btn, .add-graph-btn, .ra-add-btn, .recs-add-btn, .musicseerr-add-btn, .musicseerr-server-add-btn').forEach(btn => {
+                    document.querySelectorAll('.add-stat-btn, .add-graph-btn, .ra-add-btn, .recs-add-btn, .droppedneedle-add-btn, .droppedneedle-server-add-btn').forEach(btn => {
                         btn.textContent = 'Add';
                         btn.classList.remove('btn-success');
                         btn.classList.add('button');
@@ -4848,7 +4848,7 @@
 
                     selectedItems = [];
                     
-                    document.querySelectorAll('.add-stat-btn, .add-graph-btn, .ra-add-btn, .recs-add-btn, .musicseerr-add-btn, .musicseerr-server-add-btn').forEach(btn => {
+                    document.querySelectorAll('.add-stat-btn, .add-graph-btn, .ra-add-btn, .recs-add-btn, .droppedneedle-add-btn, .droppedneedle-server-add-btn').forEach(btn => {
                         btn.textContent = 'Add';
                         btn.classList.remove('btn-success');
                         btn.classList.add('button');

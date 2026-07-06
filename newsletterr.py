@@ -2328,9 +2328,15 @@ def fetch_and_attach_image(image_url, msg_root, cid_name, base_url=""):
         
         cid = make_msgid(domain="newsletterr.local")[1:-1]
         
-        img_part = MIMEImage(response.content, _subtype=subtype)
+        image = Image.open(io.BytesIO(response.content))
+        image.thumbnail((600, 600))
+        thumb_io = io.BytesIO()
+        image.save(thumb_io, format='JPEG')
+        thumb_io.seek(0)
+
+        img_part = MIMEImage(thumb_io.read(), _subtype='jpeg')
         img_part.add_header('Content-ID', f'<{cid}>')
-        img_part.add_header('Content-Disposition', 'inline', filename=f'{cid_name}.{subtype}')
+        img_part.add_header('Content-Disposition', 'inline', filename=f'{cid_name}.jpg')
         msg_root.attach(img_part)
         
         print(f"Successfully attached image with CID: {cid}")

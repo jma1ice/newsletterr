@@ -5506,7 +5506,11 @@ def pull_recommendations():
             "conjurr_url": ""
         }
 
-    filtered_users = {k: v for k, v in user_dict.items() if v in to_emails}
+    selected_emails = {e.strip().lower() for e in to_emails.split(',') if e.strip()}
+    filtered_users = {
+    k: v for k, v in user_dict.items()
+    if v and str(v).strip().lower() in selected_emails
+    }
 
     if request.method == 'POST':
         if conjurr_settings['conjurr_url'] == "":

@@ -1,0 +1,188 @@
+
+from app.cache import get_cache_info
+from app.emails.images import fetch_and_attach_blurred_image, fetch_and_attach_small_thumbnail
+
+import logging
+
+logger = logging.getLogger(__name__)
+
+def get_stat_headers(title, hide_play_counts=False):
+    if title == "Most Watched Movies" or title == "Most Watched TV Shows":
+        headers = ["Title", "Year", "Plays", "Hours Played", "Cert.", "Score"]
+    elif title == "Most Popular Movies" or title == "Most Popular TV Shows":
+        headers = ["Title", "Year", "Plays", "Users", "Cert.", "Score"]
+    elif title == "Most Played Artists":
+        headers = ["Author", "Year", "Plays", "Hours Played"]
+    elif title == "Most Popular Artists":
+        headers = ["Author", "Year", "Plays", "Users"]
+    elif title == "Recently Watched":
+        headers = ["Title", "Year", "Cert.", "Score"]
+    elif title == "Most Active Libraries":
+        headers = ["Library", "Plays", "Hours Played"]
+    elif title == "Most Active Users":
+        headers = ["Username", "Plays", "Hours Played"]
+    elif title == "Most Active Platforms":
+        headers = ["Platform", "Plays", "Hours Played"]
+    elif title == "Most Concurrent Streams":
+        headers = ["Category", "Count"]
+    else:
+        headers = ["Title", "Value"]
+    if hide_play_counts:
+        headers = [h for h in headers if h != "Plays"]
+    return headers
+
+def get_stat_cells(title, row, hide_play_counts=False):
+    cells = []
+
+    if title == "Most Active Libraries":
+        cells.append(row.get('section_name', ''))
+    elif title == "Most Active Users":
+        cells.append(row.get('user', ''))
+    elif title == "Most Active Platforms":
+        cells.append(row.get('platform', ''))
+    else:
+        cells.append(row.get('title', ''))
+
+    skip_year_stats = ["Most Active Libraries", "Most Active Users", "Most Active Platforms", "Most Concurrent Streams"]
+    if title not in skip_year_stats:
+        cells.append(row.get('year', ''))
+
+    if "Recently" not in title and "Concurrent" not in title and not hide_play_counts:
+        cells.append(row.get('total_plays', 0))
+
+    hours_stats = ["Most Watched Movies", "Most Watched TV Shows", "Most Played Artists", "Most Active Libraries", "Most Active Users", "Most Active Platforms"]
+    users_stats = ["Most Popular Movies", "Most Popular TV Shows", "Most Popular Artists"]
+
+    if title in hours_stats:
+        hours = round(row.get('total_duration', 0) / 3600) if row.get('total_duration') else 0
+        cells.append(int(hours))
+    elif title in users_stats:
+        cells.append(row.get('users_watched', ''))
+
+    skip_rating_stats = ["Most Active Libraries", "Most Played Artists", "Most Popular Artists", "Most Active Users", "Most Active Platforms", "Most Concurrent Streams"]
+    if title not in skip_rating_stats:
+        cells.append(row.get('content_rating', ''))
+        rating = row.get('rating')
+        cells.append(f"{rating}" if rating else 'NA')
+
+    if title == "Most Concurrent Streams":
+        cells.append(row.get('count', 0))
+
+    return cells
+
+def build_stats_html_with_cid_background(stat_data, msg_root, theme_colors, base_url="", date_range="", hide_play_counts=False, show_cover_art=False):
+    if not stat_data or not stat_data.get('rows'):
+        return ""
+    
+    title = stat_data.get('stat_title', 'Statistics')
+    rows = stat_data['rows']
+    
+    background_cid = None
+    if rows and (rows[0].get('art') or rows[0].get('grandparent_thumb')):
+        artwork_path = rows[0].get('art') or rows[0].get('grandparent_thumb')
+        if artwork_path:
+            image_url = f"/proxy-art{artwork_path}" if not artwork_path.startswith('/proxy-art') else artwork_path
+            background_cid = fetch_and_attach_blurred_image(
+                image_url, 
+                msg_root, 
+                f"stat-bg-{len(msg_root.get_payload())}", 
+                base_url
+            )
+    
+    headers = get_stat_headers(title, hide_play_counts=hide_play_counts)
+    header_cells = "".join([
+        f'<th style="padding: 12px; background-color: rgba(52, 58, 64, 0.9); color: white; font-weight: bold; border: none; font-family: \'IBM Plex Sans\', \'Segoe UI\', Helvetica, Arial, sans-serif; font-size: 14px; text-align: left;">{h}</th>'
+        for h in headers
+    ])
+
+    _COVER_ART_TYPES = {
+        "Most Watched Movies", "Most Watched TV Shows",
+        "Most Popular Movies", "Most Popular TV Shows",
+        "Most Played Artists", "Most Popular Artists",
+        "Recently Watched"
+    }
+    apply_cover_art = show_cover_art and title in _COVER_ART_TYPES
+
+    rows_html = ""
+    for row in rows:
+        cells = get_stat_cells(title, row, hide_play_counts=hide_play_counts)
+        if apply_cover_art:
+            thumb_path = row.get('thumb', '') or row.get('grandparent_thumb', '')
+            if thumb_path:
+                proxy_path = f"/proxy-art{thumb_path}" if not thumb_path.startswith('/proxy-art') else thumb_path
+                thumb_cid = fetch_and_attach_small_thumbnail(proxy_path, msg_root, f"stat-thumb-{len(msg_root.get_payload())}", base_url)
+                if thumb_cid:
+                    cells[0] = f'<img src="cid:{thumb_cid}" style="height:38px;width:auto;border-radius:3px;margin-right:7px;vertical-align:middle;">{cells[0]}'
+        cells_html = "".join([
+            f'<td style="padding: 12px; background-color: rgba(255, 255, 255, 0.5); color: #333; border-bottom: 1px solid rgba(222, 226, 230, 0.8); font-family: \'IBM Plex Sans\', \'Segoe UI\', Helvetica, Arial, sans-serif; font-size: 14px;">{cell}</td>'
+            for cell in cells
+        ])
+        rows_html += f'<tr>{cells_html}</tr>'
+    
+    container_style = f"""
+        margin: 20px 0;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        border: 1px solid {theme_colors['border']};
+        position: relative;
+        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
+    """
+    
+    if background_cid:
+        container_style += f"""
+            background-image: url('cid:{background_cid}');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+        """
+    else:
+        container_style += f"background-color: {theme_colors['card_bg']};"
+    
+    overlay = ""
+    if background_cid:
+        overlay = f"""
+            <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; 
+                        background-color: rgba(0, 0, 0, 0.3); z-index: 0;"></div>
+        """
+    
+    header_style = f"""
+        background-color: {theme_colors['primary']};
+        color: white;
+        padding: 15px;
+        text-align: center;
+        font-weight: bold;
+        font-size: 18px;
+        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
+        margin: 0;
+        position: relative;
+        z-index: 2;
+    """
+    
+    table_style = """
+        width: 100%;
+        border-collapse: collapse;
+        position: relative;
+        z-index: 2;
+        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
+    """
+
+    if date_range == "":
+        date_range = get_cache_info('stats')['params']['time_range']
+    
+    return f"""
+        <div style="{container_style}">
+            {overlay}
+            <div style="position: relative; z-index: 1;">
+                <div style="{header_style}">{title} - Last {date_range} days</div>
+                <table style="{table_style}">
+                    <thead>
+                        <tr>{header_cells}</tr>
+                    </thead>
+                    <tbody>
+                        {rows_html}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    """

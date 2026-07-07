@@ -1,14 +1,14 @@
 import calendar, sqlite3
 from datetime import datetime, timedelta
 
-from app import config
+from app.db import db_connect
 
 import logging
 
 logger = logging.getLogger(__name__)
 
 def get_saved_email_lists():
-    conn = sqlite3.connect(config.DB_PATH)
+    conn = db_connect()
     cursor = conn.cursor()
     cursor.execute("SELECT id, name, emails FROM email_lists ORDER BY name")
     lists = cursor.fetchall()
@@ -16,7 +16,7 @@ def get_saved_email_lists():
     return [{'id': row[0], 'name': row[1], 'emails': row[2]} for row in lists]
 
 def save_email_list(name, emails):
-    conn = sqlite3.connect(config.DB_PATH)
+    conn = db_connect()
     cursor = conn.cursor()
     try:
         cursor.execute("""
@@ -35,7 +35,7 @@ def save_email_list(name, emails):
         conn.close()
 
 def delete_email_list(list_id):
-    conn = sqlite3.connect(config.DB_PATH)
+    conn = db_connect()
     cursor = conn.cursor()
     cursor.execute("DELETE FROM email_lists WHERE id = ?", (list_id,))
     conn.commit()
@@ -44,7 +44,7 @@ def delete_email_list(list_id):
 def get_email_schedules():
     MONTH_ABBR_PERIOD = ["Jan.", "Feb.", "Mar.", "Apr.", "May.", "Jun.", "Jul.", "Aug.", "Sep.", "Oct.", "Nov.", "Dec."]
     
-    conn = sqlite3.connect(config.DB_PATH)
+    conn = db_connect()
     cursor = conn.cursor()
     cursor.execute("""
         SELECT 
@@ -257,7 +257,7 @@ def calculate_next_send(frequency, start_date, send_time='09:00', last_sent=None
     return next_date
 
 def create_email_schedule(name, email_list_id, template_id, frequency, start_date, send_time='09:00', date_range=7, items_count=10):
-    conn = sqlite3.connect(config.DB_PATH)
+    conn = db_connect()
     cursor = conn.cursor()
     
     next_send = calculate_next_send(frequency, start_date, send_time)
@@ -278,7 +278,7 @@ def create_email_schedule(name, email_list_id, template_id, frequency, start_dat
         conn.close()
 
 def update_email_schedule(schedule_id, name, email_list_id, template_id, frequency, start_date, send_time='09:00', date_range=7, items_count=10):
-    conn = sqlite3.connect(config.DB_PATH)
+    conn = db_connect()
     cursor = conn.cursor()
     
     next_send = calculate_next_send(frequency, start_date, send_time)
@@ -302,21 +302,21 @@ def update_email_schedule(schedule_id, name, email_list_id, template_id, frequen
         conn.close()
 
 def delete_email_schedule(schedule_id):
-    conn = sqlite3.connect(config.DB_PATH)
+    conn = db_connect()
     cursor = conn.cursor()
     cursor.execute("DELETE FROM email_schedules WHERE id = ?", (schedule_id,))
     conn.commit()
     conn.close()
 
 def toggle_schedule_status(schedule_id, is_active):
-    conn = sqlite3.connect(config.DB_PATH)
+    conn = db_connect()
     cursor = conn.cursor()
     cursor.execute("UPDATE email_schedules SET is_active = ? WHERE id = ?", (is_active, schedule_id))
     conn.commit()
     conn.close()
 
 def update_schedule_last_sent(schedule_id):
-    conn = sqlite3.connect(config.DB_PATH)
+    conn = db_connect()
     cursor = conn.cursor()
     
     cursor.execute("SELECT frequency, start_date, send_time FROM email_schedules WHERE id = ?", (schedule_id,))

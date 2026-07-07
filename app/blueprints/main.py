@@ -1,10 +1,11 @@
 import secrets
-import sqlite3, time
+import time
 
 from flask import Blueprint, Response, jsonify, redirect, render_template, request, session, url_for
 from urllib.parse import quote
 
-from app import config, state
+from app import state
+from app.db import db_connect
 from app.cache import is_cache_valid, get_cached_data, get_cache_info, clear_cache
 from app.crypto import decrypt
 from app.settings_store import get_settings
@@ -82,7 +83,7 @@ def index():
         "logo_position": s["logo_position"],
     }
 
-    conn = sqlite3.connect(config.DB_PATH)
+    conn = db_connect()
     cursor = conn.cursor()
     if logo_filename == '' or logo_filename is None:
         if email_theme == 'custom':

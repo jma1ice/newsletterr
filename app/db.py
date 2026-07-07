@@ -6,6 +6,17 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+def db_connect(row_factory=None):
+    """Open a connection to the app database.
+
+    The single place for future connection-wide decisions (timeouts, WAL,
+    pragmas). Callers own closing, exactly as with sqlite3.connect before.
+    """
+    conn = sqlite3.connect(config.DB_PATH)
+    if row_factory is not None:
+        conn.row_factory = row_factory
+    return conn
+
 def init_db(db_path):
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
@@ -206,7 +217,7 @@ def migrate_data_from_separate_dbs():
     
     logger.info("Migrating data from separate database files to unified database...")
     
-    unified_conn = sqlite3.connect(config.DB_PATH)
+    unified_conn = db_connect()
     unified_cursor = unified_conn.cursor()
     
     try:
@@ -285,7 +296,7 @@ def migrate_data_from_separate_dbs():
         unified_conn.close()
 
 def migrate_schema(column_def):
-    conn = sqlite3.connect(config.DB_PATH)
+    conn = db_connect()
     try:
         col_name = column_def.split()[0]
         cursor = conn.execute("PRAGMA table_info('settings')")
@@ -297,7 +308,7 @@ def migrate_schema(column_def):
         conn.close()
 
 def migrate_musicseerr_to_droppedneedle():
-    conn = sqlite3.connect(config.DB_PATH)
+    conn = db_connect()
     try:
         cursor = conn.execute("PRAGMA table_info('settings')")
         columns = [row[1] for row in cursor.fetchall()]
@@ -328,7 +339,7 @@ def migrate_musicseerr_to_droppedneedle():
         conn.close()
 
 def migrate_ra_recs_to_recently_added_recommendations():
-    conn = sqlite3.connect(config.DB_PATH)
+    conn = db_connect()
     cursor = conn.cursor()
 
     cursor.execute("SELECT id, selected_items FROM email_templates")
@@ -365,7 +376,7 @@ def migrate_ra_recs_to_recently_added_recommendations():
 
 def migrate_email_templates_for_expanded_collections():
     try:
-        conn = sqlite3.connect(config.DB_PATH)
+        conn = db_connect()
         cursor = conn.cursor()
         
         cursor.execute("PRAGMA table_info(email_templates)")
@@ -384,7 +395,7 @@ def migrate_email_templates_for_expanded_collections():
 
 def migrate_email_templates_for_header_title():
     try:
-        conn = sqlite3.connect(config.DB_PATH)
+        conn = db_connect()
         cursor = conn.cursor()
 
         try:
@@ -413,7 +424,7 @@ def migrate_email_templates_for_header_title():
 
 def migrate_email_templates_for_custom_html():
     try:
-        conn = sqlite3.connect(config.DB_PATH)
+        conn = db_connect()
         cursor = conn.cursor()
         cursor.execute("PRAGMA table_info(email_templates)")
         columns = [column[1] for column in cursor.fetchall()]

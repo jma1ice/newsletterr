@@ -1,11 +1,11 @@
-import json, os, smtplib, sqlite3
+import json, os, smtplib
 
 from dataclasses import dataclass, field
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.utils import formataddr
 
-from app import config
+from app.db import db_connect
 from app.settings_store import get_settings
 from app.render import capture_chart_images_via_headless
 from app.clients.tautulli import run_tautulli_command
@@ -43,7 +43,7 @@ def send_scheduled_email(schedule_id, email_list_id, template_id):
 
 def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
     try:
-        schedule_conn = sqlite3.connect(config.DB_PATH)
+        schedule_conn = db_connect()
         schedule_cursor = schedule_conn.cursor()
         schedule_cursor.execute("SELECT date_range, items_count FROM email_schedules WHERE id = ?", (schedule_id,))
         schedule_result = schedule_cursor.fetchone()
@@ -74,7 +74,7 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
                 logger.info("Tautulli not configured for ALL list")
                 return False
         else:
-            email_lists_conn = sqlite3.connect(config.DB_PATH)
+            email_lists_conn = db_connect()
             email_lists_cursor = email_lists_conn.cursor()
             email_lists_cursor.execute("SELECT emails FROM email_lists WHERE id = ?", (email_list_id,))
             email_list_result = email_lists_cursor.fetchone()
@@ -87,7 +87,7 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
             to_emails = email_list_result[0]
             to_emails_list = [email.strip() for email in to_emails.split(",")]
         
-        templates_conn = sqlite3.connect(config.DB_PATH)
+        templates_conn = db_connect()
         templates_cursor = templates_conn.cursor()
         templates_cursor.execute("SELECT name, subject, email_text, selected_items, expanded_collections, email_header_title, custom_html FROM email_templates WHERE id = ?", (template_id,))
         template_result = templates_cursor.fetchone()
@@ -410,7 +410,7 @@ def send_scheduled_user_email_with_cids(ctx, settings, recipients, user_key):
         logger.info(f"Email sent successfully!")
 
         try:
-            history_conn = sqlite3.connect(config.DB_PATH)
+            history_conn = db_connect()
             history_cursor = history_conn.cursor()
             history_cursor.execute('''INSERT INTO email_history (subject, recipients, email_content, content_size_kb, recipient_count, template_name)
                             VALUES (?, ?, ?, ?, ?, ?)''',
@@ -600,7 +600,7 @@ def send_scheduled_single_email_with_cids(ctx, settings, to_emails_list):
         logger.info(f"Email sent successfully!")
 
         try:
-            history_conn = sqlite3.connect(config.DB_PATH)
+            history_conn = db_connect()
             history_cursor = history_conn.cursor()
             history_cursor.execute('''INSERT INTO email_history (subject, recipients, email_content, content_size_kb, recipient_count, template_name)
                             VALUES (?, ?, ?, ?, ?, ?)''',

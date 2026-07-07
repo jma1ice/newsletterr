@@ -1,10 +1,9 @@
 import secrets
-import sqlite3
 
 from datetime import datetime, timezone
 from flask import Blueprint, jsonify, redirect, render_template, request, session, url_for
 
-from app import config
+from app.db import db_connect
 from app.settings_store import get_settings
 from app.security import require_csrf_for_json, requires_auth
 from app.store import get_saved_email_lists, save_email_list, delete_email_list
@@ -48,7 +47,7 @@ def send_email():
 @requires_auth
 def email_history():
     try:
-        conn = sqlite3.connect(config.DB_PATH)
+        conn = db_connect()
         cursor = conn.cursor()
         cursor.execute("""
             SELECT id, subject, recipients, content_size_kb, recipient_count, sent_at, template_name
@@ -91,7 +90,7 @@ def email_history():
 def clear_email_history():
     require_csrf_for_json()
     try:
-        conn = sqlite3.connect(config.DB_PATH)
+        conn = db_connect()
         cursor = conn.cursor()
         cursor.execute("DELETE FROM email_history")
         conn.commit()
@@ -105,7 +104,7 @@ def clear_email_history():
 @requires_auth
 def get_email_recipients(email_id):
     try:
-        conn = sqlite3.connect(config.DB_PATH)
+        conn = db_connect()
         cursor = conn.cursor()
         cursor.execute("SELECT recipients, subject FROM email_history WHERE id = ?", (email_id,))
         result = cursor.fetchone()
@@ -167,7 +166,7 @@ def delete_email_list_route(list_id):
 @requires_auth
 def get_email_templates():
     try:
-        conn = sqlite3.connect(config.DB_PATH)
+        conn = db_connect()
         cursor = conn.cursor()
         cursor.execute("SELECT id, name, selected_items, email_text, subject, expanded_collections, email_header_title, custom_html FROM email_templates ORDER BY name")
         templates = cursor.fetchall()
@@ -208,7 +207,7 @@ def save_email_template():
         if not name:
             return jsonify({"status": "error", "message": "Template name is required"}), 400
         
-        conn = sqlite3.connect(config.DB_PATH)
+        conn = db_connect()
         cursor = conn.cursor()
         
         cursor.execute("SELECT id FROM email_templates WHERE name = ?", (name,))
@@ -240,7 +239,7 @@ def save_email_template():
 @requires_auth
 def delete_email_template(template_id):
     try:
-        conn = sqlite3.connect(config.DB_PATH)
+        conn = db_connect()
         cursor = conn.cursor()
         cursor.execute("DELETE FROM email_templates WHERE id = ?", (template_id,))
         conn.commit()

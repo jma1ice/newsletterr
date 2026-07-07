@@ -1,10 +1,11 @@
-import sqlite3, uuid
+import uuid
 
 from datetime import datetime, timedelta
 from plex_api_client import PlexAPI
 from urllib.parse import quote_plus
 
 from app import config
+from app.db import db_connect
 from app.settings_store import get_settings
 from app.crypto import decrypt
 from app.security import safe_get
@@ -21,7 +22,7 @@ def get_plex_client_identifier():
         if row and row[0]:
             return row[0]
         client_id = str(uuid.uuid4())
-        conn = sqlite3.connect(config.DB_PATH)
+        conn = db_connect()
         cursor = conn.cursor()
         cursor.execute("UPDATE settings SET plex_client_id = ? WHERE id = 1", (client_id,))
         conn.commit()

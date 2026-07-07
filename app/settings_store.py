@@ -1,6 +1,6 @@
 import sqlite3
 
-from app import config
+from app.db import db_connect
 from app.crypto import decrypt
 
 # Columns stored encrypted; get_settings() returns them decrypted unless
@@ -49,8 +49,7 @@ def get_settings(decrypt_secrets=True):
     the row doesn't exist yet (fresh install before first save).
 
     Safe to call from background threads: no Flask context involved."""
-    conn = sqlite3.connect(config.DB_PATH)
-    conn.row_factory = sqlite3.Row
+    conn = db_connect(row_factory=sqlite3.Row)
     try:
         row = conn.execute("SELECT * FROM settings WHERE id = 1").fetchone()
     finally:

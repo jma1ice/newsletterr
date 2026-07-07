@@ -1,10 +1,10 @@
 import secrets
-import calendar, json, sqlite3
+import calendar, json
 
 from datetime import datetime, timedelta
 from flask import Blueprint, jsonify, render_template, request, session
 
-from app import config
+from app.db import db_connect
 from app.settings_store import get_settings
 from app.cache import can_use_cached_data_for_preview, get_cached_data
 from app.security import require_csrf_for_json, requires_auth
@@ -28,7 +28,7 @@ def scheduling():
         schedules = get_email_schedules()
         email_lists = get_saved_email_lists()
         
-        templates_conn = sqlite3.connect(config.DB_PATH)
+        templates_conn = db_connect()
         templates_cursor = templates_conn.cursor()
         templates_cursor.execute("SELECT id, name FROM email_templates ORDER BY name")
         templates = [{'id': row[0], 'name': row[1]} for row in templates_cursor.fetchall()]
@@ -126,7 +126,7 @@ def delete_schedule(schedule_id):
 def send_schedule_now(schedule_id):
     require_csrf_for_json()
     try:
-        conn = sqlite3.connect(config.DB_PATH)
+        conn = db_connect()
         cursor = conn.cursor()
         cursor.execute("""
             SELECT id, name, email_list_id, template_id, frequency, is_active
@@ -147,7 +147,7 @@ def send_schedule_now(schedule_id):
         if success:
             current_time = datetime.now().isoformat()
             
-            update_conn = sqlite3.connect(config.DB_PATH)
+            update_conn = db_connect()
             update_cursor = update_conn.cursor()
             update_cursor.execute("""
                 UPDATE email_schedules 
@@ -184,7 +184,7 @@ def toggle_schedule(schedule_id):
 @requires_auth
 def preview_schedule(schedule_id):
     try:
-        conn = sqlite3.connect(config.DB_PATH)
+        conn = db_connect()
         cursor = conn.cursor()
         cursor.execute("""
             SELECT template_id, date_range, email_list_id, items_count
@@ -201,7 +201,7 @@ def preview_schedule(schedule_id):
         date_range = date_range or 7
         items_count = items_count or 10
         
-        templates_conn = sqlite3.connect(config.DB_PATH)
+        templates_conn = db_connect()
         templates_cursor = templates_conn.cursor()
         templates_cursor.execute("SELECT name, subject, email_text, selected_items, expanded_collections, email_header_title, custom_html FROM email_templates WHERE id = ?", (template_id,))
         template_result = templates_cursor.fetchone()
@@ -226,7 +226,7 @@ def preview_schedule(schedule_id):
             logger.debug("suppressed exception; using fallback", exc_info=True)
             expanded_collections = {}
 
-        email_lists_conn = sqlite3.connect(config.DB_PATH)
+        email_lists_conn = db_connect()
         email_lists_cursor = email_lists_conn.cursor()
         email_lists_cursor.execute("SELECT emails FROM email_lists WHERE id = ?", (email_list_id,))
         email_list_result = email_lists_cursor.fetchone()
@@ -358,7 +358,7 @@ def preview_schedule(schedule_id):
 @bp.route('/scheduling/<int:schedule_id>/preview-page', methods=['GET'])
 @requires_auth
 def preview_schedule_page(schedule_id):
-    conn = sqlite3.connect(config.DB_PATH)
+    conn = db_connect()
     cursor = conn.cursor()
     try:
         cursor.execute("SELECT date_range FROM email_schedules WHERE id = ?", (schedule_id,))
@@ -468,7 +468,7 @@ def get_calendar_data():
         month = int(request.args.get('month', datetime.now().month))
         year = int(request.args.get('year', datetime.now().year))
         
-        conn = sqlite3.connect(config.DB_PATH)
+        conn = db_connect()
         cursor = conn.cursor()
         cursor.execute("""
             SELECT id, name, frequency, start_date, send_time, next_send, is_active, template_id

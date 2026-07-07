@@ -1,8 +1,9 @@
-import sqlite3, threading, time
+import threading, time
 
 from datetime import datetime
 
 from app import config, state
+from app.db import db_connect
 from app.settings_store import get_settings
 from app.cache import get_cache_info, set_cached_data
 from app.store import update_schedule_last_sent
@@ -43,7 +44,7 @@ def background_scheduler():
                     refresh_daily_cache()
                     last_cache_refresh = current_time
             
-            conn = sqlite3.connect(config.DB_PATH)
+            conn = db_connect()
             cursor = conn.cursor()
             
             cursor.execute("SELECT id, name, next_send, is_active FROM email_schedules")

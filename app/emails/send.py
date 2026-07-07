@@ -1,4 +1,4 @@
-import json, os, smtplib, sqlite3
+import json, os, smtplib
 
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -6,7 +6,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.utils import formataddr
 
-from app import config
+from app.db import db_connect
 from app.clients.tautulli import run_tautulli_command
 from app.emails.assemble import convert_html_to_plain_text, build_email_html_with_all_cids
 from app.emails.fetchers import get_current_tautulli_data_for_email, get_recommendations_for_users, get_droppedneedle_wrapped_for_users, get_droppedneedle_server_stats_cached
@@ -159,7 +159,7 @@ def send_standard_email_with_cids(req, settings, to_emails):
         logger.info(f"Email sent successfully!")
 
         try:
-            history_conn = sqlite3.connect(config.DB_PATH)
+            history_conn = db_connect()
             history_cursor = history_conn.cursor()
             history_cursor.execute("""
                 INSERT INTO email_history (subject, recipients, email_content, content_size_kb, recipient_count, template_name)
@@ -387,7 +387,7 @@ def send_single_user_email_with_cids(req, settings, recipients, user_key, recomm
         logger.info(f"Email sent successfully!")
 
         try:
-            history_conn = sqlite3.connect(config.DB_PATH)
+            history_conn = db_connect()
             history_cursor = history_conn.cursor()
             history_cursor.execute("""
                 INSERT INTO email_history (subject, recipients, email_content, content_size_kb, recipient_count, template_name)

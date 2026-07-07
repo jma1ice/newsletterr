@@ -1,10 +1,10 @@
-import sqlite3
 
 import requests
 from flask import Blueprint, jsonify, request
 from urllib.parse import quote_plus, urlparse
 
 from app import config, state
+from app.db import db_connect
 from app.settings_store import get_settings
 from app.cache import gkak
 from app.crypto import encrypt, decrypt
@@ -172,7 +172,7 @@ def plex_poll_pin(pin_id: int):
 
     token = res.auth_pin_container.auth_token
     if token:
-        conn = sqlite3.connect(config.DB_PATH)
+        conn = db_connect()
         cursor = conn.cursor()
         cursor.execute("""
             INSERT INTO settings (id, plex_token)
@@ -217,7 +217,7 @@ def plex_get_info():
     if not best_url:
         return jsonify({"connected": False, "error": "No suitable connection found"})
 
-    conn = sqlite3.connect(config.DB_PATH)
+    conn = db_connect()
     conn.execute("""
         INSERT INTO settings (id, server_name, plex_url)
         VALUES (1, ?, ?)

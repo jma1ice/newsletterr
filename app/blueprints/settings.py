@@ -1,10 +1,10 @@
 import secrets
-import os, sqlite3, time
+import os, time
 
 from flask import Blueprint, abort, current_app, jsonify, redirect, render_template, request, session, url_for
 from PIL import Image
 
-from app import config
+from app.db import db_connect
 from app.settings_store import get_settings
 from app.crypto import encrypt, decrypt
 from app.hooks import refresh_hsts_setting
@@ -19,7 +19,7 @@ bp = Blueprint('settings', __name__)
 @bp.route('/settings', methods=['GET', 'POST'])
 @requires_auth
 def settings():
-    conn = sqlite3.connect(config.DB_PATH)
+    conn = db_connect()
     cursor = conn.cursor()
 
     alert = request.args.get('alert')
@@ -468,7 +468,7 @@ def upload_logo():
         with Image.open(file_path) as img:
             width, height = img.size
 
-        conn = sqlite3.connect(config.DB_PATH)
+        conn = db_connect()
         cursor = conn.cursor()
         cursor.execute("""
             INSERT INTO settings (id, logo_filename, custom_logo_filename) 
@@ -496,7 +496,7 @@ def upload_logo():
 def delete_logo():
     require_csrf_for_json()
     try:
-        conn = sqlite3.connect(config.DB_PATH)
+        conn = db_connect()
         cursor = conn.cursor()
 
         cursor.execute("SELECT custom_logo_filename FROM settings WHERE id = 1")

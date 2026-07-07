@@ -1,5 +1,9 @@
 from app.settings_store import DEFAULTS, get_settings
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 THEME_KEYS = ('primary_color', 'secondary_color', 'accent_color', 'background_color', 'text_color', 'email_theme')
 
 def get_theme_settings():
@@ -7,7 +11,7 @@ def get_theme_settings():
         s = get_settings(decrypt_secrets=False)
         return {key: s[key] for key in THEME_KEYS}
     except Exception as e:
-        print(f"Error getting theme settings: {e}")
+        logger.error(f"Error getting theme settings: {e}")
         return {key: DEFAULTS[key] for key in THEME_KEYS}
 
 def get_email_theme_colors():

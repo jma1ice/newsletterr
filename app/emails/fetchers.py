@@ -1,6 +1,5 @@
-import sqlite3, time, traceback
+import time
 
-from app import config
 from app.settings_store import get_settings
 from app.cache import get_cached_data, set_cached_data
 from app.crypto import decrypt
@@ -8,6 +7,10 @@ from app.clients.tautulli import run_tautulli_command
 from app.clients.plex import fetch_recently_added_using_plex_sdk
 from app.clients.conjurr import run_conjurr_command
 from app.clients.droppedneedle import run_droppedneedle_command, fetch_droppedneedle_server_stats
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 def fetch_tautulli_data_for_email(tautulli_base_url, tautulli_api_key, date_range, server_name, items_count=10, stats_type='plays', recently_added_mode='items', recently_added_sort='date'):
     data = {
@@ -45,7 +48,7 @@ def fetch_tautulli_data_for_email(tautulli_base_url, tautulli_api_key, date_rang
                 graph_data.append(gd if gd is not None else {})
             except Exception as e:
                 graph_data.append({})
-                print(f"Error fetching graph data for {command['name']}: {e}")
+                logger.error(f"Error fetching graph data for {command['name']}: {e}")
         
         data['graph_data'] = graph_data
         data['graph_commands'] = graph_commands
@@ -53,11 +56,10 @@ def fetch_tautulli_data_for_email(tautulli_base_url, tautulli_api_key, date_rang
         recent_data = fetch_recently_added_using_plex_sdk(tautulli_base_url, tautulli_api_key, items_count, recently_added_mode=recently_added_mode, recently_added_sort=recently_added_sort)
         data['recent_data'] = recent_data
                 
-        print(f"Fetched Tautulli data: {len(data['stats'])} stats, {len(data['graph_data'])} graphs, {len(data['recent_data'])} recent sections")
+        logger.info(f"Fetched Tautulli data: {len(data['stats'])} stats, {len(data['graph_data'])} graphs, {len(data['recent_data'])} recent sections")
         
     except Exception as e:
-        print(f"Error fetching Tautulli data: {e}")
-        traceback.print_exc()
+        logger.exception(f"Error fetching Tautulli data: {e}")
     
     return data
 
@@ -102,7 +104,7 @@ def get_current_tautulli_data_for_email(settings):
         ]
         
     except Exception as e:
-        print(f"Error getting current Tautulli data: {e}")
+        logger.error(f"Error getting current Tautulli data: {e}")
     
     return data
 
@@ -119,12 +121,12 @@ def get_recommendations_for_users(user_keys, to_emails, user_dict, use_cache=Tru
                 required_user_keys = set(str(k) for k in filtered_users.keys())
                 
                 if required_user_keys.issubset(cached_user_keys):
-                    print(f"Using cached recommendations for users: {list(required_user_keys)}")
+                    logger.info(f"Using cached recommendations for users: {list(required_user_keys)}")
                     return {k: v for k, v in cached_recommendations.items() if str(k) in required_user_keys}
                 else:
-                    print(f"Cache miss - need users {required_user_keys}, cache has {cached_user_keys}")
+                    logger.info(f"Cache miss - need users {required_user_keys}, cache has {cached_user_keys}")
             else:
-                print("No cached recommendations available")
+                logger.info("No cached recommendations available")
 
         _s = get_settings(decrypt_secrets=False)
         row = (_s.get("conjurr_url"),) if "id" in _s else None
@@ -145,12 +147,12 @@ def get_recommendations_for_users(user_keys, to_emails, user_dict, use_cache=Tru
             cache_params = {'timestamp': time.time(), 'manual_fetch': True}
             set_cached_data('recommendations_json', recommendations_data, cache_params)
             set_cached_data('filtered_users', filtered_users, cache_params)
-            print("Cached fresh recommendations data")
+            logger.info("Cached fresh recommendations data")
 
         return recommendations_data or {}
 
     except Exception as e:
-        print(f"Error getting recommendations: {e}")
+        logger.error(f"Error getting recommendations: {e}")
         return {}
 
 def get_droppedneedle_wrapped_for_users(user_keys, to_emails, user_dict, use_cache=True):
@@ -166,12 +168,12 @@ def get_droppedneedle_wrapped_for_users(user_keys, to_emails, user_dict, use_cac
                 required_user_keys = set(str(k) for k in filtered_users.keys())
 
                 if required_user_keys.issubset(cached_user_keys):
-                    print(f"Using cached DroppedNeedle wrapped data for users: {list(required_user_keys)}")
+                    logger.info(f"Using cached DroppedNeedle wrapped data for users: {list(required_user_keys)}")
                     return {k: v for k, v in cached_wrapped.items() if str(k) in required_user_keys}
                 else:
-                    print(f"Cache miss - need users {required_user_keys}, cache has {cached_user_keys}")
+                    logger.info(f"Cache miss - need users {required_user_keys}, cache has {cached_user_keys}")
             else:
-                print("No cached DroppedNeedle wrapped data available")
+                logger.info("No cached DroppedNeedle wrapped data available")
 
         _s = get_settings(decrypt_secrets=False)
         row = (_s.get("droppedneedle_url"), _s.get("droppedneedle_api_key")) if "id" in _s else None
@@ -193,12 +195,12 @@ def get_droppedneedle_wrapped_for_users(user_keys, to_emails, user_dict, use_cac
             cache_params = {'timestamp': time.time(), 'manual_fetch': True}
             set_cached_data('droppedneedle_wrapped_json', wrapped_data, cache_params)
             set_cached_data('droppedneedle_filtered_users', filtered_users, cache_params)
-            print("Cached fresh DroppedNeedle wrapped data")
+            logger.info("Cached fresh DroppedNeedle wrapped data")
 
         return wrapped_data or {}
 
     except Exception as e:
-        print(f"Error getting DroppedNeedle wrapped data: {e}")
+        logger.error(f"Error getting DroppedNeedle wrapped data: {e}")
         return {}
 
 def get_droppedneedle_server_stats_cached(use_cache=True):
@@ -225,5 +227,5 @@ def get_droppedneedle_server_stats_cached(use_cache=True):
         return server_data
 
     except Exception as e:
-        print(f"Error getting DroppedNeedle server stats: {e}")
+        logger.error(f"Error getting DroppedNeedle server stats: {e}")
         return None

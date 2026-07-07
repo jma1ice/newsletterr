@@ -1,17 +1,19 @@
 import json, os, smtplib, sqlite3
 
 from collections import defaultdict
+from dataclasses import dataclass, field
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.utils import formataddr
-from flask import jsonify
 
 from app import config
-from app.settings_store import get_settings
-from app.crypto import decrypt
 from app.clients.tautulli import run_tautulli_command
 from app.emails.assemble import convert_html_to_plain_text, build_email_html_with_all_cids
 from app.emails.fetchers import get_current_tautulli_data_for_email, get_recommendations_for_users, get_droppedneedle_wrapped_for_users, get_droppedneedle_server_stats_cached
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 def group_recipients_by_user(to_emails_list, user_dict):
     email_to_user = { (v or '').strip().lower(): k for k, v in (user_dict or {}).items() if v }
@@ -21,19 +23,45 @@ def group_recipients_by_user(to_emails_list, user_dict):
         groups[key].append(email)
     return groups
 
-def send_standard_email_with_cids(to_emails, subject, email_header_title, selected_items, from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, settings, from_name, custom_html, expanded_collections=None, send_mode='bcc'):
+@dataclass
+class SendRequest:
+    """Per-request data for a manual send; settings travel separately."""
+    subject: str
+    email_header_title: str
+    selected_items: list
+    custom_html: str = ''
+    expanded_collections: dict = field(default_factory=dict)
+    user_dict: dict = field(default_factory=dict)
+
+def send_standard_email_with_cids(req, settings, to_emails):
+    """Returns (payload, http_status), the route wraps it in jsonify."""
     try:
-        print(f"SMTP Config: {smtp_server}:{smtp_port} using {smtp_protocol}")
+        from_email = settings.get("from_email") or ""
+        alias_email = settings.get("alias_email") or ""
+        reply_to_email = settings.get("reply_to_email") or ""
+        password = settings.get("password") or ""
+        smtp_username = settings.get("smtp_username") or ""
+        smtp_server = settings.get("smtp_server") or ""
+        smtp_port = int(settings.get("smtp_port") or 587)
+        smtp_protocol = settings.get("smtp_protocol") or "TLS"
+        from_name = settings.get("from_name") or ""
+        send_mode = settings.get("send_mode") or "bcc"
+        subject = req.subject
+        email_header_title = req.email_header_title
+        selected_items = req.selected_items
+        custom_html = req.custom_html
+        expanded_collections = req.expanded_collections
+        logger.info(f"SMTP Config: {smtp_server}:{smtp_port} using {smtp_protocol}")
 
         if smtp_port == 465 and smtp_protocol == 'TLS':
-            print("WARNING: Port 465 with TLS protocol detected!")
-            print("Port 465 requires SSL protocol. Consider changing to:")
-            print("- Port 587 with TLS, OR")
-            print("- Port 465 with SSL")
+            logger.warning("WARNING: Port 465 with TLS protocol detected!")
+            logger.info("Port 465 requires SSL protocol. Consider changing to:")
+            logger.info("- Port 587 with TLS, OR")
+            logger.info("- Port 465 with SSL")
         
         if smtp_port == 587 and smtp_protocol == 'SSL':
-            print("WARNING: Port 587 with SSL protocol detected!")
-            print("Port 587 typically uses TLS (STARTTLS)")
+            logger.warning("WARNING: Port 587 with SSL protocol detected!")
+            logger.info("Port 587 typically uses TLS (STARTTLS)")
 
         msg_root = MIMEMultipart('related')
         msg_root['Subject'] = subject
@@ -56,7 +84,7 @@ def send_standard_email_with_cids(to_emails, subject, email_header_title, select
         msg_alternative = MIMEMultipart('alternative')
         msg_root.attach(msg_alternative)
 
-        print("Building email content...")
+        logger.info("Building email content...")
         tautulli_data = get_current_tautulli_data_for_email(settings)
         droppedneedle_server_data = get_droppedneedle_server_stats_cached(use_cache=True)
 
@@ -91,32 +119,32 @@ def send_standard_email_with_cids(to_emails, subject, email_header_title, select
         msg_alternative.attach(MIMEText(plain_text, 'plain', 'utf-8'))
         msg_alternative.attach(MIMEText(email_html, 'html', 'utf-8'))
 
-        print(f"Attempting SMTP connection...")
+        logger.info(f"Attempting SMTP connection...")
 
         if smtp_protocol == 'SSL':
-            print(f"Using SMTP_SSL on port {smtp_port}")
+            logger.info(f"Using SMTP_SSL on port {smtp_port}")
             server = smtplib.SMTP_SSL(smtp_server, smtp_port)
             login_username = smtp_username if smtp_username else from_email
-            server.login(login_username, decrypt(password))
+            server.login(login_username, password)
         else:
-            print(f"Using SMTP with STARTTLS on port {smtp_port}")
+            logger.info(f"Using SMTP with STARTTLS on port {smtp_port}")
             server = smtplib.SMTP(smtp_server, smtp_port)
-            print("Starting TLS...")
+            logger.info("Starting TLS...")
             server.starttls()
             login_username = smtp_username if smtp_username else from_email
-            server.login(login_username, decrypt(password))
+            server.login(login_username, password)
 
-        print("SMTP connection established successfully")
+        logger.info("SMTP connection established successfully")
             
         email_content = msg_root.as_string()
 
         content_size_kb = len(email_content.encode('utf-8')) / 1024
         content_size_mb = len(email_content.encode('utf-8')) / (1024 * 1024)
-        print(f"Email size: {content_size_mb:.2f} MB")
+        logger.info(f"Email size: {content_size_mb:.2f} MB")
         if content_size_mb > 25:
-            print("WARNING: Email exceeds typical size limits")
+            logger.warning("WARNING: Email exceeds typical size limits")
 
-        print("Sending email...")
+        logger.info("Sending email...")
 
         from_addr = alias_email if alias_email else from_email
         if send_mode == 'to':
@@ -128,7 +156,7 @@ def send_standard_email_with_cids(to_emails, subject, email_header_title, select
             server.sendmail(from_addr, [from_addr] + to_emails, email_content)
             all_recipients = [from_addr] + to_emails
 
-        print(f"Email sent successfully!")
+        logger.info(f"Email sent successfully!")
 
         try:
             history_conn = sqlite3.connect(config.DB_PATH)
@@ -147,24 +175,27 @@ def send_standard_email_with_cids(to_emails, subject, email_header_title, select
             history_conn.commit()
             history_conn.close()
         except Exception as history_error:
-            print(f"Error saving email history: {history_error}")
+            logger.error(f"Error saving email history: {history_error}")
 
         server.quit()
-        return jsonify({"success": True, "sent_to": ', '.join(all_recipients), "size": content_size_kb})
+        return {"success": True, "sent_to": ', '.join(all_recipients), "size": content_size_kb}, 200
     except smtplib.SMTPConnectError as e:
-        print(f"SMTP Connection Error: {e}")
-        print("This often indicates wrong port/protocol combination")
-        return False
+        logger.error(f"SMTP Connection Error: {e}")
+        logger.warning("This often indicates wrong port/protocol combination")
+        return {"error": f"SMTP connection error: {e}"}, 500
     except smtplib.SMTPServerDisconnected as e:
-        print(f"SMTP Server Disconnected: {e}")
-        print("Server closed connection - likely protocol mismatch")
-        return False
+        logger.warning(f"SMTP Server Disconnected: {e}")
+        logger.warning("Server closed connection - likely protocol mismatch")
+        return {"error": f"SMTP server disconnected: {e}"}, 500
     except Exception as e:
-        print("SMTP send error:", e)
-        return jsonify({"error": str(e)}), 500
+        logger.error(f"SMTP send error: {e}")
+        return {"error": str(e)}, 500
 
-def send_recommendations_email_with_cids(to_emails, subject, email_header_title, user_dict, selected_items, from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, settings, from_name, custom_html, expanded_collections=None, send_mode='bcc'):
+def send_recommendations_email_with_cids(req, settings, to_emails):
+    """Returns (payload, http_status), the route wraps it in jsonify."""
     try:
+        selected_items = req.selected_items
+        user_dict = req.user_dict
         rec_user_keys = set()
         wrapped_user_keys = set()
         for item in selected_items:
@@ -176,20 +207,16 @@ def send_recommendations_email_with_cids(to_emails, subject, email_header_title,
         personalized_user_keys = rec_user_keys | wrapped_user_keys
 
         if not personalized_user_keys:
-            return send_standard_email_with_cids(
-                to_emails, subject, email_header_title, selected_items, from_email, alias_email,
-                reply_to_email, password, smtp_username, smtp_server, smtp_port,
-                smtp_protocol, settings, from_name, custom_html, expanded_collections, send_mode=send_mode
-            )
+            return send_standard_email_with_cids(req, settings, to_emails)
 
         recommendations_data = get_recommendations_for_users(rec_user_keys, to_emails, user_dict, use_cache=True) if rec_user_keys else {}
         droppedneedle_wrapped_data = get_droppedneedle_wrapped_for_users(wrapped_user_keys, to_emails, user_dict, use_cache=True) if wrapped_user_keys else {}
         droppedneedle_server_data = get_droppedneedle_server_stats_cached(use_cache=True)
 
         if rec_user_keys and not recommendations_data:
-            return jsonify({"error": "No recommendations data available. Please pull recommendations first."}), 400
+            return {"error": "No recommendations data available. Please pull recommendations first."}, 400
         if wrapped_user_keys and not droppedneedle_wrapped_data:
-            return jsonify({"error": "No DroppedNeedle wrapped data available. Please pull DroppedNeedle stats first."}), 400
+            return {"error": "No DroppedNeedle wrapped data available. Please pull DroppedNeedle stats first."}, 400
 
         groups = group_recipients_by_user(to_emails, user_dict)
 
@@ -198,14 +225,14 @@ def send_recommendations_email_with_cids(to_emails, subject, email_header_title,
 
         for user_key, recipients in groups.items():
             if user_key is None or user_key not in personalized_user_keys:
-                print("Skipping recipients without recommendations or wrapped stats:", recipients)
+                logger.info(f"Skipping recipients without recommendations or wrapped stats: {recipients}")
                 continue
 
             success = send_single_user_email_with_cids(
-                recipients, subject, email_header_title, selected_items, user_key, recommendations_data,
-                from_email, alias_email, reply_to_email, password, smtp_username,
-                smtp_server, smtp_port, smtp_protocol, settings, from_name, custom_html, expanded_collections,
-                send_mode=send_mode, droppedneedle_wrapped_data=droppedneedle_wrapped_data, droppedneedle_server_data=droppedneedle_server_data
+                req, settings, recipients, user_key,
+                recommendations_data=recommendations_data,
+                droppedneedle_wrapped_data=droppedneedle_wrapped_data,
+                droppedneedle_server_data=droppedneedle_server_data,
             )
 
             if success:
@@ -213,34 +240,46 @@ def send_recommendations_email_with_cids(to_emails, subject, email_header_title,
                 sent_info.append(', '.join(recipients))
 
         if total_sent == 0:
-            return jsonify({"error": "No recipients matched a recommendations or wrapped stats block. No emails sent."}), 400
+            return {"error": "No recipients matched a recommendations or wrapped stats block. No emails sent."}, 400
 
-        return jsonify({"success": True, "sent_groups": sent_info})
+        return {"success": True, "sent_groups": sent_info}, 200
 
     except Exception as e:
-        print("Error in send_recommendations_email_with_cids:", e)
-        return jsonify({"error": str(e)}), 500
+        logger.error("%s %s", "Error in send_recommendations_email_with_cids:", e)
+        return {"error": str(e)}, 500
 
-def send_single_user_email_with_cids(recipients, subject, email_header_title, selected_items, user_key, recommendations_data, from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, settings, from_name, custom_html, expanded_collections=None, send_mode='bcc', droppedneedle_wrapped_data=None, droppedneedle_server_data=None):
+def send_single_user_email_with_cids(req, settings, recipients, user_key, recommendations_data=None, droppedneedle_wrapped_data=None, droppedneedle_server_data=None):
     try:
-        print(f"SMTP Config: {smtp_server}:{smtp_port} using {smtp_protocol}")
+        from_email = settings.get("from_email") or ""
+        alias_email = settings.get("alias_email") or ""
+        reply_to_email = settings.get("reply_to_email") or ""
+        password = settings.get("password") or ""
+        smtp_username = settings.get("smtp_username") or ""
+        smtp_server = settings.get("smtp_server") or ""
+        smtp_port = int(settings.get("smtp_port") or 587)
+        smtp_protocol = settings.get("smtp_protocol") or "TLS"
+        from_name = settings.get("from_name") or ""
+        send_mode = settings.get("send_mode") or "bcc"
+        subject = req.subject
+        email_header_title = req.email_header_title
+        selected_items = req.selected_items
+        custom_html = req.custom_html
+        expanded_collections = req.expanded_collections
+        logger.info(f"SMTP Config: {smtp_server}:{smtp_port} using {smtp_protocol}")
 
         if smtp_port == 465 and smtp_protocol == 'TLS':
-            print("WARNING: Port 465 with TLS protocol detected!")
-            print("Port 465 requires SSL protocol. Consider changing to:")
-            print("- Port 587 with TLS, OR")
-            print("- Port 465 with SSL")
+            logger.warning("WARNING: Port 465 with TLS protocol detected!")
+            logger.info("Port 465 requires SSL protocol. Consider changing to:")
+            logger.info("- Port 587 with TLS, OR")
+            logger.info("- Port 465 with SSL")
         
         if smtp_port == 587 and smtp_protocol == 'SSL':
-            print("WARNING: Port 587 with SSL protocol detected!")
-            print("Port 587 typically uses TLS (STARTTLS)")
+            logger.warning("WARNING: Port 587 with SSL protocol detected!")
+            logger.info("Port 587 typically uses TLS (STARTTLS)")
 
-        _s = get_settings(decrypt_secrets=False)
-        settings_row = (_s.get("recipient_display_name"), _s.get("tautulli_url"), _s.get("tautulli_api")) if "id" in _s else None
-        
-        display_preference = settings_row[0] if settings_row and settings_row[0] else 'email'
-        tautulli_url = settings_row[1] if settings_row else None
-        tautulli_api = settings_row[2] if settings_row else None
+        display_preference = settings["recipient_display_name"]
+        tautulli_url = settings.get("tautulli_url")
+        tautulli_api = settings.get("tautulli_api")
         
         users_full_data = None
         if tautulli_url and tautulli_api:
@@ -270,7 +309,7 @@ def send_single_user_email_with_cids(recipients, subject, email_header_title, se
         msg_alternative = MIMEMultipart('alternative')
         msg_root.attach(msg_alternative)
 
-        print("Building email content...")
+        logger.info("Building email content...")
         tautulli_data = get_current_tautulli_data_for_email(settings)
         
         template_data = {
@@ -307,32 +346,32 @@ def send_single_user_email_with_cids(recipients, subject, email_header_title, se
         msg_alternative.attach(MIMEText(plain_text, 'plain', 'utf-8'))
         msg_alternative.attach(MIMEText(email_html, 'html', 'utf-8'))
 
-        print(f"Attempting SMTP connection...")
+        logger.info(f"Attempting SMTP connection...")
 
         if smtp_protocol == 'SSL':
-            print(f"Using SMTP_SSL on port {smtp_port}")
+            logger.info(f"Using SMTP_SSL on port {smtp_port}")
             server = smtplib.SMTP_SSL(smtp_server, smtp_port)
             login_username = smtp_username if smtp_username else from_email
-            server.login(login_username, decrypt(password))
+            server.login(login_username, password)
         else:
-            print(f"Using SMTP with STARTTLS on port {smtp_port}")
+            logger.info(f"Using SMTP with STARTTLS on port {smtp_port}")
             server = smtplib.SMTP(smtp_server, smtp_port)
-            print("Starting TLS...")
+            logger.info("Starting TLS...")
             server.starttls()
             login_username = smtp_username if smtp_username else from_email
-            server.login(login_username, decrypt(password))
+            server.login(login_username, password)
 
-        print("SMTP connection established successfully")
+        logger.info("SMTP connection established successfully")
             
         email_content = msg_root.as_string()
 
         content_size_kb = len(email_content.encode('utf-8')) / 1024
         content_size_mb = len(email_content.encode('utf-8')) / (1024 * 1024)
-        print(f"Email size: {content_size_mb:.2f} MB")
+        logger.info(f"Email size: {content_size_mb:.2f} MB")
         if content_size_mb > 25:
-            print("WARNING: Email exceeds typical size limits")
+            logger.warning("WARNING: Email exceeds typical size limits")
         
-        print("Sending email...")
+        logger.info("Sending email...")
 
         from_addr = alias_email if alias_email else from_email
         if send_mode == 'to':
@@ -345,7 +384,7 @@ def send_single_user_email_with_cids(recipients, subject, email_header_title, se
             all_recipients = [from_addr] + recipients
 
         server.quit()
-        print(f"Email sent successfully!")
+        logger.info(f"Email sent successfully!")
 
         try:
             history_conn = sqlite3.connect(config.DB_PATH)
@@ -364,17 +403,17 @@ def send_single_user_email_with_cids(recipients, subject, email_header_title, se
             history_conn.commit()
             history_conn.close()
         except Exception as history_error:
-            print(f"Error saving email history: {history_error}")
+            logger.error(f"Error saving email history: {history_error}")
         
         return True
     except smtplib.SMTPConnectError as e:
-        print(f"SMTP Connection Error: {e}")
-        print("This often indicates wrong port/protocol combination")
+        logger.error(f"SMTP Connection Error: {e}")
+        logger.warning("This often indicates wrong port/protocol combination")
         return False
     except smtplib.SMTPServerDisconnected as e:
-        print(f"SMTP Server Disconnected: {e}")
-        print("Server closed connection - likely protocol mismatch")
+        logger.warning(f"SMTP Server Disconnected: {e}")
+        logger.warning("Server closed connection - likely protocol mismatch")
         return False
     except Exception as e:
-        print(f"Error sending single user email: {e}")
+        logger.error(f"Error sending single user email: {e}")
         return False

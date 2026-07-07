@@ -5,6 +5,10 @@ from app import config, state
 from app.settings_store import get_settings
 from app.clients.github import _ensure_recent_check
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 def inject_update_info():
     _ensure_recent_check()
     return {
@@ -21,6 +25,7 @@ def refresh_hsts_setting():
     try:
         state._hsts_enabled = get_settings(decrypt_secrets=False)["hsts_enabled"] == 'enabled'
     except Exception:
+        logger.debug("suppressed exception; using fallback", exc_info=True)
         state._hsts_enabled = False
 
 def set_security_headers(resp: Response):
@@ -32,6 +37,7 @@ def set_security_headers(resp: Response):
             resp.headers.setdefault('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload')
         return resp
     except Exception:
+        logger.debug("suppressed exception; using fallback", exc_info=True)
         return resp
 
 def register(app):

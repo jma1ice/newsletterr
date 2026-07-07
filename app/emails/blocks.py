@@ -6,11 +6,15 @@ from email.utils import make_msgid
 from app.theme import get_email_theme_colors
 from app.emails.images import fetch_and_attach_image
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 def build_graph_html_with_frontend_image(item, msg_root):
     chart_name = item.get('name', 'Chart')
     chart_image_data = item.get('chartImage', '')
     
-    print(f"Processing graph: {chart_name}")
+    logger.debug(f"Processing graph: {chart_name}")
     
     if chart_image_data and chart_image_data.startswith('data:image/png'):
         try:
@@ -24,7 +28,7 @@ def build_graph_html_with_frontend_image(item, msg_root):
             img_part.add_header('Content-Disposition', 'inline', filename=f'chart-{cid}.png')
             msg_root.attach(img_part)
             
-            print(f"Successfully attached PNG chart with CID: {cid}")
+            logger.debug(f"Successfully attached PNG chart with CID: {cid}")
             
             container_style = """
                 border-radius: 8px;
@@ -51,9 +55,9 @@ def build_graph_html_with_frontend_image(item, msg_root):
             """
             
         except Exception as e:
-            print(f"Error processing chart image for {chart_name}: {e}")
+            logger.error(f"Error processing chart image for {chart_name}: {e}")
     
-    print(f"No valid chart data for {chart_name}")
+    logger.debug(f"No valid chart data for {chart_name}")
     
     placeholder_style = """
         margin: 20px 0;
@@ -101,7 +105,7 @@ def build_text_block_html(content, block_type='textblock', theme_colors=None):
         theme_colors = get_email_theme_colors()
     
     if not content or not content.strip():
-        print(f"Textblock called but no text present: {content}")
+        logger.debug(f"Textblock called but no text present: {content}")
         return ""
     
     formatted_content = content.strip().replace('\n', '<br>')

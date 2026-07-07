@@ -1,9 +1,8 @@
-import sqlite3, time, traceback
+import time
 
 import requests
 from flask import Blueprint, jsonify, render_template, request
 
-from app import config
 from app.settings_store import get_settings
 from app.cache import set_cached_data, get_cache_info
 from app.crypto import decrypt
@@ -14,6 +13,10 @@ from app.clients.tautulli import run_tautulli_command
 from app.clients.conjurr import run_conjurr_command
 from app.clients.droppedneedle import run_droppedneedle_command, fetch_droppedneedle_server_stats
 from app.emails.fetchers import fetch_recent_data_for_index
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 bp = Blueprint('stats', __name__)
 
@@ -313,7 +316,7 @@ def fetch_collections(collection_type):
         })
 
     except Exception as e:
-        print(f"Error fetching collections: {e}")
+        logger.error(f"Error fetching collections: {e}")
         return jsonify({"status": "error", "message": str(e)})
 
 @bp.route('/get_collection_items', methods=['POST'])
@@ -407,14 +410,13 @@ def get_collection_items():
         })
         
     except requests.RequestException as e:
-        print(f"Error fetching collection items from Plex: {e}")
+        logger.error(f"Error fetching collection items from Plex: {e}")
         return jsonify({
             'status': 'error',
             'message': f'Failed to connect to Plex: {str(e)}'
         }), 500
     except Exception as e:
-        print(f"Error in get_collection_items: {e}")
-        traceback.print_exc()
+        logger.exception(f"Error in get_collection_items: {e}")
         return jsonify({
             'status': 'error',
             'message': f'Internal server error: {str(e)}'

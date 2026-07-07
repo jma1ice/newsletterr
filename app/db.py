@@ -1,6 +1,10 @@
-import json, os, shutil, sqlite3, time, traceback
+import json, os, shutil, sqlite3, time
 
 from app import config
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 def init_db(db_path):
     conn = sqlite3.connect(db_path)
@@ -80,7 +84,7 @@ def init_db(db_path):
         if 'template_name' not in cols:
             cursor.execute("ALTER TABLE email_history ADD COLUMN template_name TEXT")
     except Exception as _e:
-        print(f"Warning: could not ensure template_name column exists: {_e}")
+        logger.warning(f"Warning: could not ensure template_name column exists: {_e}")
     
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS email_schedules (
@@ -107,34 +111,34 @@ def init_db(db_path):
     cursor.execute("PRAGMA table_info(email_schedules)")
     columns = [column[1] for column in cursor.fetchall()]
     if 'send_time' not in columns:
-        print("Adding send_time column to email_schedules table...")
+        logger.info("Adding send_time column to email_schedules table...")
         cursor.execute("ALTER TABLE email_schedules ADD COLUMN send_time TEXT DEFAULT '09:00'")
         conn.commit()
     
     if 'date_range' not in columns:
-        print("Adding date_range column to email_schedules table...")
+        logger.info("Adding date_range column to email_schedules table...")
         cursor.execute("ALTER TABLE email_schedules ADD COLUMN date_range INTEGER DEFAULT 7")
         conn.commit()
 
     if 'items_count' not in columns:
-        print("Adding items_count column to email_schedules table...")
+        logger.info("Adding items_count column to email_schedules table...")
         cursor.execute("ALTER TABLE email_schedules ADD COLUMN items_count INTEGER DEFAULT 10")
         conn.commit()
     
     cursor.execute("PRAGMA table_info(settings)")
     settings_columns = [column[1] for column in cursor.fetchall()]
     if 'smtp_username' not in settings_columns:
-        print("Adding smtp_username column to settings table...")
+        logger.info("Adding smtp_username column to settings table...")
         cursor.execute("ALTER TABLE settings ADD COLUMN smtp_username TEXT")
         conn.commit()
 
     if 'smtp_protocol' not in settings_columns:
-        print("Adding smtp_protocol column to settings table...")
+        logger.info("Adding smtp_protocol column to settings table...")
         cursor.execute("ALTER TABLE settings ADD COLUMN smtp_protocol TEXT")
         conn.commit()
 
     if 'reply_to_email' not in settings_columns:
-        print("Adding reply_to_email column to settings table...")
+        logger.info("Adding reply_to_email column to settings table...")
         cursor.execute("ALTER TABLE settings ADD COLUMN reply_to_email TEXT")
         conn.commit()
 
@@ -150,12 +154,12 @@ def init_db(db_path):
     ]
     for col_name, col_def in theme_columns:
         if col_name not in columns:
-            print(f"Adding {col_name} column to settings table...")
+            logger.info(f"Adding {col_name} column to settings table...")
             cursor.execute(f'ALTER TABLE settings ADD COLUMN {col_name} {col_def}')
             conn.commit()
 
     if 'from_name' not in settings_columns:
-        print("Adding from_name column to settings table...")
+        logger.info("Adding from_name column to settings table...")
         cursor.execute("ALTER TABLE settings ADD COLUMN from_name TEXT")
         conn.commit()
 
@@ -166,14 +170,14 @@ def init_db(db_path):
     ]
     for col_name, col_def in login_columns:
         if col_name not in settings_columns:
-            print(f"Adding {col_name} column to settings table...")
+            logger.info(f"Adding {col_name} column to settings table...")
             cursor.execute(f'ALTER TABLE settings ADD COLUMN {col_name} {col_def}')
             conn.commit()
 
     cursor.execute("PRAGMA table_info(settings)")
     columns = [column[1] for column in cursor.fetchall()]
     if 'custom_logo_filename' not in columns:
-        print("Adding custom_logo_filename column to settings table...")
+        logger.info("Adding custom_logo_filename column to settings table...")
         cursor.execute("ALTER TABLE settings ADD COLUMN custom_logo_filename TEXT")
         conn.commit()
 
@@ -181,7 +185,7 @@ def init_db(db_path):
     columns = [column[1] for column in cursor.fetchall()]
     for col_name, col_def in [('default_intro_text', 'TEXT DEFAULT ""'), ('default_outro_text', 'TEXT DEFAULT ""'), ('hsts_enabled', 'TEXT DEFAULT "disabled"'), ('scheduled_subject_prefix', 'TEXT DEFAULT "enabled"'), ('logo_position', 'TEXT DEFAULT "center"'), ('hide_stat_play_counts', 'TEXT DEFAULT "disabled"'), ('hide_graph_play_counts', 'TEXT DEFAULT "disabled"'), ('stats_type', 'TEXT DEFAULT "plays"'), ('recently_added_mode', 'TEXT DEFAULT "items"'), ('recently_added_sort', 'TEXT DEFAULT "date"'), ('ra_grid_columns', 'TEXT DEFAULT "5"'), ('recs_grid_columns', 'TEXT DEFAULT "5"'), ('stat_cover_art', 'TEXT DEFAULT "disabled"'), ('send_mode', 'TEXT DEFAULT "bcc"'), ('poster_max_height', 'TEXT DEFAULT ""'), ('droppedneedle_url', 'TEXT DEFAULT ""'), ('droppedneedle_api_key', 'TEXT DEFAULT ""')]:
         if col_name not in columns:
-            print(f"Adding {col_name} column to settings table...")
+            logger.info(f"Adding {col_name} column to settings table...")
             cursor.execute(f'ALTER TABLE settings ADD COLUMN {col_name} {col_def}')
             conn.commit()
 
@@ -200,7 +204,7 @@ def migrate_data_from_separate_dbs():
     if not has_separate_data:
         return
     
-    print("Migrating data from separate database files to unified database...")
+    logger.info("Migrating data from separate database files to unified database...")
     
     unified_conn = sqlite3.connect(config.DB_PATH)
     unified_cursor = unified_conn.cursor()
@@ -208,7 +212,7 @@ def migrate_data_from_separate_dbs():
     try:
         email_lists_path = os.path.join("database", "email_lists.db")
         if os.path.exists(email_lists_path):
-            print("Migrating email lists...")
+            logger.info("Migrating email lists...")
             old_conn = sqlite3.connect(email_lists_path)
             old_cursor = old_conn.cursor()
             old_cursor.execute("SELECT * FROM email_lists")
@@ -222,7 +226,7 @@ def migrate_data_from_separate_dbs():
         
         email_templates_path = os.path.join("database", "email_templates.db")
         if os.path.exists(email_templates_path):
-            print("Migrating email templates...")
+            logger.info("Migrating email templates...")
             old_conn = sqlite3.connect(email_templates_path)
             old_cursor = old_conn.cursor()
             old_cursor.execute("SELECT * FROM email_templates")
@@ -236,7 +240,7 @@ def migrate_data_from_separate_dbs():
         
         email_history_path = os.path.join("database", "email_history.db")
         if os.path.exists(email_history_path):
-            print("Migrating email history...")
+            logger.info("Migrating email history...")
             old_conn = sqlite3.connect(email_history_path)
             old_cursor = old_conn.cursor()
             old_cursor.execute("SELECT * FROM email_history")
@@ -250,7 +254,7 @@ def migrate_data_from_separate_dbs():
         
         schedules_path = os.path.join("database", "schedules.db")
         if os.path.exists(schedules_path):
-            print("Migrating email schedules...")
+            logger.info("Migrating email schedules...")
             old_conn = sqlite3.connect(schedules_path)
             old_cursor = old_conn.cursor()
             old_cursor.execute("SELECT * FROM email_schedules")
@@ -263,7 +267,7 @@ def migrate_data_from_separate_dbs():
             old_conn.close()
         
         unified_conn.commit()
-        print("Data migration completed successfully!")
+        logger.info("Data migration completed successfully!")
         
         backup_dir = os.path.join("database", "backup_" + str(int(time.time())))
         os.makedirs(backup_dir, exist_ok=True)
@@ -272,10 +276,10 @@ def migrate_data_from_separate_dbs():
             if os.path.exists(db_path):
                 backup_path = os.path.join(backup_dir, os.path.basename(db_path))
                 shutil.move(db_path, backup_path)
-                print(f"Moved {db_path} to {backup_path}")
+                logger.info(f"Moved {db_path} to {backup_path}")
                 
     except Exception as e:
-        print(f"Error during migration: {e}")
+        logger.error(f"Error during migration: {e}")
         unified_conn.rollback()
     finally:
         unified_conn.close()
@@ -319,8 +323,7 @@ def migrate_musicseerr_to_droppedneedle():
                     conn.execute("UPDATE email_templates SET selected_items = ? WHERE id = ?", (json.dumps(items, ensure_ascii=False), template_id))
             conn.commit()
     except Exception as e:
-        print(f"Error migrating musicseerr columns to droppedneedle: {e}")
-        traceback.print_exc()
+        logger.exception(f"Error migrating musicseerr columns to droppedneedle: {e}")
     finally:
         conn.close()
 
@@ -358,7 +361,7 @@ def migrate_ra_recs_to_recently_added_recommendations():
     conn.commit()
     conn.close()
 
-    print(f"Updated {updated} templates successfully.")
+    logger.info(f"Updated {updated} templates successfully.")
 
 def migrate_email_templates_for_expanded_collections():
     try:
@@ -369,16 +372,15 @@ def migrate_email_templates_for_expanded_collections():
         columns = [column[1] for column in cursor.fetchall()]
         
         if 'expanded_collections' not in columns:
-            print("Adding expanded_collections column to email_templates table...")
+            logger.info("Adding expanded_collections column to email_templates table...")
             cursor.execute("ALTER TABLE email_templates ADD COLUMN expanded_collections TEXT DEFAULT '{}'")
             conn.commit()
-            print("Successfully added expanded_collections column")
+            logger.info("Successfully added expanded_collections column")
             
         conn.close()
         
     except Exception as e:
-        print(f"Error migrating email_templates table: {e}")
-        traceback.print_exc()
+        logger.exception(f"Error migrating email_templates table: {e}")
 
 def migrate_email_templates_for_header_title():
     try:
@@ -390,24 +392,24 @@ def migrate_email_templates_for_header_title():
             row = cursor.fetchone()
             server_name = row[0]
         except Exception:
+            logger.debug("suppressed exception; using fallback", exc_info=True)
             server_name = "Server"
 
         cursor.execute("PRAGMA table_info(email_templates)")
         columns = [column[1] for column in cursor.fetchall()]
 
         if 'email_header_title' not in columns:
-            print("Adding email_header_title column to email_templates table...")
+            logger.info("Adding email_header_title column to email_templates table...")
             cursor.execute(f"ALTER TABLE email_templates ADD COLUMN email_header_title TEXT DEFAULT '{server_name} Newsletter'")
             conn.commit()
 
             cursor.execute(f"UPDATE email_templates SET email_header_title = '{server_name} Newsletter' WHERE email_header_title IS NULL")
             conn.commit()
-            print("Successfully added and backfilled email_header_title column")
+            logger.info("Successfully added and backfilled email_header_title column")
 
         conn.close()
     except Exception as e:
-        print(f"Error migrating email_templates for email_header_title: {e}")
-        traceback.print_exc()
+        logger.exception(f"Error migrating email_templates for email_header_title: {e}")
 
 def migrate_email_templates_for_custom_html():
     try:
@@ -416,10 +418,9 @@ def migrate_email_templates_for_custom_html():
         cursor.execute("PRAGMA table_info(email_templates)")
         columns = [column[1] for column in cursor.fetchall()]
         if 'custom_html' not in columns:
-            print("Adding custom_html column to email_templates table...")
+            logger.info("Adding custom_html column to email_templates table...")
             cursor.execute("ALTER TABLE email_templates ADD COLUMN custom_html TEXT DEFAULT ''")
             conn.commit()
         conn.close()
     except Exception as e:
-        print(f"Error migrating email_templates for custom_html: {e}")
-        traceback.print_exc()
+        logger.exception(f"Error migrating email_templates for custom_html: {e}")

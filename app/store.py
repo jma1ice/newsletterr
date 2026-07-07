@@ -3,6 +3,10 @@ from datetime import datetime, timedelta
 
 from app import config
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 def get_saved_email_lists():
     conn = sqlite3.connect(config.DB_PATH)
     cursor = conn.cursor()
@@ -25,6 +29,7 @@ def save_email_list(name, emails):
         conn.commit()
         return True
     except:
+        logger.debug("suppressed exception; using fallback", exc_info=True)
         return False
     finally:
         conn.close()
@@ -66,6 +71,7 @@ def get_email_schedules():
                 month_abbr = MONTH_ABBR_PERIOD[next_dt.month - 1]
                 next_send_formatted = f"{weekday} {month_abbr} {next_dt.day}, {next_dt.year}  {next_dt.strftime('%H:%M')}"
             except Exception:
+                logger.debug("suppressed exception; using fallback", exc_info=True)
                 next_send_formatted = schedule[8]
 
         last_sent_formatted = None
@@ -76,6 +82,7 @@ def get_email_schedules():
                 month_abbr = MONTH_ABBR_PERIOD[last_dt.month - 1]
                 last_sent_formatted = f"{weekday} {month_abbr} {last_dt.day}, {last_dt.year}  {last_dt.strftime('%H:%M')}"
             except Exception:
+                logger.debug("suppressed exception; using fallback", exc_info=True)
                 last_sent_formatted = schedule[7]
 
         start_date_raw = schedule[5]
@@ -84,6 +91,7 @@ def get_email_schedules():
             start_dt = datetime.fromisoformat(start_date_raw)
             start_date_formatted = f"{MONTH_ABBR_PERIOD[start_dt.month - 1]} {start_dt.day}, {start_dt.year}"
         except Exception:
+            logger.debug("suppressed exception; using fallback", exc_info=True)
             pass
 
         email_list_id = schedule[2]
@@ -264,7 +272,7 @@ def create_email_schedule(name, email_list_id, template_id, frequency, start_dat
         conn.commit()
         return True
     except sqlite3.Error as e:
-        print(f"Error creating schedule: {e}")
+        logger.error(f"Error creating schedule: {e}")
         return False
     finally:
         conn.close()
@@ -288,7 +296,7 @@ def update_email_schedule(schedule_id, name, email_list_id, template_id, frequen
         conn.commit()
         return True
     except sqlite3.Error as e:
-        print(f"Error updating schedule: {e}")
+        logger.error(f"Error updating schedule: {e}")
         return False
     finally:
         conn.close()

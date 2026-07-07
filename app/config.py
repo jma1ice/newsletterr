@@ -2,6 +2,10 @@ import os, secrets, shutil, sys
 from pathlib import Path
 from dotenv import load_dotenv
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 if getattr(sys, 'frozen', False):
     ROOT = Path(sys.executable).parent
     ASSET_ROOT = Path(getattr(sys, '_MEIPASS', ROOT))
@@ -21,6 +25,7 @@ if not ENV_FILE.exists():
     try:
         ENV_FILE.chmod(0o600)
     except Exception:
+        logger.debug("suppressed exception; using fallback", exc_info=True)
         pass
 
 load_dotenv(ENV_FILE)

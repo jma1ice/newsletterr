@@ -2,6 +2,10 @@ import base64, os, time
 
 from app import config, state
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 def get_global_cache_status():
     try:
         cache_keys = ['stats', 'users', 'graph_data', 'recent_data']
@@ -65,6 +69,7 @@ def get_global_cache_status():
             'present': present
         }
     except:
+        logger.debug("suppressed exception; using fallback", exc_info=True)
         return {'has_data': False, 'status': 'Cache error', 'age_display': 'error', 'class': 'cache-badge-muted'}
 
 def can_use_cached_data_for_preview(required_days):
@@ -139,4 +144,5 @@ def gkak():
     try:
         return base64.b64decode(config.k1).decode() + bytes.fromhex(config.k2).decode() + "".join(chr(c) for c in config.k3)
     except Exception:
+        logger.debug("suppressed exception; using fallback", exc_info=True)
         return ''

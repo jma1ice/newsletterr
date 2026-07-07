@@ -1,11 +1,11 @@
-import json, os, smtplib, sqlite3, traceback
+import json, os, smtplib, sqlite3
 
+from dataclasses import dataclass, field
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.utils import formataddr
 
 from app import config
-from app.crypto import decrypt
 from app.settings_store import get_settings
 from app.render import capture_chart_images_via_headless
 from app.clients.tautulli import run_tautulli_command
@@ -14,6 +14,29 @@ from app.clients.droppedneedle import run_droppedneedle_command, fetch_droppedne
 from app.emails.assemble import convert_html_to_plain_text, build_email_html_with_all_cids
 from app.emails.fetchers import fetch_tautulli_data_for_email
 from app.emails.send import group_recipients_by_user
+
+import logging
+
+logger = logging.getLogger(__name__)
+
+@dataclass
+class ScheduleContext:
+    """Per-run data for one scheduled send; settings travel separately."""
+    schedule_id: int
+    template_name: str
+    subject: str
+    email_header_title: str
+    custom_html: str
+    selected_items: list
+    expanded_collections: dict
+    date_range: int
+    items_count: int
+    use_prefix: bool
+    users_data: list = None
+    recommendations_data: dict = field(default_factory=dict)
+    droppedneedle_wrapped_data: dict = field(default_factory=dict)
+    droppedneedle_server_data: dict = None
+    email_text: str = ""
 
 def send_scheduled_email(schedule_id, email_list_id, template_id):
     return send_scheduled_email_with_cids(schedule_id, email_list_id, template_id)
@@ -26,10 +49,9 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
         schedule_result = schedule_cursor.fetchone()
         schedule_conn.close()
 
-        # settings values stay encrypted here: the child senders and API
-        # clients decrypt internally (matches the pre-accessor value flow)
-        s = get_settings(decrypt_secrets=False)
-        display_preference = s["recipient_display_name"]
+        # decrypted settings; downstream decrypt() calls in clients pass
+        # plaintext through unchanged (InvalidToken passthrough)
+        s = get_settings()
 
         date_range = schedule_result[0] if schedule_result else 7
         items_count = schedule_result[1] if schedule_result else 10
@@ -46,10 +68,10 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
                         if u.get('email') and u.get('email').strip() and u.get('is_active')
                     ]
                 else:
-                    print("No users found for ALL list")
+                    logger.info("No users found for ALL list")
                     return False
             else:
-                print("Tautulli not configured for ALL list")
+                logger.info("Tautulli not configured for ALL list")
                 return False
         else:
             email_lists_conn = sqlite3.connect(config.DB_PATH)
@@ -59,7 +81,7 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
             email_lists_conn.close()
             
             if not email_list_result:
-                print(f"Email list {email_list_id} not found")
+                logger.error(f"Email list {email_list_id} not found")
                 return False
             
             to_emails = email_list_result[0]
@@ -72,7 +94,7 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
         templates_conn.close()
         
         if not template_result:
-            print(f"Template {template_id} not found")
+            logger.error(f"Template {template_id} not found")
             return False
         
         template_name, subject, email_text, selected_items_json, expanded_collections_json, email_header_title, custom_html = template_result
@@ -82,45 +104,15 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
         custom_html = custom_html or ''
         
         if "id" not in s:
-            print("SMTP settings not found in database")
+            logger.error("SMTP settings not found in database")
             return False
-
-        from_email = s.get("from_email")
-        alias_email = s.get("alias_email")
-        reply_to_email = s.get("reply_to_email")
-        encrypted_password = s.get("password")
-        smtp_username = s.get("smtp_username")
-        smtp_server = s.get("smtp_server")
-        smtp_port = s.get("smtp_port")
-        smtp_protocol = s.get("smtp_protocol")
-        server_name = s.get("server_name")
-        tautulli_base_url = s.get("tautulli_url")
-        tautulli_api_key = s.get("tautulli_api")
-        logo_filename = s.get("logo_filename")
-        logo_width = s.get("logo_width")
-        custom_logo_filename = s.get("custom_logo_filename")
-        from_name = s.get("from_name")
-        use_prefix = s["scheduled_subject_prefix"] == 'enabled'
-        logo_position = s["logo_position"]
-        default_intro_text = s["default_intro_text"]
-        default_outro_text = s["default_outro_text"]
-        hide_stat_play_counts = s["hide_stat_play_counts"]
-        hide_graph_play_counts = s["hide_graph_play_counts"]
-        stats_type = s["stats_type"]
-        recently_added_mode = s["recently_added_mode"]
-        recently_added_sort = s["recently_added_sort"]
-        ra_grid_columns = s["ra_grid_columns"]
-        recs_grid_columns = s["recs_grid_columns"]
-        stat_cover_art = s["stat_cover_art"]
-        send_mode = s["send_mode"]
-        poster_max_height = s["poster_max_height"]
 
         public_base = os.environ.get("PUBLIC_BASE_URL", "http://127.0.0.1:6397")
         theme = 'dark'
         
-        print("Capturing chart images...")
+        logger.info("Capturing chart images...")
         chart_images = capture_chart_images_via_headless(schedule_id, public_base, theme)
-        print(f"Captured {len(chart_images)} chart images")
+        logger.info(f"Captured {len(chart_images)} chart images")
         
         for item in selected_items:
             if item.get('type') == 'graph' and item.get('id') in chart_images:
@@ -131,7 +123,7 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
         has_recs = any(item.get('type') == 'recommendations' for item in selected_items)
         has_wrapped = any(item.get('type') == 'droppedneedle_wrapped' for item in selected_items)
 
-        users_data, _ = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_users', 'Users', None)
+        users_data, _ = run_tautulli_command(s.get("tautulli_url"), s.get("tautulli_api"), 'get_users', 'Users', None)
         user_dict = {}
         if users_data:
             user_dict = {
@@ -141,11 +133,26 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
             }
 
         droppedneedle_url = (s.get("droppedneedle_url") or "").strip()
-        droppedneedle_api_key = decrypt(s["droppedneedle_api_key"]) if s.get("droppedneedle_api_key") else ""
+        droppedneedle_api_key = s.get("droppedneedle_api_key") or ""
         droppedneedle_server_data, _ = fetch_droppedneedle_server_stats(droppedneedle_url, droppedneedle_api_key) if (droppedneedle_url and droppedneedle_api_key) else (None, None)
 
+        ctx = ScheduleContext(
+            schedule_id=schedule_id,
+            template_name=template_name,
+            subject=subject,
+            email_header_title=email_header_title,
+            custom_html=custom_html,
+            selected_items=selected_items,
+            expanded_collections=expanded_collections,
+            date_range=date_range,
+            items_count=items_count,
+            use_prefix=s["scheduled_subject_prefix"] == 'enabled',
+            users_data=users_data,
+            droppedneedle_server_data=droppedneedle_server_data,
+        )
+
         if has_recs or has_wrapped:
-            print("Template contains recommendations or DroppedNeedle wrapped stats, splitting emails by user...")
+            logger.info("Template contains recommendations or DroppedNeedle wrapped stats, splitting emails by user...")
 
             rec_user_keys = set()
             wrapped_user_keys = set()
@@ -157,116 +164,136 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
 
             personalized_user_keys = rec_user_keys | wrapped_user_keys
             if not personalized_user_keys:
-                print("No recommendation or wrapped user keys found in template")
+                logger.info("No recommendation or wrapped user keys found in template")
                 return False
 
             recommendations_data = {}
             if rec_user_keys:
                 if not s.get("conjurr_url"):
-                    print("Conjurr URL not configured")
+                    logger.info("Conjurr URL not configured")
                     return False
 
                 conjurr_url = s["conjurr_url"].strip()
                 filtered_rec_users = {k: v for k, v in user_dict.items() if str(k) in rec_user_keys and v in to_emails_list}
 
                 if not filtered_rec_users:
-                    print("No users found matching recommendation blocks and email recipients")
+                    logger.info("No users found matching recommendation blocks and email recipients")
                     return False
 
                 recommendations_data, _ = run_conjurr_command(conjurr_url, filtered_rec_users, None)
                 if not recommendations_data:
-                    print("Failed to fetch recommendations data")
+                    logger.error("Failed to fetch recommendations data")
                     return False
 
             droppedneedle_wrapped_data = {}
             if wrapped_user_keys:
                 if not (droppedneedle_url and droppedneedle_api_key):
-                    print("DroppedNeedle URL/API key not configured")
+                    logger.info("DroppedNeedle URL/API key not configured")
                     return False
 
                 filtered_wrapped_users = {k: v for k, v in user_dict.items() if str(k) in wrapped_user_keys and v in to_emails_list}
 
                 if not filtered_wrapped_users:
-                    print("No users found matching DroppedNeedle wrapped blocks and email recipients")
+                    logger.info("No users found matching DroppedNeedle wrapped blocks and email recipients")
                     return False
 
                 droppedneedle_wrapped_data, _ = run_droppedneedle_command(droppedneedle_url, droppedneedle_api_key, filtered_wrapped_users, None)
                 if not droppedneedle_wrapped_data:
-                    print("Failed to fetch DroppedNeedle wrapped data")
+                    logger.error("Failed to fetch DroppedNeedle wrapped data")
                     return False
 
             groups = group_recipients_by_user(to_emails_list, user_dict)
+
+            ctx.recommendations_data = recommendations_data
+            ctx.droppedneedle_wrapped_data = droppedneedle_wrapped_data
 
             total_sent = 0
             sent_info = []
 
             for user_key, recipients in groups.items():
                 if user_key is None or str(user_key) not in personalized_user_keys:
-                    print(f"Skipping recipients without recommendations or wrapped stats: {recipients}")
+                    logger.info(f"Skipping recipients without recommendations or wrapped stats: {recipients}")
                     continue
 
-                success = send_scheduled_user_email_with_cids(
-                    recipients, subject, email_header_title, custom_html, selected_items, user_key,
-                    recommendations_data, from_email, alias_email, reply_to_email, encrypted_password,
-                    smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, tautulli_base_url,
-                    tautulli_api_key, date_range, items_count, template_name, logo_filename, logo_width,
-                    custom_logo_filename, from_name, display_preference, users_data, expanded_collections,
-                    use_prefix=use_prefix, logo_position=logo_position, default_intro_text=default_intro_text,
-                    default_outro_text=default_outro_text, hide_stat_play_counts=hide_stat_play_counts,
-                    hide_graph_play_counts=hide_graph_play_counts, stats_type=stats_type,
-                    recently_added_mode=recently_added_mode, recently_added_sort=recently_added_sort,
-                    ra_grid_columns=ra_grid_columns, recs_grid_columns=recs_grid_columns, stat_cover_art=stat_cover_art,
-                    send_mode=send_mode, poster_max_height=poster_max_height,
-                    droppedneedle_wrapped_data=droppedneedle_wrapped_data, droppedneedle_server_data=droppedneedle_server_data
-                )
+                success = send_scheduled_user_email_with_cids(ctx, s, recipients, user_key)
 
                 if success:
                     total_sent += len(recipients)
                     sent_info.append(', '.join(recipients))
-                    print(f"Successfully sent scheduled email to user {user_key}: {recipients}")
+                    logger.info(f"Successfully sent scheduled email to user {user_key}: {recipients}")
                 else:
-                    print(f"Failed to send scheduled email to user {user_key}: {recipients}")
+                    logger.error(f"Failed to send scheduled email to user {user_key}: {recipients}")
 
             if total_sent == 0:
-                print("No emails were sent successfully")
+                logger.info("No emails were sent successfully")
                 return False
 
-            print(f"Scheduled email sent successfully to {total_sent} total recipients across {len(sent_info)} user groups")
+            logger.info(f"Scheduled email sent successfully to {total_sent} total recipients across {len(sent_info)} user groups")
             return True
 
         else:
-            print("Template has no recommendations or wrapped stats, sending single email to all recipients...")
-            return send_scheduled_single_email_with_cids(
-                to_emails_list, subject, email_header_title, custom_html, selected_items, from_email, alias_email,
-                reply_to_email, encrypted_password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name,
-                tautulli_base_url, tautulli_api_key, date_range, items_count, template_name, logo_filename,
-                logo_width, custom_logo_filename, from_name, display_preference, users_data, expanded_collections,
-                use_prefix=use_prefix, logo_position=logo_position, default_intro_text=default_intro_text,
-                default_outro_text=default_outro_text, hide_stat_play_counts=hide_stat_play_counts,
-                hide_graph_play_counts=hide_graph_play_counts, stats_type=stats_type,
-                recently_added_mode=recently_added_mode, recently_added_sort=recently_added_sort,
-                ra_grid_columns=ra_grid_columns, recs_grid_columns=recs_grid_columns, stat_cover_art=stat_cover_art,
-                send_mode=send_mode, poster_max_height=poster_max_height, droppedneedle_server_data=droppedneedle_server_data
-            )
+            logger.info("Template has no recommendations or wrapped stats, sending single email to all recipients...")
+            return send_scheduled_single_email_with_cids(ctx, s, to_emails_list)
 
     except Exception as e:
-        print(f"Error in send_scheduled_email_with_cids: {e}")
-        traceback.print_exc()
+        logger.exception(f"Error in send_scheduled_email_with_cids: {e}")
         return False
 
-def send_scheduled_user_email_with_cids(recipients, subject, email_header_title, custom_html, selected_items, user_key, recommendations_data, from_email, alias_email, reply_to_email, encrypted_password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, tautulli_base_url, tautulli_api_key, date_range, items_count, template_name, logo_filename, logo_width, custom_logo_filename, from_name, display_preference, users_data, expanded_collections, use_prefix=True, logo_position='center', default_intro_text='', default_outro_text='', hide_stat_play_counts='disabled', hide_graph_play_counts='disabled', stats_type='plays', recently_added_mode='items', recently_added_sort='date', ra_grid_columns=5, recs_grid_columns=5, stat_cover_art='disabled', send_mode='bcc', poster_max_height=0, droppedneedle_wrapped_data=None, droppedneedle_server_data=None):
+def send_scheduled_user_email_with_cids(ctx, settings, recipients, user_key):
     try:
-        print(f"SMTP Config: {smtp_server}:{smtp_port} using {smtp_protocol}")
+        from_email = settings.get("from_email")
+        alias_email = settings.get("alias_email")
+        reply_to_email = settings.get("reply_to_email")
+        password = settings.get("password")
+        smtp_username = settings.get("smtp_username")
+        smtp_server = settings.get("smtp_server")
+        smtp_port = settings.get("smtp_port")
+        smtp_protocol = settings.get("smtp_protocol")
+        server_name = settings.get("server_name")
+        tautulli_base_url = settings.get("tautulli_url")
+        tautulli_api_key = settings.get("tautulli_api")
+        logo_filename = settings.get("logo_filename")
+        logo_width = settings.get("logo_width")
+        custom_logo_filename = settings.get("custom_logo_filename")
+        from_name = settings.get("from_name") or ''
+        display_preference = settings["recipient_display_name"]
+        logo_position = settings["logo_position"]
+        default_intro_text = settings["default_intro_text"]
+        default_outro_text = settings["default_outro_text"]
+        hide_stat_play_counts = settings["hide_stat_play_counts"]
+        hide_graph_play_counts = settings["hide_graph_play_counts"]
+        stats_type = settings["stats_type"]
+        recently_added_mode = settings["recently_added_mode"]
+        recently_added_sort = settings["recently_added_sort"]
+        ra_grid_columns = settings["ra_grid_columns"]
+        recs_grid_columns = settings["recs_grid_columns"]
+        stat_cover_art = settings["stat_cover_art"]
+        send_mode = settings["send_mode"]
+        poster_max_height = settings["poster_max_height"]
+        subject = ctx.subject
+        email_header_title = ctx.email_header_title
+        custom_html = ctx.custom_html
+        selected_items = ctx.selected_items
+        expanded_collections = ctx.expanded_collections
+        date_range = ctx.date_range
+        items_count = ctx.items_count
+        template_name = ctx.template_name
+        use_prefix = ctx.use_prefix
+        users_data = ctx.users_data
+        recommendations_data = ctx.recommendations_data
+        droppedneedle_wrapped_data = ctx.droppedneedle_wrapped_data
+        droppedneedle_server_data = ctx.droppedneedle_server_data
+        logger.info(f"SMTP Config: {smtp_server}:{smtp_port} using {smtp_protocol}")
 
         if smtp_port == 465 and smtp_protocol == 'TLS':
-            print("WARNING: Port 465 with TLS protocol detected!")
-            print("Port 465 requires SSL protocol. Consider changing to:")
-            print("- Port 587 with TLS, OR")
-            print("- Port 465 with SSL")
+            logger.warning("WARNING: Port 465 with TLS protocol detected!")
+            logger.info("Port 465 requires SSL protocol. Consider changing to:")
+            logger.info("- Port 587 with TLS, OR")
+            logger.info("- Port 465 with SSL")
         
         if smtp_port == 587 and smtp_protocol == 'SSL':
-            print("WARNING: Port 587 with SSL protocol detected!")
-            print("Port 587 typically uses TLS (STARTTLS)")
+            logger.warning("WARNING: Port 587 with SSL protocol detected!")
+            logger.info("Port 587 typically uses TLS (STARTTLS)")
 
         msg_root = MIMEMultipart('related')
         msg_root['Subject'] = f"[SCHEDULED] {subject}" if use_prefix else subject
@@ -290,7 +317,7 @@ def send_scheduled_user_email_with_cids(recipients, subject, email_header_title,
         msg_alternative = MIMEMultipart('alternative')
         msg_root.attach(msg_alternative)
 
-        print("Building email content...")
+        logger.info("Building email content...")
         tautulli_data = fetch_tautulli_data_for_email(tautulli_base_url, tautulli_api_key, date_range, server_name, items_count, stats_type=stats_type, recently_added_mode=recently_added_mode, recently_added_sort=recently_added_sort)
         tautulli_data["settings"]["logo_filename"] = logo_filename
         tautulli_data["settings"]["logo_width"] = logo_width
@@ -342,32 +369,32 @@ def send_scheduled_user_email_with_cids(recipients, subject, email_header_title,
         msg_alternative.attach(MIMEText(plain_text, 'plain', 'utf-8'))
         msg_alternative.attach(MIMEText(email_html, 'html', 'utf-8'))
 
-        print(f"Attempting SMTP connection...")
+        logger.info(f"Attempting SMTP connection...")
 
         if smtp_protocol == 'SSL':
-            print(f"Using SMTP_SSL on port {smtp_port}")
+            logger.info(f"Using SMTP_SSL on port {smtp_port}")
             server = smtplib.SMTP_SSL(smtp_server, int(smtp_port))
             login_username = smtp_username if smtp_username else from_email
-            server.login(login_username, decrypt(encrypted_password))
+            server.login(login_username, password)
         else:
-            print(f"Using SMTP with STARTTLS on port {smtp_port}")
+            logger.info(f"Using SMTP with STARTTLS on port {smtp_port}")
             server = smtplib.SMTP(smtp_server, int(smtp_port))
-            print("Starting TLS...")
+            logger.info("Starting TLS...")
             server.starttls()
             login_username = smtp_username if smtp_username else from_email
-            server.login(login_username, decrypt(encrypted_password))
+            server.login(login_username, password)
         
-        print("SMTP connection established successfully")
+        logger.info("SMTP connection established successfully")
         
         email_content = msg_root.as_string()
 
         content_size_kb = len(email_content.encode('utf-8')) / 1024
         content_size_mb = len(email_content.encode('utf-8')) / (1024 * 1024)
-        print(f"Email size: {content_size_mb:.2f} MB")
+        logger.info(f"Email size: {content_size_mb:.2f} MB")
         if content_size_mb > 25:
-            print("WARNING: Email exceeds typical size limits")
+            logger.warning("WARNING: Email exceeds typical size limits")
 
-        print("Sending email...")
+        logger.info("Sending email...")
 
         from_addr = alias_email if alias_email else from_email
         if send_mode == 'to':
@@ -380,7 +407,7 @@ def send_scheduled_user_email_with_cids(recipients, subject, email_header_title,
             all_recipients = [from_addr] + recipients
 
         server.quit()
-        print(f"Email sent successfully!")
+        logger.info(f"Email sent successfully!")
 
         try:
             history_conn = sqlite3.connect(config.DB_PATH)
@@ -391,35 +418,75 @@ def send_scheduled_user_email_with_cids(recipients, subject, email_header_title,
             history_conn.commit()
             history_conn.close()
         except Exception as log_err:
-            print(f"Error logging scheduled email history: {log_err}")
+            logger.error(f"Error logging scheduled email history: {log_err}")
 
         return True
     except smtplib.SMTPConnectError as e:
-        print(f"SMTP Connection Error: {e}")
-        print("This often indicates wrong port/protocol combination")
+        logger.error(f"SMTP Connection Error: {e}")
+        logger.warning("This often indicates wrong port/protocol combination")
         return False
     except smtplib.SMTPServerDisconnected as e:
-        print(f"SMTP Server Disconnected: {e}")
-        print("Server closed connection - likely protocol mismatch")
+        logger.warning(f"SMTP Server Disconnected: {e}")
+        logger.warning("Server closed connection - likely protocol mismatch")
         return False
     except Exception as e:
-        print(f"Error sending scheduled user email: {e}")
-        traceback.print_exc()
+        logger.exception(f"Error sending scheduled user email: {e}")
         return False
 
-def send_scheduled_single_email_with_cids(to_emails_list, subject, email_header_title, custom_html, selected_items, from_email, alias_email, reply_to_email, encrypted_password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, tautulli_base_url, tautulli_api_key, date_range, items_count, template_name, logo_filename, logo_width, custom_logo_filename, from_name, display_preference, users_data, expanded_collections, email_text="", use_prefix=True, logo_position='center', default_intro_text='', default_outro_text='', hide_stat_play_counts='disabled', hide_graph_play_counts='disabled', stats_type='plays', recently_added_mode='items', recently_added_sort='date', ra_grid_columns=5, recs_grid_columns=5, stat_cover_art='disabled', send_mode='bcc', poster_max_height=0, droppedneedle_server_data=None):
+def send_scheduled_single_email_with_cids(ctx, settings, to_emails_list):
     try:
-        print(f"SMTP Config: {smtp_server}:{smtp_port} using {smtp_protocol}")
+        from_email = settings.get("from_email")
+        alias_email = settings.get("alias_email")
+        reply_to_email = settings.get("reply_to_email")
+        password = settings.get("password")
+        smtp_username = settings.get("smtp_username")
+        smtp_server = settings.get("smtp_server")
+        smtp_port = settings.get("smtp_port")
+        smtp_protocol = settings.get("smtp_protocol")
+        server_name = settings.get("server_name")
+        tautulli_base_url = settings.get("tautulli_url")
+        tautulli_api_key = settings.get("tautulli_api")
+        logo_filename = settings.get("logo_filename")
+        logo_width = settings.get("logo_width")
+        custom_logo_filename = settings.get("custom_logo_filename")
+        from_name = settings.get("from_name") or ''
+        display_preference = settings["recipient_display_name"]
+        logo_position = settings["logo_position"]
+        default_intro_text = settings["default_intro_text"]
+        default_outro_text = settings["default_outro_text"]
+        hide_stat_play_counts = settings["hide_stat_play_counts"]
+        hide_graph_play_counts = settings["hide_graph_play_counts"]
+        stats_type = settings["stats_type"]
+        recently_added_mode = settings["recently_added_mode"]
+        recently_added_sort = settings["recently_added_sort"]
+        ra_grid_columns = settings["ra_grid_columns"]
+        recs_grid_columns = settings["recs_grid_columns"]
+        stat_cover_art = settings["stat_cover_art"]
+        send_mode = settings["send_mode"]
+        poster_max_height = settings["poster_max_height"]
+        subject = ctx.subject
+        email_header_title = ctx.email_header_title
+        custom_html = ctx.custom_html
+        selected_items = ctx.selected_items
+        expanded_collections = ctx.expanded_collections
+        date_range = ctx.date_range
+        items_count = ctx.items_count
+        template_name = ctx.template_name
+        use_prefix = ctx.use_prefix
+        users_data = ctx.users_data
+        droppedneedle_server_data = ctx.droppedneedle_server_data
+        email_text = ctx.email_text
+        logger.info(f"SMTP Config: {smtp_server}:{smtp_port} using {smtp_protocol}")
 
         if smtp_port == 465 and smtp_protocol == 'TLS':
-            print("WARNING: Port 465 with TLS protocol detected!")
-            print("Port 465 requires SSL protocol. Consider changing to:")
-            print("- Port 587 with TLS, OR")
-            print("- Port 465 with SSL")
+            logger.warning("WARNING: Port 465 with TLS protocol detected!")
+            logger.info("Port 465 requires SSL protocol. Consider changing to:")
+            logger.info("- Port 587 with TLS, OR")
+            logger.info("- Port 465 with SSL")
         
         if smtp_port == 587 and smtp_protocol == 'SSL':
-            print("WARNING: Port 587 with SSL protocol detected!")
-            print("Port 587 typically uses TLS (STARTTLS)")
+            logger.warning("WARNING: Port 587 with SSL protocol detected!")
+            logger.info("Port 587 typically uses TLS (STARTTLS)")
 
         msg_root = MIMEMultipart('related')
         msg_root['Subject'] = f"[SCHEDULED] {subject}" if use_prefix else subject
@@ -443,7 +510,7 @@ def send_scheduled_single_email_with_cids(to_emails_list, subject, email_header_
         msg_alternative = MIMEMultipart('alternative')
         msg_root.attach(msg_alternative)
 
-        print("Building email content...")
+        logger.info("Building email content...")
         tautulli_data = fetch_tautulli_data_for_email(tautulli_base_url, tautulli_api_key, date_range, server_name, items_count, stats_type=stats_type, recently_added_mode=recently_added_mode, recently_added_sort=recently_added_sort)
         tautulli_data["settings"]["logo_filename"] = logo_filename
         tautulli_data["settings"]["logo_width"] = logo_width
@@ -492,32 +559,32 @@ def send_scheduled_single_email_with_cids(to_emails_list, subject, email_header_
         msg_alternative.attach(MIMEText(plain_text, 'plain', 'utf-8'))
         msg_alternative.attach(MIMEText(email_html, 'html', 'utf-8'))
 
-        print(f"Attempting SMTP connection...")
+        logger.info(f"Attempting SMTP connection...")
 
         if smtp_protocol == 'SSL':
-            print(f"Using SMTP_SSL on port {smtp_port}")
+            logger.info(f"Using SMTP_SSL on port {smtp_port}")
             server = smtplib.SMTP_SSL(smtp_server, int(smtp_port))
             login_username = smtp_username if smtp_username else from_email
-            server.login(login_username, decrypt(encrypted_password))
+            server.login(login_username, password)
         else:
-            print(f"Using SMTP with STARTTLS on port {smtp_port}")
+            logger.info(f"Using SMTP with STARTTLS on port {smtp_port}")
             server = smtplib.SMTP(smtp_server, int(smtp_port))
-            print("Starting TLS...")
+            logger.info("Starting TLS...")
             server.starttls()
             login_username = smtp_username if smtp_username else from_email
-            server.login(login_username, decrypt(encrypted_password))
+            server.login(login_username, password)
         
-        print("SMTP connection established successfully")
+        logger.info("SMTP connection established successfully")
         
         email_content = msg_root.as_string()
 
         content_size_kb = len(email_content.encode('utf-8')) / 1024
         content_size_mb = len(email_content.encode('utf-8')) / (1024 * 1024)
-        print(f"Email size: {content_size_mb:.2f} MB")
+        logger.info(f"Email size: {content_size_mb:.2f} MB")
         if content_size_mb > 25:
-            print("WARNING: Email exceeds typical size limits")
+            logger.warning("WARNING: Email exceeds typical size limits")
 
-        print("Sending email...")
+        logger.info("Sending email...")
 
         from_addr = alias_email if alias_email else from_email
         if send_mode == 'to':
@@ -530,7 +597,7 @@ def send_scheduled_single_email_with_cids(to_emails_list, subject, email_header_
             all_recipients = [from_addr] + to_emails_list
 
         server.quit()
-        print(f"Email sent successfully!")
+        logger.info(f"Email sent successfully!")
 
         try:
             history_conn = sqlite3.connect(config.DB_PATH)
@@ -541,19 +608,18 @@ def send_scheduled_single_email_with_cids(to_emails_list, subject, email_header_
             history_conn.commit()
             history_conn.close()
         except Exception as log_err:
-            print(f"Error logging scheduled email history: {log_err}")
+            logger.error(f"Error logging scheduled email history: {log_err}")
         
-        print(f"Scheduled email sent successfully to {len(all_recipients)} recipients")
+        logger.info(f"Scheduled email sent successfully to {len(all_recipients)} recipients")
         return True
     except smtplib.SMTPConnectError as e:
-        print(f"SMTP Connection Error: {e}")
-        print("This often indicates wrong port/protocol combination")
+        logger.error(f"SMTP Connection Error: {e}")
+        logger.warning("This often indicates wrong port/protocol combination")
         return False
     except smtplib.SMTPServerDisconnected as e:
-        print(f"SMTP Server Disconnected: {e}")
-        print("Server closed connection - likely protocol mismatch")
+        logger.warning(f"SMTP Server Disconnected: {e}")
+        logger.warning("Server closed connection - likely protocol mismatch")
         return False
     except Exception as e:
-        print(f"Error in send_scheduled_single_email_with_cids: {e}")
-        traceback.print_exc()
+        logger.exception(f"Error in send_scheduled_single_email_with_cids: {e}")
         return False

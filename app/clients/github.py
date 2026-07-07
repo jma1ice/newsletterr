@@ -3,6 +3,10 @@ import time
 from app import config, state
 from app.security import safe_get
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 def _norm(v: str):
     if not v:
         return (0,)
@@ -44,6 +48,7 @@ def _check_github_latest():
             "etag": r.headers.get("ETag"),
         })
     except Exception as e:
+        logger.debug("suppressed exception; using fallback", exc_info=True)
         state._update_cache["checked_at"] = time.time()
 
 def _ensure_recent_check():

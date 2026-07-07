@@ -4,8 +4,11 @@ from flask import Flask
 
 from app import cache, config, crypto, db, hooks, scheduler, state
 from app.clients import plex
+from app.log import setup_logging
 
 def create_app():
+    setup_logging()
+
     from app.blueprints import api, auth, emails, main, scheduling, settings, stats
 
     app = Flask(__name__, template_folder = str(config.ASSET_ROOT / 'templates'), static_folder = str(config.ASSET_ROOT / 'static'))

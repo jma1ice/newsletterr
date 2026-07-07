@@ -11,6 +11,10 @@ from app.clients.github import _background_update_checker
 from app.emails.fetchers import fetch_recent_data_for_index
 from app.emails.scheduled import send_scheduled_email
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 def start_background_workers():
     with state._WORKERS_LOCK:
         if state._WORKERS_STARTED:
@@ -18,10 +22,10 @@ def start_background_workers():
         threading.Thread(target=background_scheduler, daemon=True, name="scheduler").start()
         threading.Thread(target=_background_update_checker, daemon=True, name="update-checker").start()
         state._WORKERS_STARTED = True
-        print("Background workers started.")
+        logger.info("Background workers started.")
 
 def background_scheduler():
-    print("Background scheduler started...")
+    logger.info("Background scheduler started...")
     last_cache_refresh = 0
     
     while True:
@@ -32,10 +36,10 @@ def background_scheduler():
             if current_time - last_cache_refresh > config.CACHE_DURATION:
                 cache_info = get_cache_info('recent_data')
                 if cache_info.get('exists') and cache_info.get('age_hours', 999) * 3600 < 60:
-                    print("Cache recently updated manually, skipping background refresh")
+                    logger.info("Cache recently updated manually, skipping background refresh")
                     last_cache_refresh = current_time
                 else:
-                    print(f"Daily cache refresh triggered at {now.isoformat()}")
+                    logger.info(f"Daily cache refresh triggered at {now.isoformat()}")
                     refresh_daily_cache()
                     last_cache_refresh = current_time
             
@@ -44,10 +48,10 @@ def background_scheduler():
             
             cursor.execute("SELECT id, name, next_send, is_active FROM email_schedules")
             all_schedules = cursor.fetchall()
-            print(f"Scheduler check at {now.isoformat()}")
-            print(f"Found {len(all_schedules)} total schedules:")
+            logger.info(f"Scheduler check at {now.isoformat()}")
+            logger.info(f"Found {len(all_schedules)} total schedules:")
             for sched in all_schedules:
-                print(f"  - ID {sched[0]}: {sched[1]}, next_send: {sched[2]}, active: {sched[3]}")
+                logger.info(f"  - ID {sched[0]}: {sched[1]}, next_send: {sched[2]}, active: {sched[3]}")
             
             cursor.execute("""
                 SELECT id, name, email_list_id, template_id, frequency 
@@ -58,36 +62,36 @@ def background_scheduler():
             due_schedules = cursor.fetchall()
             conn.close()
             
-            print(f"Found {len(due_schedules)} schedules due for sending")
+            logger.info(f"Found {len(due_schedules)} schedules due for sending")
             
             for schedule in due_schedules:
                 schedule_id, name, email_list_id, template_id, frequency = schedule
-                print(f"Processing schedule: {name} (ID: {schedule_id})")
+                logger.info(f"Processing schedule: {name} (ID: {schedule_id})")
                 try:
                     success = send_scheduled_email(schedule_id, email_list_id, template_id)
                     if success:
                         update_schedule_last_sent(schedule_id)
-                        print(f"Successfully sent scheduled email: {name}")
+                        logger.info(f"Successfully sent scheduled email: {name}")
                     else:
-                        print(f"Failed to send scheduled email: {name}")
+                        logger.error(f"Failed to send scheduled email: {name}")
                 except Exception as e:
-                    print(f"Error sending scheduled email {name}: {e}")
+                    logger.error(f"Error sending scheduled email {name}: {e}")
             
         except Exception as e:
-            print(f"Error in background scheduler: {e}")
+            logger.error(f"Error in background scheduler: {e}")
         
         time.sleep(60)
 
 def refresh_daily_cache():
     if not state._REFRESH_LOCK.acquire(blocking=False):
-        print("Cache refresh already in progress, skipping.")
+        logger.info("Cache refresh already in progress, skipping.")
         return
     try:
         _s = get_settings(decrypt_secrets=False)
         row = (_s.get("server_name"), _s.get("tautulli_url"), _s.get("tautulli_api"), _s.get("stats_type"), _s.get("recently_added_mode"), _s.get("recently_added_sort")) if "id" in _s else None
 
         if not row or not row[0]:
-            print("No settings found for cache refresh")
+            logger.info("No settings found for cache refresh")
             return
 
         settings = {
@@ -113,7 +117,7 @@ def refresh_daily_cache():
             time_range = stats_info['params'].get('time_range', time_range)
             count = stats_info['params'].get('count', count)
         
-        print(f"Refreshing cache with time_range: {time_range}, count: {count}")
+        logger.info(f"Refreshing cache with time_range: {time_range}, count: {count}")
         
         graph_commands = [
             {'command': 'get_concurrent_streams_by_stream_type', 'name': 'Stream Type'},
@@ -150,7 +154,7 @@ def refresh_daily_cache():
         stats, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_home_stats', 'Stats', error, time_range, stats_type=stats_type)
         if stats:
             set_cached_data('stats', stats, cache_params)
-            print("✓ Stats cache refreshed")
+            logger.info("✓ Stats cache refreshed")
 
         users, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_users', 'Users', error)
         user_list = []
@@ -162,7 +166,7 @@ def refresh_daily_cache():
             ]
         if user_list:
             set_cached_data('users', user_list, cache_params)
-            print("✓ Users cache refreshed")
+            logger.info("✓ Users cache refreshed")
 
         graph_data = []
         for command in graph_commands:
@@ -172,11 +176,11 @@ def refresh_daily_cache():
         
         if graph_data:
             set_cached_data('graph_data', graph_data, cache_params)
-            print("✓ Graph data cache refreshed")
+            logger.info("✓ Graph data cache refreshed")
         
         libraries, _ = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_library_names', None, None, "10")
         if not libraries:
-            print("No libraries found")
+            logger.info("No libraries found")
             return
 
         library_section_ids = {}
@@ -187,12 +191,12 @@ def refresh_daily_cache():
 
         if recent_data:
             set_cached_data('recent_data', recent_data, cache_params)
-            print("✓ Recent data cache refreshed")
+            logger.info("✓ Recent data cache refreshed")
         
-        print("Daily cache refresh completed successfully")
+        logger.info("Daily cache refresh completed successfully")
         
     except Exception as e:
-        print(f"Error in daily cache refresh: {e}")
+        logger.error(f"Error in daily cache refresh: {e}")
 
     finally:
         state._REFRESH_LOCK.release()

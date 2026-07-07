@@ -1,5 +1,5 @@
 import secrets
-import calendar, json, sqlite3, traceback
+import calendar, json, sqlite3
 
 from datetime import datetime, timedelta
 from flask import Blueprint, jsonify, render_template, request, session
@@ -14,6 +14,10 @@ from app.clients.tautulli import run_tautulli_command
 from app.clients.conjurr import run_conjurr_command
 from app.emails.fetchers import fetch_tautulli_data_for_email
 from app.emails.scheduled import send_scheduled_email
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 bp = Blueprint('scheduling', __name__)
 
@@ -35,7 +39,7 @@ def scheduling():
         
         return render_template('scheduling.html', schedules=schedules, email_lists=email_lists, templates=templates, csrf_token=session["csrf_token"])
     except Exception as e:
-        print(f"Error loading scheduling page: {e}")
+        logger.error(f"Error loading scheduling page: {e}")
         return render_template('scheduling.html', schedules=[], email_lists=[], templates=[])
 
 @bp.route('/scheduling/create', methods=['POST'])
@@ -70,7 +74,7 @@ def create_schedule():
         else:
             return jsonify({"status": "error", "message": "Failed to create schedule"}), 500
     except Exception as e:
-        print(f"Error creating schedule: {e}")
+        logger.error(f"Error creating schedule: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @bp.route('/scheduling/<int:schedule_id>', methods=['PUT'])
@@ -104,7 +108,7 @@ def update_schedule(schedule_id):
         else:
             return jsonify({"status": "error", "message": "Failed to update schedule"}), 500
     except Exception as e:
-        print(f"Error updating schedule: {e}")
+        logger.error(f"Error updating schedule: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @bp.route('/scheduling/<int:schedule_id>', methods=['DELETE'])
@@ -114,7 +118,7 @@ def delete_schedule(schedule_id):
         delete_email_schedule(schedule_id)
         return jsonify({"status": "success", "message": "Schedule deleted successfully"})
     except Exception as e:
-        print(f"Error deleting schedule: {e}")
+        logger.error(f"Error deleting schedule: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @bp.route('/scheduling/<int:schedule_id>/send-now', methods=['POST'])
@@ -137,7 +141,7 @@ def send_schedule_now(schedule_id):
         
         schedule_id, name, email_list_id, template_id, frequency, is_active = schedule
         
-        print(f"Manual send triggered for schedule: {name}")
+        logger.info(f"Manual send triggered for schedule: {name}")
         success = send_scheduled_email(schedule_id, email_list_id, template_id)
         
         if success:
@@ -153,13 +157,13 @@ def send_schedule_now(schedule_id):
             update_conn.commit()
             update_conn.close()
             
-            print(f"Updated last_sent timestamp for schedule {name}")
+            logger.info(f"Updated last_sent timestamp for schedule {name}")
             return jsonify({"status": "success", "message": f"Email '{name}' sent successfully"})
         else:
             return jsonify({"status": "error", "message": f"Failed to send email '{name}'"})
             
     except Exception as e:
-        print(f"Error in manual send: {e}")
+        logger.error(f"Error in manual send: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @bp.route('/scheduling/<int:schedule_id>/toggle', methods=['POST'])
@@ -173,7 +177,7 @@ def toggle_schedule(schedule_id):
         status = "activated" if is_active else "deactivated"
         return jsonify({"status": "success", "message": f"Schedule {status} successfully"})
     except Exception as e:
-        print(f"Error toggling schedule: {e}")
+        logger.error(f"Error toggling schedule: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @bp.route('/scheduling/<int:schedule_id>/preview', methods=['GET'])
@@ -213,11 +217,13 @@ def preview_schedule(schedule_id):
         try:
             selected_items = json.loads(selected_items_json) if selected_items_json else []
         except:
+            logger.debug("suppressed exception; using fallback", exc_info=True)
             selected_items = []
 
         try:
             expanded_collections = json.loads(expanded_collections_json) if expanded_collections_json else []
         except:
+            logger.debug("suppressed exception; using fallback", exc_info=True)
             expanded_collections = {}
 
         email_lists_conn = sqlite3.connect(config.DB_PATH)
@@ -272,7 +278,7 @@ def preview_schedule(schedule_id):
                         if u.get('email') != None and u.get('email') != '' and u.get('is_active')
                     }
             except Exception as e:
-                print(f"Error fetching user_dict for preview API: {e}")
+                logger.error(f"Error fetching user_dict for preview API: {e}")
         
         tautulli_data = fetch_tautulli_data_for_email(
             settings['tautulli_url'].rstrip('/'),
@@ -319,7 +325,7 @@ def preview_schedule(schedule_id):
                     recommendations_data, _ = run_conjurr_command(conjurr_url, filtered_users, error=None)
 
             except Exception as e:
-                print("preview_schedule: recommendations unavailable:", e)
+                logger.warning(f"preview_schedule: recommendations unavailable: {e}")
                 recommendations_data = {}
         
         return jsonify({
@@ -346,8 +352,7 @@ def preview_schedule(schedule_id):
         })
         
     except Exception as e:
-        print(f"Error generating preview: {e}")
-        traceback.print_exc()
+        logger.exception(f"Error generating preview: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @bp.route('/scheduling/<int:schedule_id>/preview-page', methods=['GET'])
@@ -361,6 +366,7 @@ def preview_schedule_page(schedule_id):
         
         date_range = schedule_result[0] if schedule_result else 7
     except:
+        logger.debug("suppressed exception; using fallback", exc_info=True)
         date_range = 7
 
     _s = get_settings(decrypt_secrets=False)
@@ -409,18 +415,18 @@ def preview_schedule_page(schedule_id):
                     if u.get('email') != None and u.get('email') != '' and u.get('is_active')
                 }
         except Exception as e:
-            print(f"Error fetching user_dict for preview: {e}")
+            logger.error(f"Error fetching user_dict for preview: {e}")
     
     can_use_cache, cache_reason = can_use_cached_data_for_preview(date_range)
     
     if can_use_cache:
-        print(f"Preview page using cached data: {cache_reason}")
+        logger.info(f"Preview page using cached data: {cache_reason}")
         stats = get_cached_data('stats', strict=True) or get_cached_data('stats', strict=False) or []
         graph_data = get_cached_data('graph_data', strict=True) or get_cached_data('graph_data', strict=False) or []
         recent_data = get_cached_data('recent_data', strict=True) or get_cached_data('recent_data', strict=False) or []
         recommendations = (get_cached_data('recommendations', strict=True) or get_cached_data('recommendations', strict=False) or {})
     else:
-        print(f"Preview page using cached data (fallback): {cache_reason}")
+        logger.info(f"Preview page using cached data (fallback): {cache_reason}")
         stats = get_cached_data('stats', strict=False) or []
         graph_data = get_cached_data('graph_data', strict=False) or []
         recent_data = get_cached_data('recent_data', strict=False) or []
@@ -488,6 +494,7 @@ def get_calendar_data():
             try:
                 schedule_start = datetime.fromisoformat(schedule_start_date)
             except:
+                logger.debug("suppressed exception; using fallback", exc_info=True)
                 continue
             
             current_date = schedule_start
@@ -689,5 +696,5 @@ def get_calendar_data():
             'year': year
         })
     except Exception as e:
-        print(f"Error getting calendar data: {e}")
+        logger.error(f"Error getting calendar data: {e}")
         return jsonify({'status': 'error', 'message': str(e)}), 500

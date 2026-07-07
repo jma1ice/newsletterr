@@ -10,6 +10,10 @@ from app.crypto import encrypt, decrypt
 from app.hooks import refresh_hsts_setting
 from app.security import require_csrf_for_json, requires_auth
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 bp = Blueprint('settings', __name__)
 
 @bp.route('/settings', methods=['GET', 'POST'])
@@ -234,6 +238,7 @@ def settings():
                 plex_token = cursor.fetchone()[0]
                 conn.close()
             except Exception:
+                logger.debug("suppressed exception; using fallback", exc_info=True)
                 pass
             error_settings = {
                 "from_email": request.form.get("from_email", ""),
@@ -483,7 +488,7 @@ def upload_logo():
         })
 
     except Exception as e:
-        print(f"Error uploading logo: {e}")
+        logger.error(f"Error uploading logo: {e}")
         return jsonify({"status": "error", "message": f"Upload failed: {str(e)}"}), 500
 
 @bp.route('/delete-logo', methods=['POST'])
@@ -523,7 +528,7 @@ def delete_logo():
             })
 
     except Exception as e:
-        print(f"Error deleting logo: {e}")
+        logger.error(f"Error deleting logo: {e}")
         return jsonify({"status": "error", "message": f"Delete failed: {str(e)}"}), 500
 
 @bp.route('/upload/media', methods=['POST'])
@@ -566,5 +571,5 @@ def upload_media():
             "url": f"/static/uploads/media/{new_filename}"
         })
     except Exception as e:
-        print(f"Error uploading media: {e}")
+        logger.error(f"Error uploading media: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500

@@ -1,13 +1,15 @@
-import sqlite3
 
 from datetime import datetime, timezone, timedelta
 from urllib.parse import quote_plus
 
-from app import config
 from app.settings_store import get_settings
 from app.cache import get_cache_info
 from app.clients.plex import build_plex_web_link, get_collection_items_for_email
 from app.emails.images import fetch_and_attach_image, fetch_and_attach_blurred_image, fetch_and_attach_small_thumbnail, truncate_text
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 def get_user_display_name(user_id, users_data, display_preference='email'):
     if not users_data:
@@ -336,6 +338,7 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
                         added_date = f"{diff_days} days ago"
 
                 except Exception as e:
+                    logger.debug("suppressed exception; using fallback", exc_info=True)
                     if item.get('originally_available_at'):
                         try:
                             timestamp = item['originally_available_at']
@@ -364,6 +367,7 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
                                 added_date = f"{diff_days} days ago"
 
                         except Exception as e2:
+                            logger.debug("suppressed exception; using fallback", exc_info=True)
                             added_date = ""
             
             if item_type == 'album':
@@ -377,6 +381,7 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
                         m = (s % 3600) // 60
                         duration = f"{h}h {m}m" if h else f"{m}m"
                     except:
+                        logger.debug("suppressed exception; using fallback", exc_info=True)
                         pass
             
             cell_style = f"""
@@ -555,6 +560,7 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
         try:
             since_date = (datetime.now() - timedelta(days=int(max_items))).strftime("%-m/%-d/%y")
         except Exception:
+            logger.debug("suppressed exception; using fallback", exc_info=True)
             since_date = ""
         ra_title = (f"Added to {library_filter}" if library_filter else "Recently Added") + (f" since {since_date}" if since_date else "")
     else:
@@ -1022,25 +1028,25 @@ def build_individual_item_card_html(item, theme_colors, msg_root, base_url="", p
     poster_cid = None
     poster_url = item.get('thumb', '')
     if poster_url:
-        print(f"Attempting to fetch thumb image: {poster_url}")
+        logger.debug(f"Attempting to fetch thumb image: {poster_url}")
         if poster_url.startswith('http'):
             poster_cid = fetch_and_attach_image(poster_url, msg_root, f"collection_{item.get('key', 'unknown')}_thumb", base_url, max_height=_pmh)
         else:
             full_poster_url = f"/proxy-art{poster_url if poster_url.startswith('/') else '/' + poster_url}"
             poster_cid = fetch_and_attach_image(full_poster_url, msg_root, f"collection_{item.get('key', 'unknown')}_thumb", base_url, max_height=_pmh)
-        print(f"Thumb CID result: {poster_cid}")
+        logger.debug(f"Thumb CID result: {poster_cid}")
 
     if not poster_cid:
-        print("No thumb CID, trying art URL...")
+        logger.debug("No thumb CID, trying art URL...")
         art_url = item.get('art', '')
         if art_url:
-            print(f"Attempting to fetch art image: {art_url}")
+            logger.debug(f"Attempting to fetch art image: {art_url}")
             if art_url.startswith('http'):
                 poster_cid = fetch_and_attach_image(art_url, msg_root, f"collection_{item.get('key', 'unknown')}_art", base_url, max_height=_pmh)
             else:
                 full_art_url = f"/proxy-art{art_url if art_url.startswith('/') else '/' + art_url}"
                 poster_cid = fetch_and_attach_image(full_art_url, msg_root, f"collection_{item.get('key', 'unknown')}_art", base_url, max_height=_pmh)
-            print(f"Art CID result: {poster_cid}")
+            logger.debug(f"Art CID result: {poster_cid}")
 
     if poster_cid:
         return f"""
@@ -1153,25 +1159,25 @@ def build_collection_card_html(collection, theme_colors, msg_root, base_url="", 
     poster_cid = None
     poster_url = collection.get('thumb', '')
     if poster_url:
-        print(f"Attempting to fetch thumb image: {poster_url}")
+        logger.debug(f"Attempting to fetch thumb image: {poster_url}")
         if poster_url.startswith('http'):
             poster_cid = fetch_and_attach_image(poster_url, msg_root, f"collection_{collection.get('key', 'unknown')}_thumb", base_url, max_height=_pmh)
         else:
             full_poster_url = f"/proxy-art{poster_url if poster_url.startswith('/') else '/' + poster_url}"
             poster_cid = fetch_and_attach_image(full_poster_url, msg_root, f"collection_{collection.get('key', 'unknown')}_thumb", base_url, max_height=_pmh)
-        print(f"Thumb CID result: {poster_cid}")
+        logger.debug(f"Thumb CID result: {poster_cid}")
 
     if not poster_cid:
-        print("No thumb CID, trying art URL...")
+        logger.debug("No thumb CID, trying art URL...")
         art_url = collection.get('art', '')
         if art_url:
-            print(f"Attempting to fetch art image: {art_url}")
+            logger.debug(f"Attempting to fetch art image: {art_url}")
             if art_url.startswith('http'):
                 poster_cid = fetch_and_attach_image(art_url, msg_root, f"collection_{collection.get('key', 'unknown')}_art", base_url, max_height=_pmh)
             else:
                 full_art_url = f"/proxy-art{art_url if art_url.startswith('/') else '/' + art_url}"
                 poster_cid = fetch_and_attach_image(full_art_url, msg_root, f"collection_{collection.get('key', 'unknown')}_art", base_url, max_height=_pmh)
-            print(f"Art CID result: {poster_cid}")
+            logger.debug(f"Art CID result: {poster_cid}")
     
     collection_title = collection.get('title', 'Unknown Collection')
     count = collection.get('childCount', 0)
@@ -1181,7 +1187,7 @@ def build_collection_card_html(collection, theme_colors, msg_root, base_url="", 
     
     if poster_cid:
         poster_bg_url = f"cid:{poster_cid}"
-        print(f"Final poster src for {collection_title}: {poster_bg_url}")
+        logger.debug(f"Final poster src for {collection_title}: {poster_bg_url}")
         
         return f"""
             <table cellpadding="0" cellspacing="0" border="0" style="
@@ -1243,7 +1249,7 @@ def build_collection_card_html(collection, theme_colors, msg_root, base_url="", 
             </table>
         """
     else:
-        print(f"No valid image data for {collection_title}, using placeholder")
+        logger.debug(f"No valid image data for {collection_title}, using placeholder")
         return f"""
             <table cellpadding="0" cellspacing="0" border="0" style="
                 background-color: {theme_colors['card_bg']};
@@ -1305,7 +1311,7 @@ def build_collections_html_with_cids(all_collections, msg_root, theme_colors, ba
         collection_id = f"{group_index}-{collection_index}-{collection_key}"
 
         if collection_id in expanded_collections and plex_settings:
-            print(f"Collection {collection_id} is expanded, fetching individual items...")
+            logger.debug(f"Collection {collection_id} is expanded, fetching individual items...")
             individual_items = get_collection_items_for_email(collection_key, plex_settings)
             
             for item in individual_items:
@@ -1313,13 +1319,13 @@ def build_collections_html_with_cids(all_collections, msg_root, theme_colors, ba
                 item['original_collection'] = collection.get('title', 'Unknown Collection')
                 all_items_to_display.append(item)
         else:
-            print(f"  No match for {collection_id}")
+            logger.debug(f"  No match for {collection_id}")
             if not (collection_id in expanded_collections):
-                print(f"     Reason: Collection ID not in expanded_collections")
+                logger.debug(f"     Reason: Collection ID not in expanded_collections")
                 if expanded_collections:
-                    print(f"     Available expanded IDs: {list(expanded_collections.keys())}")
+                    logger.debug(f"     Available expanded IDs: {list(expanded_collections.keys())}")
             if not plex_settings:
-                print(f"     Reason: No plex_settings available")
+                logger.debug(f"     Reason: No plex_settings available")
             collection['is_individual_item'] = False
             all_items_to_display.append(collection)
     

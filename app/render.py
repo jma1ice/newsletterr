@@ -4,6 +4,10 @@ from playwright.sync_api import sync_playwright
 
 from app import state
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 def capture_chart_images_via_headless(schedule_id: int, base: str, theme: str) -> dict:
     url = f"{base}/scheduling/{schedule_id}/preview-page?schedule_id={schedule_id}"
     
@@ -15,9 +19,9 @@ def capture_chart_images_via_headless(schedule_id: int, base: str, theme: str) -
                 color_scheme="dark" if theme == "dark" else "light"
             )
             page = context.new_page()
-            page.on("console", lambda msg: print(f"PAGE LOG: {msg.text}"))
+            page.on("console", lambda msg: logger.debug(f"PAGE LOG: {msg.text}"))
             page.goto(url, wait_until="load")
-            print(f"Loaded URL (before waiting): {page.url}")
+            logger.debug(f"Loaded URL (before waiting): {page.url}")
             
             try:
                 page.wait_for_function("typeof loadPreview === 'function'", timeout=30_000)
@@ -25,13 +29,13 @@ def capture_chart_images_via_headless(schedule_id: int, base: str, theme: str) -
                 page.wait_for_function("typeof Highcharts !== 'undefined' && Highcharts.charts && Highcharts.charts.filter(Boolean).length > 0", timeout=60_000)
                 page.wait_for_timeout(2000)
             except Exception as e:
-                print(f"Error waiting for charts to load: {e}")
+                logger.error(f"Error waiting for charts to load: {e}")
 
             try:
                 page.wait_for_function("typeof selectedItems !== 'undefined'", timeout=10_000)
                 selected_items = page.evaluate("selectedItems || []")
             except Exception as e:
-                print(f"selectedItems never defined or timeout: {e}")
+                logger.warning(f"selectedItems never defined or timeout: {e}")
                 selected_items = []
 
             chart_images = {}
@@ -41,7 +45,7 @@ def capture_chart_images_via_headless(schedule_id: int, base: str, theme: str) -
                     chart_id = item.get('id')
                     chart_name = item.get('name', 'Chart')
                     
-                    print(f"Processing chart: {chart_id}")
+                    logger.debug(f"Processing chart: {chart_id}")
                     
                     try:
                         page.evaluate(f"""
@@ -81,7 +85,7 @@ def capture_chart_images_via_headless(schedule_id: int, base: str, theme: str) -
                             }})()
                         """)
                         
-                        print(f"Element #{chart_id} visible after adjustment: {is_visible}")
+                        logger.debug(f"Element #{chart_id} visible after adjustment: {is_visible}")
                         
                         if is_visible:
                             chart_element = page.locator(f"#{chart_id}")
@@ -95,15 +99,15 @@ def capture_chart_images_via_headless(schedule_id: int, base: str, theme: str) -
                                 'dataUrl': data_url
                             }
                             
-                            print(f"Successfully captured screenshot for chart: {chart_id}")
+                            logger.debug(f"Successfully captured screenshot for chart: {chart_id}")
                         else:
-                            print(f"Chart element #{chart_id} still not visible after adjustments")
+                            logger.debug(f"Chart element #{chart_id} still not visible after adjustments")
                         
                     except Exception as e:
-                        print(f"Error capturing screenshot for chart {chart_id}: {e}")
+                        logger.error(f"Error capturing screenshot for chart {chart_id}: {e}")
 
             context.close()
             browser.close()
             
-            print(f"Total chart images captured: {len(chart_images)}")
+            logger.debug(f"Total chart images captured: {len(chart_images)}")
             return chart_images

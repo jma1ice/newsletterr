@@ -12,6 +12,10 @@ from app.security import require_csrf_for_json, requires_auth, safe_get
 from app.store import get_saved_email_lists
 from app.theme import get_theme_settings
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 bp = Blueprint('main', __name__)
 
 @bp.route('/', methods=['GET'])
@@ -137,6 +141,7 @@ def index():
     try:
         email_lists = get_saved_email_lists()
     except:
+        logger.debug("suppressed exception; using fallback", exc_info=True)
         email_lists = []
     
     cache_info = {
@@ -196,7 +201,7 @@ def proxy_art(art_path):
     plex_url = settings['plex_url'].rstrip('/')
 
     if '/composite/' in art_path:
-        print(f"proxy-art: Detected composite image: {art_path}")
+        logger.info(f"proxy-art: Detected composite image: {art_path}")
         
         composite_url = f"/{art_path}"
         if '?' in composite_url:
@@ -219,7 +224,7 @@ def proxy_art(art_path):
         else:
             full_url += f"?X-Plex-Token={decrypt(plex_token)}"
     
-    print(f"proxy-art: Fetching {full_url}")
+    logger.info(f"proxy-art: Fetching {full_url}")
     
     try:
         headers = {
@@ -230,13 +235,13 @@ def proxy_art(art_path):
         r.raise_for_status()
         
         content_type = r.headers.get('Content-Type', 'image/jpeg')
-        print(f"proxy-art: Success - Content-Type: {content_type}, Size: {r.headers.get('Content-Length', 'unknown')}")
+        logger.info(f"proxy-art: Success - Content-Type: {content_type}, Size: {r.headers.get('Content-Length', 'unknown')}")
         
         return Response(r.content, content_type=content_type, headers={
             'Cache-Control': 'public, max-age=86400'
         })
     except Exception as e:
-        print(f"proxy-art: Error fetching {full_url}: {e}")
+        logger.error(f"proxy-art: Error fetching {full_url}: {e}")
         return Response("Image not found", status=404)
 
 @bp.get("/proxy-img")

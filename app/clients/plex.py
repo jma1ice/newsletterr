@@ -1,4 +1,4 @@
-import sqlite3, traceback, uuid
+import sqlite3, uuid
 
 from datetime import datetime, timedelta
 from plex_api_client import PlexAPI
@@ -9,6 +9,10 @@ from app.settings_store import get_settings
 from app.crypto import decrypt
 from app.security import safe_get
 from app.clients.tautulli import run_tautulli_command
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 def get_plex_client_identifier():
     try:
@@ -24,6 +28,7 @@ def get_plex_client_identifier():
         conn.close()
         return client_id
     except Exception:
+        logger.debug("suppressed exception; using fallback", exc_info=True)
         return str(uuid.uuid4())
 
 def get_plex_headers(extra=None):
@@ -59,7 +64,7 @@ def get_plex_machine_id():
         
         return None
     except Exception as e:
-        print(f"Error getting Plex machine ID: {e}")
+        logger.error(f"Error getting Plex machine ID: {e}")
         return None
 
 def build_plex_web_link(rating_key, machine_id):
@@ -95,12 +100,12 @@ def search_plex_for_rating_key(title, year, media_type, plex_url, plex_token, tm
                             if isinstance(guid_obj, dict):
                                 guid_id = guid_obj.get('id', '')
                                 if f"tmdb://{tmdb_id}" in guid_id or f"themoviedb://{tmdb_id}" in guid_id:
-                                    print(f"Found exact TMDB match for {title} (tmdb:{tmdb_id})")
+                                    logger.debug(f"Found exact TMDB match for {title} (tmdb:{tmdb_id})")
                                     return provider.get('ratingKey')
                     
                     single_guid = provider.get('guid', '')
                     if f"tmdb://{tmdb_id}" in single_guid or f"themoviedb://{tmdb_id}" in single_guid:
-                        print(f"Found exact TMDB match for {title} (tmdb:{tmdb_id})")
+                        logger.debug(f"Found exact TMDB match for {title} (tmdb:{tmdb_id})")
                         return provider.get('ratingKey')
         
         search_query = quote_plus(title)
@@ -139,7 +144,7 @@ def search_plex_for_rating_key(title, year, media_type, plex_url, plex_token, tm
                     guid_match = True
                 
                 if guid_match:
-                    print(f"Found TMDB match for {title} via fallback search (tmdb:{tmdb_id})")
+                    logger.debug(f"Found TMDB match for {title} via fallback search (tmdb:{tmdb_id})")
                     return provider.get('ratingKey')
             
             title_match = title.lower() in item_title or item_title in title.lower()
@@ -147,21 +152,20 @@ def search_plex_for_rating_key(title, year, media_type, plex_url, plex_token, tm
             
             if title_match and year_match:
                 if item_title == title.lower():
-                    print(f"Found exact title match for {title}")
+                    logger.debug(f"Found exact title match for {title}")
                     return provider.get('ratingKey')
                 elif not best_match:
                     best_match = provider.get('ratingKey')
         
         if best_match:
-            print(f"Found approximate match for {title}")
+            logger.debug(f"Found approximate match for {title}")
             return best_match
         
-        print(f"No match found in Plex for {title} ({year})" + (f" [tmdb:{tmdb_id}]" if tmdb_id else ""))
+        logger.debug(f"No match found in Plex for {title} ({year})" + (f" [tmdb:{tmdb_id}]" if tmdb_id else ""))
         return None
         
     except Exception as e:
-        print(f"Error searching Plex for {title}: {e}")
-        traceback.print_exc()
+        logger.exception(f"Error searching Plex for {title}: {e}")
         return None
 
 def fetch_tv_shows_from_plex_sdk(section_id, limit=10, machine_id=None, days=None):
@@ -170,7 +174,7 @@ def fetch_tv_shows_from_plex_sdk(section_id, limit=10, machine_id=None, days=Non
         plex_settings = (_s.get("plex_url"), _s.get("plex_token")) if "id" in _s else None
 
         if not plex_settings or not plex_settings[0] or not plex_settings[1]:
-            print("Plex not configured")
+            logger.debug("Plex not configured")
             return []
 
         plex_url = plex_settings[0].rstrip('/')
@@ -211,7 +215,7 @@ def fetch_tv_shows_from_plex_sdk(section_id, limit=10, machine_id=None, days=Non
 
             duration = int(directory.get('duration', 0) or 0)
             if duration == 0:
-                print(f"Skipping show '{directory.get('title')}' - zero duration")
+                logger.debug(f"Skipping show '{directory.get('title')}' - zero duration")
                 continue
 
             show = {
@@ -235,12 +239,11 @@ def fetch_tv_shows_from_plex_sdk(section_id, limit=10, machine_id=None, days=Non
             }
             shows.append(show)
         
-        print(f"Fetched {len(shows)} TV shows from Plex API ({'by date filter' if days else 'sorted by recent episode'})")
+        logger.debug(f"Fetched {len(shows)} TV shows from Plex API ({'by date filter' if days else 'sorted by recent episode'})")
         return shows
             
     except Exception as e:
-        print(f"Error fetching TV shows from Plex API: {e}")
-        traceback.print_exc()
+        logger.exception(f"Error fetching TV shows from Plex API: {e}")
         return []
 
 def fetch_movies_from_plex_sdk(section_id, limit=10, machine_id=None, days=None):
@@ -249,7 +252,7 @@ def fetch_movies_from_plex_sdk(section_id, limit=10, machine_id=None, days=None)
         plex_settings = (_s.get("plex_url"), _s.get("plex_token")) if "id" in _s else None
 
         if not plex_settings or not plex_settings[0] or not plex_settings[1]:
-            print("Plex not configured")
+            logger.debug("Plex not configured")
             return []
 
         plex_url = plex_settings[0].rstrip('/')
@@ -290,7 +293,7 @@ def fetch_movies_from_plex_sdk(section_id, limit=10, machine_id=None, days=None)
 
             duration = int(video.get('duration', 0) or 0)
             if duration == 0:
-                print(f"Skipping movie '{video.get('title')}' - zero duration")
+                logger.debug(f"Skipping movie '{video.get('title')}' - zero duration")
                 continue
             
             movie = {
@@ -314,12 +317,11 @@ def fetch_movies_from_plex_sdk(section_id, limit=10, machine_id=None, days=None)
             }
             movies.append(movie)
         
-        print(f"Fetched {len(movies)} movies from Plex API ({'by date filter' if days else 'sorted by addedAt'})")
+        logger.debug(f"Fetched {len(movies)} movies from Plex API ({'by date filter' if days else 'sorted by addedAt'})")
         return movies
             
     except Exception as e:
-        print(f"Error fetching movies from Plex API: {e}")
-        traceback.print_exc()
+        logger.exception(f"Error fetching movies from Plex API: {e}")
         return []
 
 def fetch_albums_from_plex_sdk(section_id, limit=10, machine_id=None, days=None):
@@ -328,7 +330,7 @@ def fetch_albums_from_plex_sdk(section_id, limit=10, machine_id=None, days=None)
         plex_settings = (_s.get("plex_url"), _s.get("plex_token")) if "id" in _s else None
 
         if not plex_settings or not plex_settings[0] or not plex_settings[1]:
-            print("Plex not configured")
+            logger.debug("Plex not configured")
             return []
 
         plex_url = plex_settings[0].rstrip('/')
@@ -390,12 +392,11 @@ def fetch_albums_from_plex_sdk(section_id, limit=10, machine_id=None, days=None)
             }
             albums.append(album_data)
         
-        print(f"Fetched {len(albums)} albums from Plex API")
+        logger.debug(f"Fetched {len(albums)} albums from Plex API")
         return albums
             
     except Exception as e:
-        print(f"Error fetching albums from Plex API: {e}")
-        traceback.print_exc()
+        logger.exception(f"Error fetching albums from Plex API: {e}")
         return []
 
 def fetch_recently_added_using_plex_sdk(tautulli_base_url, tautulli_api_key, items_count=10, recently_added_mode="items", recently_added_sort="date"):
@@ -404,14 +405,14 @@ def fetch_recently_added_using_plex_sdk(tautulli_base_url, tautulli_api_key, ite
 
     machine_id = get_plex_machine_id()
     if machine_id:
-        print(f"Plex machine ID: {machine_id}")
+        logger.debug(f"Plex machine ID: {machine_id}")
     else:
-        print("Warning: Could not get Plex machine ID, links may not work")
+        logger.warning("Warning: Could not get Plex machine ID, links may not work")
 
     libraries, _ = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_library_names', None, None, "10")
 
     if not libraries:
-        print("No libraries found")
+        logger.debug("No libraries found")
         return recent_data
 
     for library in libraries:
@@ -419,7 +420,7 @@ def fetch_recently_added_using_plex_sdk(tautulli_base_url, tautulli_api_key, ite
         section_type = library['section_type']
         library_name = library['section_name']
 
-        print(f"\nFetching recently added for library: {library_name} (type: {section_type}, mode: {recently_added_mode})")
+        logger.debug(f"\nFetching recently added for library: {library_name} (type: {section_type}, mode: {recently_added_mode})")
 
         items = []
         days_val = int(items_count) if days_mode else None
@@ -431,7 +432,7 @@ def fetch_recently_added_using_plex_sdk(tautulli_base_url, tautulli_api_key, ite
         elif section_type == 'artist':
             items = fetch_albums_from_plex_sdk(section_id, items_count, machine_id, days=days_val)
         else:
-            print(f"Using Tautulli fallback for library type: {section_type}")
+            logger.debug(f"Using Tautulli fallback for library type: {section_type}")
             fetch_count = str(items_count * 5) if not days_mode else "500"
             rd, _ = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_recently_added', section_id, None, fetch_count, 0)
             if rd and rd.get('recently_added'):
@@ -463,17 +464,17 @@ def get_collection_items_for_email(collection_key, settings):
         plex_token = settings.get('plex_token', '')
         
         if not plex_url or not plex_token:
-            print(f"ERROR: Plex connection not configured for collection {collection_key}")
+            logger.error(f"ERROR: Plex connection not configured for collection {collection_key}")
             return []
         
         collection_items_url = f"{plex_url}/library/collections/{collection_key}/children"
         headers = get_plex_headers({'X-Plex-Token': decrypt(plex_token)})
 
-        print(f"Fetching collection items from: {collection_items_url}")
+        logger.debug(f"Fetching collection items from: {collection_items_url}")
         response = safe_get(collection_items_url, headers=headers, timeout=30)
         
         if response.status_code != 200:
-            print(f"ERROR: Failed to fetch collection items. Status: {response.status_code}")
+            logger.error(f"ERROR: Failed to fetch collection items. Status: {response.status_code}")
             return []
         
         plex_data = response.json()
@@ -509,10 +510,9 @@ def get_collection_items_for_email(collection_key, settings):
                 }
                 items.append(item_info)
         
-        print(f"Successfully fetched {len(items)} items from collection {collection_key}")
+        logger.debug(f"Successfully fetched {len(items)} items from collection {collection_key}")
         return items
         
     except Exception as e:
-        print(f"ERROR: Exception fetching collection items for {collection_key}: {e}")
-        traceback.print_exc()
+        logger.exception(f"ERROR: Exception fetching collection items for {collection_key}: {e}")
         return []

@@ -1,11 +1,13 @@
-import sqlite3
 
 import requests
 
-from app import config
 from app.settings_store import get_settings
 from app.security import safe_get
 from app.clients.plex import search_plex_for_rating_key, build_plex_web_link, get_plex_machine_id
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 def run_conjurr_command(base_url, user_dict, error):
     if base_url == None:
@@ -52,9 +54,9 @@ def run_conjurr_command(base_url, user_dict, error):
                             item['rating_key'] = rating_key
                             item['machine_id'] = machine_id
                             item['plex_url'] = build_plex_web_link(rating_key, machine_id)
-                            print(f"Linked movie: {title} (tmdb:{tmdb_id}) -> ratingKey:{rating_key}")
+                            logger.info(f"Linked movie: {title} (tmdb:{tmdb_id}) -> ratingKey:{rating_key}")
                         else:
-                            print(f"Could not find movie in Plex: {title} (tmdb:{tmdb_id})")
+                            logger.info(f"Could not find movie in Plex: {title} (tmdb:{tmdb_id})")
                 
                 if 'show_posters' in data:
                     for item in data['show_posters']:
@@ -68,9 +70,9 @@ def run_conjurr_command(base_url, user_dict, error):
                             item['rating_key'] = rating_key
                             item['machine_id'] = machine_id
                             item['plex_url'] = build_plex_web_link(rating_key, machine_id)
-                            print(f"Linked show: {title} (tmdb:{tmdb_id}) -> ratingKey:{rating_key}")
+                            logger.info(f"Linked show: {title} (tmdb:{tmdb_id}) -> ratingKey:{rating_key}")
                         else:
-                            print(f"Could not find show in Plex: {title} (tmdb:{tmdb_id})")
+                            logger.info(f"Could not find show in Plex: {title} (tmdb:{tmdb_id})")
 
             recommendations_dict[user] = data
         except requests.exceptions.RequestException as e:

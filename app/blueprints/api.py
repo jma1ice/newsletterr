@@ -12,6 +12,10 @@ from app.security import requires_auth, safe_get
 from app.clients.plex import get_plex_client_identifier, get_plex_headers
 from plex_api_client import PlexAPI
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 bp = Blueprint('api', __name__)
 
 @bp.route('/api/test/tautulli', methods=['POST'])
@@ -127,7 +131,7 @@ def gif_search():
             "per_page": per_page
         })
     except Exception as e:
-        print(f"GIF search error: {e}")
+        logger.error(f"GIF search error: {e}")
         return jsonify({"error": "GIF search failed"}), 500
 
 @bp.post('/api/plex/pin')

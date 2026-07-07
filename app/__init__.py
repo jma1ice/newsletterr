@@ -1,6 +1,6 @@
 import os, secrets
 
-from app import config, state, crypto
+from app import cache, config, crypto, db, state
 
 def create_app():
     from app import legacy
@@ -15,22 +15,22 @@ def create_app():
 
     app.jinja_env.globals["version"] = config.VERSION
     app.jinja_env.globals["publish_date"] = config.PUBLISH_DATE
-    app.jinja_env.globals["get_cache_status"] = legacy.get_global_cache_status
+    app.jinja_env.globals["get_cache_status"] = cache.get_global_cache_status
 
     os.makedirs("database", exist_ok=True)
 
-    legacy.migrate_data_from_separate_dbs()
-    legacy.migrate_musicseerr_to_droppedneedle()
-    legacy.init_db(config.DB_PATH)
+    db.migrate_data_from_separate_dbs()
+    db.migrate_musicseerr_to_droppedneedle()
+    db.init_db(config.DB_PATH)
     legacy.refresh_hsts_setting()
-    legacy.migrate_schema("logo_filename TEXT")
-    legacy.migrate_schema("logo_width INTEGER")
-    legacy.migrate_schema("recipient_display_name TEXT DEFAULT 'email'")
-    legacy.migrate_schema("plex_client_id TEXT")
-    legacy.migrate_ra_recs_to_recently_added_recommendations()
-    legacy.migrate_email_templates_for_expanded_collections()
-    legacy.migrate_email_templates_for_header_title()
-    legacy.migrate_email_templates_for_custom_html()
+    db.migrate_schema("logo_filename TEXT")
+    db.migrate_schema("logo_width INTEGER")
+    db.migrate_schema("recipient_display_name TEXT DEFAULT 'email'")
+    db.migrate_schema("plex_client_id TEXT")
+    db.migrate_ra_recs_to_recently_added_recommendations()
+    db.migrate_email_templates_for_expanded_collections()
+    db.migrate_email_templates_for_header_title()
+    db.migrate_email_templates_for_custom_html()
 
     state.plex_headers = legacy.get_plex_headers()
 

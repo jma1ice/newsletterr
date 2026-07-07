@@ -7,6 +7,7 @@ from email.utils import formataddr
 from flask import jsonify
 
 from app import config
+from app.settings_store import get_settings
 from app.crypto import decrypt
 from app.clients.tautulli import run_tautulli_command
 from app.emails.assemble import convert_html_to_plain_text, build_email_html_with_all_cids
@@ -234,11 +235,8 @@ def send_single_user_email_with_cids(recipients, subject, email_header_title, se
             print("WARNING: Port 587 with SSL protocol detected!")
             print("Port 587 typically uses TLS (STARTTLS)")
 
-        conn = sqlite3.connect(config.DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute("SELECT recipient_display_name, tautulli_url, tautulli_api FROM settings WHERE id = 1")
-        settings_row = cursor.fetchone()
-        conn.close()
+        _s = get_settings(decrypt_secrets=False)
+        settings_row = (_s.get("recipient_display_name"), _s.get("tautulli_url"), _s.get("tautulli_api")) if "id" in _s else None
         
         display_preference = settings_row[0] if settings_row and settings_row[0] else 'email'
         tautulli_url = settings_row[1] if settings_row else None

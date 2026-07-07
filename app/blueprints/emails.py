@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from flask import Blueprint, jsonify, redirect, render_template, request, session, url_for
 
 from app import config
+from app.settings_store import get_settings
 from app.security import require_csrf_for_json, requires_auth
 from app.store import get_saved_email_lists, save_email_list, delete_email_list
 from app.emails.send import send_standard_email_with_cids, send_recommendations_email_with_cids
@@ -15,15 +16,8 @@ bp = Blueprint('emails', __name__)
 @requires_auth
 def send_email():
     require_csrf_for_json()
-    conn = sqlite3.connect(config.DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("""
-        SELECT
-        from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, logo_filename, logo_width, from_name, custom_logo_filename, send_mode, poster_max_height
-        FROM settings WHERE id = 1
-    """)
-    row = cursor.fetchone()
-    conn.close()
+    _s = get_settings(decrypt_secrets=False)
+    row = (_s.get("from_email"), _s.get("alias_email"), _s.get("reply_to_email"), _s.get("password"), _s.get("smtp_username"), _s.get("smtp_server"), _s.get("smtp_port"), _s.get("smtp_protocol"), _s.get("server_name"), _s.get("logo_filename"), _s.get("logo_width"), _s.get("from_name"), _s.get("custom_logo_filename"), _s.get("send_mode"), _s.get("poster_max_height")) if "id" in _s else None
 
     if row:
         settings = {

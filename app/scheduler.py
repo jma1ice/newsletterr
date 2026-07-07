@@ -3,6 +3,7 @@ import sqlite3, threading, time
 from datetime import datetime
 
 from app import config, state
+from app.settings_store import get_settings
 from app.cache import get_cache_info, set_cached_data
 from app.store import update_schedule_last_sent
 from app.clients.tautulli import run_tautulli_command
@@ -82,11 +83,8 @@ def refresh_daily_cache():
         print("Cache refresh already in progress, skipping.")
         return
     try:
-        conn = sqlite3.connect(config.DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute("SELECT server_name, tautulli_url, tautulli_api, stats_type, recently_added_mode, recently_added_sort FROM settings WHERE id = 1")
-        row = cursor.fetchone()
-        conn.close()
+        _s = get_settings(decrypt_secrets=False)
+        row = (_s.get("server_name"), _s.get("tautulli_url"), _s.get("tautulli_api"), _s.get("stats_type"), _s.get("recently_added_mode"), _s.get("recently_added_sort")) if "id" in _s else None
 
         if not row or not row[0]:
             print("No settings found for cache refresh")

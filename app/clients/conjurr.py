@@ -3,6 +3,7 @@ import sqlite3
 import requests
 
 from app import config
+from app.settings_store import get_settings
 from app.security import safe_get
 from app.clients.plex import search_plex_for_rating_key, build_plex_web_link, get_plex_machine_id
 
@@ -21,11 +22,8 @@ def run_conjurr_command(base_url, user_dict, error):
         except requests.exceptions.RequestException as e:
             return [{}, f"Conjurr Error: Could not reach conjurr at {base_url}. Is it running?"]
 
-    conn = sqlite3.connect(config.DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("SELECT plex_url, plex_token FROM settings WHERE id = 1")
-    plex_settings = cursor.fetchone()
-    conn.close()
+    _s = get_settings(decrypt_secrets=False)
+    plex_settings = (_s.get("plex_url"), _s.get("plex_token")) if "id" in _s else None
     
     plex_url = plex_settings[0].rstrip('/') if plex_settings and plex_settings[0] else None
     plex_token = plex_settings[1] if plex_settings and plex_settings[1] else None

@@ -4,6 +4,7 @@ from datetime import datetime, timezone, timedelta
 from urllib.parse import quote_plus
 
 from app import config
+from app.settings_store import get_settings
 from app.cache import get_cache_info
 from app.clients.plex import build_plex_web_link, get_collection_items_for_email
 from app.emails.images import fetch_and_attach_image, fetch_and_attach_blurred_image, fetch_and_attach_small_thumbnail, truncate_text
@@ -1287,11 +1288,8 @@ def build_collections_html_with_cids(all_collections, msg_root, theme_colors, ba
     expanded_collections = expanded_collections or {}
     all_items_to_display = []
     
-    conn = sqlite3.connect(config.DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("SELECT plex_url, plex_token FROM settings WHERE id = 1")
-    row = cursor.fetchone()
-    conn.close()
+    _s = get_settings(decrypt_secrets=False)
+    row = (_s.get("plex_url"), _s.get("plex_token")) if "id" in _s else None
     
     plex_settings = {}
     if row and row[0] and row[1]:

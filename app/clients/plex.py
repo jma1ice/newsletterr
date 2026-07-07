@@ -5,17 +5,15 @@ from plex_api_client import PlexAPI
 from urllib.parse import quote_plus
 
 from app import config
+from app.settings_store import get_settings
 from app.crypto import decrypt
 from app.security import safe_get
 from app.clients.tautulli import run_tautulli_command
 
 def get_plex_client_identifier():
     try:
-        conn = sqlite3.connect(config.DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute("SELECT plex_client_id FROM settings WHERE id = 1")
-        row = cursor.fetchone()
-        conn.close()
+        _s = get_settings(decrypt_secrets=False)
+        row = (_s.get("plex_client_id"),) if "id" in _s else None
         if row and row[0]:
             return row[0]
         client_id = str(uuid.uuid4())
@@ -42,11 +40,8 @@ def get_plex_headers(extra=None):
 
 def get_plex_machine_id():
     try:
-        conn = sqlite3.connect(config.DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute("SELECT plex_url, plex_token FROM settings WHERE id = 1")
-        plex_settings = cursor.fetchone()
-        conn.close()
+        _s = get_settings(decrypt_secrets=False)
+        plex_settings = (_s.get("plex_url"), _s.get("plex_token")) if "id" in _s else None
         
         if not plex_settings or not plex_settings[0] or not plex_settings[1]:
             return None
@@ -171,11 +166,8 @@ def search_plex_for_rating_key(title, year, media_type, plex_url, plex_token, tm
 
 def fetch_tv_shows_from_plex_sdk(section_id, limit=10, machine_id=None, days=None):
     try:
-        conn = sqlite3.connect(config.DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute("SELECT plex_url, plex_token FROM settings WHERE id = 1")
-        plex_settings = cursor.fetchone()
-        conn.close()
+        _s = get_settings(decrypt_secrets=False)
+        plex_settings = (_s.get("plex_url"), _s.get("plex_token")) if "id" in _s else None
 
         if not plex_settings or not plex_settings[0] or not plex_settings[1]:
             print("Plex not configured")
@@ -253,11 +245,8 @@ def fetch_tv_shows_from_plex_sdk(section_id, limit=10, machine_id=None, days=Non
 
 def fetch_movies_from_plex_sdk(section_id, limit=10, machine_id=None, days=None):
     try:
-        conn = sqlite3.connect(config.DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute("SELECT plex_url, plex_token FROM settings WHERE id = 1")
-        plex_settings = cursor.fetchone()
-        conn.close()
+        _s = get_settings(decrypt_secrets=False)
+        plex_settings = (_s.get("plex_url"), _s.get("plex_token")) if "id" in _s else None
 
         if not plex_settings or not plex_settings[0] or not plex_settings[1]:
             print("Plex not configured")
@@ -335,11 +324,8 @@ def fetch_movies_from_plex_sdk(section_id, limit=10, machine_id=None, days=None)
 
 def fetch_albums_from_plex_sdk(section_id, limit=10, machine_id=None, days=None):
     try:
-        conn = sqlite3.connect(config.DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute("SELECT plex_url, plex_token FROM settings WHERE id = 1")
-        plex_settings = cursor.fetchone()
-        conn.close()
+        _s = get_settings(decrypt_secrets=False)
+        plex_settings = (_s.get("plex_url"), _s.get("plex_token")) if "id" in _s else None
 
         if not plex_settings or not plex_settings[0] or not plex_settings[1]:
             print("Plex not configured")

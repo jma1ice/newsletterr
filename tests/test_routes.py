@@ -134,6 +134,9 @@ def test_settings_save_and_reload(csrf_client, app):
     assert str(row[1]) == "465"
     assert decrypt(row[2]) == "smtp-pass"  # stored encrypted, decrypts to the submitted value
 
+    # with from_email configured, index renders instead of redirecting
+    assert client.get("/").status_code == 200
+
 def test_settings_post_without_csrf_is_rejected(client, seeded_settings):
     assert client.post("/settings", data=SETTINGS_FORM).status_code == 400
 

@@ -1,40 +1,14 @@
-import sqlite3
+from app.settings_store import DEFAULTS, get_settings
 
-from app import config
+THEME_KEYS = ('primary_color', 'secondary_color', 'accent_color', 'background_color', 'text_color', 'email_theme')
 
 def get_theme_settings():
-    conn = sqlite3.connect(config.DB_PATH)
-    cursor = conn.cursor()
-    
     try:
-        cursor.execute("""
-            SELECT primary_color, secondary_color, accent_color, background_color, text_color, email_theme
-            FROM settings WHERE id = 1
-        """)
-        row = cursor.fetchone()
-        
-        if row:
-            return {
-                'primary_color': row[0] or '#8acbd4',
-                'secondary_color': row[1] or '#222222',
-                'accent_color': row[2] or '#62a1a4',
-                'background_color': row[3] or '#333333',
-                'text_color': row[4] or '#62a1a4',
-                'email_theme': row[5] or 'newsletterr_blue'
-            }
+        s = get_settings(decrypt_secrets=False)
+        return {key: s[key] for key in THEME_KEYS}
     except Exception as e:
         print(f"Error getting theme settings: {e}")
-    finally:
-        conn.close()
-    
-    return {
-        'primary_color': '#8acbd4',
-        'secondary_color': '#222222',
-        'accent_color': '#62a1a4',
-        'background_color': '#333333',
-        'text_color': '#62a1a4',
-        'email_theme': 'newsletterr_blue'
-    }
+        return {key: DEFAULTS[key] for key in THEME_KEYS}
 
 def get_email_theme_colors():
     theme_settings = get_theme_settings()

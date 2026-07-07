@@ -1,8 +1,8 @@
-import sqlite3
 
 from flask import Response
 
 from app import config, state
+from app.settings_store import get_settings
 from app.clients.github import _ensure_recent_check
 
 def inject_update_info():
@@ -19,10 +19,7 @@ def inject_update_info():
 
 def refresh_hsts_setting():
     try:
-        conn = sqlite3.connect(config.DB_PATH)
-        result = conn.execute("SELECT hsts_enabled FROM settings WHERE id = 1").fetchone()
-        conn.close()
-        state._hsts_enabled = bool(result and result[0] == 'enabled')
+        state._hsts_enabled = get_settings(decrypt_secrets=False)["hsts_enabled"] == 'enabled'
     except Exception:
         state._hsts_enabled = False
 

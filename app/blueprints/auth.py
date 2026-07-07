@@ -1,23 +1,18 @@
 import secrets
-import sqlite3
 
 from flask import Blueprint, abort, redirect, render_template, request, session, url_for
 
-from app import config
 from app.security import requires_auth, check_credentials
+from app.settings_store import get_settings
 
 bp = Blueprint('auth', __name__)
 
 @bp.route('/login', methods=['GET', 'POST'])
 def login():
-    conn = sqlite3.connect(config.DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("SELECT login_toggle FROM settings WHERE id = 1")
-    login_toggle = cursor.fetchone()
-    conn.close()
-
     alert = request.args.get('alert')
-    if login_toggle[0] != 'enabled':
+    # missing-row default is 'disabled', so a fresh install redirects instead
+    # of crashing on login_toggle[0]
+    if get_settings(decrypt_secrets=False)["login_toggle"] != 'enabled':
         return redirect(url_for('main.index', alert=alert))
 
     if request.method == 'POST':

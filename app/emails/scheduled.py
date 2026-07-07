@@ -6,6 +6,7 @@ from email.utils import formataddr
 
 from app import config
 from app.crypto import decrypt
+from app.settings_store import get_settings
 from app.render import capture_chart_images_via_headless
 from app.clients.tautulli import run_tautulli_command
 from app.clients.conjurr import run_conjurr_command
@@ -25,26 +26,18 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
         schedule_result = schedule_cursor.fetchone()
         schedule_conn.close()
 
-        display_name_conn = sqlite3.connect(config.DB_PATH)
-        display_name_cursor = display_name_conn.cursor()
-        display_name_cursor.execute("SELECT recipient_display_name FROM settings WHERE id = 1")
-        display_pref_row = display_name_cursor.fetchone()
-        display_preference = display_pref_row[0] if display_pref_row else 'email'
-        display_name_conn.close()
-        
+        # settings values stay encrypted here: the child senders and API
+        # clients decrypt internally (matches the pre-accessor value flow)
+        s = get_settings(decrypt_secrets=False)
+        display_preference = s["recipient_display_name"]
+
         date_range = schedule_result[0] if schedule_result else 7
         items_count = schedule_result[1] if schedule_result else 10
 
         if email_list_id == 0 or email_list_id == 'ALL':
-            settings_conn = sqlite3.connect(config.DB_PATH)
-            settings_cursor = settings_conn.cursor()
-            settings_cursor.execute("SELECT tautulli_url, tautulli_api FROM settings WHERE id = 1")
-            settings_row = settings_cursor.fetchone()
-            settings_conn.close()
-            
-            if settings_row and settings_row[0] and settings_row[1]:
-                tautulli_url = settings_row[0].rstrip('/')
-                tautulli_api = settings_row[1]
+            if s.get("tautulli_url") and s.get("tautulli_api"):
+                tautulli_url = s["tautulli_url"].rstrip('/')
+                tautulli_api = s["tautulli_api"]
                 users_data, _ = run_tautulli_command(tautulli_url, tautulli_api, 'get_users', 'Users', None)
                 
                 if users_data:
@@ -88,31 +81,39 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
         email_header_title = email_header_title or ''
         custom_html = custom_html or ''
         
-        settings_conn = sqlite3.connect(config.DB_PATH)
-        settings_cursor = settings_conn.cursor()
-        settings_cursor.execute("SELECT from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, tautulli_url, tautulli_api, logo_filename, logo_width, custom_logo_filename, from_name, scheduled_subject_prefix, logo_position, default_intro_text, default_outro_text, hide_stat_play_counts, hide_graph_play_counts, stats_type, recently_added_mode, recently_added_sort, ra_grid_columns, recs_grid_columns, stat_cover_art, send_mode, poster_max_height FROM settings WHERE id = 1")
-        settings_result = settings_cursor.fetchone()
-        settings_conn.close()
-
-        if not settings_result:
+        if "id" not in s:
             print("SMTP settings not found in database")
             return False
 
-        from_email, alias_email, reply_to_email, encrypted_password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, tautulli_base_url, tautulli_api_key, logo_filename, logo_width, custom_logo_filename, from_name, scheduled_subject_prefix, logo_position, default_intro_text, default_outro_text, hide_stat_play_counts, hide_graph_play_counts, stats_type, recently_added_mode, recently_added_sort, ra_grid_columns, recs_grid_columns, stat_cover_art, send_mode, poster_max_height = settings_result
-        use_prefix = (scheduled_subject_prefix or 'enabled') == 'enabled'
-        logo_position = logo_position or 'center'
-        default_intro_text = default_intro_text or ''
-        default_outro_text = default_outro_text or ''
-        hide_stat_play_counts = hide_stat_play_counts or 'disabled'
-        hide_graph_play_counts = hide_graph_play_counts or 'disabled'
-        stats_type = stats_type or 'plays'
-        recently_added_mode = recently_added_mode or 'items'
-        recently_added_sort = recently_added_sort or 'date'
-        ra_grid_columns = int(ra_grid_columns or 5)
-        recs_grid_columns = int(recs_grid_columns or 5)
-        stat_cover_art = stat_cover_art or 'disabled'
-        send_mode = send_mode or 'bcc'
-        poster_max_height = int(poster_max_height or 0)
+        from_email = s.get("from_email")
+        alias_email = s.get("alias_email")
+        reply_to_email = s.get("reply_to_email")
+        encrypted_password = s.get("password")
+        smtp_username = s.get("smtp_username")
+        smtp_server = s.get("smtp_server")
+        smtp_port = s.get("smtp_port")
+        smtp_protocol = s.get("smtp_protocol")
+        server_name = s.get("server_name")
+        tautulli_base_url = s.get("tautulli_url")
+        tautulli_api_key = s.get("tautulli_api")
+        logo_filename = s.get("logo_filename")
+        logo_width = s.get("logo_width")
+        custom_logo_filename = s.get("custom_logo_filename")
+        from_name = s.get("from_name")
+        use_prefix = s["scheduled_subject_prefix"] == 'enabled'
+        logo_position = s["logo_position"]
+        default_intro_text = s["default_intro_text"]
+        default_outro_text = s["default_outro_text"]
+        hide_stat_play_counts = s["hide_stat_play_counts"]
+        hide_graph_play_counts = s["hide_graph_play_counts"]
+        stats_type = s["stats_type"]
+        recently_added_mode = s["recently_added_mode"]
+        recently_added_sort = s["recently_added_sort"]
+        ra_grid_columns = s["ra_grid_columns"]
+        recs_grid_columns = s["recs_grid_columns"]
+        stat_cover_art = s["stat_cover_art"]
+        send_mode = s["send_mode"]
+        poster_max_height = s["poster_max_height"]
 
         public_base = os.environ.get("PUBLIC_BASE_URL", "http://127.0.0.1:6397")
         theme = 'dark'
@@ -139,13 +140,8 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
                 if u.get('email') != None and u.get('email') != '' and u.get('is_active')
             }
 
-        droppedneedle_conn = sqlite3.connect(config.DB_PATH)
-        droppedneedle_cursor = droppedneedle_conn.cursor()
-        droppedneedle_cursor.execute("SELECT droppedneedle_url, droppedneedle_api_key FROM settings WHERE id = 1")
-        droppedneedle_result = droppedneedle_cursor.fetchone()
-        droppedneedle_conn.close()
-        droppedneedle_url = (droppedneedle_result[0] or "").strip() if droppedneedle_result else ""
-        droppedneedle_api_key = decrypt(droppedneedle_result[1]) if droppedneedle_result and droppedneedle_result[1] else ""
+        droppedneedle_url = (s.get("droppedneedle_url") or "").strip()
+        droppedneedle_api_key = decrypt(s["droppedneedle_api_key"]) if s.get("droppedneedle_api_key") else ""
         droppedneedle_server_data, _ = fetch_droppedneedle_server_stats(droppedneedle_url, droppedneedle_api_key) if (droppedneedle_url and droppedneedle_api_key) else (None, None)
 
         if has_recs or has_wrapped:
@@ -166,17 +162,11 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
 
             recommendations_data = {}
             if rec_user_keys:
-                conjurr_conn = sqlite3.connect(config.DB_PATH)
-                conjurr_cursor = conjurr_conn.cursor()
-                conjurr_cursor.execute("SELECT conjurr_url FROM settings WHERE id = 1")
-                conjurr_result = conjurr_cursor.fetchone()
-                conjurr_conn.close()
-
-                if not conjurr_result or not conjurr_result[0]:
+                if not s.get("conjurr_url"):
                     print("Conjurr URL not configured")
                     return False
 
-                conjurr_url = conjurr_result[0].strip()
+                conjurr_url = s["conjurr_url"].strip()
                 filtered_rec_users = {k: v for k, v in user_dict.items() if str(k) in rec_user_keys and v in to_emails_list}
 
                 if not filtered_rec_users:

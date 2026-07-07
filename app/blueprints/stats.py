@@ -4,6 +4,7 @@ import requests
 from flask import Blueprint, jsonify, render_template, request
 
 from app import config
+from app.settings_store import get_settings
 from app.cache import set_cached_data, get_cache_info
 from app.crypto import decrypt
 from app.security import require_csrf_for_json, requires_auth, safe_get
@@ -24,11 +25,8 @@ def pull_stats():
     time_range = str(data.get('time_range', 30))
     count = str(data.get('count', 10))
 
-    conn = sqlite3.connect(config.DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("SELECT tautulli_url, tautulli_api, server_name, stats_type, recently_added_mode, recently_added_sort FROM settings WHERE id = 1")
-    row = cursor.fetchone()
-    conn.close()
+    _s = get_settings(decrypt_secrets=False)
+    row = (_s.get("tautulli_url"), _s.get("tautulli_api"), _s.get("server_name"), _s.get("stats_type"), _s.get("recently_added_mode"), _s.get("recently_added_sort")) if "id" in _s else None
 
     if not row:
         return jsonify({"error": "Please enter tautulli info on settings page"}), 500
@@ -135,11 +133,8 @@ def pull_recommendations():
     settings = data['settings']
     to_emails = data['to_emails']
 
-    conn = sqlite3.connect(config.DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("SELECT conjurr_url FROM settings WHERE id = 1")
-    row = cursor.fetchone()
-    conn.close()
+    _s = get_settings(decrypt_secrets=False)
+    row = (_s.get("conjurr_url"),) if "id" in _s else None
 
     if row:
         conjurr_settings = {
@@ -206,11 +201,8 @@ def pull_droppedneedle_stats():
     settings = data['settings']
     to_emails = data['to_emails']
 
-    conn = sqlite3.connect(config.DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("SELECT droppedneedle_url, droppedneedle_api_key FROM settings WHERE id = 1")
-    row = cursor.fetchone()
-    conn.close()
+    _s = get_settings(decrypt_secrets=False)
+    row = (_s.get("droppedneedle_url"), _s.get("droppedneedle_api_key")) if "id" in _s else None
 
     droppedneedle_url = (row[0] or "").strip() if row else ""
     droppedneedle_api_key = decrypt(row[1]) if row and row[1] else ""
@@ -258,11 +250,8 @@ def pull_droppedneedle_stats():
 @requires_auth
 def fetch_collections(collection_type):
     try:
-        conn = sqlite3.connect(config.DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute("SELECT plex_url, plex_token FROM settings WHERE id = 1")
-        row = cursor.fetchone()
-        conn.close()
+        _s = get_settings(decrypt_secrets=False)
+        row = (_s.get("plex_url"), _s.get("plex_token")) if "id" in _s else None
 
         if not row or not row[0] or not row[1]:
             return jsonify({"status": "error", "message": "Plex connection not configured"})
@@ -342,11 +331,8 @@ def get_collection_items():
                 'message': 'Collection key is required'
             }), 400
         
-        conn = sqlite3.connect(config.DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute("SELECT plex_url, plex_token FROM settings WHERE id = 1")
-        row = cursor.fetchone()
-        conn.close()
+        _s = get_settings(decrypt_secrets=False)
+        row = (_s.get("plex_url"), _s.get("plex_token")) if "id" in _s else None
 
         if not row or not row[0] or not row[1]:
             return jsonify({"status": "error", "message": "Plex connection not configured"})

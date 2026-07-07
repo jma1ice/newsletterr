@@ -1,0 +1,68 @@
+import sqlite3
+
+from app import config
+from app.crypto import decrypt
+
+# Columns stored encrypted; get_settings() returns them decrypted unless
+# decrypt_secrets=False. decrypt() passes legacy plaintext values through.
+SECRET_COLUMNS = frozenset({
+    "password",
+    "plex_token",
+    "tautulli_api",
+    "nl_password",
+    "droppedneedle_api_key",
+})
+
+# Empty/NULL columns are normalized with `or`-semantics, matching the
+# normalizations previously scattered across theme.py, main.py and
+# emails/scheduled.py.
+DEFAULTS = {
+    "primary_color": "#8acbd4",
+    "secondary_color": "#222222",
+    "accent_color": "#62a1a4",
+    "background_color": "#333333",
+    "text_color": "#62a1a4",
+    "email_theme": "newsletterr_blue",
+    "recipient_display_name": "email",
+    "scheduled_subject_prefix": "enabled",
+    "logo_position": "center",
+    "default_intro_text": "",
+    "default_outro_text": "",
+    "hide_stat_play_counts": "disabled",
+    "hide_graph_play_counts": "disabled",
+    "stats_type": "plays",
+    "recently_added_mode": "items",
+    "recently_added_sort": "date",
+    "stat_cover_art": "disabled",
+    "send_mode": "bcc",
+    "hsts_enabled": "disabled",
+}
+
+INT_COLUMNS = {
+    "ra_grid_columns": 5,
+    "recs_grid_columns": 5,
+    "poster_max_height": 0,
+}
+
+def get_settings(decrypt_secrets=True):
+    """Return the singleton settings row as a dict, or {} plus defaults when
+    the row doesn't exist yet (fresh install before first save).
+
+    Safe to call from background threads: no Flask context involved."""
+    conn = sqlite3.connect(config.DB_PATH)
+    conn.row_factory = sqlite3.Row
+    try:
+        row = conn.execute("SELECT * FROM settings WHERE id = 1").fetchone()
+    finally:
+        conn.close()
+
+    s = dict(row) if row else {}
+    if decrypt_secrets:
+        for col in SECRET_COLUMNS:
+            if s.get(col):
+                s[col] = decrypt(s[col])
+    for col, default in DEFAULTS.items():
+        s[col] = s.get(col) or default
+    for col, default in INT_COLUMNS.items():
+        s[col] = int(s.get(col) or default)
+    return s

@@ -7,6 +7,7 @@ from urllib.parse import quote
 from app import config, state
 from app.cache import is_cache_valid, get_cached_data, get_cache_info, clear_cache
 from app.crypto import decrypt
+from app.settings_store import get_settings
 from app.security import require_csrf_for_json, requires_auth, safe_get
 from app.store import get_saved_email_lists
 from app.theme import get_theme_settings
@@ -53,65 +54,32 @@ def index():
     if session.get('username'):
         username = session.get('username')
 
-    conn = sqlite3.connect(config.DB_PATH)
-    cursor = conn.cursor()
-    try:
-        from_email = cursor.execute("SELECT from_email FROM settings WHERE id = 1").fetchone()[0]
-        server_name = cursor.execute("SELECT server_name FROM settings WHERE id = 1").fetchone()[0]
-        tautulli_url = cursor.execute("SELECT tautulli_url FROM settings WHERE id = 1").fetchone()[0]
-        tautulli_api = cursor.execute("SELECT tautulli_api FROM settings WHERE id = 1").fetchone()[0]
-        logo_filename = cursor.execute("SELECT logo_filename FROM settings WHERE id = 1").fetchone()[0]
-        logo_width = cursor.execute("SELECT logo_width FROM settings WHERE id = 1").fetchone()[0]
-        email_theme = cursor.execute("SELECT email_theme FROM settings WHERE id = 1").fetchone()[0]
-        custom_logo_filename = cursor.execute("SELECT custom_logo_filename FROM settings WHERE id = 1").fetchone()[0]
-        recipient_display_name = cursor.execute("SELECT recipient_display_name FROM settings WHERE id = 1").fetchone()[0]
-        default_intro_text = cursor.execute("SELECT default_intro_text FROM settings WHERE id = 1").fetchone()[0]
-        default_outro_text = cursor.execute("SELECT default_outro_text FROM settings WHERE id = 1").fetchone()[0]
-        recently_added_mode = cursor.execute("SELECT recently_added_mode FROM settings WHERE id = 1").fetchone()[0]
-        recently_added_sort = cursor.execute("SELECT recently_added_sort FROM settings WHERE id = 1").fetchone()[0]
-        ra_grid_columns = cursor.execute("SELECT ra_grid_columns FROM settings WHERE id = 1").fetchone()[0]
-        recs_grid_columns = cursor.execute("SELECT recs_grid_columns FROM settings WHERE id = 1").fetchone()[0]
-        stat_cover_art = cursor.execute("SELECT stat_cover_art FROM settings WHERE id = 1").fetchone()[0]
-        poster_max_height = cursor.execute("SELECT poster_max_height FROM settings WHERE id = 1").fetchone()[0]
-        logo_position = cursor.execute("SELECT logo_position FROM settings WHERE id = 1").fetchone()[0]
-    except:
-        from_email = cursor.execute("SELECT from_email FROM settings WHERE id = 1").fetchone()
-        server_name = cursor.execute("SELECT server_name FROM settings WHERE id = 1").fetchone()
-        tautulli_url = cursor.execute("SELECT tautulli_url FROM settings WHERE id = 1").fetchone()
-        tautulli_api = cursor.execute("SELECT tautulli_api FROM settings WHERE id = 1").fetchone()
-        logo_filename = cursor.execute("SELECT logo_filename FROM settings WHERE id = 1").fetchone()
-        logo_width = cursor.execute("SELECT logo_width FROM settings WHERE id = 1").fetchone()
-        email_theme = cursor.execute("SELECT email_theme FROM settings WHERE id = 1").fetchone()
-        custom_logo_filename = cursor.execute("SELECT custom_logo_filename FROM settings WHERE id = 1").fetchone()
-        recipient_display_name = cursor.execute("SELECT recipient_display_name FROM settings WHERE id = 1").fetchone()
-        default_intro_text = cursor.execute("SELECT default_intro_text FROM settings WHERE id = 1").fetchone()
-        default_outro_text = cursor.execute("SELECT default_outro_text FROM settings WHERE id = 1").fetchone()
-        recently_added_mode = cursor.execute("SELECT recently_added_mode FROM settings WHERE id = 1").fetchone()
-        recently_added_sort = cursor.execute("SELECT recently_added_sort FROM settings WHERE id = 1").fetchone()
-        ra_grid_columns = cursor.execute("SELECT ra_grid_columns FROM settings WHERE id = 1").fetchone()
-        recs_grid_columns = cursor.execute("SELECT recs_grid_columns FROM settings WHERE id = 1").fetchone()
-        stat_cover_art = cursor.execute("SELECT stat_cover_art FROM settings WHERE id = 1").fetchone()
-        poster_max_height = cursor.execute("SELECT poster_max_height FROM settings WHERE id = 1").fetchone()
-        logo_position = cursor.execute("SELECT logo_position FROM settings WHERE id = 1").fetchone()
+    s = get_settings()
+    logo_filename = s.get("logo_filename")
+    logo_width = s.get("logo_width")
+    email_theme = s["email_theme"]
 
     settings = {
-        "from_email": from_email or "",
-        "server_name": server_name or "",
-        "tautulli_url": tautulli_url or "",
-        "tautulli_api": decrypt(tautulli_api),
-        "email_theme": email_theme or "",
-        "custom_logo_filename": custom_logo_filename or "",
-        "recipient_display_name": recipient_display_name or "email",
-        "default_intro_text": default_intro_text or "",
-        "default_outro_text": default_outro_text or "",
-        "recently_added_mode": recently_added_mode or "items",
-        "recently_added_sort": recently_added_sort or "date",
-        "ra_grid_columns": ra_grid_columns or "5",
-        "recs_grid_columns": recs_grid_columns or "5",
-        "stat_cover_art": stat_cover_art or "disabled",
-        "poster_max_height": poster_max_height or "",
-        "logo_position": logo_position or "center",
+        "from_email": s.get("from_email") or "",
+        "server_name": s.get("server_name") or "",
+        "tautulli_url": s.get("tautulli_url") or "",
+        "tautulli_api": s.get("tautulli_api") or "",
+        "email_theme": email_theme,
+        "custom_logo_filename": s.get("custom_logo_filename") or "",
+        "recipient_display_name": s["recipient_display_name"],
+        "default_intro_text": s["default_intro_text"],
+        "default_outro_text": s["default_outro_text"],
+        "recently_added_mode": s["recently_added_mode"],
+        "recently_added_sort": s["recently_added_sort"],
+        "ra_grid_columns": s["ra_grid_columns"],
+        "recs_grid_columns": s["recs_grid_columns"],
+        "stat_cover_art": s["stat_cover_art"],
+        "poster_max_height": s["poster_max_height"],
+        "logo_position": s["logo_position"],
     }
+
+    conn = sqlite3.connect(config.DB_PATH)
+    cursor = conn.cursor()
     if logo_filename == '' or logo_filename is None:
         if email_theme == 'custom':
             settings['logo_filename'] = ''
@@ -207,11 +175,8 @@ def index():
 @bp.route('/proxy-art/<path:art_path>')
 @requires_auth
 def proxy_art(art_path):
-    conn = sqlite3.connect(config.DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("SELECT plex_url, plex_token FROM settings WHERE id = 1")
-    row = cursor.fetchone()
-    conn.close()
+    _s = get_settings(decrypt_secrets=False)
+    row = (_s.get("plex_url"), _s.get("plex_token")) if "id" in _s else None
 
     if row:
         settings = {

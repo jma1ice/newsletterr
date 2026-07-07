@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from flask import Blueprint, jsonify, render_template, request, session
 
 from app import config
+from app.settings_store import get_settings
 from app.cache import can_use_cached_data_for_preview, get_cached_data
 from app.security import require_csrf_for_json, requires_auth
 from app.store import get_saved_email_lists, get_email_schedules, create_email_schedule, update_email_schedule, delete_email_schedule, toggle_schedule_status
@@ -231,11 +232,8 @@ def preview_schedule(schedule_id):
         to_emails = email_list_result[0]
         to_emails_list = [email.strip() for email in to_emails.split(",")]
         
-        settings_conn = sqlite3.connect(config.DB_PATH)
-        settings_cursor = settings_conn.cursor()
-        settings_cursor.execute("SELECT server_name, tautulli_url, tautulli_api, logo_filename, logo_width, custom_logo_filename, logo_position, default_intro_text, default_outro_text, hide_stat_play_counts, hide_graph_play_counts, stats_type, recently_added_mode, recently_added_sort, ra_grid_columns, recs_grid_columns, stat_cover_art, poster_max_height FROM settings WHERE id = 1")
-        settings_row = settings_cursor.fetchone()
-        settings_conn.close()
+        _s = get_settings(decrypt_secrets=False)
+        settings_row = (_s.get("server_name"), _s.get("tautulli_url"), _s.get("tautulli_api"), _s.get("logo_filename"), _s.get("logo_width"), _s.get("custom_logo_filename"), _s.get("logo_position"), _s.get("default_intro_text"), _s.get("default_outro_text"), _s.get("hide_stat_play_counts"), _s.get("hide_graph_play_counts"), _s.get("stats_type"), _s.get("recently_added_mode"), _s.get("recently_added_sort"), _s.get("ra_grid_columns"), _s.get("recs_grid_columns"), _s.get("stat_cover_art"), _s.get("poster_max_height")) if "id" in _s else None
 
         if settings_row:
             settings = {
@@ -312,11 +310,8 @@ def preview_schedule(schedule_id):
         
         if has_recs:
             try:
-                conn = sqlite3.connect(config.DB_PATH)
-                c = conn.cursor()
-                c.execute("SELECT conjurr_url FROM settings WHERE id = 1")
-                row = c.fetchone()
-                conn.close()
+                _s = get_settings(decrypt_secrets=False)
+                row = (_s.get("conjurr_url"),) if "id" in _s else None
                 conjurr_url = (row[0] or "").strip() if row else ""
 
                 if conjurr_url and user_dict:
@@ -368,8 +363,8 @@ def preview_schedule_page(schedule_id):
     except:
         date_range = 7
 
-    cursor.execute("SELECT logo_filename, logo_width, tautulli_url, tautulli_api, custom_logo_filename, recipient_display_name, hide_graph_play_counts, stats_type, recently_added_mode, recently_added_sort, ra_grid_columns, recs_grid_columns, stat_cover_art, poster_max_height, logo_position FROM settings WHERE id = 1")
-    settings_row = cursor.fetchone()
+    _s = get_settings(decrypt_secrets=False)
+    settings_row = (_s.get("logo_filename"), _s.get("logo_width"), _s.get("tautulli_url"), _s.get("tautulli_api"), _s.get("custom_logo_filename"), _s.get("recipient_display_name"), _s.get("hide_graph_play_counts"), _s.get("stats_type"), _s.get("recently_added_mode"), _s.get("recently_added_sort"), _s.get("ra_grid_columns"), _s.get("recs_grid_columns"), _s.get("stat_cover_art"), _s.get("poster_max_height"), _s.get("logo_position")) if "id" in _s else None
     logo_filename = settings_row[0] if settings_row else 'Asset_94x.png'
     logo_width = settings_row[1] if settings_row else 80
     tautulli_url = settings_row[2] if settings_row else ''

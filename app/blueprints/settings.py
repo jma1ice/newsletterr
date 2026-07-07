@@ -5,6 +5,7 @@ from flask import Blueprint, abort, current_app, jsonify, redirect, render_templ
 from PIL import Image
 
 from app import config
+from app.settings_store import get_settings
 from app.crypto import encrypt, decrypt
 from app.hooks import refresh_hsts_setting
 from app.security import require_csrf_for_json, requires_auth
@@ -285,98 +286,52 @@ def settings():
                 session["csrf_token"] = secrets.token_urlsafe(32)
             return render_template('settings.html', settings=error_settings, error=f"Error saving settings: {str(e)}", nonce=secrets.token_urlsafe(16), csrf_token=session["csrf_token"])
 
-    try:
-        from_email = cursor.execute("SELECT from_email FROM settings WHERE id = 1").fetchone()[0]
-        alias_email = cursor.execute("SELECT alias_email FROM settings WHERE id = 1").fetchone()[0]
-        reply_to_email = cursor.execute("SELECT reply_to_email FROM settings WHERE id = 1").fetchone()[0]
-        password = cursor.execute("SELECT password FROM settings WHERE id = 1").fetchone()[0]
-        smtp_username = cursor.execute("SELECT smtp_username FROM settings WHERE id = 1").fetchone()[0]
-        smtp_server = cursor.execute("SELECT smtp_server FROM settings WHERE id = 1").fetchone()[0]
-        smtp_port = cursor.execute("SELECT smtp_port FROM settings WHERE id = 1").fetchone()[0]
-        smtp_protocol = cursor.execute("SELECT smtp_protocol FROM settings WHERE id = 1").fetchone()[0]
-        server_name = cursor.execute("SELECT server_name FROM settings WHERE id = 1").fetchone()[0]
-        plex_url = cursor.execute("SELECT plex_url FROM settings WHERE id = 1").fetchone()[0]
-        plex_token = cursor.execute("SELECT plex_token FROM settings WHERE id = 1").fetchone()[0]
-        tautulli_url = cursor.execute("SELECT tautulli_url FROM settings WHERE id = 1").fetchone()[0]
-        tautulli_api = cursor.execute("SELECT tautulli_api FROM settings WHERE id = 1").fetchone()[0]
-        conjurr_url = cursor.execute("SELECT conjurr_url FROM settings WHERE id = 1").fetchone()[0]
-        droppedneedle_url = cursor.execute("SELECT droppedneedle_url FROM settings WHERE id = 1").fetchone()[0]
-        droppedneedle_api_key = cursor.execute("SELECT droppedneedle_api_key FROM settings WHERE id = 1").fetchone()[0]
-        recipient_display_name = cursor.execute("SELECT recipient_display_name FROM settings WHERE id = 1").fetchone()[0]
-        logo_filename = cursor.execute("SELECT logo_filename FROM settings WHERE id = 1").fetchone()[0]
-        logo_width = cursor.execute("SELECT logo_width FROM settings WHERE id = 1").fetchone()[0]
-        email_theme = cursor.execute("SELECT email_theme FROM settings WHERE id = 1").fetchone()[0]
-        primary_color = cursor.execute("SELECT primary_color FROM settings WHERE id = 1").fetchone()[0]
-        secondary_color = cursor.execute("SELECT secondary_color FROM settings WHERE id = 1").fetchone()[0]
-        accent_color = cursor.execute("SELECT accent_color FROM settings WHERE id = 1").fetchone()[0]
-        background_color = cursor.execute("SELECT background_color FROM settings WHERE id = 1").fetchone()[0]
-        text_color = cursor.execute("SELECT text_color FROM settings WHERE id = 1").fetchone()[0]
-        from_name = cursor.execute("SELECT from_name FROM settings WHERE id = 1").fetchone()[0]
-        custom_logo_filename = cursor.execute("SELECT custom_logo_filename FROM settings WHERE id = 1").fetchone()[0]
-        login_toggle = cursor.execute("SELECT login_toggle FROM settings WHERE id = 1").fetchone()[0]
-        nl_username = cursor.execute("SELECT nl_username FROM settings WHERE id = 1").fetchone()[0]
-        nl_password = cursor.execute("SELECT nl_password FROM settings WHERE id = 1").fetchone()[0]
-        default_intro_text = cursor.execute("SELECT default_intro_text FROM settings WHERE id = 1").fetchone()[0]
-        default_outro_text = cursor.execute("SELECT default_outro_text FROM settings WHERE id = 1").fetchone()[0]
-        hsts_enabled = cursor.execute("SELECT hsts_enabled FROM settings WHERE id = 1").fetchone()[0]
-        scheduled_subject_prefix = cursor.execute("SELECT scheduled_subject_prefix FROM settings WHERE id = 1").fetchone()[0]
-        logo_position = cursor.execute("SELECT logo_position FROM settings WHERE id = 1").fetchone()[0]
-        hide_stat_play_counts = cursor.execute("SELECT hide_stat_play_counts FROM settings WHERE id = 1").fetchone()[0]
-        hide_graph_play_counts = cursor.execute("SELECT hide_graph_play_counts FROM settings WHERE id = 1").fetchone()[0]
-        stats_type = cursor.execute("SELECT stats_type FROM settings WHERE id = 1").fetchone()[0]
-        recently_added_mode = cursor.execute("SELECT recently_added_mode FROM settings WHERE id = 1").fetchone()[0]
-        recently_added_sort = cursor.execute("SELECT recently_added_sort FROM settings WHERE id = 1").fetchone()[0]
-        ra_grid_columns = cursor.execute("SELECT ra_grid_columns FROM settings WHERE id = 1").fetchone()[0]
-        recs_grid_columns = cursor.execute("SELECT recs_grid_columns FROM settings WHERE id = 1").fetchone()[0]
-        stat_cover_art = cursor.execute("SELECT stat_cover_art FROM settings WHERE id = 1").fetchone()[0]
-        send_mode = cursor.execute("SELECT send_mode FROM settings WHERE id = 1").fetchone()[0]
-        poster_max_height = cursor.execute("SELECT poster_max_height FROM settings WHERE id = 1").fetchone()[0]
-    except:
-        from_email = cursor.execute("SELECT from_email FROM settings WHERE id = 1").fetchone()
-        alias_email = cursor.execute("SELECT alias_email FROM settings WHERE id = 1").fetchone()
-        reply_to_email = cursor.execute("SELECT reply_to_email FROM settings WHERE id = 1").fetchone()
-        password = cursor.execute("SELECT password FROM settings WHERE id = 1").fetchone()
-        smtp_username = cursor.execute("SELECT smtp_username FROM settings WHERE id = 1").fetchone()
-        smtp_server = cursor.execute("SELECT smtp_server FROM settings WHERE id = 1").fetchone()
-        smtp_port = cursor.execute("SELECT smtp_port FROM settings WHERE id = 1").fetchone()
-        smtp_protocol = cursor.execute("SELECT smtp_protocol FROM settings WHERE id = 1").fetchone()
-        server_name = cursor.execute("SELECT server_name FROM settings WHERE id = 1").fetchone()
-        plex_url = cursor.execute("SELECT plex_url FROM settings WHERE id = 1").fetchone()
-        plex_token = cursor.execute("SELECT plex_token FROM settings WHERE id = 1").fetchone()
-        tautulli_url = cursor.execute("SELECT tautulli_url FROM settings WHERE id = 1").fetchone()
-        tautulli_api = cursor.execute("SELECT tautulli_api FROM settings WHERE id = 1").fetchone()
-        conjurr_url = cursor.execute("SELECT conjurr_url FROM settings WHERE id = 1").fetchone()
-        droppedneedle_url = cursor.execute("SELECT droppedneedle_url FROM settings WHERE id = 1").fetchone()
-        droppedneedle_api_key = cursor.execute("SELECT droppedneedle_api_key FROM settings WHERE id = 1").fetchone()
-        recipient_display_name = cursor.execute("SELECT recipient_display_name FROM settings WHERE id = 1").fetchone()
-        logo_filename = cursor.execute("SELECT logo_filename FROM settings WHERE id = 1").fetchone()
-        logo_width = cursor.execute("SELECT logo_width FROM settings WHERE id = 1").fetchone()
-        email_theme = cursor.execute("SELECT email_theme FROM settings WHERE id = 1").fetchone()
-        primary_color = cursor.execute("SELECT primary_color FROM settings WHERE id = 1").fetchone()
-        secondary_color = cursor.execute("SELECT secondary_color FROM settings WHERE id = 1").fetchone()
-        accent_color = cursor.execute("SELECT accent_color FROM settings WHERE id = 1").fetchone()
-        background_color = cursor.execute("SELECT background_color FROM settings WHERE id = 1").fetchone()
-        text_color = cursor.execute("SELECT text_color FROM settings WHERE id = 1").fetchone()
-        from_name = cursor.execute("SELECT from_name FROM settings WHERE id = 1").fetchone()
-        custom_logo_filename = cursor.execute("SELECT custom_logo_filename FROM settings WHERE id = 1").fetchone()
-        login_toggle = cursor.execute("SELECT login_toggle FROM settings WHERE id = 1").fetchone()
-        nl_username = cursor.execute("SELECT nl_username FROM settings WHERE id = 1").fetchone()
-        nl_password = cursor.execute("SELECT nl_password FROM settings WHERE id = 1").fetchone()
-        default_intro_text = cursor.execute("SELECT default_intro_text FROM settings WHERE id = 1").fetchone()
-        default_outro_text = cursor.execute("SELECT default_outro_text FROM settings WHERE id = 1").fetchone()
-        hsts_enabled = cursor.execute("SELECT hsts_enabled FROM settings WHERE id = 1").fetchone()
-        scheduled_subject_prefix = cursor.execute("SELECT scheduled_subject_prefix FROM settings WHERE id = 1").fetchone()
-        logo_position = cursor.execute("SELECT logo_position FROM settings WHERE id = 1").fetchone()
-        hide_stat_play_counts = cursor.execute("SELECT hide_stat_play_counts FROM settings WHERE id = 1").fetchone()
-        hide_graph_play_counts = cursor.execute("SELECT hide_graph_play_counts FROM settings WHERE id = 1").fetchone()
-        stats_type = cursor.execute("SELECT stats_type FROM settings WHERE id = 1").fetchone()
-        recently_added_mode = cursor.execute("SELECT recently_added_mode FROM settings WHERE id = 1").fetchone()
-        recently_added_sort = cursor.execute("SELECT recently_added_sort FROM settings WHERE id = 1").fetchone()
-        ra_grid_columns = cursor.execute("SELECT ra_grid_columns FROM settings WHERE id = 1").fetchone()
-        recs_grid_columns = cursor.execute("SELECT recs_grid_columns FROM settings WHERE id = 1").fetchone()
-        stat_cover_art = cursor.execute("SELECT stat_cover_art FROM settings WHERE id = 1").fetchone()
-        send_mode = cursor.execute("SELECT send_mode FROM settings WHERE id = 1").fetchone()
-        poster_max_height = cursor.execute("SELECT poster_max_height FROM settings WHERE id = 1").fetchone()
+    s = get_settings(decrypt_secrets=False)
+    from_email = s.get("from_email")
+    alias_email = s.get("alias_email")
+    reply_to_email = s.get("reply_to_email")
+    password = s.get("password")
+    smtp_username = s.get("smtp_username")
+    smtp_server = s.get("smtp_server")
+    smtp_port = s.get("smtp_port")
+    smtp_protocol = s.get("smtp_protocol")
+    server_name = s.get("server_name")
+    plex_url = s.get("plex_url")
+    plex_token = s.get("plex_token")
+    tautulli_url = s.get("tautulli_url")
+    tautulli_api = s.get("tautulli_api")
+    conjurr_url = s.get("conjurr_url")
+    droppedneedle_url = s.get("droppedneedle_url")
+    droppedneedle_api_key = s.get("droppedneedle_api_key")
+    recipient_display_name = s.get("recipient_display_name")
+    logo_filename = s.get("logo_filename")
+    logo_width = s.get("logo_width")
+    email_theme = s.get("email_theme")
+    primary_color = s.get("primary_color")
+    secondary_color = s.get("secondary_color")
+    accent_color = s.get("accent_color")
+    background_color = s.get("background_color")
+    text_color = s.get("text_color")
+    from_name = s.get("from_name")
+    custom_logo_filename = s.get("custom_logo_filename")
+    login_toggle = s.get("login_toggle")
+    nl_username = s.get("nl_username")
+    nl_password = s.get("nl_password")
+    default_intro_text = s.get("default_intro_text")
+    default_outro_text = s.get("default_outro_text")
+    hsts_enabled = s.get("hsts_enabled")
+    scheduled_subject_prefix = s.get("scheduled_subject_prefix")
+    logo_position = s.get("logo_position")
+    hide_stat_play_counts = s.get("hide_stat_play_counts")
+    hide_graph_play_counts = s.get("hide_graph_play_counts")
+    stats_type = s.get("stats_type")
+    recently_added_mode = s.get("recently_added_mode")
+    recently_added_sort = s.get("recently_added_sort")
+    ra_grid_columns = s.get("ra_grid_columns")
+    recs_grid_columns = s.get("recs_grid_columns")
+    stat_cover_art = s.get("stat_cover_art")
+    send_mode = s.get("send_mode")
+    poster_max_height = s.get("poster_max_height")
 
     current_theme = email_theme or "newsletterr_blue"
     if current_theme in theme_presets and current_theme != "custom":

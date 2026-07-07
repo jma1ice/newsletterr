@@ -1,6 +1,7 @@
 import sqlite3, time, traceback
 
 from app import config
+from app.settings_store import get_settings
 from app.cache import get_cached_data, set_cached_data
 from app.crypto import decrypt
 from app.clients.tautulli import run_tautulli_command
@@ -125,11 +126,8 @@ def get_recommendations_for_users(user_keys, to_emails, user_dict, use_cache=Tru
             else:
                 print("No cached recommendations available")
 
-        conn = sqlite3.connect(config.DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute("SELECT conjurr_url FROM settings WHERE id = 1")
-        row = cursor.fetchone()
-        conn.close()
+        _s = get_settings(decrypt_secrets=False)
+        row = (_s.get("conjurr_url"),) if "id" in _s else None
         
         if not row or not row[0]:
             return {}
@@ -175,11 +173,8 @@ def get_droppedneedle_wrapped_for_users(user_keys, to_emails, user_dict, use_cac
             else:
                 print("No cached DroppedNeedle wrapped data available")
 
-        conn = sqlite3.connect(config.DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute("SELECT droppedneedle_url, droppedneedle_api_key FROM settings WHERE id = 1")
-        row = cursor.fetchone()
-        conn.close()
+        _s = get_settings(decrypt_secrets=False)
+        row = (_s.get("droppedneedle_url"), _s.get("droppedneedle_api_key")) if "id" in _s else None
 
         if not row or not row[0] or not row[1]:
             return {}
@@ -213,11 +208,8 @@ def get_droppedneedle_server_stats_cached(use_cache=True):
             if cached:
                 return cached
 
-        conn = sqlite3.connect(config.DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute("SELECT droppedneedle_url, droppedneedle_api_key FROM settings WHERE id = 1")
-        row = cursor.fetchone()
-        conn.close()
+        _s = get_settings(decrypt_secrets=False)
+        row = (_s.get("droppedneedle_url"), _s.get("droppedneedle_api_key")) if "id" in _s else None
 
         if not row or not row[0] or not row[1]:
             return None

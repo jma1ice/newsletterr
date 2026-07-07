@@ -1,11 +1,11 @@
-import html, sqlite3, time
+import html, time
 
 import bleach, requests
 from flask import abort, redirect, request, session, url_for
 from functools import wraps
 
 from app import config
-from app.crypto import decrypt
+from app.settings_store import get_settings
 
 def require_csrf_for_json():
     token = request.headers.get('X-CSRF-Token') or request.form.get('csrf_token')
@@ -46,18 +46,9 @@ def escape_html_output(text):
 def requires_auth(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        conn = sqlite3.connect(config.DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute("SELECT login_toggle FROM settings WHERE id = 1")
-        login_toggle = cursor.fetchone()
-        conn.close()
-
-        if login_toggle == None:
+        if get_settings(decrypt_secrets=False).get('login_toggle') != 'enabled':
             return f(*args, **kwargs)
 
-        if login_toggle[0] != 'enabled':
-            return f(*args, **kwargs)
-        
         if request.headers.get('X-Internal-Token') == config.INTERNAL_TOKEN:
             return f(*args, **kwargs)
 
@@ -67,18 +58,14 @@ def requires_auth(f):
     return decorated_function
 
 def check_credentials(username, password):
-    conn = sqlite3.connect(config.DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("SELECT nl_username, nl_password FROM settings WHERE id = 1")
-    login_info = cursor.fetchone()
-    conn.close()
-
-    expected_username, expected_password = login_info
+    s = get_settings()
+    expected_username = s.get('nl_username')
+    expected_password = s.get('nl_password')
 
     if not expected_password:
         return False
 
-    return username == expected_username and password == decrypt(expected_password)
+    return username == expected_username and password == expected_password
 
 def safe_get(url: str, *, timeout: int = 120, retries: int = 2, **kwargs):
     for attempt in range(retries + 1):

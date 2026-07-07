@@ -5,6 +5,7 @@ from flask import Blueprint, jsonify, request
 from urllib.parse import quote_plus, urlparse
 
 from app import config, state
+from app.settings_store import get_settings
 from app.cache import gkak
 from app.crypto import encrypt, decrypt
 from app.security import requires_auth, safe_get
@@ -183,11 +184,7 @@ def plex_poll_pin(pin_id: int):
 @bp.get('/api/plex/info')
 @requires_auth
 def plex_get_info():
-    conn = sqlite3.connect(config.DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("SELECT plex_token FROM settings WHERE id = 1")
-    row = cursor.fetchone()
-    token = row[0]
+    token = get_settings(decrypt_secrets=False).get("plex_token")
 
     url = "https://plex.tv/api/v2/resources"
     headers = get_plex_headers({"X-Plex-Token": decrypt(token)})
@@ -216,7 +213,8 @@ def plex_get_info():
     if not best_url:
         return jsonify({"connected": False, "error": "No suitable connection found"})
 
-    cursor.execute("""
+    conn = sqlite3.connect(config.DB_PATH)
+    conn.execute("""
         INSERT INTO settings (id, server_name, plex_url)
         VALUES (1, ?, ?)
         ON CONFLICT(id) DO UPDATE SET server_name = excluded.server_name, plex_url = excluded.plex_url

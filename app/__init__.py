@@ -1,6 +1,7 @@
 import os, secrets
 
 from app import cache, config, crypto, db, state
+from app.clients import plex
 
 def create_app():
     from app import legacy
@@ -32,7 +33,7 @@ def create_app():
     db.migrate_email_templates_for_header_title()
     db.migrate_email_templates_for_custom_html()
 
-    state.plex_headers = legacy.get_plex_headers()
+    state.plex_headers = plex.get_plex_headers()
 
     # Same worker gate as the old __main__ block: skip only in the werkzeug
     # reloader parent (WERKZEUG_RUN_MAIN unset while FLASK_DEBUG=1).

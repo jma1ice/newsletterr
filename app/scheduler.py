@@ -181,7 +181,7 @@ def refresh_daily_cache():
         libraries, _ = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_library_names', None, None, "10")
         if not libraries:
             print("No libraries found")
-            return recent_data
+            return
 
         library_section_ids = {}
         for library in libraries:

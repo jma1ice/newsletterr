@@ -83,12 +83,12 @@ def fetch_and_attach_image(image_url, msg_root, cid_name, base_url="", max_heigh
         image_bytes = response.content
         if max_height and isinstance(max_height, int) and max_height > 0:
             try:
-                img = Image.open(BytesIO(image_bytes))
+                img = Image.open(io.BytesIO(image_bytes))
                 orig_w, orig_h = img.size
                 if orig_h > max_height:
                     target_w = max(1, int(orig_w * max_height / orig_h))
                     img = img.resize((target_w, max_height), Image.LANCZOS)
-                    out = BytesIO()
+                    out = io.BytesIO()
                     save_fmt = 'JPEG' if subtype == 'jpeg' else 'PNG'
                     if save_fmt == 'JPEG' and img.mode in ('RGBA', 'P', 'LA'):
                         img = img.convert('RGB')

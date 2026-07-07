@@ -1,12 +1,14 @@
 import os, secrets
 
+from flask import Flask
+
 from app import cache, config, crypto, db, hooks, scheduler, state
 from app.clients import plex
 
 def create_app():
-    from app import legacy
     from app.blueprints import api, auth, emails, main, scheduling, settings, stats
-    app = legacy.app
+
+    app = Flask(__name__, template_folder = str(config.ASSET_ROOT / 'templates'), static_folder = str(config.ASSET_ROOT / 'static'))
 
     for module in (api, auth, emails, main, scheduling, settings, stats):
         app.register_blueprint(module.bp)

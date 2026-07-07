@@ -1,6 +1,6 @@
 import os, secrets
 
-from app import cache, config, crypto, db, state
+from app import cache, config, crypto, db, hooks, scheduler, state
 from app.clients import plex
 
 def create_app():
@@ -23,7 +23,7 @@ def create_app():
     db.migrate_data_from_separate_dbs()
     db.migrate_musicseerr_to_droppedneedle()
     db.init_db(config.DB_PATH)
-    legacy.refresh_hsts_setting()
+    hooks.refresh_hsts_setting()
     db.migrate_schema("logo_filename TEXT")
     db.migrate_schema("logo_width INTEGER")
     db.migrate_schema("recipient_display_name TEXT DEFAULT 'email'")
@@ -35,9 +35,11 @@ def create_app():
 
     state.plex_headers = plex.get_plex_headers()
 
+    hooks.register(app)
+
     # Same worker gate as the old __main__ block: skip only in the werkzeug
     # reloader parent (WERKZEUG_RUN_MAIN unset while FLASK_DEBUG=1).
     if os.environ.get("WERKZEUG_RUN_MAIN") == "true" or os.environ.get("FLASK_DEBUG", "0") != "1":
-        legacy.start_background_workers()
+        scheduler.start_background_workers()
 
     return app

@@ -1,4 +1,4 @@
-import os, secrets
+import os
 
 from flask import Flask
 
@@ -17,8 +17,7 @@ def create_app():
     app.config["GITHUB_REPO"] = config.GITHUB_REPO
     app.config["UPDATE_CHECK_INTERVAL_SEC"] = config.UPDATE_CHECK_INTERVAL_SEC
 
-    if not app.secret_key:
-        app.secret_key = secrets.token_hex(16) + crypto.DATA_KEY[:16]
+    app.secret_key = crypto.ensure_secret_key()
 
     app.jinja_env.globals["version"] = config.VERSION
     app.jinja_env.globals["publish_date"] = config.PUBLISH_DATE

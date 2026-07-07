@@ -1,7 +1,7 @@
 import html, sqlite3, time
 
 import bleach, requests
-from flask import abort, jsonify, redirect, request, session, url_for
+from flask import abort, redirect, request, session, url_for
 from functools import wraps
 
 from app import config

@@ -1,4 +1,4 @@
-import calendar, json, sqlite3
+import calendar, sqlite3
 from datetime import datetime, timedelta
 
 from app import config

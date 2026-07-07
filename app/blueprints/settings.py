@@ -46,7 +46,7 @@ def settings():
     }
 
     if request.method == "POST":
-        token = request.form.get("csrf_token").strip()
+        token = request.form.get("csrf_token", "").strip()
         if not token or token != session.get("csrf_token"):
             abort(400)
 

@@ -1,4 +1,4 @@
-import os, re, secrets, shutil, sys
+import os, secrets, shutil, sys
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -32,11 +32,6 @@ INTERNAL_TOKEN = os.environ.get('INTERNAL_TOKEN', secrets.token_hex(32))
 k2 = "754c514b50483558474a5935514b7a45494165796866"
 CACHE_DURATION = 86400
 CACHE_EXTENDED_DURATION = 86400 * 7
-
-DATA_IMG_RE = re.compile(
-    r'^data:(image/(png|jpeg|jpg|gif|webp));base64,([A-Za-z0-9+/=]+)$',
-    re.IGNORECASE
-)
 
 GITHUB_OWNER = "jma1ice"
 GITHUB_REPO = "newsletterr"

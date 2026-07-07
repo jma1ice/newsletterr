@@ -16,7 +16,7 @@
                 <tr style="height: 100%; padding: 10px;">
                     <td id="config-row" style="width: 20%; padding: 10px; vertical-align: top;">
                         <form method="POST" id="stats_form">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token }} " />
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
                             <label for="items_to_pull" id="items_to_pull_label">Recently Added Items {% if settings.get('recently_added_mode') == 'days' %}(days){% else %}(items){% endif %}:</label>
                             <input type="number" id="items_to_pull" name="items_to_pull" value="10" style="width: 8.5rem; margin-bottom: 8px;" /><br>
                             <label for="days_to_pull">Time Range (days):</label>
@@ -5594,7 +5594,7 @@
                 }
             });
         </script>
-        <script nonce=" {{ nonce }}">
+        <script nonce="{{ nonce }}">
             (function initGifPicker() {
                 let currentTargetIndex = null;
                 let currentPage = 1;

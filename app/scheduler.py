@@ -1,13 +1,11 @@
-import sqlite3, threading, time, traceback
+import sqlite3, threading, time
 
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from app import config, state
-from app.cache import get_cache_info, get_cached_data, set_cached_data
-from app.crypto import decrypt
-from app.store import get_email_schedules, update_schedule_last_sent
+from app.cache import get_cache_info, set_cached_data
+from app.store import update_schedule_last_sent
 from app.clients.tautulli import run_tautulli_command
-from app.clients.plex import fetch_recently_added_using_plex_sdk
 from app.clients.github import _background_update_checker
 from app.emails.fetchers import fetch_recent_data_for_index
 from app.emails.scheduled import send_scheduled_email

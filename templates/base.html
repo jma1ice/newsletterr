@@ -41,13 +41,13 @@
     </div>
     <nav class="navbar">
         <ul id="navLinks">
-            <li><a href="{{ url_for('index') }}" class="hover:underline">newsletterr</a></li>
-            <li><a href="{{ url_for('email_history') }}" class="hover:underline">email history</a></li>
-            <li><a href="{{ url_for('scheduling') }}" class="hover:underline">scheduling</a></li>
-            <li><a href="{{ url_for('settings') }}" class="hover:underline">settings</a></li>
-            <li><a href="{{ url_for('about') }}" class="hover:underline">about</a></li>
+            <li><a href="{{ url_for('main.index') }}" class="hover:underline">newsletterr</a></li>
+            <li><a href="{{ url_for('emails.email_history') }}" class="hover:underline">email history</a></li>
+            <li><a href="{{ url_for('scheduling.scheduling') }}" class="hover:underline">scheduling</a></li>
+            <li><a href="{{ url_for('settings.settings') }}" class="hover:underline">settings</a></li>
+            <li><a href="{{ url_for('main.about') }}" class="hover:underline">about</a></li>
             {% if session["username"] %}
-                <li><a href="{{ url_for('logout') }}" class="hover:underline">logout</a></li>
+                <li><a href="{{ url_for('auth.logout') }}" class="hover:underline">logout</a></li>
             {% endif %}
             <li id="cache-li" style="margin-left: 20px;">
                 {% set cache_status = get_cache_status() %}

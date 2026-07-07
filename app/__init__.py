@@ -5,7 +5,11 @@ from app.clients import plex
 
 def create_app():
     from app import legacy
+    from app.blueprints import api, auth, emails, main, scheduling, settings, stats
     app = legacy.app
+
+    for module in (api, auth, emails, main, scheduling, settings, stats):
+        app.register_blueprint(module.bp)
 
     app.config["GITHUB_OWNER"] = config.GITHUB_OWNER
     app.config["GITHUB_REPO"] = config.GITHUB_REPO

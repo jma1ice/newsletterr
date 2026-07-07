@@ -62,7 +62,7 @@ def requires_auth(f):
             return f(*args, **kwargs)
 
         if not session.get('authenticated'):
-            return redirect(url_for('login'))
+            return redirect(url_for('auth.login'))
         return f(*args, **kwargs)
     return decorated_function
 

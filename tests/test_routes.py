@@ -24,6 +24,35 @@ def test_json_post_with_wrong_csrf_is_rejected(csrf_client):
 def test_clear_cache_requires_csrf(client, seeded_settings):
     assert client.post("/clear_cache").status_code == 400
 
+# --- input validation returns 400, not 500
+
+def test_send_email_rejects_non_json_body(csrf_client):
+    client, token = csrf_client
+    resp = client.post("/send_email", data="not json", content_type="application/json",
+                       headers={"X-CSRF-Token": token})
+    assert resp.status_code == 400
+
+def test_send_email_rejects_missing_fields(csrf_client):
+    client, token = csrf_client
+    resp = _post_json(client, token, "/send_email", {"subject": "hi"})  # no to_emails
+    assert resp.status_code == 400
+
+def test_pull_stats_without_tautulli_returns_400(csrf_client, seeded_settings):
+    client, token = csrf_client
+    import sqlite3
+    from app import config
+    conn = sqlite3.connect(config.DB_PATH)
+    conn.execute("UPDATE settings SET tautulli_url = '' WHERE id = 1")
+    conn.commit()
+    conn.close()
+    resp = _post_json(client, token, "/pull_stats", {})
+    assert resp.status_code == 400  # was a 500 crash on None.rstrip
+
+def test_schedule_create_missing_fields_returns_400(csrf_client):
+    client, token = csrf_client
+    resp = _post_json(client, token, "/scheduling/create", {"name": "x"})
+    assert resp.status_code == 400
+
 # --- email list CRUD
 
 def test_email_list_crud(csrf_client):

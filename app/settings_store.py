@@ -63,5 +63,10 @@ def get_settings(decrypt_secrets=True):
     for col, default in DEFAULTS.items():
         s[col] = s.get(col) or default
     for col, default in INT_COLUMNS.items():
-        s[col] = int(s.get(col) or default)
+        # a bad stored value must not take down every get_settings() caller
+        # (request threads and the scheduler all depend on this)
+        try:
+            s[col] = int(s.get(col) or default)
+        except (TypeError, ValueError):
+            s[col] = default
     return s

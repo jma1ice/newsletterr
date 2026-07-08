@@ -6,7 +6,7 @@ from flask import Blueprint, jsonify, render_template, request
 from app.settings_store import get_settings
 from app.cache import set_cached_data, get_cache_info
 from app.crypto import decrypt
-from app.security import require_csrf_for_json, requires_auth, safe_get
+from app.security import require_csrf_for_json, requires_auth, safe_get, json_body
 from app.theme import get_theme_settings
 from app.clients.plex import get_plex_headers
 from app.clients.tautulli import run_tautulli_command
@@ -24,15 +24,17 @@ bp = Blueprint('stats', __name__)
 @requires_auth
 def pull_stats():
     require_csrf_for_json()
-    data = request.get_json()
+    data, err = json_body()
+    if err:
+        return err
     time_range = str(data.get('time_range', 30))
     count = str(data.get('count', 10))
 
     _s = get_settings(decrypt_secrets=False)
     row = (_s.get("tautulli_url"), _s.get("tautulli_api"), _s.get("server_name"), _s.get("stats_type"), _s.get("recently_added_mode"), _s.get("recently_added_sort")) if "id" in _s else None
 
-    if not row:
-        return jsonify({"error": "Please enter tautulli info on settings page"}), 500
+    if not row or not row[0]:
+        return jsonify({"error": "Please enter tautulli info on settings page"}), 400
 
     tautulli_base_url = row[0].rstrip('/')
     tautulli_api_key = decrypt(row[1])
@@ -82,8 +84,9 @@ def pull_stats():
 
     libraries, _ = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_library_names', None, None, "10")
     library_section_ids = {}
-    for library in libraries:
-        library_section_ids[f"{library['section_id']}"] = library["section_name"]
+    for library in (libraries or []):
+        if isinstance(library, dict) and 'section_id' in library:
+            library_section_ids[f"{library['section_id']}"] = library.get("section_name")
 
     recent_data = fetch_recent_data_for_index(tautulli_base_url, tautulli_api_key, count, recently_added_mode=recently_added_mode, recently_added_sort=recently_added_sort)
     set_cached_data('recent_data', recent_data, cache_params)
@@ -126,14 +129,16 @@ def pull_recommendations():
     error = None
     alert = None
     
-    data = request.get_json()
-    stats = data['stats']
-    user_dict = data['user_dict']
-    graph_data = data['graph_data']
-    graph_commands = data['graph_commands']
-    recent_data = data['recent_data']
-    libs = data['libs']
-    settings = data['settings']
+    data, err = json_body(["to_emails"])
+    if err:
+        return err
+    stats = data.get('stats')
+    user_dict = data.get('user_dict', {})
+    graph_data = data.get('graph_data')
+    graph_commands = data.get('graph_commands')
+    recent_data = data.get('recent_data')
+    libs = data.get('libs')
+    settings = data.get('settings', {})
     to_emails = data['to_emails']
 
     _s = get_settings(decrypt_secrets=False)
@@ -194,14 +199,16 @@ def pull_droppedneedle_stats():
     error = None
     alert = None
 
-    data = request.get_json()
-    stats = data['stats']
-    user_dict = data['user_dict']
-    graph_data = data['graph_data']
-    graph_commands = data['graph_commands']
-    recent_data = data['recent_data']
-    libs = data['libs']
-    settings = data['settings']
+    data, err = json_body(["to_emails"])
+    if err:
+        return err
+    stats = data.get('stats')
+    user_dict = data.get('user_dict', {})
+    graph_data = data.get('graph_data')
+    graph_commands = data.get('graph_commands')
+    recent_data = data.get('recent_data')
+    libs = data.get('libs')
+    settings = data.get('settings', {})
     to_emails = data['to_emails']
 
     _s = get_settings(decrypt_secrets=False)

@@ -1,7 +1,7 @@
 import html, time
 
 import bleach, requests
-from flask import abort, redirect, request, session, url_for
+from flask import abort, jsonify, redirect, request, session, url_for
 from functools import wraps
 
 from app import config
@@ -11,6 +11,23 @@ def require_csrf_for_json():
     token = request.headers.get('X-CSRF-Token') or request.form.get('csrf_token')
     if not token or token.strip() != session.get('csrf_token'):
         abort(400)
+
+def json_body(required=()):
+    """Parse a JSON object body and validate required fields.
+
+    Returns (data, None) on success or (None, (response, 400)) on a malformed
+    body or missing field, so routes stay 400-not-500 on junk input:
+        data, err = json_body(["to_emails", "subject"])
+        if err:
+            return err
+    """
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return None, (jsonify({"error": "Request body must be a JSON object"}), 400)
+    missing = [f for f in required if data.get(f) in (None, "")]
+    if missing:
+        return None, (jsonify({"error": f"Missing required field(s): {', '.join(missing)}"}), 400)
+    return data, None
 
 def sanitize_html_input(text):
     if not text:

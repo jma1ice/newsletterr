@@ -4,7 +4,7 @@ import pytest
 
 from app.crypto import decrypt, encrypt
 from app.security import escape_html_output, sanitize_html, sanitize_html_input
-from app.store import calculate_next_send
+from app.store import calculate_next_send, next_future_send
 
 # (frequency, start_date, send_time, last_sent, expected)
 NEXT_SEND_CASES = [
@@ -16,9 +16,12 @@ NEXT_SEND_CASES = [
     ("weekly", "2026-03-02T09:00:00", "09:00", "2026-03-04T09:00:00", datetime(2026, 3, 9, 9, 0)),  # Wed -> Mon
     # biweekly: flat +14 days
     ("biweekly", "2026-03-01T09:00:00", "09:00", None, datetime(2026, 3, 15, 9, 0)),
-    # bimonthly (1st/15th cadence when start day <= 15)
-    ("bimonthly", "2026-03-05T09:00:00", "09:00", None, datetime(2026, 3, 15, 9, 0)),
-    ("bimonthly", "2026-03-05T09:00:00", "09:00", "2026-03-20T09:00:00", datetime(2026, 4, 1, 9, 0)),
+    # bimonthly: fixed 1st/15th cadence regardless of start day
+    ("bimonthly", "2026-03-05T09:00:00", "09:00", None, datetime(2026, 3, 15, 9, 0)),   # before 15th -> 15th
+    ("bimonthly", "2026-03-05T09:00:00", "09:00", "2026-03-20T09:00:00", datetime(2026, 4, 1, 9, 0)),  # after 15th -> next 1st
+    ("bimonthly", "2026-03-20T09:00:00", "09:00", None, datetime(2026, 4, 1, 9, 0)),    # start after 15th -> next 1st (was buggy: gave the 15th)
+    ("bimonthly", "2026-03-15T09:00:00", "09:00", None, datetime(2026, 4, 1, 9, 0)),    # exactly 15th -> next 1st
+    ("bimonthly", "2026-12-20T09:00:00", "09:00", None, datetime(2027, 1, 1, 9, 0)),    # year wrap
     # monthly: clamps to short months (Jan 31 -> Feb 28 in a non-leap year)
     ("monthly", "2026-01-31T09:00:00", "09:00", None, datetime(2026, 2, 28, 9, 0)),
     ("monthly", "2026-04-15T09:00:00", "09:00", "2026-05-15T09:00:00", datetime(2026, 6, 15, 9, 0)),
@@ -38,6 +41,16 @@ NEXT_SEND_CASES = [
 @pytest.mark.parametrize("frequency,start,send_time,last_sent,expected", NEXT_SEND_CASES)
 def test_calculate_next_send(frequency, start, send_time, last_sent, expected):
     assert calculate_next_send(frequency, start, send_time, last_sent) == expected
+
+@pytest.mark.parametrize("frequency", ["daily", "weekly", "biweekly", "bimonthly", "monthly"])
+def test_next_future_send_rolls_past_start_forward(frequency):
+    result = next_future_send(frequency, "2020-01-01T09:00:00", "09:00")
+    assert result > datetime.now()
+
+def test_next_future_send_matches_calculate_for_future_start():
+    future = datetime.now().replace(microsecond=0)
+    start = future.replace(year=future.year + 1).isoformat()
+    assert next_future_send("daily", start, "09:00") == calculate_next_send("daily", start, "09:00")
 
 def test_encrypt_decrypt_roundtrip():
     assert decrypt(encrypt("hunter2")) == "hunter2"

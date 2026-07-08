@@ -82,8 +82,11 @@ def test_droppedneedle():
 @requires_auth
 def gif_search():
     query = request.args.get('q', '').strip()
-    page = max(1, int(request.args.get('page', 1)))
-    per_page = min(max(8, int(request.args.get('per_page', 24))), 50)
+    try:
+        page = max(1, int(request.args.get('page', 1)))
+        per_page = min(max(8, int(request.args.get('per_page', 24))), 50)
+    except (TypeError, ValueError):
+        return jsonify({"error": "page and per_page must be integers"}), 400
 
     if not query:
         return jsonify({"results": []}), 200
@@ -189,31 +192,40 @@ def plex_poll_pin(pin_id: int):
 @requires_auth
 def plex_get_info():
     token = get_settings(decrypt_secrets=False).get("plex_token")
+    if not token:
+        return jsonify({"connected": False, "error": "Plex is not connected"}), 400
 
     url = "https://plex.tv/api/v2/resources"
     headers = get_plex_headers({"X-Plex-Token": decrypt(token)})
     params = {
         "includeHttps": "1"
     }
-    
-    response = safe_get(url, headers=headers, params=params)
-    data = response.json()
-    
+
+    try:
+        response = safe_get(url, headers=headers, params=params)
+        data = response.json()
+    except Exception:
+        logger.debug("plex info fetch/parse failed", exc_info=True)
+        return jsonify({"connected": False, "error": "Could not reach Plex.tv"}), 502
+
     def select_best_connection(connections):
         https_connections = [connection for connection in connections if connection.get('protocol') == 'https']
-        
+
         if https_connections:
             local_https = [connection for connection in https_connections if connection.get('local')]
             if local_https:
                 return local_https[0]['uri']
-            
+
             return https_connections[0]['uri']
-        
+
         return connections[0]['uri'] if connections else None
 
+    if not isinstance(data, list) or not data:
+        return jsonify({"connected": False, "error": "No Plex servers found on this account"}), 400
+
     server = data[0]
-    best_url = select_best_connection(server['connections'])
-    
+    best_url = select_best_connection(server.get('connections') or [])
+
     if not best_url:
         return jsonify({"connected": False, "error": "No suitable connection found"})
 
@@ -222,10 +234,8 @@ def plex_get_info():
         INSERT INTO settings (id, server_name, plex_url)
         VALUES (1, ?, ?)
         ON CONFLICT(id) DO UPDATE SET server_name = excluded.server_name, plex_url = excluded.plex_url
-    """, (server['name'], best_url))
+    """, (server.get('name'), best_url))
     conn.commit()
     conn.close()
 
-    if response.status_code == 200:
-        return jsonify({"connected": True})
-    return jsonify({"connected": False})
+    return jsonify({"connected": True})

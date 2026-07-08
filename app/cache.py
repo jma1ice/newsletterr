@@ -98,44 +98,53 @@ def can_use_cached_data_for_preview(required_days):
         return False, f"Error checking cache: {str(e)}"
 
 def is_cache_valid(cache_key, strict=True):
-    cache_entry = state.cache_storage.get(cache_key)
-    if cache_entry and cache_entry['data'] is not None:
-        age = time.time() - cache_entry['timestamp']
-        duration = config.CACHE_DURATION if strict else config.CACHE_EXTENDED_DURATION
-        return age < duration
-    return False
+    with state._CACHE_LOCK:
+        cache_entry = state.cache_storage.get(cache_key)
+        if cache_entry and cache_entry['data'] is not None:
+            age = time.time() - cache_entry['timestamp']
+            duration = config.CACHE_DURATION if strict else config.CACHE_EXTENDED_DURATION
+            return age < duration
+        return False
 
 def get_cached_data(cache_key, strict=True):
-    if is_cache_valid(cache_key, strict):
-        return state.cache_storage[cache_key]['data']
+    with state._CACHE_LOCK:
+        cache_entry = state.cache_storage.get(cache_key)
+        if cache_entry and cache_entry['data'] is not None:
+            age = time.time() - cache_entry['timestamp']
+            duration = config.CACHE_DURATION if strict else config.CACHE_EXTENDED_DURATION
+            if age < duration:
+                return cache_entry['data']
     return None
 
 def set_cached_data(cache_key, data, params=None):
-    state.cache_storage[cache_key] = {
-        'data': data,
-        'timestamp': time.time(),
-        'params': params
-    }
+    with state._CACHE_LOCK:
+        state.cache_storage[cache_key] = {
+            'data': data,
+            'timestamp': time.time(),
+            'params': params
+        }
 
 def get_cache_info(cache_key):
-    cache_entry = state.cache_storage.get(cache_key)
-    if cache_entry and cache_entry['data'] is not None:
-        age = time.time() - cache_entry['timestamp']
-        return {
-            'exists': True,
-            'age_hours': age / 3600,
-            'params': cache_entry.get('params'),
-            'is_fresh': age < config.CACHE_DURATION,
-            'is_usable': age < config.CACHE_EXTENDED_DURATION
-        }
+    with state._CACHE_LOCK:
+        cache_entry = state.cache_storage.get(cache_key)
+        if cache_entry and cache_entry['data'] is not None:
+            age = time.time() - cache_entry['timestamp']
+            return {
+                'exists': True,
+                'age_hours': age / 3600,
+                'params': cache_entry.get('params'),
+                'is_fresh': age < config.CACHE_DURATION,
+                'is_usable': age < config.CACHE_EXTENDED_DURATION
+            }
     return {'exists': False}
 
 def clear_cache(cache_key=None):
-    if cache_key:
-        state.cache_storage[cache_key] = {'data': None, 'timestamp': 0, 'params': None}
-    else:
-        for key in state.cache_storage:
-            state.cache_storage[key] = {'data': None, 'timestamp': 0, 'params': None}
+    with state._CACHE_LOCK:
+        if cache_key:
+            state.cache_storage[cache_key] = {'data': None, 'timestamp': 0, 'params': None}
+        else:
+            for key in list(state.cache_storage):
+                state.cache_storage[key] = {'data': None, 'timestamp': 0, 'params': None}
 
 def gkak():
     env_override = os.environ.get('KLIPY', '').strip()

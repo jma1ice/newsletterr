@@ -5,7 +5,7 @@ from flask import Blueprint, jsonify, redirect, render_template, request, sessio
 
 from app.db import db_connect
 from app.settings_store import get_settings
-from app.security import require_csrf_for_json, requires_auth
+from app.security import require_csrf_for_json, requires_auth, json_body
 from app.store import get_saved_email_lists, save_email_list, delete_email_list
 from app.emails.send import SendRequest, send_standard_email_with_cids, send_recommendations_email_with_cids
 
@@ -23,8 +23,12 @@ def send_email():
     if "id" not in settings:
         return jsonify({"error": "Please enter email info on settings page"}), 500
 
-    data = request.get_json()
-    to_emails = data['to_emails'].split(", ")
+    data, err = json_body(["to_emails", "subject"])
+    if err:
+        return err
+    to_emails = [e.strip() for e in str(data['to_emails']).split(",") if e.strip()]
+    if not to_emails:
+        return jsonify({"error": "At least one recipient is required"}), 400
     req = SendRequest(
         subject=data['subject'],
         email_header_title=data.get('email_header_title'),

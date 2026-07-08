@@ -75,7 +75,7 @@
             {% endif %}
 
             <form method="POST">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token }} " />
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
                 <div class="mb-3">
                     <label for="username" class="form-label">Username</label>
                     <input type="text" class="form-control" id="username" name="username" required>
@@ -90,6 +90,6 @@
             </form>
         </div>
 
-        <script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}" nonce="{{ nonce }}"></script>
+        <script src="{{ url_for('static', filename='js/vendor/bootstrap.bundle.min.js') }}" nonce="{{ nonce }}"></script>
     </body>
 </html>

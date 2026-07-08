@@ -7,8 +7,8 @@
         <div class="col-lg-12">
             <div class="card theme-card">
                 <div class="card-header theme-card-header d-flex justify-content-between align-items-center">
-                    <h3 class="mb-0">📧 Email Preview - <span id="schedule-name"></span></h3>
-                    <button class="btn btn-primary" onclick="window.close()">Close Preview</button>
+                    <h3 class="mb-0">Email Preview - <span id="schedule-name"></span></h3>
+                    <button class="btn btn-primary" id="close-preview-btn">Close Preview</button>
                 </div>
                 <div class="card-body">
                     <div id="loading" class="text-center p-4">
@@ -31,7 +31,7 @@
                             <div class="col-lg-12">
                                 <div class="card theme-card">
                                     <div class="card-header theme-card-header">
-                                        <h5 class="mb-0">📧 Email Preview</h5>
+                                        <h5 class="mb-0">Email Preview</h5>
                                     </div>
                                     <div class="card-body">
                                         <iframe id="preview" style="width: 100%; height: 600px; border: 1px solid #dee2e6; border-radius: 4px; background: white;"></iframe>
@@ -50,15 +50,22 @@
     </div>
 </div>
 
-<script src="{{ url_for('static', filename='js/html2canvas.min.js') }}" nonce="{{ nonce }}"></script>
-<script src="{{ url_for('static', filename='js/highcharts.js') }}" nonce="{{ nonce }}"></script>
-<script src="{{ url_for('static', filename='js/highcharts-exporting.js') }}" nonce="{{ nonce }}"></script>
+<script src="{{ url_for('static', filename='js/vendor/html2canvas.min.js') }}" nonce="{{ nonce }}"></script>
+<script src="{{ url_for('static', filename='js/vendor/highcharts.js') }}" nonce="{{ nonce }}"></script>
+<script src="{{ url_for('static', filename='js/vendor/highcharts-exporting.js') }}" nonce="{{ nonce }}"></script>
 
 <script nonce="{{ nonce }}">
+    document.getElementById('close-preview-btn').addEventListener('click', () => window.close());
     const urlParams = new URLSearchParams(window.location.search);
     const scheduleId = urlParams.get('schedule_id');
     const themeSettings = {{ theme_settings | tojson }};
     const displayPreference = "{{ settings.recipient_display_name }}";
+    const hideGraphPlayCounts = {{ 'true' if settings.get('hide_graph_play_counts') == 'enabled' else 'false' }};
+    const statType = "{{ settings.get('stats_type', 'plays') }}";
+    const recentlyAddedMode = "{{ settings.get('recently_added_mode', 'items') }}";
+    const raGridColumns = parseInt("{{ settings.get('ra_grid_columns', '5') }}") || 5;
+    const recsGridColumns = parseInt("{{ settings.get('recs_grid_columns', '5') }}") || 5;
+    const showStatCoverArt = "{{ settings.get('stat_cover_art', 'disabled') }}" === "enabled";
 
     let templateData = {};
     let stats = [];
@@ -418,7 +425,14 @@
         const rating = row.content_rating || '';
         const usersWatch = row.users_watched;
 
-        let tds = `<td>${esc(firstCol||'')}</td>`;
+        const coverArtTypes = ["Most Watched Movies", "Most Watched TV Shows", "Most Popular Movies", "Most Popular TV Shows", "Most Played Artists", "Most Popular Artists", "Recently Watched"];
+        let thumbHtml = '';
+        if (showStatCoverArt && coverArtTypes.includes(title) && (row.thumb || row.grandparent_thumb)) {
+            const thumbPath = row.thumb || row.grandparent_thumb;
+            thumbHtml = `<img src="/proxy-art${esc(thumbPath)}" style="height:38px;width:auto;border-radius:3px;margin-right:7px;vertical-align:middle;">`;
+        }
+
+        let tds = `<td>${thumbHtml}${esc(firstCol||'')}</td>`;
         if (showYear) tds += `<td>${esc(row.year||'')}</td>`;
         if (showPlays) tds += `<td>${esc(row.total_plays ?? row.plays ?? row.count ?? 0)}</td>`;
 
@@ -604,7 +618,8 @@
                         title: { text: cmd.name + ' - Last ' + `${dateRange}` + ' days' },
                         exporting: { enabled: true },
                         xAxis: { categories: g.categories || [] },
-                        yAxis: { title: { text: 'Plays' } },
+                        yAxis: { title: { text: hideGraphPlayCounts ? null : (statType === 'duration' ? 'Duration' : 'Plays') }, labels: { enabled: !hideGraphPlayCounts } },
+                        tooltip: hideGraphPlayCounts ? { enabled: false } : {},
                         series: g.series || []
                     };
                     
@@ -1021,7 +1036,7 @@
         }
 
         const maxItems = templateData.items_count ? parseInt(templateData.items_count) : 10;
-        allItems = deduplicated.slice(0, maxItems);
+        allItems = recentlyAddedMode === 'days' ? deduplicated : deduplicated.slice(0, maxItems);
         
         if (allItems.length === 0) {
             return `<div class="recently-added"><p style="text-align: center; color: var(--email-muted); padding: 20px;">No recently added items found${libraryFilter ? ` for ${libraryFilter}` : ''}</p></div>`;
@@ -1127,12 +1142,20 @@
             return cardContent;
         }).join('');
         
+        let raTitle;
+        if (recentlyAddedMode === 'days' && maxItems) {
+            const sinceDate = new Date(Date.now() - maxItems * 864e5);
+            const mm = sinceDate.getMonth() + 1, dd = sinceDate.getDate(), yy = String(sinceDate.getFullYear()).slice(-2);
+            raTitle = (libraryFilter ? `Added to ${libraryFilter}` : 'Recently Added') + ` since ${mm}/${dd}/${yy}`;
+        } else {
+            raTitle = `Recently Added${libraryFilter ? ` - ${libraryFilter}` : ''}`;
+        }
         return `
             <div class="recently-added">
-                <h2>Recently Added${libraryFilter ? ` - ${libraryFilter}` : ''}</h2>
+                <h2>${raTitle}</h2>
                 <div style="
                     display: grid;
-                    grid-template-columns: repeat(5, 1fr);
+                    grid-template-columns: repeat(${raGridColumns}, 1fr);
                     gap: 12px;
                     margin: 15px auto 0 auto;
                     padding: 0;
@@ -1285,7 +1308,7 @@
                 <h3 style="color: var(--email-text); margin-bottom: 5px;">${title}</h3>
                 <div style="
                     display: grid;
-                    grid-template-columns: repeat(5, 1fr);
+                    grid-template-columns: repeat(${recsGridColumns}, 1fr);
                     gap: 12px;
                     padding: 0;
                     margin: 0 auto 0 auto;
@@ -1749,14 +1772,17 @@
         const logoFilename = "{{ settings.logo_filename }}";
         const logoWidth = "{{ settings.logo_width }}";
         const customLogoFilename = "{{ settings.custom_logo_filename }}"
+        const logoPosition = "{{ settings.get('logo_position', 'center') }}";
         const themedCSS = getThemedEmailCSS();
 
         let logoHTML = "";
         if (logoFilename && logoWidth) {
+            const _ml = logoPosition === 'left' ? '0' : 'auto';
+            const _mr = logoPosition === 'right' ? '0' : 'auto';
             if (logoFilename == 'custom') {
-                logoHTML = `<img src="/static/uploads/logos/${customLogoFilename}" alt="${serverName}" class="email-logo" style="max-width: ${logoWidth}px; width: auto; height: auto;">`;
+                logoHTML = `<img src="/static/uploads/logos/${customLogoFilename}" alt="${serverName}" class="email-logo" style="max-width: ${logoWidth}px; width: auto; height: auto; display: block; margin-left: ${_ml}; margin-right: ${_mr};">`;
             } else {
-                logoHTML = `<img src="/static/img/${logoFilename}" alt="${serverName}" class="email-logo" style="max-width: ${logoWidth}px; width: auto; height: auto;">`;
+                logoHTML = `<img src="/static/img/${logoFilename}" alt="${serverName}" class="email-logo" style="max-width: ${logoWidth}px; width: auto; height: auto; display: block; margin-left: ${_ml}; margin-right: ${_mr};">`;
             }
         }
         

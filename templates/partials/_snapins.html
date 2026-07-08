@@ -1,0 +1,151 @@
+                        <div class="mb-4">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h2>Text Blocks</h2>
+                                <div class="d-flex gap-2">
+                                    <button type="button" class="btn button-outline btn-sm" id="add-title-btn" title="Add a title block with large heading text">
+                                        + Title
+                                    </button>
+                                    <button type="button" class="btn button-outline btn-sm" id="add-header-btn" title="Add a header block with medium heading text">
+                                        + Header
+                                    </button>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm" id="add-intro-btn" title="Add introduction text about server membership">
+                                        + Intro
+                                    </button>
+                                    <button type="button" class="btn button btn-sm" id="add-text-block-btn">
+                                        + Text Block
+                                    </button>
+                                    <button type="button" class="btn button btn-sm" id="add-separator-btn" title="Add a horizontal divider line">
+                                        + Separator
+                                    </button>
+                                    <button type="button" class="btn button btn-sm" id="add-html-text-block-btn">
+                                        + HTML Block
+                                    </button>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm" id="add-outro-btn" title="Add closing thank you message">
+                                        + Outro
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h2>Media</h2>
+                                <div class="d-flex gap-2">
+                                    <button type="button" class="btn button btn-sm" id="add-image-btn" title="Add an image or GIF from file or URL">
+                                        + Image/GIF
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <input type="file" id="media-upload-input" accept=".png,.jpg,.jpeg,.webp,.gif" style="display: none;">
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h2 id="ra-header" style="{{ '' if recent_data else 'display:none;' }}">Recently Added</h2>
+                                <div id="ra-lib-list" class="row" style="{{ '' if recent_data else 'display:none;' }}"></div>
+                            </div>
+                            <div class="col-md-6" id="recs-col">
+                                {% if recommendations_json %}
+                                    <h2>Recommendations</h2>
+                                    <div id="recs-user-list" class="row"></div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="row mt-3" id="droppedneedle-col">
+                            {% if droppedneedle_wrapped_json or droppedneedle_server_json %}
+                                <div class="col-md-6">
+                                    <h2>DroppedNeedle Wrapped</h2>
+                                    <div id="droppedneedle-user-list" class="row"></div>
+                                </div>
+                                <div class="col-md-6">
+                                    <h2>DroppedNeedle Server Stats</h2>
+                                    <div id="droppedneedle-server-list" class="row"></div>
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="row mt-4">
+                            <div class="col-12">
+                                <h2>Plex Collections</h2>
+                                <button type="button" class="btn button btn-sm mb-2" id="add-collection-group-btn">
+                                    + Collection Group
+                                </button>
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <h5>📽️ Movie Collections</h5>
+                                        <div class="d-flex align-items-center gap-2 mb-3">
+                                            <select id="movie-collections-dropdown" class="form-select" style="flex: 1;">
+                                                <option value="">Pick collection...</option>
+                                            </select>
+                                            <button id="add-movie-collection-btn" class="btn button btn-sm" disabled>
+                                                Add
+                                            </button>
+                                        </div>
+                                        <div id="movie-collections-loading" class="text-center d-none">
+                                            <div class="spinner-border spinner-border-sm" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                            <span class="ms-2">Loading movie collections...</span>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <h5>📺 TV Show Collections</h5>
+                                        <div class="d-flex align-items-center gap-2 mb-3">
+                                            <select id="show-collections-dropdown" class="form-select" style="flex: 1;">
+                                                <option value="">Pick collection...</option>
+                                            </select>
+                                            <button id="add-show-collection-btn" class="btn button btn-sm" disabled>
+                                                Add
+                                            </button>
+                                        </div>
+                                        <div id="show-collections-loading" class="text-center d-none">
+                                            <div class="spinner-border spinner-border-sm" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                            <span class="ms-2">Loading TV collections...</span>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <h5>🎧 Audio Collections</h5>
+                                        <div class="d-flex align-items-center gap-2 mb-3">
+                                            <select id="audio-collections-dropdown" class="form-select" style="flex: 1;">
+                                                <option value="">Pick collection...</option>
+                                            </select>
+                                            <button id="add-audio-collection-btn" class="btn button btn-sm" disabled>
+                                                Add
+                                            </button>
+                                        </div>
+                                        <div id="audio-collections-loading" class="text-center d-none">
+                                            <div class="spinner-border spinner-border-sm" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                            <span class="ms-2">Loading audio collections...</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h2>Available Stats</h2>
+                                <div id="stats-list" class="row">
+                                    <div class="alert alert-info" style="font-size: 0.9rem; padding: 0.75rem;">
+                                        <i class="fas fa-info-circle me-2"></i>
+                                        No stats data available. Click <strong>"Get Stats\Users"</strong> to load data.
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <h2>Available Graphs</h2>
+                                <div id="graphs-list" class="row">
+                                    <div class="alert alert-info" style="font-size: 0.9rem; padding: 0.75rem;">
+                                        <i class="fas fa-info-circle me-2"></i>
+                                        No graph data available. Click <strong>"Get Stats\Users"</strong> to load data.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+

@@ -16,14 +16,14 @@
     <link href="https://fonts.googleapis.com/css?family=IBM+Plex+Sans:400,700&display=swap" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/tailwind.min.css') }}" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
-    <script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}" nonce="{{ nonce }}"></script>
-    <script src="{{ url_for('static', filename='js/html2canvas.min.js') }}" nonce="{{ nonce }}"></script>
-    <script src="{{ url_for('static', filename='js/highcharts.js') }}" nonce="{{ nonce }}"></script>
-    <script src="{{ url_for('static', filename='js/highcharts-exporting.js') }}" nonce="{{ nonce }}"></script>
-    <script src="{{ url_for('static', filename='js/highcharts-offline-exporting.js') }}" nonce="{{ nonce }}"></script>
-    <script type="module" src="{{ url_for('static', filename='js/emoji-picker-element.js') }}" nonce="{{ nonce }}"></script>
-    <!-- Tailwind Play CDN - downloaded [03.15.26], re-run: curl -L -o static/js/tailwind-play-cdn.js https://cdn.tailwindcss.com -->
-    <script src="{{ url_for('static', filename='js/tailwind-play-cdn.js') }}" nonce="{{ nonce }}"></script>
+    <script src="{{ url_for('static', filename='js/vendor/bootstrap.bundle.min.js') }}" nonce="{{ nonce }}"></script>
+    <script src="{{ url_for('static', filename='js/vendor/html2canvas.min.js') }}" nonce="{{ nonce }}"></script>
+    <script src="{{ url_for('static', filename='js/vendor/highcharts.js') }}" nonce="{{ nonce }}"></script>
+    <script src="{{ url_for('static', filename='js/vendor/highcharts-exporting.js') }}" nonce="{{ nonce }}"></script>
+    <script src="{{ url_for('static', filename='js/vendor/highcharts-offline-exporting.js') }}" nonce="{{ nonce }}"></script>
+    <script type="module" src="{{ url_for('static', filename='js/vendor/emoji-picker-element.js') }}" nonce="{{ nonce }}"></script>
+    <!-- Tailwind Play CDN - downloaded [03.15.26], re-run: curl -L -o static/js/vendor/tailwind-play-cdn.js https://cdn.tailwindcss.com -->
+    <script src="{{ url_for('static', filename='js/vendor/tailwind-play-cdn.js') }}" nonce="{{ nonce }}"></script>
     <script nonce="{{ nonce }}">
         tailwind.config = {
             darkMode: 'class',
@@ -41,13 +41,13 @@
     </div>
     <nav class="navbar">
         <ul id="navLinks">
-            <li><a href="{{ url_for('index') }}" class="hover:underline">newsletterr</a></li>
-            <li><a href="{{ url_for('email_history') }}" class="hover:underline">email history</a></li>
-            <li><a href="{{ url_for('scheduling') }}" class="hover:underline">scheduling</a></li>
-            <li><a href="{{ url_for('settings') }}" class="hover:underline">settings</a></li>
-            <li><a href="{{ url_for('about') }}" class="hover:underline">about</a></li>
+            <li><a href="{{ url_for('main.index') }}" class="hover:underline">newsletterr</a></li>
+            <li><a href="{{ url_for('emails.email_history') }}" class="hover:underline">email history</a></li>
+            <li><a href="{{ url_for('scheduling.scheduling') }}" class="hover:underline">scheduling</a></li>
+            <li><a href="{{ url_for('settings.settings') }}" class="hover:underline">settings</a></li>
+            <li><a href="{{ url_for('main.about') }}" class="hover:underline">about</a></li>
             {% if session["username"] %}
-                <li><a href="{{ url_for('logout') }}" class="hover:underline">logout</a></li>
+                <li><a href="{{ url_for('auth.logout') }}" class="hover:underline">logout</a></li>
             {% endif %}
             <li id="cache-li" style="margin-left: 20px;">
                 {% set cache_status = get_cache_status() %}

@@ -34,8 +34,8 @@
         </div>
     </div>
 
-    <div class="border-1 border-green-400 dark:border-green-500 rounded-lg p-2 w-25 mb-2">
-        <div class="grid grid-cols-2 gap-2 w-100">
+    <div class="border-1 border-green-400 dark:border-green-500 rounded-lg p-2 mb-2" style="width: 800px;">
+        <div class="grid grid-cols-3 gap-2 w-100">
             <div class="flex w-100 items-center space-x-3 p-3 bg-[#8acbd4] dark:bg-[#62a1a4] rounded-lg">
                 <div class="w-20 h-10 bg-[#62a1a4] dark:bg-[#8acbd4] rounded-full flex items-center justify-center text-[#333] font-bold">
                     Ko-Fi
@@ -47,6 +47,12 @@
                     GitHub
                 </div>
                 <div class="font-semibold text-[#333]">@quinneydavid</div>
+            </div>
+            <div class="flex w-100 items-center space-x-3 p-3 bg-[#8acbd4] dark:bg-[#62a1a4] rounded-lg">
+                <div class="w-20 h-10 bg-[#62a1a4] dark:bg-[#8acbd4] rounded-full flex items-center justify-center text-[#333] font-bold">
+                    Ko-Fi
+                </div>
+                <div class="font-semibold text-[#333]">@bferd</div>
             </div>
         </div>
     </div>
@@ -97,33 +103,25 @@
     <h2 class="text-2xl font-bold mb-2">Recent Changes</h2>
     <dt class="font-semibold dark:border-gray-300">Fixes:</dt>
     <ul class="list-disc list-inside space-y-2 text-sm mb-2">
-        <li>Some CSS Optimizations for mobile - more still in the works</li>
-        <li>Timeout on safe_get() extended to 120s so that conjurr api call has enough time to generate the recommendations</li>
-        <li>Fixed authentication issue with /proxy-art that made art unavailble in the sent email if a login page was set up</li>
-        <li>Fixed a bug where libraries that share name similarities were causing both libraries to be pulled into the 'recently added' snap in</li>
-        <li>Fixed graph hanging bug by moving some variable declarations higher and packaging highcharts with the app instead of calls to the CDN</li>
-        <li>While we're at it, moved all CDN calls to local files</li>
-        <li>Fixed missing smtp_username variable from scheduled email send logic</li>
-        <li>Added consistent headers to avoid repeated 'New Device Connected' notifications on Plex API calls</li>
-        <li>Fixed bug where recommendations pull would hang for a short period if conjurr is not running</li>
-        <li>Fixed bug where missing theme_settings in an early return to index was causing an error updating the preview</li>
+        <li>Fixed issue where fresh setup `migrate_email_templates_for_header_title()` calls for `server_name` failed creating a missing `email_header_title` column</li>
     </ul>
     <dt class="font-semibold dark:border-gray-300">New Features:</dt>
     <ul class="list-disc list-inside space-y-2 text-sm mb-2">
-        <li>GitHub link is now a stylized logo</li>
-        <li>Page no longer reloads on stats/users pull</li>
-        <li>Added separator blocks to add lines between sections in emails</li>
-        <li>Made the header title into a text input (under subject) so that it is editable/removable</li>
-        <li>Made 'Title' Text Block drag-able and not pinned to top</li>
-        <li>Recently Added now filters out 0 length run time items</li>
-        <li>Added functionality for full custom HTML templates</li>
-        <li>Added an export email HTML button</li>
-        <li>Added an import email template button</li>
-        <li>Ratings (G, PG, etc) are now listed on recently added</li>
-        <li>Added IMDb ratings in stat tables - requires Tautulli PR approval and then update</li>
-        <li>Added snap-ins for images/gifs</li>
-        <li>Added emoji support to various Text Block Snap-ins</li>
-        <li>Pop out preview now updates with changes to the email</li>
+        <li>Added sections to settings page (email server | external services | data settings | email styling | email body defaults | login | security)</li>
+        <li>Settings changes are now kept on error so user won't have to re-enter them</li>
+        <li>Added test api buttons for conjurr and tautulli</li>
+        <li>Added setting for custom intro/outro text</li>
+        <li>Added HSTS option in security settings</li>
+        <li>Added option to use or not use [SCHEDULED] in scheduled email subject</li>
+        <li>Added setting for logo positioning</li>
+        <li>Added setting to hide play counts in stats and graphs</li>
+        <li>Added setting to choose if duration or play counts is used for stats/graphs</li>
+        <li>Added an option to pull recently added by # of days. When this is used, "Recently Added" snap-in header now shows 'Added since X date'</li>
+        <li>Added option to sort recently added by rating</li>
+        <li>Added option for item width of recently added and recommendations grids</li>
+        <li>Added option for small cover art of each item in stats tables</li>
+        <li>Added To: vs BCC: option for email send</li>
+        <li>Added option for setting max image heights to reduce email size</li>
     </ul>
 </div>
 {% endblock %}

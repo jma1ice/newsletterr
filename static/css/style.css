@@ -696,6 +696,63 @@ footer p {
     box-shadow: none;
 }
 
+.settings-nav-btn {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 10px 14px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: inherit;
+    transition: background 0.15s;
+}
+
+.settings-nav-btn:hover {
+    background: rgba(138, 203, 212, 0.2);
+}
+
+.settings-nav-btn.active {
+    background: #333;
+    color: #62a1a4;
+    font-weight: 600;
+}
+
+.dark .settings-nav-btn.active {
+    background: #62a1a4;
+    color: #333;
+}
+
+.dark .settings-nav-btn:hover {
+    background: rgba(138, 203, 212, 0.15);
+}
+
+#emoji-picker-container emoji-picker {
+    --background: #8acbd4;
+    --border-color: #ccc;
+    --category-font-color: #222;
+    --input-border-color: #aaa;
+    --input-font-color: #222;
+    --input-placeholder-color: #555;
+    --outline-color: #62a1a4;
+    --category-button-active-background: #62a1a4;
+    --border-size: 1px;
+    border-radius: 8px;
+}
+
+.dark #emoji-picker-container emoji-picker {
+    --background: #4a4a4a;
+    --border-color: #666;
+    --category-font-color: #8acbd4;
+    --input-border-color: #666;
+    --input-font-color: #8acbd4;
+    --input-placeholder-color: #888;
+    --outline-color: #8acbd4;
+    --category-button-active-background: #62a1a4;
+}
+
 @media (max-width: 768px) {
     
     body {

@@ -1,0 +1,19 @@
+[project]
+name = "newsletterr"
+description = "Self-hosted newsletter builder for Plex servers"
+requires-python = ">=3.12"
+dynamic = ["version"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 300
+
+[tool.ruff.lint]
+# Correctness rules only (undefined names, unused imports, syntax errors).
+# F541 (f-strings without placeholders) and F841 (unused locals) are
+# pre-existing patterns in this codebase and deliberately not enforced.
+select = ["E9", "F"]
+ignore = ["F541", "F841"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

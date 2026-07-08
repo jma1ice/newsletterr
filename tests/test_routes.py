@@ -140,6 +140,36 @@ def test_settings_save_and_reload(csrf_client, app):
 def test_settings_post_without_csrf_is_rejected(client, seeded_settings):
     assert client.post("/settings", data=SETTINGS_FORM).status_code == 400
 
+def test_secrets_never_rendered_to_browser(csrf_client, app):
+    client, token = csrf_client
+    # save a config with distinctive secret values
+    form = {**SETTINGS_FORM, "csrf_token": token, "password": "SECRET-smtp-pw",
+            "tautulli_url": "http://tt.local", "tautulli_api": "SECRET-tt-key"}
+    client.post("/settings", data=form)
+
+    settings_html = client.get("/settings").get_data(as_text=True)
+    assert "SECRET-smtp-pw" not in settings_html
+    assert "SECRET-tt-key" not in settings_html
+    # the placeholder proves the field knows a value is stored without leaking it
+    assert "leave blank to keep" in settings_html
+
+    index_html = client.get("/").get_data(as_text=True)
+    assert "SECRET-tt-key" not in index_html
+
+def test_blank_secret_submission_keeps_existing(csrf_client, app):
+    client, token = csrf_client
+    client.post("/settings", data={**SETTINGS_FORM, "csrf_token": token, "password": "keep-me"})
+    # resubmit with blank password (as the write-only field does)
+    client.post("/settings", data={**SETTINGS_FORM, "csrf_token": token, "password": ""})
+
+    import sqlite3
+    from app import config
+    from app.crypto import decrypt
+    conn = sqlite3.connect(config.DB_PATH)
+    row = conn.execute("SELECT password FROM settings WHERE id = 1").fetchone()
+    conn.close()
+    assert decrypt(row[0]) == "keep-me"  # not clobbered to empty
+
 # --- auth gate
 
 def test_auth_gate_blocks_and_login_flow_works(client, login_enabled):

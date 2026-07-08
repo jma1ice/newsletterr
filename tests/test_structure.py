@@ -16,6 +16,7 @@ EXPECTED_RULES = [
     "/api/test/tautulli",
     "/cache_status",
     "/clear_cache",
+    "/csp-report",
     "/delete-logo",
     "/email_history",
     "/email_history/clear",

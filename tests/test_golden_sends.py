@@ -7,7 +7,6 @@
 
 import email as email_lib
 import json
-import re
 import smtplib
 import sqlite3
 from pathlib import Path

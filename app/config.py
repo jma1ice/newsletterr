@@ -43,5 +43,15 @@ GITHUB_REPO = "newsletterr"
 k3 = [52, 103, 75, 113, 57, 77, 75, 81, 70, 121, 57, 99, 75, 98, 80, 70, 120, 69, 117, 76, 51]
 UPDATE_CHECK_INTERVAL_SEC = 60 * 60
 
-VERSION = "v2026.2"
-PUBLISH_DATE = "May 27, 2026"
+# Single source of truth for release metadata is the repo-root VERSION file:
+# line 1 is the version, line 2 the publish date. The release workflow
+# verifies the git tag matches line 1. The version format must stay vYYYY.N
+# so the update checker's numeric comparison keeps working.
+try:
+    _version_lines = (ASSET_ROOT / "VERSION").read_text().strip().splitlines()
+    VERSION = _version_lines[0].strip()
+    PUBLISH_DATE = _version_lines[1].strip() if len(_version_lines) > 1 else ""
+except OSError:
+    VERSION = "v0.0"
+    PUBLISH_DATE = ""
+    logger.warning("VERSION file missing next to the application; update checks will misbehave")

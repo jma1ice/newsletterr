@@ -1,5 +1,6 @@
+import secrets
 
-from flask import Response
+from flask import Response, g
 
 from app import config, state
 from app.settings_store import get_settings
@@ -8,6 +9,13 @@ from app.clients.github import _ensure_recent_check
 import logging
 
 logger = logging.getLogger(__name__)
+
+def mint_csp_nonce():
+    g.csp_nonce = secrets.token_urlsafe(16)
+
+def inject_csp_nonce():
+    # every template gets the same per-request nonce the CSP header carries
+    return {"nonce": g.csp_nonce}
 
 def inject_update_info():
     _ensure_recent_check()
@@ -33,6 +41,19 @@ def set_security_headers(resp: Response):
         resp.headers.setdefault('X-Frame-Options', 'DENY')
         resp.headers.setdefault('X-Content-Type-Options', 'nosniff')
         resp.headers.setdefault('Referrer-Policy', 'no-referrer')
+        # Report-Only while the policy soaks; flip to enforcing once
+        # /csp-report stays quiet through normal use.
+        csp = (
+            "default-src 'self'; "
+            f"script-src 'self' 'nonce-{g.csp_nonce}'; "
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+            "font-src 'self' https://fonts.gstatic.com; "
+            "img-src 'self' data: blob: https:; "
+            "frame-src 'self'; "
+            "connect-src 'self'; "
+            "report-uri /csp-report"
+        )
+        resp.headers.setdefault('Content-Security-Policy-Report-Only', csp)
         if state._hsts_enabled:
             resp.headers.setdefault('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload')
         return resp
@@ -41,5 +62,7 @@ def set_security_headers(resp: Response):
         return resp
 
 def register(app):
+    app.before_request(mint_csp_nonce)
+    app.context_processor(inject_csp_nonce)
     app.context_processor(inject_update_info)
     app.after_request(set_security_headers)

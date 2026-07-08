@@ -32,6 +32,9 @@ def create_app():
     db.migrate_musicseerr_to_droppedneedle()
     db.init_db(config.DB_PATH)
     hooks.refresh_hsts_setting()
+    app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+    # HSTS enabled implies the instance is served over https
+    app.config["SESSION_COOKIE_SECURE"] = state._hsts_enabled
     db.migrate_schema("logo_filename TEXT")
     db.migrate_schema("logo_width INTEGER")
     db.migrate_schema("recipient_display_name TEXT DEFAULT 'email'")

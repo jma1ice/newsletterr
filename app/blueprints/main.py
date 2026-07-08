@@ -175,7 +175,7 @@ def index():
                            cache_info=cache_info, recommendations_json=recommendations_json,
                            filtered_users=filtered_users, theme_settings=theme_settings,
                            droppedneedle_wrapped_json=droppedneedle_wrapped_json, droppedneedle_server_json=droppedneedle_server_json,
-                           nonce=secrets.token_urlsafe(16), csrf_token=session["csrf_token"], username=username
+                           csrf_token=session["csrf_token"], username=username
                         )
 
 @bp.route('/proxy-art/<path:art_path>')
@@ -278,3 +278,14 @@ def cache_status():
             'age_seconds': int(time.time() - state.cache_storage[key]['timestamp']) if state.cache_storage[key]['timestamp'] > 0 else 0
         }
     return jsonify(status)
+
+@bp.route('/csp-report', methods=['POST'])
+def csp_report():
+    # browsers post violation reports here; no auth or CSRF (they cannot
+    # attach either) and nothing is stored, only logged
+    try:
+        report = request.get_json(force=True, silent=True) or {}
+        logger.warning(f"CSP violation report: {report}")
+    except Exception:
+        logger.debug("unparseable CSP report", exc_info=True)
+    return ('', 204)

@@ -20,9 +20,8 @@
                         
                         {% if cache_info %}
                             <div class="card mt-3" id="cache-card">
-                                <div class="card-header d-flex justify-content-between align-items-center" 
-                                    style="cursor: pointer; padding: 8px 12px;" 
-                                    onclick="document.getElementById('cache-status-badge').classList.toggle('d-none')">
+                                <div id="cache-card-header" class="card-header d-flex justify-content-between align-items-center" 
+                                    style="cursor: pointer; padding: 8px 12px;">
                                     <h6 class="mb-0" style="font-size: 0.85rem;">Cache Status</h6>
                                     <span style="font-size: 0.8rem;">▼</span>
                                 </div>
@@ -49,9 +48,8 @@
                         {% endif %}
 
                         <div class="card mb-3" style="margin-top: 20px;">
-                            <div class="card-header d-flex justify-content-between align-items-center" 
-                                 style="cursor: pointer;" 
-                                 onclick="document.getElementById('bcc-collapse').classList.toggle('d-none')">
+                            <div id="bcc-card-header" class="card-header d-flex justify-content-between align-items-center" 
+                                 style="cursor: pointer;">
                                 <h5 class="mb-0">Email Recipients</h5>
                                 <span id="bcc-toggle-icon" style="transition: transform 0.3s;">▼</span>
                             </div>

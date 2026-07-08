@@ -111,7 +111,13 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
         theme = 'dark'
         
         logger.info("Capturing chart images...")
-        chart_images = capture_chart_images_via_headless(schedule_id, public_base, theme)
+        try:
+            chart_images = capture_chart_images_via_headless(schedule_id, public_base, theme)
+        except Exception:
+            # environments without playwright browsers (release binaries)
+            # still send the email, just without rendered chart images
+            logger.warning("Chart capture unavailable; sending without chart images", exc_info=True)
+            chart_images = {}
         logger.info(f"Captured {len(chart_images)} chart images")
         
         for item in selected_items:

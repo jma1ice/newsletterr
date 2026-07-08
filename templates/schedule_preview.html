@@ -8,7 +8,7 @@
             <div class="card theme-card">
                 <div class="card-header theme-card-header d-flex justify-content-between align-items-center">
                     <h3 class="mb-0">Email Preview - <span id="schedule-name"></span></h3>
-                    <button class="btn btn-primary" onclick="window.close()">Close Preview</button>
+                    <button class="btn btn-primary" id="close-preview-btn">Close Preview</button>
                 </div>
                 <div class="card-body">
                     <div id="loading" class="text-center p-4">
@@ -50,11 +50,12 @@
     </div>
 </div>
 
-<script src="{{ url_for('static', filename='js/html2canvas.min.js') }}" nonce="{{ nonce }}"></script>
-<script src="{{ url_for('static', filename='js/highcharts.js') }}" nonce="{{ nonce }}"></script>
-<script src="{{ url_for('static', filename='js/highcharts-exporting.js') }}" nonce="{{ nonce }}"></script>
+<script src="{{ url_for('static', filename='js/vendor/html2canvas.min.js') }}" nonce="{{ nonce }}"></script>
+<script src="{{ url_for('static', filename='js/vendor/highcharts.js') }}" nonce="{{ nonce }}"></script>
+<script src="{{ url_for('static', filename='js/vendor/highcharts-exporting.js') }}" nonce="{{ nonce }}"></script>
 
 <script nonce="{{ nonce }}">
+    document.getElementById('close-preview-btn').addEventListener('click', () => window.close());
     const urlParams = new URLSearchParams(window.location.search);
     const scheduleId = urlParams.get('schedule_id');
     const themeSettings = {{ theme_settings | tojson }};

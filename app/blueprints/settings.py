@@ -289,7 +289,7 @@ def settings():
             }
             if not session.get("csrf_token"):
                 session["csrf_token"] = secrets.token_urlsafe(32)
-            return render_template('settings.html', settings=error_settings, error=f"Error saving settings: {str(e)}", nonce=secrets.token_urlsafe(16), csrf_token=session["csrf_token"])
+            return render_template('settings.html', settings=error_settings, error=f"Error saving settings: {str(e)}", csrf_token=session["csrf_token"])
 
     s = get_settings(decrypt_secrets=False)
     from_email = s.get("from_email")
@@ -425,7 +425,7 @@ def settings():
 
     if not session.get("csrf_token"):
         session["csrf_token"] = secrets.token_urlsafe(32)
-    return render_template('settings.html', settings=settings, alert=alert, nonce=secrets.token_urlsafe(16), csrf_token=session["csrf_token"])
+    return render_template('settings.html', settings=settings, alert=alert, csrf_token=session["csrf_token"])
 
 @bp.route('/upload-logo', methods=['POST'])
 @requires_auth

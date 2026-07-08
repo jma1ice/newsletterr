@@ -4,4 +4,5 @@ env/
 .db
 __pycache__/
 *.json
+!tests/goldens/*.json
 venv/

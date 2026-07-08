@@ -73,7 +73,7 @@ Newsletterr is a lightweight Flask application that talks to **[Tautulli](https:
 
 ### 1. Prerequisites
 
-* Python **3.9** or higher  
+* Python **3.12** or higher  
 * A running **Tautulli** instance with an API key  
 * SMTP credentials (username & password _or_ an app‑password if using Gmail)
 
@@ -91,6 +91,9 @@ python -m pip install -r requirements.txt
 python -m playwright install chromium
 ```
 
+#### Release binaries
+Download the zip for your platform from the latest [GitHub release](https://github.com/jma1ice/newsletterr/releases) (newsletterr-linux-x64.zip or newsletterr-windows-x64.zip), unzip it, and run the `newsletterr` executable inside. The app creates its `database/` and `env/` folders next to the executable. For chart images in scheduled emails, install the Playwright browser once with `pip install playwright && playwright install chromium`; without it, emails send without chart images.
+
 #### Docker
 On docker hub: jma1ice/newsletterr:latest
 or build locally: 
@@ -106,11 +109,29 @@ docker run -d --name newsletterr \
 
 ### 3. Run
 
+For development:
 ```bash
 python newsletterr.py
 ```
 
-By default the app listens on **http://127.0.0.1:6397**.
+For production, use gunicorn (a single worker is required because the send scheduler runs in-process; threads provide request concurrency):
+```bash
+gunicorn -w 1 -k gthread --threads 8 --timeout 180 -b 0.0.0.0:6397 newsletterr:app
+```
+
+By default the app listens on **http://127.0.0.1:6397**. Set the `PORT` environment variable to change the port when running `python newsletterr.py`.
+
+#### Environment variables
+
+| Variable | Purpose | Default |
+|---|---|---|
+| `PUBLIC_BASE_URL` | URL the app uses to call itself for chart capture and image proxying | `http://127.0.0.1:6397` |
+| `PORT` | Listen port for `python newsletterr.py` | `6397` |
+| `LOG_LEVEL` | Logging verbosity (`DEBUG` shows per-item traces, useful for support) | `INFO` |
+| `FLASK_DEBUG` | Set to `1` for the dev server with auto reload | `0` |
+| `DATA_ENC_KEY` | Fernet key encrypting stored credentials; auto-generated into `env/.env` on first run | generated |
+| `NEWSLETTERR_SECRET_KEY` | Session signing key; auto-generated into `env/.env` so sessions survive restarts | generated |
+| `INTERNAL_TOKEN` | Token for the app's internal self-requests | generated per boot |
 
 ---
 
@@ -149,6 +170,22 @@ By default the app listens on **http://127.0.0.1:6397**.
 6. Hit **Send Email**. Success and error messages will show after running.  
 
 ---
+
+---
+
+## Development
+
+```bash
+pip install -r requirements-dev.txt
+ruff check app/ newsletterr.py tests/   # lint
+pytest                                  # test suite, runs in seconds
+```
+
+The email pipeline is covered by golden-master tests: full MIME output is compared against fixtures in `tests/goldens/`. After an intentional change to email output, regenerate them with `UPDATE_GOLDENS=1 pytest tests/test_golden_sends.py` and review the diff.
+
+CI runs lint and tests on every pull request. Docker images publish automatically: pushes to the `nightly` branch build `:nightly`, pushes to `main` build `:pre-release`, and published releases build `:latest`, `:nightly`, `:pre-release`, and the version tag. Release binaries for Linux and Windows are built and attached to each release. The release tag must match the repo `VERSION` file or the build fails.
+
+To back up your data, stop the container (or app) and copy the `database/` and `env/` volumes/folders, or use `sqlite3 database/data.db ".backup backup.db"` while running.
 
 ---
 
@@ -198,7 +235,8 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Can Snap-Ins work with custom HTML?
 * Settings submit should audit the external tools api test
 * Does this work with Emby/Jellyfin?
-* app/legacy.py:2471 uses bare BytesIO where only io is imported, so the poster max-height resize path silently fails inside its try/except. app/legacy.py:1345 returns recent_data before it's assigned when Tautulli returns no libraries
+* Tailwind Play CDN fix
+* CSP out of Report-Only after trial run
 
 ---
 

@@ -24,6 +24,13 @@ def test_json_post_with_wrong_csrf_is_rejected(csrf_client):
 def test_clear_cache_requires_csrf(client, seeded_settings):
     assert client.post("/clear_cache").status_code == 400
 
+def test_delete_routes_require_csrf(csrf_client):
+    client, token = csrf_client
+    # without a token the DELETE endpoints must be rejected
+    assert client.delete("/email_lists/1").status_code == 400
+    assert client.delete("/email_templates/1").status_code == 400
+    assert client.delete("/scheduling/1").status_code == 400
+
 # --- input validation returns 400, not 500
 
 def test_send_email_rejects_non_json_body(csrf_client):
@@ -65,7 +72,7 @@ def test_email_list_crud(csrf_client):
     ours = [l for l in lists if l["name"] == "testers"]
     assert len(ours) == 1
 
-    resp = client.delete(f"/email_lists/{ours[0]['id']}")
+    resp = client.delete(f"/email_lists/{ours[0]['id']}", headers={"X-CSRF-Token": token})
     assert resp.get_json()["status"] == "success"
     lists = client.get("/email_lists").get_json()["lists"]
     assert not [l for l in lists if l["name"] == "testers"]
@@ -94,7 +101,7 @@ def test_email_template_crud(csrf_client):
     ours = [t for t in templates if t["name"] == "tpl-1"]
     assert len(ours) == 1 and ours[0]["subject"] == "Hello v2"
 
-    assert client.delete(f"/email_templates/{ours[0]['id']}").get_json()["status"] == "success"
+    assert client.delete(f"/email_templates/{ours[0]['id']}", headers={"X-CSRF-Token": token}).get_json()["status"] == "success"
 
 # --- schedule CRUD
 
@@ -199,10 +206,11 @@ def test_blank_secret_submission_keeps_existing(csrf_client, app):
     conn.close()
     assert decrypt(row[0]) == "keep-me"  # not clobbered to empty
 
-# --- auth gate
+# --- auth gate (uses an unauthenticated client against the seeded admin)
 
-def test_auth_gate_blocks_and_login_flow_works(client, login_enabled):
+def test_auth_gate_blocks_and_login_flow_works(anon_client, login_enabled):
     creds = login_enabled
+    client = anon_client
 
     resp = client.get("/settings")
     assert resp.status_code == 302 and "/login" in resp.headers["Location"]

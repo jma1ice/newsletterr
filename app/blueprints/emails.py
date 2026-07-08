@@ -160,6 +160,7 @@ def save_email_list_route():
 @bp.route('/email_lists/<int:list_id>', methods=['DELETE'])
 @requires_auth
 def delete_email_list_route(list_id):
+    require_csrf_for_json()
     try:
         delete_email_list(list_id)
         return jsonify({"status": "success", "message": "List deleted successfully"})
@@ -242,6 +243,7 @@ def save_email_template():
 @bp.route('/email_templates/<int:template_id>', methods=['DELETE'])
 @requires_auth
 def delete_email_template(template_id):
+    require_csrf_for_json()
     try:
         conn = db_connect()
         cursor = conn.cursor()

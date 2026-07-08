@@ -237,6 +237,7 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Does this work with Emby/Jellyfin?
 * Tailwind Play CDN fix
 * CSP out of Report-Only after trial run
+* Add more to /setup to configure settings on first run
 
 ---
 

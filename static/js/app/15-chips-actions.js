@@ -138,7 +138,8 @@ document.addEventListener('DOMContentLoaded', () => {
         
         try {
             const response = await fetch(`/email_lists/${selectedValue}`, {
-                method: 'DELETE'
+                method: 'DELETE',
+                headers: { 'X-CSRF-Token': APP.csrfToken }
             });
             
             const result = await response.json();

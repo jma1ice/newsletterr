@@ -35,6 +35,7 @@ EXPECTED_RULES = [
     "/pull_recommendations",
     "/pull_stats",
     "/scheduling",
+    "/setup",
     "/scheduling/<int:schedule_id>",
     "/scheduling/<int:schedule_id>/preview",
     "/scheduling/<int:schedule_id>/preview-page",
@@ -87,6 +88,6 @@ def test_security_headers(client, seeded_settings):
     assert resp.headers.get("X-Frame-Options") == "DENY"
     assert resp.headers.get("X-Content-Type-Options") == "nosniff"
 
-def test_login_redirects_when_login_disabled(client, seeded_settings):
+def test_login_page_renders_when_admin_configured(client, seeded_settings):
     resp = client.get("/login")
-    assert resp.status_code == 302
+    assert resp.status_code == 200

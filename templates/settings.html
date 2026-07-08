@@ -366,21 +366,17 @@
                     <div class="settings-section d-none" id="section-security">
                         <h4 class="mb-4">Security</h4>
 
-                        <label for="login_toggle">Login Page:</label><br>
-                        <select id="login_toggle" name="login_toggle">
-                            <option value="disabled" {% if settings.login_toggle == 'disabled' %}selected{% endif %}>Disabled</option>
-                            <option value="enabled" {% if settings.login_toggle == 'enabled' %}selected{% endif %}>Enabled</option>
-                        </select><br><br>
-
-                        <div id="login_options" style="display: {% if settings.login_toggle == 'enabled' %}block{% else %}none{% endif %};">
+                        <label>Login Account:</label><br>
+                        <p style="font-size: 0.85rem; color: #888; margin: 2px 0 8px 0;">Login is required. Update your account credentials below.</p>
+                        <div id="login_options">
                             <label for="nl_username">Username:</label><br>
-                            <input type="text" id="nl_username" name="nl_username"
+                            <input type="text" id="nl_username" name="nl_username" autocomplete="username"
                                 {% if settings.nl_username != "" %}value="{{ settings.nl_username }}"{% endif %}
-                                placeholder="Newsletterr Username" {% if settings.login_toggle == 'enabled' %}required{% endif %}><br><br>
+                                placeholder="Newsletterr Username"><br><br>
 
                             <label for="nl_password">Password:</label><br>
                             <input type="password" id="nl_password" name="nl_password" autocomplete="new-password"
-                                placeholder="{% if settings.has_nl_password %}Saved - leave blank to keep{% else %}Newsletterr Password{% endif %}" {% if settings.login_toggle == 'enabled' and not settings.has_nl_password %}required{% endif %}><br><br>
+                                placeholder="{% if settings.has_nl_password %}Saved - leave blank to keep{% else %}Newsletterr Password{% endif %}"><br><br>
                         </div>
 
                         <label for="hsts_enabled">HTTP Strict Transport Security (HSTS):</label><br>
@@ -456,25 +452,6 @@
 <script nonce="{{ nonce }}">
     document.getElementById('email_theme').addEventListener('change', function() {
         document.getElementById('color_inputs').style.display = this.value === 'custom' ? 'block' : 'none';
-    });
-</script>
-
-<script nonce="{{ nonce }}">
-    document.getElementById('login_toggle').addEventListener('change', function() {
-        const loginOptions = document.getElementById('login_options');
-        const nlUser = document.getElementById('nl_username');
-        const nlPass = document.getElementById('nl_password');
-        if (this.value === 'enabled') {
-            loginOptions.style.display = 'block';
-            nlUser.setAttribute('required', true);
-            nlPass.setAttribute('required', true);
-        } else {
-            loginOptions.style.display = 'none';
-            nlUser.removeAttribute('required');
-            nlUser.value = "";
-            nlPass.removeAttribute('required');
-            nlPass.value = "";
-        }
     });
 </script>
 

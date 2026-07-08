@@ -7,6 +7,7 @@ from PIL import Image
 from app.db import db_connect
 from app.settings_store import get_settings
 from app.crypto import encrypt, decrypt
+from werkzeug.security import generate_password_hash
 from app.hooks import refresh_hsts_setting
 from app.security import require_csrf_for_json, requires_auth
 
@@ -96,9 +97,11 @@ def settings():
             email_theme = request.form.get("email_theme", "newsletterr_blue")
             from_name = request.form.get("from_name")
             custom_logo_filename = request.form.get("custom_logo_filename", "")
-            login_toggle = request.form.get("login_toggle")
-            nl_username = request.form.get("nl_username")
-            nl_password = _secret("nl_password", existing_nl_password)
+            # login is mandatory now; the toggle is retained as always-enabled
+            login_toggle = "enabled"
+            nl_username = request.form.get("nl_username") or existing_nl_username
+            _submitted_pw = (request.form.get("nl_password") or "").strip()
+            nl_password = generate_password_hash(_submitted_pw) if _submitted_pw else existing_nl_password
             default_intro_text = request.form.get("default_intro_text", "")
             default_outro_text = request.form.get("default_outro_text", "")
             hsts_enabled = request.form.get("hsts_enabled", "disabled")

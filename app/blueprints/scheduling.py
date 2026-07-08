@@ -112,6 +112,7 @@ def update_schedule(schedule_id):
 @bp.route('/scheduling/<int:schedule_id>', methods=['DELETE'])
 @requires_auth
 def delete_schedule(schedule_id):
+    require_csrf_for_json()
     try:
         delete_email_schedule(schedule_id)
         return jsonify({"status": "success", "message": "Schedule deleted successfully"})

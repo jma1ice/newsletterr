@@ -1,15 +1,23 @@
-import html, time
+import hmac, html, time
 
 import bleach, requests
 from flask import abort, jsonify, redirect, request, session, url_for
 from functools import wraps
+from werkzeug.security import generate_password_hash, check_password_hash
 
 from app import config
+from app.crypto import decrypt
+from app.db import db_connect
 from app.settings_store import get_settings
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 def require_csrf_for_json():
     token = request.headers.get('X-CSRF-Token') or request.form.get('csrf_token')
-    if not token or token.strip() != session.get('csrf_token'):
+    expected = session.get('csrf_token') or ""
+    if not token or not hmac.compare_digest(token.strip(), expected):
         abort(400)
 
 def json_body(required=()):
@@ -60,29 +68,59 @@ def escape_html_output(text):
         return ""
     return html.escape(text)
 
+def admin_configured():
+    s = get_settings(decrypt_secrets=False)
+    return bool(s.get('nl_username')) and bool(s.get('nl_password'))
+
 def requires_auth(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if get_settings(decrypt_secrets=False).get('login_toggle') != 'enabled':
+        # internal server-to-self calls (image proxy) carry a per-process token
+        token = request.headers.get('X-Internal-Token')
+        if token and hmac.compare_digest(token, config.INTERNAL_TOKEN):
             return f(*args, **kwargs)
 
-        if request.headers.get('X-Internal-Token') == config.INTERNAL_TOKEN:
-            return f(*args, **kwargs)
+        if not admin_configured():
+            return redirect(url_for('auth.setup'))
 
         if not session.get('authenticated'):
             return redirect(url_for('auth.login'))
         return f(*args, **kwargs)
     return decorated_function
 
-def check_credentials(username, password):
-    s = get_settings()
-    expected_username = s.get('nl_username')
-    expected_password = s.get('nl_password')
+def set_admin_credentials(username, password):
+    conn = db_connect()
+    conn.execute("INSERT OR IGNORE INTO settings (id) VALUES (1)")
+    conn.execute(
+        "UPDATE settings SET login_toggle = 'enabled', nl_username = ?, nl_password = ? WHERE id = 1",
+        (username, generate_password_hash(password)),
+    )
+    conn.commit()
+    conn.close()
 
-    if not expected_password:
+def check_credentials(username, password):
+    s = get_settings(decrypt_secrets=False)
+    expected_username = s.get('nl_username')
+    stored = s.get('nl_password')
+
+    if not stored or username != expected_username:
         return False
 
-    return username == expected_username and password == expected_password
+    # current scheme: a werkzeug password hash
+    try:
+        if check_password_hash(stored, password):
+            return True
+    except Exception:
+        logger.debug("password hash check failed to parse stored value", exc_info=True)
+
+    # legacy scheme: Fernet-encrypted plaintext. If it matches, transparently
+    # upgrade the stored value to a hash so the legacy form disappears.
+    legacy = decrypt(stored)
+    if legacy and hmac.compare_digest(legacy, password):
+        set_admin_credentials(username, password)
+        return True
+
+    return False
 
 def safe_get(url: str, *, timeout: int = 120, retries: int = 2, **kwargs):
     for attempt in range(retries + 1):

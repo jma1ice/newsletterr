@@ -5,11 +5,12 @@ from app.crypto import decrypt
 
 # Columns stored encrypted; get_settings() returns them decrypted unless
 # decrypt_secrets=False. decrypt() passes legacy plaintext values through.
+# nl_password is deliberately NOT here: it is a one-way password hash
+# (werkzeug), handled by app.security, never Fernet-decrypted.
 SECRET_COLUMNS = frozenset({
     "password",
     "plex_token",
     "tautulli_api",
-    "nl_password",
     "droppedneedle_api_key",
 })
 

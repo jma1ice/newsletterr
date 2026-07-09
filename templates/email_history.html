@@ -23,6 +23,7 @@
                 <table class="table table-striped table-hover">
                     <thead class="table-dark">
                         <tr>
+                            <th>Status</th>
                             <th>Subject</th>
                             <th>Date & Time Sent</th>
                             <th>Template</th>
@@ -34,18 +35,30 @@
                     <tbody>
                         {% for email in emails %}
                             <tr>
-                                <td><strong>{{ email.subject }}</strong></td>
+                                <td>
+                                    {% if email.status == 'failed' %}
+                                        <span class="badge bg-danger" title="{{ email.error or 'Send failed' }}">Failed</span>
+                                    {% else %}
+                                        <span class="badge bg-success">Sent</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <strong>{{ email.subject }}</strong>
+                                    {% if email.status == 'failed' and email.error %}
+                                        <div class="small text-danger">{{ email.error }}</div>
+                                    {% endif %}
+                                </td>
                                 <td><span class="text-muted">{{ email.sent_at }}</span></td>
                                 <td><span class="badge bg-secondary">{{ email.template_name }}</span></td>
                                 <td>
-                                    <span class="badge bg-info">{{ "%.2f"|format(email.content_size_kb) }} KB</span>
+                                    <span class="badge bg-info">{{ "%.2f"|format(email.content_size_kb or 0) }} KB</span>
                                 </td>
                                 <td>
                                     <span class="badge bg-primary">{{ email.recipient_count }} recipient{{ 's' if email.recipient_count != 1 else '' }}</span>
                                 </td>
                                 <td>
-                                    <button class="btn btn-secondary btn-sm view-recipients-btn" 
-                                            data-email-id="{{ email.id }}" 
+                                    <button class="btn btn-secondary btn-sm view-recipients-btn"
+                                            data-email-id="{{ email.id }}"
                                             data-subject="{{ email.subject }}">
                                         👥 Recipients
                                     </button>
@@ -55,6 +68,20 @@
                     </tbody>
                 </table>
             </div>
+
+            {% if total_pages > 1 %}
+                <nav class="d-flex justify-content-between align-items-center mt-2">
+                    <span class="text-muted small">{{ total }} total, page {{ page }} of {{ total_pages }}</span>
+                    <div class="btn-group">
+                        {% if page > 1 %}
+                            <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('emails.email_history', page=page-1) }}">Previous</a>
+                        {% endif %}
+                        {% if page < total_pages %}
+                            <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('emails.email_history', page=page+1) }}">Next</a>
+                        {% endif %}
+                    </div>
+                </nav>
+            {% endif %}
         {% else %}
             <div class="alert alert-info" role="alert">
                 <h4 class="alert-heading">No Email History</h4>

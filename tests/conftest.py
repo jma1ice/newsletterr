@@ -26,44 +26,58 @@ def app(tmp_path_factory):
     from app import create_app
     return create_app()
 
-@pytest.fixture()
-def client(app):
-    return app.test_client()
-
 def _db():
     from app import config
     return sqlite3.connect(config.DB_PATH)
 
+@pytest.fixture(autouse=True)
+def _reset_login_throttle():
+    # the login rate limiter is module-level state; clear it between tests so
+    # one test's failed logins do not lock out another
+    yield
+    try:
+        from app.blueprints import auth
+        with auth._attempts_lock:
+            auth._attempts.clear()
+    except Exception:
+        pass
+
 @pytest.fixture()
 def seeded_settings(app):
-    """Ensure the singleton settings row exists (login disabled)."""
+    """Ensure the singleton settings row exists with an admin account."""
+    from werkzeug.security import generate_password_hash
     conn = _db()
     conn.execute("INSERT OR IGNORE INTO settings (id) VALUES (1)")
-    conn.execute("UPDATE settings SET login_toggle = 'disabled' WHERE id = 1")
+    conn.execute(
+        "UPDATE settings SET login_toggle = 'enabled', nl_username = 'admin', nl_password = ? WHERE id = 1",
+        (generate_password_hash("secret123"),),
+    )
     conn.commit()
     conn.close()
 
 @pytest.fixture()
-def csrf_client(client, seeded_settings):
-    """Client with a session CSRF token; returns (client, token)."""
+def client(app, seeded_settings):
+    """Authenticated test client."""
+    c = app.test_client()
+    with c.session_transaction() as sess:
+        sess["authenticated"] = True
+        sess["username"] = "admin"
+    return c
+
+@pytest.fixture()
+def anon_client(app):
+    """Unauthenticated client, for testing the auth gate and setup flow."""
+    return app.test_client()
+
+@pytest.fixture()
+def csrf_client(client):
+    """Authenticated client with a session CSRF token; returns (client, token)."""
     token = "test-csrf-token"
     with client.session_transaction() as sess:
         sess["csrf_token"] = token
     return client, token
 
 @pytest.fixture()
-def login_enabled(app, seeded_settings):
-    """Enable login with admin/secret123 for the duration of a test."""
-    from app.crypto import encrypt
-    conn = _db()
-    conn.execute(
-        "UPDATE settings SET login_toggle = 'enabled', nl_username = ?, nl_password = ? WHERE id = 1",
-        ("admin", encrypt("secret123")),
-    )
-    conn.commit()
-    conn.close()
-    yield {"username": "admin", "password": "secret123"}
-    conn = _db()
-    conn.execute("UPDATE settings SET login_toggle = 'disabled' WHERE id = 1")
-    conn.commit()
-    conn.close()
+def login_enabled(anon_client, seeded_settings):
+    """Credentials for the seeded admin, with an unauthenticated client."""
+    return {"username": "admin", "password": "secret123"}

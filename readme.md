@@ -237,6 +237,7 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Does this work with Emby/Jellyfin?
 * Tailwind Play CDN fix
 * CSP out of Report-Only after trial run
+* Add more to /setup to configure settings on first run
 
 ---
 
@@ -263,6 +264,8 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Added option for small cover art of each item in stats tables
 * Added To: vs BCC: option for email send
 * Added option for setting max image heights to reduce email size
+* Added API functionality to pull wrapped stats from DroppedNeedle
+* Complete codebase overhaul -> app factory
 
 
 ### v2026.1:
@@ -303,5 +306,6 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * [Highcharts](https://www.highcharts.com/) for charting  
 * [Tailwind CSS](https://tailwindcss.com/) & [Bootstrap](https://getbootstrap.com/) for styling
 * [conjurr](https://github.com/yungsnuzzy/conjurr) for user watchlist based recommendations  
+* [DroppedNeedle](https://github.com/HabiRabbu/DroppedNeedle) for user yearly wrapped music  
 
 Happy streaming!

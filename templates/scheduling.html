@@ -1070,7 +1070,8 @@
                 if (confirm(`Are you sure you want to delete the schedule "${scheduleName}"? This action cannot be undone.`)) {
                     try {
                         const response = await fetch(`/scheduling/${scheduleId}`, {
-                            method: 'DELETE'
+                            method: 'DELETE',
+                            headers: { 'X-CSRF-Token': '{{ csrf_token }}' }
                         });
                         
                         const result = await response.json();

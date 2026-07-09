@@ -7,6 +7,7 @@ from PIL import Image
 from app.db import db_connect
 from app.settings_store import get_settings
 from app.crypto import encrypt, decrypt
+from werkzeug.security import generate_password_hash
 from app.hooks import refresh_hsts_setting
 from app.security import require_csrf_for_json, requires_auth
 
@@ -60,16 +61,25 @@ def settings():
             db_custom_logo = cursor.fetchone()
             existing_custom_logo = db_custom_logo[0] if db_custom_logo and db_custom_logo[0] else ""
 
-            cursor.execute("SELECT login_toggle, nl_username, nl_password FROM settings WHERE id = 1")
+            cursor.execute("SELECT login_toggle, nl_username, nl_password, password, tautulli_api, droppedneedle_api_key FROM settings WHERE id = 1")
             db_login_info = cursor.fetchone()
             existing_login_toggle = db_login_info[0] if db_login_info and db_login_info[0] else ""
             existing_nl_username = db_login_info[1] if db_login_info and db_login_info[1] else ""
             existing_nl_password = db_login_info[2] if db_login_info and db_login_info[2] else ""
+            existing_password = db_login_info[3] if db_login_info and db_login_info[3] else ""
+            existing_tautulli_api = db_login_info[4] if db_login_info and db_login_info[4] else ""
+            existing_droppedneedle_api_key = db_login_info[5] if db_login_info and db_login_info[5] else ""
+
+            # secret fields are write-only: a blank submission keeps the stored
+            # value rather than overwriting it with an empty string
+            def _secret(form_name, existing):
+                submitted = (request.form.get(form_name) or "").strip()
+                return encrypt(submitted) if submitted else existing
 
             from_email = request.form.get("from_email")
             alias_email = request.form.get("alias_email")
             reply_to_email = request.form.get("reply_to_email")
-            password = encrypt(request.form.get("password"))
+            password = _secret("password", existing_password)
             smtp_username = request.form.get("smtp_username")
             smtp_server = request.form.get("smtp_server")
             smtp_port = int(request.form.get("smtp_port"))
@@ -77,19 +87,21 @@ def settings():
             server_name = request.form.get("server_name")
             plex_url = request.form.get("plex_url")
             tautulli_url = request.form.get("tautulli_url")
-            tautulli_api = encrypt(request.form.get("tautulli_api"))
+            tautulli_api = _secret("tautulli_api", existing_tautulli_api)
             conjurr_url = request.form.get("conjurr_url")
             droppedneedle_url = request.form.get("droppedneedle_url")
-            droppedneedle_api_key = encrypt(request.form.get("droppedneedle_api_key"))
+            droppedneedle_api_key = _secret("droppedneedle_api_key", existing_droppedneedle_api_key)
             recipient_display_name = request.form.get("recipient_display_name", "email")
             logo_filename = request.form.get("logo_filename")
             logo_width = request.form.get("logo_width")
             email_theme = request.form.get("email_theme", "newsletterr_blue")
             from_name = request.form.get("from_name")
             custom_logo_filename = request.form.get("custom_logo_filename", "")
-            login_toggle = request.form.get("login_toggle")
-            nl_username = request.form.get("nl_username")
-            nl_password = encrypt(request.form.get("nl_password"))
+            # login is mandatory now; the toggle is retained as always-enabled
+            login_toggle = "enabled"
+            nl_username = request.form.get("nl_username") or existing_nl_username
+            _submitted_pw = (request.form.get("nl_password") or "").strip()
+            nl_password = generate_password_hash(_submitted_pw) if _submitted_pw else existing_nl_password
             default_intro_text = request.form.get("default_intro_text", "")
             default_outro_text = request.form.get("default_outro_text", "")
             hsts_enabled = request.form.get("hsts_enabled", "disabled")
@@ -388,10 +400,16 @@ def settings():
         "send_mode": send_mode or "bcc",
         "poster_max_height": poster_max_height or "",
     }
-    if password == '' or password is None:
-        settings["password"] = ""
-    else:
-        settings["password"] = decrypt(password)
+    # secrets are never sent to the browser; the form shows a placeholder and
+    # a blank submission keeps the stored value (write-only fields)
+    settings["password"] = ""
+    settings["has_password"] = bool(password)
+    settings["tautulli_api"] = ""
+    settings["has_tautulli_api"] = bool(tautulli_api)
+    settings["droppedneedle_api_key"] = ""
+    settings["has_droppedneedle_api_key"] = bool(droppedneedle_api_key)
+    settings["nl_password"] = ""
+    settings["has_nl_password"] = bool(nl_password)
     if smtp_port == '' or smtp_port is None:
         settings["smtp_port"] = 587
         cursor.execute("""
@@ -402,10 +420,6 @@ def settings():
         conn.commit()
     else:
         settings["smtp_port"] = int(smtp_port)
-    if tautulli_api == '' or tautulli_api is None:
-        settings["tautulli_api"] = ""
-    else:
-        settings["tautulli_api"] = decrypt(tautulli_api)
     if logo_width == '' or logo_width is None:
         settings["logo_width"] = 80
         cursor.execute("""
@@ -416,11 +430,7 @@ def settings():
         conn.commit()
     else:
         settings["logo_width"] = int(logo_width)
-    if nl_password == '' or nl_password is None:
-        settings["nl_password"] = ""
-    else:
-        settings["nl_password"] = decrypt(nl_password)
-    
+
     conn.close()
 
     if not session.get("csrf_token"):

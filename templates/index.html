@@ -4,9 +4,14 @@
 <div class="container-fluid">
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h1 id="welcome-message">{% if username != "" %}welcome, {{ username }}!{% else %}newsletterr dashboard{% endif %}</h1>
-        <button id="sendEmailBtn" class="btn btn-success btn-lg px-5 py-3" style="font-size: 1.6rem; font-weight: 700; min-width: 220px; box-shadow: 0 4px 8px rgba(0,0,0,0.2);">
-            Send Email
-        </button>
+        <div class="d-flex gap-2 align-items-center">
+            <button id="sendTestBtn" class="btn btn-outline-info btn-lg px-4 py-3" style="font-size: 1rem; font-weight: 600;" title="Send this email only to your From address">
+                Send Test
+            </button>
+            <button id="sendEmailBtn" class="btn btn-success btn-lg px-5 py-3" style="font-size: 1.6rem; font-weight: 700; min-width: 220px; box-shadow: 0 4px 8px rgba(0,0,0,0.2);">
+                Send Email
+            </button>
+        </div>
     </div>
     <p id="alert_p" style="display: none; color: #01b301; text-shadow: 1px 0 #000, 0 1px #000, -1px 0 #000, 0 -1px #000;">{{ alert or '' }}</p>
     <p id="error_p" style="display: none; color: #770010; text-shadow: 1px 0 #000, 0 1px #000, -1px 0 #000, 0 -1px #000;">{{ error or '' }}</p>

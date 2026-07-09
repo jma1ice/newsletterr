@@ -6,7 +6,7 @@ from app import config, state
 from app.db import db_connect
 from app.settings_store import get_settings
 from app.cache import get_cache_info, set_cached_data
-from app.store import update_schedule_last_sent
+from app.store import update_schedule_last_sent, advance_schedule_next_send
 from app.clients.tautulli import run_tautulli_command
 from app.clients.github import _background_update_checker
 from app.emails.fetchers import fetch_recent_data_for_index
@@ -68,6 +68,10 @@ def background_scheduler():
             for schedule in due_schedules:
                 schedule_id, name, email_list_id, template_id, frequency = schedule
                 logger.info(f"Processing schedule: {name} (ID: {schedule_id})")
+                # advance next_send BEFORE dispatch: if the send crashes or the
+                # process dies mid-send, the schedule is no longer "due" and will
+                # not re-blast the whole list on the next tick
+                advance_schedule_next_send(schedule_id)
                 try:
                     success = send_scheduled_email(schedule_id, email_list_id, template_id)
                     if success:

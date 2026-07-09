@@ -6,8 +6,8 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.utils import formataddr
 
-from app.db import db_connect
 from app.clients.tautulli import run_tautulli_command
+from app.store import record_email_history
 from app.emails.assemble import convert_html_to_plain_text, build_email_html_with_all_cids
 from app.emails.fetchers import get_current_tautulli_data_for_email, get_recommendations_for_users, get_droppedneedle_wrapped_for_users, get_droppedneedle_server_stats_cached
 
@@ -158,37 +158,26 @@ def send_standard_email_with_cids(req, settings, to_emails):
 
         logger.info(f"Email sent successfully!")
 
-        try:
-            history_conn = db_connect()
-            history_cursor = history_conn.cursor()
-            history_cursor.execute("""
-                INSERT INTO email_history (subject, recipients, email_content, content_size_kb, recipient_count, template_name)
-                VALUES (?, ?, ?, ?, ?, ?)
-            """, (
-                subject,
-                ', '.join(all_recipients),
-                email_content[:1000],
-                round(content_size_kb, 2),
-                len(all_recipients),
-                'Manual'
-            ))
-            history_conn.commit()
-            history_conn.close()
-        except Exception as history_error:
-            logger.error(f"Error saving email history: {history_error}")
+        record_email_history(subject, ', '.join(all_recipients), email_content,
+                             round(content_size_kb, 2), len(all_recipients), 'Manual')
 
         server.quit()
         return {"success": True, "sent_to": ', '.join(all_recipients), "size": content_size_kb}, 200
     except smtplib.SMTPConnectError as e:
         logger.error(f"SMTP Connection Error: {e}")
         logger.warning("This often indicates wrong port/protocol combination")
-        return {"error": f"SMTP connection error: {e}"}, 500
+        msg = f"SMTP connection error: {e}"
+        record_email_history(req.subject, ', '.join(to_emails), '', 0, len(to_emails), 'Manual', status='failed', error=msg)
+        return {"error": msg}, 500
     except smtplib.SMTPServerDisconnected as e:
         logger.warning(f"SMTP Server Disconnected: {e}")
         logger.warning("Server closed connection - likely protocol mismatch")
-        return {"error": f"SMTP server disconnected: {e}"}, 500
+        msg = f"SMTP server disconnected: {e}"
+        record_email_history(req.subject, ', '.join(to_emails), '', 0, len(to_emails), 'Manual', status='failed', error=msg)
+        return {"error": msg}, 500
     except Exception as e:
         logger.error(f"SMTP send error: {e}")
+        record_email_history(req.subject, ', '.join(to_emails), '', 0, len(to_emails), 'Manual', status='failed', error=str(e))
         return {"error": str(e)}, 500
 
 def send_recommendations_email_with_cids(req, settings, to_emails):
@@ -386,34 +375,21 @@ def send_single_user_email_with_cids(req, settings, recipients, user_key, recomm
         server.quit()
         logger.info(f"Email sent successfully!")
 
-        try:
-            history_conn = db_connect()
-            history_cursor = history_conn.cursor()
-            history_cursor.execute("""
-                INSERT INTO email_history (subject, recipients, email_content, content_size_kb, recipient_count, template_name)
-                VALUES (?, ?, ?, ?, ?, ?)
-            """, (
-                subject,
-                ', '.join(all_recipients),
-                email_content[:1000],
-                round(content_size_kb, 2),
-                len(all_recipients),
-                'Manual'
-            ))
-            history_conn.commit()
-            history_conn.close()
-        except Exception as history_error:
-            logger.error(f"Error saving email history: {history_error}")
-        
+        record_email_history(subject, ', '.join(all_recipients), email_content,
+                             round(content_size_kb, 2), len(all_recipients), 'Manual')
+
         return True
     except smtplib.SMTPConnectError as e:
         logger.error(f"SMTP Connection Error: {e}")
         logger.warning("This often indicates wrong port/protocol combination")
+        record_email_history(req.subject, ', '.join(recipients), '', 0, len(recipients), 'Manual', status='failed', error=f"SMTP connection error: {e}")
         return False
     except smtplib.SMTPServerDisconnected as e:
         logger.warning(f"SMTP Server Disconnected: {e}")
         logger.warning("Server closed connection - likely protocol mismatch")
+        record_email_history(req.subject, ', '.join(recipients), '', 0, len(recipients), 'Manual', status='failed', error=f"SMTP server disconnected: {e}")
         return False
     except Exception as e:
         logger.error(f"Error sending single user email: {e}")
+        record_email_history(req.subject, ', '.join(recipients), '', 0, len(recipients), 'Manual', status='failed', error=str(e))
         return False

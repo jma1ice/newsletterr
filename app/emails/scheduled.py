@@ -7,6 +7,7 @@ from email.utils import formataddr
 
 from app.db import db_connect
 from app.settings_store import get_settings
+from app.store import record_email_history
 from app.render import capture_chart_images_via_headless
 from app.clients.tautulli import run_tautulli_command
 from app.clients.conjurr import run_conjurr_command
@@ -415,28 +416,23 @@ def send_scheduled_user_email_with_cids(ctx, settings, recipients, user_key):
         server.quit()
         logger.info(f"Email sent successfully!")
 
-        try:
-            history_conn = db_connect()
-            history_cursor = history_conn.cursor()
-            history_cursor.execute('''INSERT INTO email_history (subject, recipients, email_content, content_size_kb, recipient_count, template_name)
-                            VALUES (?, ?, ?, ?, ?, ?)''',
-                            (f"[SCHEDULED] {subject}", ', '.join(all_recipients), email_content[:1000], content_size_kb, len(all_recipients), template_name))
-            history_conn.commit()
-            history_conn.close()
-        except Exception as log_err:
-            logger.error(f"Error logging scheduled email history: {log_err}")
+        record_email_history(f"[SCHEDULED] {subject}", ', '.join(all_recipients), email_content,
+                             content_size_kb, len(all_recipients), template_name)
 
         return True
     except smtplib.SMTPConnectError as e:
         logger.error(f"SMTP Connection Error: {e}")
         logger.warning("This often indicates wrong port/protocol combination")
+        record_email_history(f"[SCHEDULED] {ctx.subject}", ', '.join(recipients), '', 0, len(recipients), ctx.template_name, status='failed', error=f"SMTP connection error: {e}")
         return False
     except smtplib.SMTPServerDisconnected as e:
         logger.warning(f"SMTP Server Disconnected: {e}")
         logger.warning("Server closed connection - likely protocol mismatch")
+        record_email_history(f"[SCHEDULED] {ctx.subject}", ', '.join(recipients), '', 0, len(recipients), ctx.template_name, status='failed', error=f"SMTP server disconnected: {e}")
         return False
     except Exception as e:
         logger.exception(f"Error sending scheduled user email: {e}")
+        record_email_history(f"[SCHEDULED] {ctx.subject}", ', '.join(recipients), '', 0, len(recipients), ctx.template_name, status='failed', error=str(e))
         return False
 
 def send_scheduled_single_email_with_cids(ctx, settings, to_emails_list):
@@ -605,27 +601,22 @@ def send_scheduled_single_email_with_cids(ctx, settings, to_emails_list):
         server.quit()
         logger.info(f"Email sent successfully!")
 
-        try:
-            history_conn = db_connect()
-            history_cursor = history_conn.cursor()
-            history_cursor.execute('''INSERT INTO email_history (subject, recipients, email_content, content_size_kb, recipient_count, template_name)
-                            VALUES (?, ?, ?, ?, ?, ?)''',
-                            (f"[SCHEDULED] {subject}", ', '.join(all_recipients), email_content[:1000], content_size_kb, len(all_recipients), template_name))
-            history_conn.commit()
-            history_conn.close()
-        except Exception as log_err:
-            logger.error(f"Error logging scheduled email history: {log_err}")
-        
+        record_email_history(f"[SCHEDULED] {subject}", ', '.join(all_recipients), email_content,
+                             content_size_kb, len(all_recipients), template_name)
+
         logger.info(f"Scheduled email sent successfully to {len(all_recipients)} recipients")
         return True
     except smtplib.SMTPConnectError as e:
         logger.error(f"SMTP Connection Error: {e}")
         logger.warning("This often indicates wrong port/protocol combination")
+        record_email_history(f"[SCHEDULED] {ctx.subject}", ', '.join(to_emails_list), '', 0, len(to_emails_list), ctx.template_name, status='failed', error=f"SMTP connection error: {e}")
         return False
     except smtplib.SMTPServerDisconnected as e:
         logger.warning(f"SMTP Server Disconnected: {e}")
         logger.warning("Server closed connection - likely protocol mismatch")
+        record_email_history(f"[SCHEDULED] {ctx.subject}", ', '.join(to_emails_list), '', 0, len(to_emails_list), ctx.template_name, status='failed', error=f"SMTP server disconnected: {e}")
         return False
     except Exception as e:
         logger.exception(f"Error in send_scheduled_single_email_with_cids: {e}")
+        record_email_history(f"[SCHEDULED] {ctx.subject}", ', '.join(to_emails_list), '', 0, len(to_emails_list), ctx.template_name, status='failed', error=str(e))
         return False

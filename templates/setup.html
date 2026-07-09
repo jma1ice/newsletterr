@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>setup</title>
+        <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
+        <style>
+            body {
+                background: linear-gradient(160deg, #8acbd4 0%, #62a1a4 100%);
+                min-height: 100vh;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+            .login-card {
+                background: rgba(255, 255, 255, 0.95);
+                border-radius: 15px;
+                padding: 2rem;
+                box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+                width: 100%;
+                max-width: 400px;
+            }
+            .logo {
+                text-align: center;
+                margin-bottom: 10px;
+            }
+            .logo-png {
+                height: 75px;
+                margin: 0 0 18px 0;
+            }
+            .form-control {
+                border-radius: 10px;
+                border: 1px solid #ddd;
+                padding: 0.75rem;
+            }
+            .btn-login {
+                background: linear-gradient(160deg, #8acbd4 0%, #62a1a4 100%);
+                border: none;
+                border-radius: 10px;
+                padding: 0.75rem;
+                font-weight: 600;
+                text-transform: uppercase;
+                letter-spacing: 1px;
+            }
+            .alert {
+                border-radius: 10px;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="login-card">
+            <div class="logo">
+                <img src="/static/img/Asset_94x.png" alt="Logo" class="logo-png" />
+                <p class="text-muted">Create your administrator account to get started</p>
+            </div>
+
+            {% if error %}
+                <div class="alert alert-danger" role="alert">
+                    {{ error }}
+                </div>
+            {% endif %}
+
+            <form method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+                <div class="mb-3">
+                    <label for="username" class="form-label">Username</label>
+                    <input type="text" class="form-control" id="username" name="username" autocomplete="username" required>
+                </div>
+
+                <div class="mb-3">
+                    <label for="password" class="form-label">Password (at least 8 characters)</label>
+                    <input type="password" class="form-control" id="password" name="password" autocomplete="new-password" required>
+                </div>
+
+                <div class="mb-4">
+                    <label for="confirm" class="form-label">Confirm Password</label>
+                    <input type="password" class="form-control" id="confirm" name="confirm" autocomplete="new-password" required>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-login w-100">Create Account</button>
+            </form>
+        </div>
+
+        <script src="{{ url_for('static', filename='js/vendor/bootstrap.bundle.min.js') }}" nonce="{{ nonce }}"></script>
+    </body>
+</html>

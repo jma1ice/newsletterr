@@ -3,11 +3,13 @@ import time
 
 from flask import Blueprint, Response, jsonify, redirect, render_template, request, session, url_for
 from urllib.parse import quote
+import re
 
 from app import state
 from app.db import db_connect
 from app.cache import is_cache_valid, get_cached_data, get_cache_info, clear_cache
 from app.crypto import decrypt
+from app.net import is_safe_fetch_url, configured_media_hosts
 from app.settings_store import get_settings
 from app.security import require_csrf_for_json, requires_auth, safe_get
 from app.store import get_saved_email_lists
@@ -18,6 +20,9 @@ import logging
 logger = logging.getLogger(__name__)
 
 bp = Blueprint('main', __name__)
+
+def _redact_token(url):
+    return re.sub(r'(X-Plex-Token=)[^&]*', r'\1REDACTED', url)
 
 @bp.route('/', methods=['GET'])
 @requires_auth
@@ -68,7 +73,6 @@ def index():
         "from_email": s.get("from_email") or "",
         "server_name": s.get("server_name") or "",
         "tautulli_url": s.get("tautulli_url") or "",
-        "tautulli_api": s.get("tautulli_api") or "",
         "email_theme": email_theme,
         "custom_logo_filename": s.get("custom_logo_filename") or "",
         "recipient_display_name": s["recipient_display_name"],
@@ -225,7 +229,7 @@ def proxy_art(art_path):
         else:
             full_url += f"?X-Plex-Token={decrypt(plex_token)}"
     
-    logger.info(f"proxy-art: Fetching {full_url}")
+    logger.info(f"proxy-art: Fetching {_redact_token(full_url)}")
     
     try:
         headers = {
@@ -242,16 +246,22 @@ def proxy_art(art_path):
             'Cache-Control': 'public, max-age=86400'
         })
     except Exception as e:
-        logger.error(f"proxy-art: Error fetching {full_url}: {e}")
+        logger.error(f"proxy-art: Error fetching {_redact_token(full_url)}: {e}")
         return Response("Image not found", status=404)
 
 @bp.get("/proxy-img")
 @requires_auth
 def proxy_img():
     url = request.args.get("u", "")
-    if not url.startswith(("http://","https://")):
+    ok, reason = is_safe_fetch_url(url, allowed_hosts=configured_media_hosts())
+    if not ok:
+        logger.warning(f"proxy-img refused url ({reason})")
         return Response(status=400)
-    r = safe_get(url, timeout=15)
+    try:
+        r = safe_get(url, timeout=15)
+    except Exception:
+        logger.debug("proxy-img fetch failed", exc_info=True)
+        return Response(status=502)
     ct = r.headers.get("Content-Type", "image/jpeg")
     return Response(r.content, headers={"Content-Type": ct, "Cache-Control": "public, max-age=86400"})
 

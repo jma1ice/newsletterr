@@ -9,10 +9,14 @@ logger = logging.getLogger(__name__)
 def db_connect(row_factory=None):
     """Open a connection to the app database.
 
-    The single place for future connection-wide decisions (timeouts, WAL,
-    pragmas). Callers own closing, exactly as with sqlite3.connect before.
+    WAL journaling plus a busy timeout let the scheduler thread and the
+    gthread request workers write concurrently without "database is locked"
+    errors. WAL is a persistent property of the file (set once, cheap to
+    re-assert); busy_timeout is per-connection. Callers own closing.
     """
-    conn = sqlite3.connect(config.DB_PATH)
+    conn = sqlite3.connect(config.DB_PATH, timeout=10)
+    conn.execute("PRAGMA busy_timeout=10000")
+    conn.execute("PRAGMA journal_mode=WAL")
     if row_factory is not None:
         conn.row_factory = row_factory
     return conn
@@ -85,7 +89,9 @@ def init_db(db_path):
             content_size_kb REAL,
             recipient_count INTEGER,
             sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            template_name TEXT  -- Name of template used (NULL/Manual for legacy/manual sends)
+            template_name TEXT,  -- Name of template used (NULL/Manual for legacy/manual sends)
+            status TEXT DEFAULT 'sent',  -- 'sent' or 'failed'
+            error TEXT  -- failure reason when status = 'failed'
         )
     """)
 
@@ -94,8 +100,12 @@ def init_db(db_path):
         cols = [r[1] for r in cursor.fetchall()]
         if 'template_name' not in cols:
             cursor.execute("ALTER TABLE email_history ADD COLUMN template_name TEXT")
+        if 'status' not in cols:
+            cursor.execute("ALTER TABLE email_history ADD COLUMN status TEXT DEFAULT 'sent'")
+        if 'error' not in cols:
+            cursor.execute("ALTER TABLE email_history ADD COLUMN error TEXT")
     except Exception as _e:
-        logger.warning(f"Warning: could not ensure template_name column exists: {_e}")
+        logger.warning(f"Warning: could not ensure email_history columns exist: {_e}")
     
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS email_schedules (

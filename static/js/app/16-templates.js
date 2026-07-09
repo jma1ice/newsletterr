@@ -340,7 +340,8 @@ document.getElementById('delete-template-btn').addEventListener('click', async f
     if (confirm(`Are you sure you want to delete the template "${template.name}"?`)) {
         try {
             const response = await fetch(`/email_templates/${templateId}`, {
-                method: 'DELETE'
+                method: 'DELETE',
+                headers: { 'X-CSRF-Token': APP.csrfToken }
             });
             
             const result = await response.json();

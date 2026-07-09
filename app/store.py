@@ -41,6 +41,33 @@ def delete_email_list(list_id):
     conn.commit()
     conn.close()
 
+EMAIL_HISTORY_RETENTION = 1000
+
+def record_email_history(subject, recipients, email_content, content_size_kb,
+                         recipient_count, template_name="Manual",
+                         status="sent", error=None):
+    recipients = (recipients or "")[:5000]
+    email_content = (email_content or "")[:1000]
+    try:
+        conn = db_connect()
+        conn.execute(
+            """INSERT INTO email_history
+               (subject, recipients, email_content, content_size_kb, recipient_count, template_name, status, error)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            (subject, recipients, email_content, content_size_kb, recipient_count,
+             template_name, status, error),
+        )
+        conn.execute(
+            """DELETE FROM email_history WHERE id NOT IN (
+                   SELECT id FROM email_history ORDER BY sent_at DESC, id DESC LIMIT ?
+               )""",
+            (EMAIL_HISTORY_RETENTION,),
+        )
+        conn.commit()
+        conn.close()
+    except Exception:
+        logger.warning("could not record email history", exc_info=True)
+
 def get_email_schedules():
     MONTH_ABBR_PERIOD = ["Jan.", "Feb.", "Mar.", "Apr.", "May.", "Jun.", "Jul.", "Aug.", "Sep.", "Oct.", "Nov.", "Dec."]
     
@@ -147,33 +174,16 @@ def calculate_next_send(frequency, start_date, send_time='09:00', last_sent=None
         next_date = base_date + timedelta(days=14)
 
     elif frequency == 'bimonthly':
-        start_dt = datetime.fromisoformat(start_date)
-
-        if start_dt.day <= 15:
-            target_days = [1, 15]
+        if base_date.day < 15:
+            next_date = datetime(base_date.year, base_date.month, 15)
         else:
-            target_days = [15, 1]
-        
-        current_month = base_date.month
-        current_year = base_date.year
-        current_day = base_date.day
-        
-        next_target_day = None
-        for day in target_days:
-            if day > current_day:
-                next_target_day = day
-                break
-        
-        if next_target_day:
-            next_date = datetime(current_year, current_month, next_target_day)
-        else:
-            next_month = current_month + 1
-            next_year = current_year
+            next_month = base_date.month + 1
+            next_year = base_date.year
             if next_month > 12:
                 next_month = 1
                 next_year += 1
-            next_date = datetime(next_year, next_month, target_days[0])
-        
+            next_date = datetime(next_year, next_month, 1)
+
     elif frequency == 'monthly':
         start_dt = datetime.fromisoformat(start_date)
         target_day = start_dt.day
@@ -256,11 +266,20 @@ def calculate_next_send(frequency, start_date, send_time='09:00', last_sent=None
     next_date = next_date.replace(hour=hour, minute=minute, second=0, microsecond=0)
     return next_date
 
+def next_future_send(frequency, start_date, send_time='09:00'):
+    nxt = calculate_next_send(frequency, start_date, send_time)
+    now = datetime.now()
+    guard = 0
+    while nxt <= now and guard < 10000:
+        nxt = calculate_next_send(frequency, start_date, send_time, last_sent=nxt.isoformat())
+        guard += 1
+    return nxt
+
 def create_email_schedule(name, email_list_id, template_id, frequency, start_date, send_time='09:00', date_range=7, items_count=10):
     conn = db_connect()
     cursor = conn.cursor()
     
-    next_send = calculate_next_send(frequency, start_date, send_time)
+    next_send = next_future_send(frequency, start_date, send_time)
     
     try:
         list_id_value = 0 if email_list_id == 'ALL' else int(email_list_id)
@@ -281,7 +300,7 @@ def update_email_schedule(schedule_id, name, email_list_id, template_id, frequen
     conn = db_connect()
     cursor = conn.cursor()
     
-    next_send = calculate_next_send(frequency, start_date, send_time)
+    next_send = next_future_send(frequency, start_date, send_time)
 
     try:
         list_id_value = 0 if email_list_id == 'ALL' else int(email_list_id)
@@ -315,23 +334,37 @@ def toggle_schedule_status(schedule_id, is_active):
     conn.commit()
     conn.close()
 
-def update_schedule_last_sent(schedule_id):
+def advance_schedule_next_send(schedule_id):
     conn = db_connect()
     cursor = conn.cursor()
-    
     cursor.execute("SELECT frequency, start_date, send_time FROM email_schedules WHERE id = ?", (schedule_id,))
     result = cursor.fetchone()
     if not result:
         conn.close()
         return
-    
+    frequency, start_date, send_time = result
+    next_send = next_future_send(frequency, start_date, send_time or '09:00')
+    cursor.execute("UPDATE email_schedules SET next_send = ? WHERE id = ?", (next_send.isoformat(), schedule_id))
+    conn.commit()
+    conn.close()
+
+def update_schedule_last_sent(schedule_id):
+    conn = db_connect()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT frequency, start_date, send_time FROM email_schedules WHERE id = ?", (schedule_id,))
+    result = cursor.fetchone()
+    if not result:
+        conn.close()
+        return
+
     frequency, start_date, send_time = result
     now = datetime.now()
     next_send = calculate_next_send(frequency, start_date, send_time or '09:00', now.isoformat())
-    
+
     cursor.execute("""
-        UPDATE email_schedules 
-        SET last_sent = ?, next_send = ? 
+        UPDATE email_schedules
+        SET last_sent = ?, next_send = ?
         WHERE id = ?
     """, (now.isoformat(), next_send.isoformat(), schedule_id))
     conn.commit()

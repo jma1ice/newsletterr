@@ -7,7 +7,7 @@ from flask import Blueprint, jsonify, render_template, request, session
 from app.db import db_connect
 from app.settings_store import get_settings
 from app.cache import can_use_cached_data_for_preview, get_cached_data
-from app.security import require_csrf_for_json, requires_auth
+from app.security import require_csrf_for_json, requires_auth, json_body
 from app.store import get_saved_email_lists, get_email_schedules, create_email_schedule, update_email_schedule, delete_email_schedule, toggle_schedule_status
 from app.theme import get_theme_settings
 from app.clients.tautulli import run_tautulli_command
@@ -46,8 +46,10 @@ def scheduling():
 @requires_auth
 def create_schedule():
     require_csrf_for_json()
+    data, err = json_body(["name", "email_list_id", "template_id", "frequency", "start_date"])
+    if err:
+        return err
     try:
-        data = request.get_json()
         name = data.get('name', '').strip()
         email_list_id = data.get('email_list_id')
         template_id = int(data.get('template_id'))
@@ -56,10 +58,7 @@ def create_schedule():
         send_time = data.get('send_time', '09:00')
         date_range = int(data.get('date_range', 7))
         items_count = int(data.get('items_count', 10))
-        
-        if not all([name, email_list_id, template_id, frequency, start_date]):
-            return jsonify({"status": "error", "message": "All fields are required"}), 400
-        
+
         if email_list_id == 'ALL':
             list_id = 'ALL'
         else:
@@ -67,7 +66,7 @@ def create_schedule():
                 list_id = int(email_list_id)
             except (ValueError, TypeError):
                 return jsonify({"status": "error", "message": "Invalid email list ID"}), 400
-        
+
         success = create_email_schedule(name, list_id, template_id, frequency, start_date, send_time, date_range, items_count)
         if success:
             return jsonify({"status": "success", "message": f"Schedule '{name}' created successfully"})
@@ -80,8 +79,10 @@ def create_schedule():
 @bp.route('/scheduling/<int:schedule_id>', methods=['PUT'])
 @requires_auth
 def update_schedule(schedule_id):
+    data, err = json_body(["name", "email_list_id", "template_id", "frequency", "start_date"])
+    if err:
+        return err
     try:
-        data = request.get_json()
         name = data.get('name', '').strip()
         email_list_id = data.get('email_list_id')
         template_id = int(data.get('template_id'))
@@ -90,10 +91,7 @@ def update_schedule(schedule_id):
         send_time = data.get('send_time', '09:00')
         date_range = int(data.get('date_range', 7))
         items_count = int(data.get('items_count', 10))
-        
-        if not all([name, email_list_id, template_id, frequency, start_date]):
-            return jsonify({"status": "error", "message": "All fields are required"}), 400
-        
+
         if email_list_id == 'ALL':
             list_id = 'ALL'
         else:
@@ -114,6 +112,7 @@ def update_schedule(schedule_id):
 @bp.route('/scheduling/<int:schedule_id>', methods=['DELETE'])
 @requires_auth
 def delete_schedule(schedule_id):
+    require_csrf_for_json()
     try:
         delete_email_schedule(schedule_id)
         return jsonify({"status": "success", "message": "Schedule deleted successfully"})
@@ -160,7 +159,7 @@ def send_schedule_now(schedule_id):
             logger.info(f"Updated last_sent timestamp for schedule {name}")
             return jsonify({"status": "success", "message": f"Email '{name}' sent successfully"})
         else:
-            return jsonify({"status": "error", "message": f"Failed to send email '{name}'"})
+            return jsonify({"status": "error", "message": f"Failed to send email '{name}'. Check Email History for the reason."})
             
     except Exception as e:
         logger.error(f"Error in manual send: {e}")
@@ -312,7 +311,7 @@ def preview_schedule(schedule_id):
         tautulli_data["settings"]["poster_max_height"] = settings.get("poster_max_height", 0)
 
         recommendations_data = None
-        has_recs = any(item.get('type') == 'recs' for item in selected_items)
+        has_recs = any(item.get('type') == 'recommendations' for item in selected_items)
         
         if has_recs:
             try:
@@ -467,6 +466,9 @@ def get_calendar_data():
     try:
         month = int(request.args.get('month', datetime.now().month))
         year = int(request.args.get('year', datetime.now().year))
+    except (TypeError, ValueError):
+        return jsonify({"error": "month and year must be integers"}), 400
+    try:
         
         conn = db_connect()
         cursor = conn.cursor()

@@ -24,6 +24,7 @@ _WORKERS_STARTED = False
 _WORKERS_LOCK = threading.Lock()
 _RENDER_LOCK = threading.Lock()
 _REFRESH_LOCK = threading.Lock()
+_CACHE_LOCK = threading.Lock()
 
 _hsts_enabled = False
 

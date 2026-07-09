@@ -4,10 +4,54 @@ function collectEmailsFromChips() {
         .filter(Boolean);
 }
 
-document.getElementById('sendEmailBtn').addEventListener('click', async () => {
+async function buildEmailPayload() {
     const subject = document.getElementById('subject').value;
     const emailHeaderTitle = document.getElementById('email_header_title').value;
-    
+
+    const previewFrame = document.getElementById('preview');
+    const previewDoc = previewFrame.contentDocument || previewFrame.contentWindow.document;
+    const emailHTML = previewDoc.documentElement.outerHTML;
+
+    for (let item of selectedItems) {
+        if (item.type === 'graph' && !item.chartImage) {
+            const chartImage = await captureChartAsBase64(item.id);
+            if (chartImage) {
+                item.chartImage = chartImage;
+            }
+        }
+    }
+
+    selectedItems.forEach(item => {
+        if (['textblock', 'titleblock', 'headerblock'].includes(item.type)) {
+            item.content = getTextBlockContent(item.id);
+        }
+    });
+
+    return {
+        subject,
+        email_header_title: emailHeaderTitle,
+        email_html: emailHTML,
+        selected_items: selectedItems,
+        user_dict: userDict,
+        expanded_collections: convertExpandedCollectionsForBackend(),
+        custom_html: document.getElementById('custom-html-toggle')?.checked ? (document.getElementById('custom-html-editor')?.value || '') : ''
+    };
+}
+
+function describeSendResult(data, fallbackCount) {
+    if (Array.isArray(data.sent_groups)) {
+        const n = data.sent_groups.length;
+        return `Email sent to ${n} user group${n !== 1 ? 's' : ''}.`;
+    }
+    if (data.sent_to) {
+        return `Email sent (${data.sent_to}).`;
+    }
+    return `Email sent to ${fallbackCount} recipient${fallbackCount !== 1 ? 's' : ''}.`;
+}
+
+document.getElementById('sendEmailBtn').addEventListener('click', async () => {
+    const subject = document.getElementById('subject').value;
+
     const chipInput = document.getElementById('email_chip_input');
     if (chipInput && chipInput.value.trim()) {
         chipInput.dispatchEvent(new Event('blur'));
@@ -19,8 +63,6 @@ document.getElementById('sendEmailBtn').addEventListener('click', async () => {
         return;
     }
 
-    const to_emails = toList.join(', ');
-
     const ok = window.confirm(
         `Send email?\n\nSubject: ${subject || '(no subject)'}\n\nRecipients (${toList.length}):\n${toList.join('\n')}`
     );
@@ -29,28 +71,8 @@ document.getElementById('sendEmailBtn').addEventListener('click', async () => {
     showSpinner('Preparing email content...');
 
     try {
-        const previewFrame = document.getElementById('preview');
-        const previewDoc = previewFrame.contentDocument || previewFrame.contentWindow.document;
-        const emailHTML = previewDoc.documentElement.outerHTML;
-
-        for (let item of selectedItems) {
-            if (item.type === 'graph' && !item.chartImage) {
-                console.log('Capturing missing chart for:', item.id);
-                const chartImage = await captureChartAsBase64(item.id);
-                if (chartImage) {
-                    item.chartImage = chartImage;
-                }
-            }
-        }
-
-        selectedItems.forEach(item => {
-            if (['textblock', 'titleblock', 'headerblock'].includes(item.type)) {
-                const content = getTextBlockContent(item.id);
-                item.content = content;
-            }
-        });
-
-        const expandedCollections = window.expandedCollections || {};
+        const payload = await buildEmailPayload();
+        payload.to_emails = toList.join(', ');
 
         showSpinner('Sending email...');
 
@@ -60,29 +82,50 @@ document.getElementById('sendEmailBtn').addEventListener('click', async () => {
                 'Content-Type': 'application/json',
                 'X-CSRF-Token': APP.csrfToken,
             },
-            body: JSON.stringify({
-                to_emails,
-                subject,
-                email_header_title: emailHeaderTitle,
-                email_html: emailHTML,
-                selected_items: selectedItems,
-                user_dict: userDict,
-                expanded_collections: convertExpandedCollectionsForBackend(),
-                custom_html: document.getElementById('custom-html-toggle')?.checked ? (document.getElementById('custom-html-editor')?.value || '') : ''
-            })
+            body: JSON.stringify(payload)
         });
-        
+
+        const data = await resp.json();
         if (resp.ok) {
-            const data = await resp.json();
-            alert(`Email sent successfully to ${toList.length} recipient${toList.length !== 1 ? 's' : ''}!`);
+            window.clearDraft?.();
+            alert(describeSendResult(data, toList.length));
         } else {
-            const data = await resp.json();
-            alert("Error sending email: " + data.error);
+            alert("Error sending email: " + (data.error || resp.statusText));
         }
     } catch (err) {
         console.error("Error sending email:", err);
         alert("Something went wrong while sending the email.");
     }
 
+    hideSpinner();
+});
+
+document.getElementById('sendTestBtn')?.addEventListener('click', async () => {
+    const subject = document.getElementById('subject').value;
+    if (!window.confirm(`Send a test copy of this email to your From address?\n\nSubject: ${subject || '(no subject)'}`)) return;
+
+    showSpinner('Sending test email...');
+    try {
+        const payload = await buildEmailPayload();
+
+        const resp = await fetch('/send_test_email', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-Token': APP.csrfToken,
+            },
+            body: JSON.stringify(payload)
+        });
+
+        const data = await resp.json();
+        if (resp.ok) {
+            alert(data.message || 'Test email sent.');
+        } else {
+            alert("Error sending test: " + (data.error || resp.statusText));
+        }
+    } catch (err) {
+        console.error("Error sending test email:", err);
+        alert("Something went wrong while sending the test email.");
+    }
     hideSpinner();
 });

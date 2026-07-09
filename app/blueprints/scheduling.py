@@ -159,7 +159,7 @@ def send_schedule_now(schedule_id):
             logger.info(f"Updated last_sent timestamp for schedule {name}")
             return jsonify({"status": "success", "message": f"Email '{name}' sent successfully"})
         else:
-            return jsonify({"status": "error", "message": f"Failed to send email '{name}'"})
+            return jsonify({"status": "error", "message": f"Failed to send email '{name}'. Check Email History for the reason."})
             
     except Exception as e:
         logger.error(f"Error in manual send: {e}")

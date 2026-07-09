@@ -44,6 +44,17 @@ def test_send_email_rejects_missing_fields(csrf_client):
     resp = _post_json(client, token, "/send_email", {"subject": "hi"})  # no to_emails
     assert resp.status_code == 400
 
+def test_send_test_email_requires_from_address(csrf_client, app):
+    client, token = csrf_client
+    import sqlite3
+    from app import config
+    conn = sqlite3.connect(config.DB_PATH)
+    conn.execute("UPDATE settings SET from_email = '' WHERE id = 1")
+    conn.commit()
+    conn.close()
+    resp = _post_json(client, token, "/send_test_email", {"subject": "hi", "selected_items": []})
+    assert resp.status_code == 400  # no From address configured
+
 def test_pull_stats_without_tautulli_returns_400(csrf_client, seeded_settings):
     client, token = csrf_client
     import sqlite3

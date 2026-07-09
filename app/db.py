@@ -89,7 +89,9 @@ def init_db(db_path):
             content_size_kb REAL,
             recipient_count INTEGER,
             sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            template_name TEXT  -- Name of template used (NULL/Manual for legacy/manual sends)
+            template_name TEXT,  -- Name of template used (NULL/Manual for legacy/manual sends)
+            status TEXT DEFAULT 'sent',  -- 'sent' or 'failed'
+            error TEXT  -- failure reason when status = 'failed'
         )
     """)
 
@@ -98,8 +100,12 @@ def init_db(db_path):
         cols = [r[1] for r in cursor.fetchall()]
         if 'template_name' not in cols:
             cursor.execute("ALTER TABLE email_history ADD COLUMN template_name TEXT")
+        if 'status' not in cols:
+            cursor.execute("ALTER TABLE email_history ADD COLUMN status TEXT DEFAULT 'sent'")
+        if 'error' not in cols:
+            cursor.execute("ALTER TABLE email_history ADD COLUMN error TEXT")
     except Exception as _e:
-        logger.warning(f"Warning: could not ensure template_name column exists: {_e}")
+        logger.warning(f"Warning: could not ensure email_history columns exist: {_e}")
     
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS email_schedules (

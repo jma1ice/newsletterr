@@ -41,6 +41,33 @@ def delete_email_list(list_id):
     conn.commit()
     conn.close()
 
+EMAIL_HISTORY_RETENTION = 1000
+
+def record_email_history(subject, recipients, email_content, content_size_kb,
+                         recipient_count, template_name="Manual",
+                         status="sent", error=None):
+    recipients = (recipients or "")[:5000]
+    email_content = (email_content or "")[:1000]
+    try:
+        conn = db_connect()
+        conn.execute(
+            """INSERT INTO email_history
+               (subject, recipients, email_content, content_size_kb, recipient_count, template_name, status, error)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            (subject, recipients, email_content, content_size_kb, recipient_count,
+             template_name, status, error),
+        )
+        conn.execute(
+            """DELETE FROM email_history WHERE id NOT IN (
+                   SELECT id FROM email_history ORDER BY sent_at DESC, id DESC LIMIT ?
+               )""",
+            (EMAIL_HISTORY_RETENTION,),
+        )
+        conn.commit()
+        conn.close()
+    except Exception:
+        logger.warning("could not record email history", exc_info=True)
+
 def get_email_schedules():
     MONTH_ABBR_PERIOD = ["Jan.", "Feb.", "Mar.", "Apr.", "May.", "Jun.", "Jul.", "Aug.", "Sep.", "Oct.", "Nov.", "Dec."]
     

@@ -35,6 +35,7 @@ EXPECTED_RULES = [
     "/pull_recommendations",
     "/pull_stats",
     "/scheduling",
+    "/send_test_email",
     "/setup",
     "/scheduling/<int:schedule_id>",
     "/scheduling/<int:schedule_id>/preview",

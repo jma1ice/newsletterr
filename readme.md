@@ -226,6 +226,9 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Add opt out support
 * Add hosted images to reduce email size
 
+--- UI ---
+* General update/modernization
+
 --- Misc. ---
 * Stats for total items in library
 * Date range for stats (i.e. 1.1.25 - 1.1.26) (instead of 'last X days')
@@ -238,6 +241,7 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Tailwind Play CDN fix
 * CSP out of Report-Only after trial run
 * Add more to /setup to configure settings on first run
+* Resend from history
 
 ---
 
@@ -247,6 +251,11 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 
 #### Fixed:
 * Fixed issue where fresh setup `migrate_email_templates_for_header_title()` calls for `server_name` failed creating a missing `email_header_title` column
+* Patched up some SSRF/secrete containment
+* CSRF fixes
+* Fixed possible double send on scheduled emails
+* Bimonthly cadence fix
+* Schedule fix for recommendation emails
 
 #### New Features:
 * Added sections to settings page (email server | external services | data settings | email styling | email body defaults | security)
@@ -266,6 +275,12 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Added option for setting max image heights to reduce email size
 * Added API functionality to pull wrapped stats from DroppedNeedle
 * Complete codebase overhaul -> app factory
+* SQLite hardened with WAL
+* Auth required and extra setup page added for first sign-in
+* Visibility for failed sends
+* Test send button
+* Email builder auto-save
+* Pagination in email history, history capped to 1000
 
 
 ### v2026.1:

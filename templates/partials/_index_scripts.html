@@ -38,7 +38,7 @@
         <script src="{{ url_for('static', filename='js/app/06-chart-theme.js') }}" nonce="{{ nonce }}"></script>
         <script src="{{ url_for('static', filename='js/app/07-email-builder.js') }}" nonce="{{ nonce }}"></script>
         <script id="recommendations-json" type="application/json" nonce="{{ nonce }}">
-            {{ recommendations_json | tojson | safe }}
+            {{ (recommendations_json or {}) | tojson | safe }}
         </script>
         <script id="droppedneedle-wrapped-json" type="application/json" nonce="{{ nonce }}">
             {{ (droppedneedle_wrapped_json or {}) | tojson | safe }}

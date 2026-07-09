@@ -1,7 +1,7 @@
 import time
 
 import requests
-from flask import Blueprint, jsonify, render_template, request
+from flask import Blueprint, jsonify, render_template, request, session
 
 from app.settings_store import get_settings
 from app.cache import set_cached_data, get_cache_info
@@ -160,7 +160,8 @@ def pull_recommendations():
             return render_template('index.html', error='Please enter conjurr info on settings page',
                                     stats=stats, user_dict=user_dict, graph_data=graph_data,
                                     graph_commands=graph_commands, recent_data=recent_data,
-                                    libs=libs, settings=settings, theme_settings=get_theme_settings())
+                                    libs=libs, settings=settings, theme_settings=get_theme_settings(),
+                                    csrf_token=session.get("csrf_token", ""))
         else:
             conjurr_base_url = conjurr_settings['conjurr_url']
             recommendations_json, error = run_conjurr_command(conjurr_base_url, filtered_users, error)
@@ -188,7 +189,7 @@ def pull_recommendations():
     return render_template('index.html', stats=stats, user_dict=user_dict, graph_data=graph_data, cache_info=cache_info,
                             graph_commands=graph_commands, recent_data=recent_data, libs=libs, settings=settings,
                             recommendations_json=recommendations_json, filtered_users=filtered_users, alert=alert,
-                            error=error, theme_settings=theme_settings)
+                            error=error, theme_settings=theme_settings, csrf_token=session.get("csrf_token", ""))
 
 @bp.route('/pull_droppedneedle_stats', methods=['POST'])
 @requires_auth
@@ -223,7 +224,8 @@ def pull_droppedneedle_stats():
         return render_template('index.html', error='Please enter DroppedNeedle URL and API key on settings page',
                                 stats=stats, user_dict=user_dict, graph_data=graph_data,
                                 graph_commands=graph_commands, recent_data=recent_data,
-                                libs=libs, settings=settings, theme_settings=get_theme_settings())
+                                libs=libs, settings=settings, theme_settings=get_theme_settings(),
+                                csrf_token=session.get("csrf_token", ""))
 
     droppedneedle_wrapped_json, error = run_droppedneedle_command(droppedneedle_url, droppedneedle_api_key, filtered_users, error)
     droppedneedle_server_json, server_error = fetch_droppedneedle_server_stats(droppedneedle_url, droppedneedle_api_key)
@@ -254,7 +256,8 @@ def pull_droppedneedle_stats():
     return render_template('index.html', stats=stats, user_dict=user_dict, graph_data=graph_data, cache_info=cache_info,
                             graph_commands=graph_commands, recent_data=recent_data, libs=libs, settings=settings,
                             droppedneedle_wrapped_json=droppedneedle_wrapped_json, droppedneedle_server_json=droppedneedle_server_json,
-                            alert=alert, error=error, theme_settings=theme_settings)
+                            alert=alert, error=error, theme_settings=theme_settings,
+                            csrf_token=session.get("csrf_token", ""))
 
 @bp.route('/fetch_collections/<collection_type>', methods=['GET'])
 @requires_auth

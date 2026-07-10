@@ -36,8 +36,11 @@ def scheduling():
 
         if not session.get("csrf_token"):
             session["csrf_token"] = secrets.token_urlsafe(32)
-        
-        return render_template('scheduling.html', schedules=schedules, email_lists=email_lists, templates=templates, csrf_token=session["csrf_token"])
+
+        _s = get_settings(decrypt_secrets=False)
+        recently_added_mode = (_s.get("recently_added_mode") or "items") if "id" in _s else "items"
+
+        return render_template('scheduling.html', schedules=schedules, email_lists=email_lists, templates=templates, csrf_token=session["csrf_token"], recently_added_mode=recently_added_mode)
     except Exception as e:
         logger.error(f"Error loading scheduling page: {e}")
         return render_template('scheduling.html', schedules=[], email_lists=[], templates=[])

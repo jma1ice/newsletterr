@@ -41,6 +41,17 @@ def fetch_tautulli_data_for_email(tautulli_base_url, tautulli_api_key, date_rang
         if stats:
             data['stats'] = stats
 
+        libraries, _ = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_libraries', None, None)
+        if libraries:
+            data['stats'].append({
+                'stat_id': 'library_item_counts',
+                'stat_title': 'Library Item Counts',
+                'rows': [
+                    {'section_name': lib.get('section_name', ''), 'count': lib.get('count', 0)}
+                    for lib in libraries
+                ]
+            })
+
         graph_data = []
         for command in graph_commands:
             try:

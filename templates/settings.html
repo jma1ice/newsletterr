@@ -18,6 +18,17 @@
         <p style="color: #01b301; text-shadow: 1px 0 #000, 0 1px #000, -1px 0 #000, 0 -1px #000;">{{ alert }}</p>
     {% endif %}
 
+    {% if audit_results %}
+        <div class="mb-3">
+            {% for result in audit_results %}
+                {% set audit_colors = {'ok': '#01b301', 'error': '#770010', 'warning': '#e5a00d'} %}
+                <p style="margin-bottom: 2px; color: {{ audit_colors.get(result.status, '#333') }}; text-shadow: 1px 0 #000, 0 1px #000, -1px 0 #000, 0 -1px #000;">
+                    {{ result.service }}: {{ result.message }}
+                </p>
+            {% endfor %}
+        </div>
+    {% endif %}
+
     {% if error %}
         <p style="color: #770010; text-shadow: 1px 0 #000, 0 1px #000, -1px 0 #000, 0 -1px #000;">{{ error }}</p>
     {% endif %}
@@ -387,6 +398,13 @@
                         <p class="text-info mt-2" style="font-size: 0.875rem;">
                             Only enable HSTS if this app is running behind HTTPS (e.g. a reverse proxy with a valid certificate).
                             Enabling it on plain HTTP will cause browsers to block access to the site until the max-age expires (2 years).
+                        </p><br>
+
+                        <label for="discord_webhook_url">Discord Webhook URL (optional):</label><br>
+                        <input type="password" id="discord_webhook_url" name="discord_webhook_url" autocomplete="off" style="width: 24rem;"
+                            placeholder="{% if settings.has_discord_webhook_url %}Saved - leave blank to keep{% else %}https://discord.com/api/webhooks/...{% endif %}"><br>
+                        <p class="text-info mt-2" style="font-size: 0.875rem;">
+                            Used by the "Send to Discord" button on the Export Logs page to attach a redacted log file to a channel or forum thread of your choosing.
                         </p><br>
 
                         <button id="apply_settings_security" class="button">Apply Settings</button>

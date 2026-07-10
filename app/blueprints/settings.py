@@ -1,4 +1,5 @@
 import secrets
+import json
 import os, time
 
 from flask import Blueprint, abort, current_app, jsonify, redirect, render_template, request, session, url_for
@@ -10,6 +11,7 @@ from app.crypto import encrypt, decrypt
 from werkzeug.security import generate_password_hash
 from app.hooks import refresh_hsts_setting
 from app.security import require_csrf_for_json, requires_auth
+from app.blueprints.api import test_tautulli_connection, test_conjurr_connection, test_droppedneedle_connection
 
 import logging
 
@@ -24,6 +26,10 @@ def settings():
     cursor = conn.cursor()
 
     alert = request.args.get('alert')
+    try:
+        audit_results = json.loads(request.args.get('audit') or 'null')
+    except (TypeError, ValueError):
+        audit_results = None
 
     theme_presets = {
         "newsletterr_blue": {
@@ -61,7 +67,7 @@ def settings():
             db_custom_logo = cursor.fetchone()
             existing_custom_logo = db_custom_logo[0] if db_custom_logo and db_custom_logo[0] else ""
 
-            cursor.execute("SELECT login_toggle, nl_username, nl_password, password, tautulli_api, droppedneedle_api_key FROM settings WHERE id = 1")
+            cursor.execute("SELECT login_toggle, nl_username, nl_password, password, tautulli_api, droppedneedle_api_key, discord_webhook_url FROM settings WHERE id = 1")
             db_login_info = cursor.fetchone()
             existing_login_toggle = db_login_info[0] if db_login_info and db_login_info[0] else ""
             existing_nl_username = db_login_info[1] if db_login_info and db_login_info[1] else ""
@@ -69,6 +75,7 @@ def settings():
             existing_password = db_login_info[3] if db_login_info and db_login_info[3] else ""
             existing_tautulli_api = db_login_info[4] if db_login_info and db_login_info[4] else ""
             existing_droppedneedle_api_key = db_login_info[5] if db_login_info and db_login_info[5] else ""
+            existing_discord_webhook_url = db_login_info[6] if db_login_info and db_login_info[6] else ""
 
             # secret fields are write-only: a blank submission keeps the stored
             # value rather than overwriting it with an empty string
@@ -91,6 +98,7 @@ def settings():
             conjurr_url = request.form.get("conjurr_url")
             droppedneedle_url = request.form.get("droppedneedle_url")
             droppedneedle_api_key = _secret("droppedneedle_api_key", existing_droppedneedle_api_key)
+            discord_webhook_url = _secret("discord_webhook_url", existing_discord_webhook_url)
             recipient_display_name = request.form.get("recipient_display_name", "email")
             logo_filename = request.form.get("logo_filename")
             logo_width = request.form.get("logo_width")
@@ -147,8 +155,8 @@ def settings():
                 INSERT INTO settings
                 (id, from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, plex_url, tautulli_url,
                     tautulli_api, conjurr_url, droppedneedle_url, droppedneedle_api_key, recipient_display_name, logo_filename, logo_width, email_theme, primary_color, secondary_color, accent_color, background_color,
-                    text_color, from_name, custom_logo_filename, login_toggle, nl_username, nl_password, default_intro_text, default_outro_text, hsts_enabled, scheduled_subject_prefix, logo_position, hide_stat_play_counts, hide_graph_play_counts, stats_type, recently_added_mode, recently_added_sort, ra_grid_columns, recs_grid_columns, stat_cover_art, send_mode, poster_max_height)
-                VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    text_color, from_name, custom_logo_filename, login_toggle, nl_username, nl_password, default_intro_text, default_outro_text, hsts_enabled, scheduled_subject_prefix, logo_position, hide_stat_play_counts, hide_graph_play_counts, stats_type, recently_added_mode, recently_added_sort, ra_grid_columns, recs_grid_columns, stat_cover_art, send_mode, poster_max_height, discord_webhook_url)
+                VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT (id) DO UPDATE
                 SET from_email = excluded.from_email, alias_email = excluded.alias_email, reply_to_email = excluded.reply_to_email, password = excluded.password,
                     smtp_username = excluded.smtp_username, smtp_server = excluded.smtp_server, smtp_port = excluded.smtp_port, smtp_protocol = excluded.smtp_protocol,
@@ -164,11 +172,12 @@ def settings():
                     ra_grid_columns = excluded.ra_grid_columns, recs_grid_columns = excluded.recs_grid_columns,
                     stat_cover_art = excluded.stat_cover_art,
                     send_mode = excluded.send_mode,
-                    poster_max_height = excluded.poster_max_height
+                    poster_max_height = excluded.poster_max_height,
+                    discord_webhook_url = excluded.discord_webhook_url
             """, (from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, plex_url, tautulli_url, tautulli_api,
                   conjurr_url, droppedneedle_url, droppedneedle_api_key, recipient_display_name, logo_filename, logo_width, email_theme, primary_color, secondary_color, accent_color, background_color, text_color, from_name,
                   custom_logo_filename, login_toggle, nl_username, nl_password, default_intro_text, default_outro_text, hsts_enabled, scheduled_subject_prefix, logo_position,
-                  hide_stat_play_counts, hide_graph_play_counts, stats_type, recently_added_mode, recently_added_sort, ra_grid_columns, recs_grid_columns, stat_cover_art, send_mode, poster_max_height))
+                  hide_stat_play_counts, hide_graph_play_counts, stats_type, recently_added_mode, recently_added_sort, ra_grid_columns, recs_grid_columns, stat_cover_art, send_mode, poster_max_height, discord_webhook_url))
             conn.commit()
             cursor.execute("SELECT plex_token FROM settings WHERE id = 1")
             plex_token = cursor.fetchone()[0]
@@ -220,7 +229,17 @@ def settings():
                 "stat_cover_art": stat_cover_art,
                 "send_mode": send_mode,
                 "poster_max_height": poster_max_height,
+                "discord_webhook_url": decrypt(discord_webhook_url),
             }
+
+            audit_results = []
+            if settings["tautulli_url"]:
+                audit_results.append({"service": "Tautulli", **test_tautulli_connection(settings["tautulli_url"], settings["tautulli_api"])})
+            if settings["conjurr_url"]:
+                audit_results.append({"service": "Conjurr", **test_conjurr_connection(settings["conjurr_url"])})
+            if settings["droppedneedle_url"]:
+                audit_results.append({"service": "DroppedNeedle", **test_droppedneedle_connection(settings["droppedneedle_url"], settings["droppedneedle_api_key"])})
+            audit_json = json.dumps(audit_results) if audit_results else None
 
             refresh_hsts_setting()
 
@@ -242,7 +261,7 @@ def settings():
                 session.pop('authenticated', None)
                 return redirect(url_for('auth.login', alert="Settings saved successfully!"))
 
-            return redirect(url_for('settings.settings', alert="Settings saved successfully!", settings=settings))
+            return redirect(url_for('settings.settings', alert="Settings saved successfully!", settings=settings, audit=audit_json))
 
         except Exception as e:
             try:
@@ -349,6 +368,7 @@ def settings():
     stat_cover_art = s.get("stat_cover_art")
     send_mode = s.get("send_mode")
     poster_max_height = s.get("poster_max_height")
+    discord_webhook_url = s.get("discord_webhook_url")
 
     current_theme = email_theme or "newsletterr_blue"
     if current_theme in theme_presets and current_theme != "custom":
@@ -410,6 +430,8 @@ def settings():
     settings["has_droppedneedle_api_key"] = bool(droppedneedle_api_key)
     settings["nl_password"] = ""
     settings["has_nl_password"] = bool(nl_password)
+    settings["discord_webhook_url"] = ""
+    settings["has_discord_webhook_url"] = bool(discord_webhook_url)
     if smtp_port == '' or smtp_port is None:
         settings["smtp_port"] = 587
         cursor.execute("""
@@ -435,7 +457,7 @@ def settings():
 
     if not session.get("csrf_token"):
         session["csrf_token"] = secrets.token_urlsafe(32)
-    return render_template('settings.html', settings=settings, alert=alert, csrf_token=session["csrf_token"])
+    return render_template('settings.html', settings=settings, alert=alert, audit_results=audit_results, csrf_token=session["csrf_token"])
 
 @bp.route('/upload-logo', methods=['POST'])
 @requires_auth

@@ -30,6 +30,7 @@
                             <th>Size (KB)</th>
                             <th>Recipients</th>
                             <th>View Recipients</th>
+                            <th>Resend</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -62,6 +63,18 @@
                                             data-subject="{{ email.subject }}">
                                         👥 Recipients
                                     </button>
+                                </td>
+                                <td>
+                                    {% if email.status != 'failed' %}
+                                        <button class="btn btn-outline-secondary btn-sm resend-btn"
+                                                data-email-id="{{ email.id }}"
+                                                data-subject="{{ email.subject }}"
+                                                data-recipient-count="{{ email.recipient_count }}">
+                                            🔁 Resend
+                                        </button>
+                                    {% else %}
+                                        <span class="text-muted small">n/a</span>
+                                    {% endif %}
                                 </td>
                             </tr>
                         {% endfor %}
@@ -161,6 +174,48 @@
                         
                     } catch (error) {
                         alert('Error loading recipients: ' + error.message);
+                    }
+                });
+            });
+
+            const resendButtons = document.querySelectorAll('.resend-btn');
+
+            resendButtons.forEach(button => {
+                button.addEventListener('click', async function() {
+                    const emailId = this.dataset.emailId;
+                    const subject = this.dataset.subject;
+                    const recipientCount = this.dataset.recipientCount;
+
+                    if (!confirm(`Resend "${subject}" to ${recipientCount} recipient${recipientCount != 1 ? 's' : ''}? This sends the email again right now.`)) {
+                        return;
+                    }
+
+                    const originalText = this.textContent;
+                    this.disabled = true;
+                    this.textContent = 'Sending…';
+
+                    try {
+                        const response = await fetch(`/email_history/${emailId}/resend`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-Token': '{{ csrf_token }}',
+                            },
+                            credentials: 'same-origin'
+                        });
+                        const data = await response.json();
+
+                        if (data.status === 'ok') {
+                            alert('Resent successfully.');
+                            location.reload();
+                        } else {
+                            alert('Resend failed: ' + data.message);
+                        }
+                    } catch (error) {
+                        alert('Resend failed: ' + error.message);
+                    } finally {
+                        this.disabled = false;
+                        this.textContent = originalText;
                     }
                 });
             });

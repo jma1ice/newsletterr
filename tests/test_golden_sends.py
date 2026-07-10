@@ -249,3 +249,58 @@ def test_manual_recommendations_email_golden(manual_send_env):
     assert normalized["envelope"]["to"] == ["news@example.com", "a@b.c"]
     assert "Manual personal intro" in normalized["html"]
     _assert_golden("manual_recommendations", normalized)
+
+def test_resend_from_history_replays_stored_mime(manual_send_env):
+    from app.store import record_email_history
+
+    client = manual_send_env
+    stored_mime = (
+        "Subject: Original Subject\r\n"
+        "From: news@example.com\r\n"
+        "To: a@b.c\r\n"
+        "\r\n"
+        "<html><body>Original stored content</body></html>"
+    )
+    record_email_history("Original Subject", "a@b.c, d@e.f", stored_mime, 1.0, 2, "Manual")
+
+    from app import config
+    conn = sqlite3.connect(config.DB_PATH)
+    history_id = conn.execute("SELECT id FROM email_history ORDER BY id DESC LIMIT 1").fetchone()[0]
+    conn.close()
+
+    resp = client.post(f"/email_history/{history_id}/resend", headers={"X-CSRF-Token": "golden-token"})
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["status"] == "ok"
+
+    sends = [s for inst in RecorderSMTP.instances for s in inst.sent]
+    assert len(sends) == 1
+    from_addr, to_addrs, content = sends[0]
+    assert from_addr == "news@example.com"
+    assert sorted(to_addrs) == ["a@b.c", "d@e.f"]
+    assert content == stored_mime  # replayed verbatim, not rebuilt
+
+    from app import config
+    conn = sqlite3.connect(config.DB_PATH)
+    rows = conn.execute("SELECT subject, email_content FROM email_history ORDER BY id DESC LIMIT 1").fetchone()
+    conn.close()
+    assert rows[0] == "Original Subject"
+    assert rows[1] == stored_mime
+
+def test_resend_from_history_rejects_failed_send(manual_send_env):
+    from app.store import record_email_history
+
+    client = manual_send_env
+    record_email_history("Never sent", "a@b.c", "", 0, 1, "Manual", status="failed", error="SMTP down")
+
+    from app import config
+    conn = sqlite3.connect(config.DB_PATH)
+    history_id = conn.execute("SELECT id FROM email_history ORDER BY id DESC LIMIT 1").fetchone()[0]
+    conn.close()
+
+    resp = client.post(f"/email_history/{history_id}/resend", headers={"X-CSRF-Token": "golden-token"})
+    assert resp.status_code == 500
+    body = resp.get_json()
+    assert body["status"] == "error"
+    assert "failed" in body["message"].lower()
+    assert len(RecorderSMTP.instances) == 0  # never attempted a connection

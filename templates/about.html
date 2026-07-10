@@ -72,6 +72,13 @@
             <dt class="font-semibold dark:border-gray-300">License</dt>
             <dd class="mt-1 text-sm">MIT</dd>
         </div>
+        <div class="sm:col-span-2">
+            <dt class="font-semibold dark:border-gray-300">Found a bug?</dt>
+            <dd class="mt-1 text-sm">
+                <a href="{{ url_for('logs.logs_page') }}">Export logs</a> to attach to a
+                <a target="_blank" href="https://discord.gg/7Skcsqs4uT">support post on Discord</a>.
+            </dd>
+        </div>
         <div>
             <dt class="font-semibold dark:border-gray-300">Check out our other projects:</dt>
             <a target="_blank" href="https://github.com/yungsnuzzy/conjurr">conjurr</a>
@@ -110,6 +117,12 @@
         <li>Fixed possible double send on scheduled emails</li>
         <li>Bimonthly cadence fix</li>
         <li>Schedule fix for recommendation emails</li>
+        <li>API fields in settings are now a password field</li>
+        <li>Fixed ra/recs card differing width issues when >5 columns used</li>
+        <li>Added a 'pop-up blocked' to index for `save_template()` and similar</li>
+        <li>Adjusted issue where some email clients show posters as small slivers</li>
+        <li>Fixed where contributor area would start clipping out on lower size screens</li>
+        <li>Removed plex-api-client as plexapi.plex was no longer supported</li>
     </ul>
     <dt class="font-semibold dark:border-gray-300">New Features:</dt>
     <ul class="list-disc list-inside space-y-2 text-sm mb-2">

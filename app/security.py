@@ -1,4 +1,4 @@
-import hmac, html, time
+import hmac, html, re, time
 
 import bleach, requests
 from flask import abort, jsonify, redirect, request, session, url_for
@@ -130,6 +130,23 @@ def safe_get(url: str, *, timeout: int = 120, retries: int = 2, **kwargs):
             if attempt == retries:
                 raise
             time.sleep(1.0 * (attempt + 1))
+
+_REDACT_KV_RE = re.compile(
+    r'(?i)\b(api[_-]?key|apikey|token|password|passwd|secret|x-plex-token|x-wrapped-api-key)\b'
+    r'\s*[=:]\s*("[^"]*"|\'[^\']*\'|[^\s&"\']+)'
+)
+_REDACT_BEARER_RE = re.compile(r'(?i)\bBearer\s+[A-Za-z0-9\-_.]+')
+_REDACT_WEBHOOK_RE = re.compile(r'https://discord(?:app)?\.com/api/webhooks/\S+')
+_REDACT_EMAIL_RE = re.compile(r'[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}')
+
+def redact_log_content(text: str) -> str:
+    if not text:
+        return text
+    text = _REDACT_WEBHOOK_RE.sub('[REDACTED-WEBHOOK-URL]', text)
+    text = _REDACT_BEARER_RE.sub('Bearer [REDACTED]', text)
+    text = _REDACT_KV_RE.sub(lambda m: f"{m.group(1)}=[REDACTED]", text)
+    text = _REDACT_EMAIL_RE.sub('[REDACTED-EMAIL]', text)
+    return text
 
 def sanitize_html(html: str) -> str:
     allowed_tags = [

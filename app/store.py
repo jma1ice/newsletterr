@@ -43,11 +43,17 @@ def delete_email_list(list_id):
 
 EMAIL_HISTORY_RETENTION = 1000
 
+# email_content stores the full raw MIME (msg_root.as_string()) so a send can
+# be replayed verbatim from history; the cap is a sanity ceiling against
+# pathological cases (e.g. unoptimized attachments), not a normal-case limit.
+EMAIL_CONTENT_MAX_CHARS = 5 * 1024 * 1024
+RECIPIENTS_MAX_CHARS = 50_000
+
 def record_email_history(subject, recipients, email_content, content_size_kb,
                          recipient_count, template_name="Manual",
                          status="sent", error=None):
-    recipients = (recipients or "")[:5000]
-    email_content = (email_content or "")[:1000]
+    recipients = (recipients or "")[:RECIPIENTS_MAX_CHARS]
+    email_content = (email_content or "")[:EMAIL_CONTENT_MAX_CHARS]
     try:
         conn = db_connect()
         conn.execute(

@@ -12,6 +12,7 @@ SECRET_COLUMNS = frozenset({
     "plex_token",
     "tautulli_api",
     "droppedneedle_api_key",
+    "discord_webhook_url",
 })
 
 # Empty/NULL columns are normalized with `or`-semantics, matching the

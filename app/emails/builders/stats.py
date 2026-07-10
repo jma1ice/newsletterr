@@ -19,6 +19,8 @@ def get_stat_headers(title, hide_play_counts=False):
         headers = ["Title", "Year", "Cert.", "Score"]
     elif title == "Most Active Libraries":
         headers = ["Library", "Plays", "Hours Played"]
+    elif title == "Library Item Counts":
+        headers = ["Library", "Item Count"]
     elif title == "Most Active Users":
         headers = ["Username", "Plays", "Hours Played"]
     elif title == "Most Active Platforms":
@@ -34,7 +36,7 @@ def get_stat_headers(title, hide_play_counts=False):
 def get_stat_cells(title, row, hide_play_counts=False):
     cells = []
 
-    if title == "Most Active Libraries":
+    if title == "Most Active Libraries" or title == "Library Item Counts":
         cells.append(row.get('section_name', ''))
     elif title == "Most Active Users":
         cells.append(row.get('user', ''))
@@ -43,11 +45,12 @@ def get_stat_cells(title, row, hide_play_counts=False):
     else:
         cells.append(row.get('title', ''))
 
-    skip_year_stats = ["Most Active Libraries", "Most Active Users", "Most Active Platforms", "Most Concurrent Streams"]
+    skip_year_stats = ["Most Active Libraries", "Library Item Counts", "Most Active Users", "Most Active Platforms", "Most Concurrent Streams"]
     if title not in skip_year_stats:
         cells.append(row.get('year', ''))
 
-    if "Recently" not in title and "Concurrent" not in title and not hide_play_counts:
+    skip_plays_stats = ["Library Item Counts"]
+    if "Recently" not in title and "Concurrent" not in title and title not in skip_plays_stats and not hide_play_counts:
         cells.append(row.get('total_plays', 0))
 
     hours_stats = ["Most Watched Movies", "Most Watched TV Shows", "Most Played Artists", "Most Active Libraries", "Most Active Users", "Most Active Platforms"]
@@ -59,13 +62,15 @@ def get_stat_cells(title, row, hide_play_counts=False):
     elif title in users_stats:
         cells.append(row.get('users_watched', ''))
 
-    skip_rating_stats = ["Most Active Libraries", "Most Played Artists", "Most Popular Artists", "Most Active Users", "Most Active Platforms", "Most Concurrent Streams"]
+    skip_rating_stats = ["Most Active Libraries", "Library Item Counts", "Most Played Artists", "Most Popular Artists", "Most Active Users", "Most Active Platforms", "Most Concurrent Streams"]
     if title not in skip_rating_stats:
         cells.append(row.get('content_rating', ''))
         rating = row.get('rating')
         cells.append(f"{rating}" if rating else 'NA')
 
     if title == "Most Concurrent Streams":
+        cells.append(row.get('count', 0))
+    elif title == "Library Item Counts":
         cells.append(row.get('count', 0))
 
     return cells
@@ -169,12 +174,14 @@ def build_stats_html_with_cid_background(stat_data, msg_root, theme_colors, base
 
     if date_range == "":
         date_range = get_cache_info('stats')['params']['time_range']
-    
+
+    date_suffix = "" if title == "Library Item Counts" else f" - Last {date_range} days"
+
     return f"""
         <div style="{container_style}">
             {overlay}
             <div style="position: relative; z-index: 1;">
-                <div style="{header_style}">{title} - Last {date_range} days</div>
+                <div style="{header_style}">{title}{date_suffix}</div>
                 <table style="{table_style}">
                     <thead>
                         <tr>{header_cells}</tr>

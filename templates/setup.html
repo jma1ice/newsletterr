@@ -48,13 +48,20 @@
             .alert {
                 border-radius: 10px;
             }
-            .step-indicator {
-                text-align: center;
-                color: #888;
-                font-size: 0.8rem;
-                text-transform: uppercase;
-                letter-spacing: 1px;
-                margin-bottom: 4px;
+            .step-dots {
+                display: flex;
+                justify-content: center;
+                gap: 8px;
+                margin-top: 1.5rem;
+            }
+            .step-dot {
+                width: 8px;
+                height: 8px;
+                border-radius: 50%;
+                background: #ddd;
+            }
+            .step-dot.active {
+                background: #62a1a4;
             }
             .step-title {
                 text-align: center;
@@ -82,8 +89,6 @@
             <div class="logo">
                 <img src="/static/img/Asset_94x.png" alt="Logo" class="logo-png" />
             </div>
-
-            <div class="step-indicator">Step {{ steps.index(step) + 1 }} of {{ steps|length }}</div>
 
             {% if error %}
                 <div class="alert alert-danger" role="alert">{{ error }}</div>
@@ -237,6 +242,12 @@
                 </form>
                 <p class="text-center mt-3"><a href="{{ url_for('auth.setup_conjurr') }}">&larr; Back</a></p>
             {% endif %}
+
+            <div class="step-dots">
+                {% for s in steps %}
+                    <span class="step-dot{% if s == step %} active{% endif %}"></span>
+                {% endfor %}
+            </div>
         </div>
 
         <script src="{{ url_for('static', filename='js/vendor/bootstrap.bundle.min.js') }}" nonce="{{ nonce }}"></script>

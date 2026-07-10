@@ -1,27 +1,102 @@
 import json, re
 
+from html.parser import HTMLParser
+import html as _html_stdlib
+
 from app.cache import get_cache_info
 from app.emails.images import fetch_and_attach_image
 from app.emails.blocks import build_graph_html_with_frontend_image, build_text_block_html, build_separator_html, build_image_html_with_cid, build_emoji_html
 from app.emails.builders import build_stats_html_with_cid_background, build_recently_added_html_with_cids, build_recommendations_html_with_cids, build_droppedneedle_wrapped_html_with_cids, build_droppedneedle_server_stats_html_with_cids, build_collections_html_with_cids
 from app.theme import get_email_theme_colors, build_email_css_from_theme
 
+_BLOCK_TAGS = {'p', 'div', 'tr', 'ul', 'ol', 'table', 'blockquote', 'section', 'article'}
+_HEADING_TAGS = {'h1', 'h2', 'h3', 'h4', 'h5', 'h6'}
+
+class _PlainTextExtractor(HTMLParser):
+    """Walk email HTML and emit a readable text/plain alternative: entities
+    are decoded (convert_charrefs), block elements and headings become line
+    breaks, list items get bullets, table cells are separated, link targets
+    are preserved as 'text (url)', and image alt text is surfaced."""
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.parts = []
+        self._skip = 0            # depth inside <script>/<style>
+        self._in_link = False
+        self._href = None
+        self._link_text = []
+
+    def handle_starttag(self, tag, attrs):
+        if tag in ('script', 'style'):
+            self._skip += 1
+            return
+        if self._skip:
+            return
+        attrs = dict(attrs)
+        if tag == 'br':
+            self.parts.append('\n')
+        elif tag in _HEADING_TAGS:
+            self.parts.append('\n\n')
+        elif tag == 'li':
+            self.parts.append('\n- ')
+        elif tag in ('td', 'th'):
+            if self.parts and not self.parts[-1].endswith('\n'):
+                self.parts.append('  |  ')
+        elif tag in _BLOCK_TAGS:
+            self.parts.append('\n')
+        elif tag == 'a':
+            self._in_link = True
+            self._href = attrs.get('href')
+            self._link_text = []
+        elif tag == 'img':
+            alt = (attrs.get('alt') or '').strip()
+            if alt:
+                self.parts.append(f'[{alt}]')
+
+    def handle_endtag(self, tag):
+        if tag in ('script', 'style'):
+            if self._skip:
+                self._skip -= 1
+            return
+        if self._skip:
+            return
+        if tag == 'a':
+            text = ''.join(self._link_text).strip()
+            href = (self._href or '').strip()
+            if href and not href.startswith(('#', 'mailto:', 'cid:')) and text and href != text:
+                self.parts.append(f'{text} ({href})')
+            else:
+                self.parts.append(text)
+            self._in_link = False
+            self._href = None
+            self._link_text = []
+        elif tag in _BLOCK_TAGS or tag in _HEADING_TAGS:
+            # note: <li> intentionally omitted; the next item's "\n- " breaks
+            # the line, so closing it here would double-space list entries
+            self.parts.append('\n')
+
+    def handle_data(self, data):
+        if self._skip:
+            return
+        if self._in_link:
+            self._link_text.append(data)
+        else:
+            self.parts.append(data)
+
 def convert_html_to_plain_text(html_content):
-    html_content = re.sub(r'<script.*?</script>', '', html_content, flags=re.DOTALL)
-    html_content = re.sub(r'<style.*?</style>', '', html_content, flags=re.DOTALL)
-    
-    html_content = re.sub(r'<br\s*/?>', '\n', html_content)
-    html_content = re.sub(r'</p>', '\n\n', html_content)
-    html_content = re.sub(r'</div>', '\n', html_content)
-    html_content = re.sub(r'<h[1-6][^>]*>', '\n\n', html_content)
-    html_content = re.sub(r'</h[1-6]>', '\n', html_content)
-    
-    html_content = re.sub(r'<[^>]+>', '', html_content)
-    
-    html_content = re.sub(r'\n\s*\n', '\n\n', html_content)
-    html_content = html_content.strip()
-    
-    return html_content
+    if not html_content:
+        return ""
+    try:
+        parser = _PlainTextExtractor()
+        parser.feed(html_content)
+        parser.close()
+        text = ''.join(parser.parts)
+    except Exception:
+        # a parser hiccup must never block a send; fall back to a bare strip
+        text = _html_stdlib.unescape(re.sub(r'<[^>]+>', '', html_content))
+    # collapse intra-line whitespace and cap consecutive blank lines
+    lines = [re.sub(r'[ \t]+', ' ', ln).strip() for ln in text.splitlines()]
+    text = re.sub(r'\n{3,}', '\n\n', '\n'.join(lines))
+    return text.strip()
 
 def attach_logo_image(msg_root, logo_filename, custom_logo_filename, base_url=""):
     if logo_filename == 'custom':

@@ -3,14 +3,13 @@ import requests
 from flask import Blueprint, jsonify, request
 from urllib.parse import quote_plus, urlparse
 
-from app import config, state
+from app import state
 from app.db import db_connect
 from app.settings_store import get_settings
 from app.cache import gkak
 from app.crypto import encrypt, decrypt
 from app.security import requires_auth, safe_get
 from app.clients.plex import get_plex_client_identifier, get_plex_headers
-from plex_api_client import PlexAPI
 
 import logging
 
@@ -140,40 +139,25 @@ def gif_search():
 @bp.post('/api/plex/pin')
 @requires_auth
 def plex_create_pin():
-    with PlexAPI() as plex_api:
-        res = plex_api.plex.get_pin(request={
-            "client_id": state.plex_headers["X-Plex-Client-Identifier"],
-            "client_name": "newsletterr",
-            "device_nickname": "newsletterr",
-            "client_version": config.VERSION,
-            "platform": "Flask",
-        })
-    
-    assert res.auth_pin_container is not None
+    response = requests.post("https://plex.tv/api/v2/pins", headers=state.plex_headers, timeout=10)
+    response.raise_for_status()
+    data = response.json()
 
     auth_url = (
         "https://plex.tv/link?"
         f"clientID={quote_plus(state.plex_headers['X-Plex-Client-Identifier'])}"
-        f"&code={quote_plus(res.auth_pin_container.code)}"
+        f"&code={quote_plus(data['code'])}"
     )
-    return jsonify({"pin_id": res.auth_pin_container.id, "code": res.auth_pin_container.code, "auth_url": auth_url, "expires_in": res.auth_pin_container.expires_in})
+    return jsonify({"pin_id": data["id"], "code": data["code"], "auth_url": auth_url, "expires_in": data.get("expiresIn", 900)})
 
 @bp.get('/api/plex/pin/<int:pin_id>')
 @requires_auth
 def plex_poll_pin(pin_id: int):
-    with PlexAPI() as plex_api:
-        res = plex_api.plex.get_token_by_pin_id(request={
-            "pin_id": pin_id,
-            "client_id": state.plex_headers["X-Plex-Client-Identifier"],
-            "client_name": "newsletterr",
-            "device_nickname": "newsletterr",
-            "client_version": config.VERSION,
-            "platform": "Flask",
-        })
-    
-    assert res.auth_pin_container is not None
+    response = requests.get(f"https://plex.tv/api/v2/pins/{pin_id}", headers=state.plex_headers, timeout=10)
+    response.raise_for_status()
+    data = response.json()
 
-    token = res.auth_pin_container.auth_token
+    token = data.get("authToken")
     if token:
         conn = db_connect()
         cursor = conn.cursor()

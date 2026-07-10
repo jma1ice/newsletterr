@@ -1,7 +1,7 @@
 import threading
 
 # Mutable runtime state shared across modules and background threads.
-# Always access as attributes (state.X) — from-imports would copy the
+# Always access as attributes (state.X), from-imports would copy the
 # binding and break cross-module mutation.
 
 cache_storage = {

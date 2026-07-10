@@ -1127,10 +1127,23 @@
         document.querySelectorAll('.preview-schedule-btn').forEach(button => {
             button.addEventListener('click', function() {
                 const scheduleId = this.dataset.scheduleId;
-                const scheduleName = this.dataset.scheduleName;
-                
+
                 const previewUrl = `/scheduling/${scheduleId}/preview-page?schedule_id=${scheduleId}`;
-                window.open(previewUrl, '_blank', 'width=1000,height=800,scrollbars=yes,resizable=yes');
+                const previewWindow = window.open(previewUrl, '_blank', 'width=1000,height=800,scrollbars=yes,resizable=yes');
+
+                const cell = this.closest('td');
+                let statusEl = cell.querySelector('.preview-popup-status');
+                if (!previewWindow) {
+                    if (!statusEl) {
+                        statusEl = document.createElement('div');
+                        statusEl.className = 'preview-popup-status small mt-1';
+                        statusEl.style.color = '#f39c12';
+                        cell.appendChild(statusEl);
+                    }
+                    statusEl.textContent = 'Pop-up blocked! Please allow pop-ups for this site to preview schedules.';
+                } else if (statusEl) {
+                    statusEl.remove();
+                }
             });
         });
     });

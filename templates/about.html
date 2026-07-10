@@ -17,8 +17,8 @@
         Whether monetarily or through pull requests, we appreciate you!
     </p>
 
-    <div class="border-1 border-yellow-400 dark:border-yellow-500 rounded-lg p-2 w-25 mb-2">
-        <div class="grid grid-cols-2 gap-2 w-100">
+    <div class="border-1 border-yellow-400 dark:border-yellow-500 rounded-lg p-2 mb-2 w-100" style="max-width: 500px;">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 w-100">
             <div class="flex w-100 items-center space-x-3 p-3 bg-[#8acbd4] dark:bg-[#62a1a4] rounded-lg">
                 <div class="w-20 h-10 bg-[#62a1a4] dark:bg-[#8acbd4] rounded-full flex items-center justify-center text-[#333] font-bold">
                     Ko-Fi
@@ -34,8 +34,8 @@
         </div>
     </div>
 
-    <div class="border-1 border-green-400 dark:border-green-500 rounded-lg p-2 mb-2" style="width: 800px;">
-        <div class="grid grid-cols-3 gap-2 w-100">
+    <div class="border-1 border-green-400 dark:border-green-500 rounded-lg p-2 mb-2 w-100" style="max-width: 800px;">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 w-100">
             <div class="flex w-100 items-center space-x-3 p-3 bg-[#8acbd4] dark:bg-[#62a1a4] rounded-lg">
                 <div class="w-20 h-10 bg-[#62a1a4] dark:bg-[#8acbd4] rounded-full flex items-center justify-center text-[#333] font-bold">
                     Ko-Fi
@@ -92,10 +92,11 @@
 
     <h2 class="text-2xl font-bold mb-4">Credits & Libraries</h2>
     <ul class="list-disc list-inside space-y-2 text-sm">
-        <li>Python Flask 3.x</li>
+        <li>DroppedNeedle 'Wrapped' API</li>
         <li>Tautulli API</li>
         <li>Highcharts for interactive graphs</li>
         <li>Tailwind CSS + Bootstrap utilities</li>
+        <li>Python Flask 3.x</li>
     </ul>
 
     <hr class="my-8 border-dashed border-gray-300 dark:border-gray-600">
@@ -104,6 +105,11 @@
     <dt class="font-semibold dark:border-gray-300">Fixes:</dt>
     <ul class="list-disc list-inside space-y-2 text-sm mb-2">
         <li>Fixed issue where fresh setup `migrate_email_templates_for_header_title()` calls for `server_name` failed creating a missing `email_header_title` column</li>
+        <li>Patched up some SSRF/secrete containment</li>
+        <li>CSRF fixes</li>
+        <li>Fixed possible double send on scheduled emails</li>
+        <li>Bimonthly cadence fix</li>
+        <li>Schedule fix for recommendation emails</li>
     </ul>
     <dt class="font-semibold dark:border-gray-300">New Features:</dt>
     <ul class="list-disc list-inside space-y-2 text-sm mb-2">
@@ -124,6 +130,12 @@
         <li>Added option for setting max image heights to reduce email size</li>
         <li>Added API functionality to pull wrapped stats from DroppedNeedle</li>
         <li>Complete codebase overhaul -> app factory</li>
+        <li>SQLite hardened with WAL</li>
+        <li>Auth required and extra setup page added for first sign-in</li>
+        <li>Visibility for failed sends</li>
+        <li>Test send button</li>
+        <li>Email builder auto-save</li>
+        <li>Pagination in email history, history capped to 1000</li>
     </ul>
 </div>
 {% endblock %}

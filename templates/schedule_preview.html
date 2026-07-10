@@ -1155,7 +1155,7 @@
                 <h2>${raTitle}</h2>
                 <div style="
                     display: grid;
-                    grid-template-columns: repeat(${raGridColumns}, 1fr);
+                    grid-template-columns: repeat(${raGridColumns}, minmax(0, 1fr));
                     gap: 12px;
                     margin: 15px auto 0 auto;
                     padding: 0;
@@ -1308,7 +1308,7 @@
                 <h3 style="color: var(--email-text); margin-bottom: 5px;">${title}</h3>
                 <div style="
                     display: grid;
-                    grid-template-columns: repeat(${recsGridColumns}, 1fr);
+                    grid-template-columns: repeat(${recsGridColumns}, minmax(0, 1fr));
                     gap: 12px;
                     padding: 0;
                     margin: 0 auto 0 auto;

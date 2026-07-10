@@ -87,7 +87,7 @@ def _wrapped_ranked_list_html(title, items, label_fn, theme_colors):
     rows = "".join(
         f'<li style="margin: 4px 0; color: {theme_colors["text"]};">'
         f'<strong>#{i + 1}</strong> {label_fn(item)}'
-        f'<span style="color: {theme_colors["muted_text"]}; font-size: 0.85em;"> — {item.get("listen_count", 0)} plays</span>'
+        f'<span style="color: {theme_colors["muted_text"]}; font-size: 0.85em;"> - {item.get("listen_count", 0)} plays</span>'
         f'</li>'
         for i, item in enumerate(items)
     )
@@ -119,8 +119,8 @@ def build_droppedneedle_wrapped_html_with_cids(wrapped_data, msg_root, theme_col
 
         sections = "".join([
             _wrapped_ranked_list_html('Top Artists', payload.get('top_artists', []), lambda a: a.get('name', ''), theme_colors),
-            _wrapped_ranked_list_html('Top Tracks', payload.get('top_tracks', []), lambda t: f"{t.get('name', '')} — {t.get('artist_name', '')}", theme_colors),
-            _wrapped_ranked_list_html('Top Albums', payload.get('top_albums', []), lambda al: f"{al.get('name', '')} — {al.get('artist_name', '')}", theme_colors),
+            _wrapped_ranked_list_html('Top Tracks', payload.get('top_tracks', []), lambda t: f"{t.get('name', '')} - {t.get('artist_name', '')}", theme_colors),
+            _wrapped_ranked_list_html('Top Albums', payload.get('top_albums', []), lambda al: f"{al.get('name', '')} - {al.get('artist_name', '')}", theme_colors),
             _wrapped_ranked_list_html('Top Genres', payload.get('top_genres', []), lambda g: g.get('genre', ''), theme_colors),
         ])
 
@@ -167,7 +167,7 @@ def build_droppedneedle_server_stats_html_with_cids(server_data, msg_root, theme
         f'({top_artist.get("listen_count", 0)} plays)</p>'
     ) if top_artist else ""
     top_album_html = (
-        f'<p style="color: {theme_colors["text"]};"><strong>Top Album:</strong> {top_album.get("name", "")} — '
+        f'<p style="color: {theme_colors["text"]};"><strong>Top Album:</strong> {top_album.get("name", "")} - '
         f'{top_album.get("artist_name", "")} ({top_album.get("listen_count", 0)} plays)</p>'
     ) if top_album else ""
 
@@ -190,7 +190,7 @@ def build_droppedneedle_server_stats_html_with_cids(server_data, msg_root, theme
 
     return f"""
         <div style="{container_style}">
-            <h2 style="{title_style}">Server Stats — {server_data.get('year', '')}</h2>
+            <h2 style="{title_style}">Server Stats - {server_data.get('year', '')}</h2>
             <p style="text-align: center; color: {theme_colors['muted_text']}; margin-bottom: 16px;">
                 ~{server_data.get('total_listens_estimated', 0)} plays across {server_data.get('total_users_tracked', 0)} listeners
             </p>
@@ -258,8 +258,27 @@ def build_recommendations_section_with_cids(available_items, unavailable_items, 
             """
 
             if poster_cid:
-                poster_bg_url = f"cid:{poster_cid}"
-                
+                poster_src = f"cid:{poster_cid}"
+
+                img_attrs = 'width="100%"'
+                img_style = (
+                    "width: 100%; height: auto; display: block; object-fit: cover; "
+                    "border-radius: 12px 12px 0 0; background-color: #f8f9fa;"
+                )
+                if poster_max_height:
+                    img_attrs = f'width="100%" height="{poster_max_height}"'
+                    img_style = (
+                        f"width: 100%; height: {poster_max_height}px; display: block; object-fit: cover; "
+                        "border-radius: 12px 12px 0 0; background-color: #f8f9fa;"
+                    )
+
+                meta_line = " • ".join(filter(None, [
+                    str(year) if year else '',
+                    vote_text,
+                    runtime,
+                    'Unavailable' if is_unavailable else ''
+                ]))
+
                 card_content = f"""
                     <div style="
                         background-color: {theme_colors['card_bg']};
@@ -270,89 +289,40 @@ def build_recommendations_section_with_cids(available_items, unavailable_items, 
                         margin: 0 auto;
                         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
                     ">
-                        <div style="
-                            background-image: url('{poster_bg_url}');
-                            background-size: cover;
-                            background-position: center;
-                            background-repeat: no-repeat;
-                            padding-top: 148%;
-                            height: 0;
-                            position: relative;
-                            background-color: #f8f9fa;
-                        ">
-                            {f'''
-                            <div style="
-                                position: absolute;
-                                top: 4px;
-                                left: 4px;
-                                background-color: rgba(0, 0, 0, 0.7);
-                                color: white;
-                                padding: 2px 6px;
-                                border-radius: 4px;
-                                font-size: 9px;
-                                font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
-                                line-height: 1;
-                            ">{year} {vote_text}</div>
-                            ''' if year or vote_text else ''}
-
-                            {'''
-                            <div style="
-                                position: absolute;
-                                top: 4px;
-                                right: 4px;
-                                background-color: rgba(255, 0, 0, 0.8);
-                                color: white;
-                                padding: 2px 6px;
-                                border-radius: 4px;
-                                font-size: 9px;
-                                font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
-                                line-height: 1;
-                            ">Unavailable</div>
-                            ''' if is_unavailable else ''}
-
-                            <div style="
-                                position: absolute;
-                                bottom: 0;
-                                left: 0;
-                                right: 0;
-                                padding: 8px;
-                                background: linear-gradient(transparent, rgba(0, 0, 0, 0.7));
-                            ">
-                                <div style="
-                                    font-weight: bold;
-                                    font-size: 12px;
-                                    color: white;
-                                    line-height: 1.2;
-                                    font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
-                                    word-wrap: break-word;
-                                ">{title_text}</div>
-                                {f'''
-                                <div style="
-                                    font-size: 10px;
-                                    color: rgba(255, 255, 255, 0.8);
-                                    margin-top: 2px;
-                                    font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
-                                ">{runtime}</div>
-                                ''' if runtime else ''}
-                            </div>
-                        </div>
-                        
-                        {f'''
+                        <img src="{poster_src}" alt="{title_text}" {img_attrs} style="{img_style}">
                         <div style="
                             padding: 8px;
                             background-color: {theme_colors['card_bg']};
                             color: {theme_colors['text']};
-                            font-size: 10px;
-                            line-height: 1.3;
                             font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
-                            border-top: 1px solid {theme_colors['border']};
                         ">
-                            {overview[:80]}{'...' if len(overview) > 80 else ''}
+                            <div style="
+                                font-weight: bold;
+                                font-size: 12px;
+                                color: {theme_colors['text']};
+                                line-height: 1.2;
+                                word-wrap: break-word;
+                            ">{title_text}</div>
+                            {f'''
+                            <div style="
+                                font-size: 10px;
+                                color: {theme_colors['muted_text']};
+                                margin-top: 2px;
+                            ">{meta_line}</div>
+                            ''' if meta_line else ''}
+                            {f'''
+                            <div style="
+                                font-size: 10px;
+                                line-height: 1.3;
+                                margin-top: 4px;
+                                padding-top: 4px;
+                                border-top: 1px solid {theme_colors['border']};
+                            ">{overview[:80]}{'...' if len(overview) > 80 else ''}</div>
+                            ''' if overview else ''}
                         </div>
-                        ''' if overview else ''}
                     </div>
                 """
-                
+
                 card_html = f'<a href="{href}" style="text-decoration: none; color: inherit; display: block;" target="_blank" title="{link_title}">{card_content}</a>'
             else:
                 card_html = f"""

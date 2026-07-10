@@ -7,6 +7,7 @@ from email.mime.text import MIMEText
 from email.utils import formataddr
 
 from app.clients.tautulli import run_tautulli_command
+from app.db import db_connect
 from app.store import record_email_history
 from app.emails.assemble import convert_html_to_plain_text, build_email_html_with_all_cids
 from app.emails.fetchers import get_current_tautulli_data_for_email, get_recommendations_for_users, get_droppedneedle_wrapped_for_users, get_droppedneedle_server_stats_cached
@@ -393,3 +394,55 @@ def send_single_user_email_with_cids(req, settings, recipients, user_key, recomm
         logger.error(f"Error sending single user email: {e}")
         record_email_history(req.subject, ', '.join(recipients), '', 0, len(recipients), 'Manual', status='failed', error=str(e))
         return False
+
+def resend_email_from_history(email_id, settings):
+    conn = db_connect()
+    row = conn.execute(
+        "SELECT subject, recipients, email_content, status, template_name FROM email_history WHERE id = ?",
+        (email_id,)
+    ).fetchone()
+    conn.close()
+
+    if not row:
+        return False, "History entry not found"
+
+    subject, recipients_str, email_content, status, template_name = row
+    if status == 'failed':
+        return False, "Cannot resend a failed send (no content was captured)"
+    if not email_content:
+        return False, "No stored content for this send (sent before resend support was added)"
+
+    recipients = [r.strip() for r in (recipients_str or "").split(',') if r.strip()]
+    if not recipients:
+        return False, "No recipients stored for this send"
+
+    from_email = settings.get("from_email") or ""
+    alias_email = settings.get("alias_email") or ""
+    password = settings.get("password") or ""
+    smtp_username = settings.get("smtp_username") or ""
+    smtp_server = settings.get("smtp_server") or ""
+    smtp_port = int(settings.get("smtp_port") or 587)
+    smtp_protocol = settings.get("smtp_protocol") or "TLS"
+    from_addr = alias_email if alias_email else from_email
+
+    try:
+        if smtp_protocol == 'SSL':
+            server = smtplib.SMTP_SSL(smtp_server, smtp_port)
+        else:
+            server = smtplib.SMTP(smtp_server, smtp_port)
+            server.starttls()
+        login_username = smtp_username if smtp_username else from_email
+        server.login(login_username, password)
+
+        server.sendmail(from_addr, recipients, email_content)
+        server.quit()
+
+        content_size_kb = len(email_content.encode('utf-8')) / 1024
+        record_email_history(subject, ', '.join(recipients), email_content,
+                             round(content_size_kb, 2), len(recipients), template_name or 'Manual')
+        logger.info(f"Resent history entry {email_id} to {len(recipients)} recipients")
+        return True, f"Resent to {len(recipients)} recipient{'s' if len(recipients) != 1 else ''}"
+    except Exception as e:
+        logger.error(f"Error resending history entry {email_id}: {e}")
+        record_email_history(subject, ', '.join(recipients), '', 0, len(recipients), template_name or 'Manual', status='failed', error=str(e))
+        return False, str(e)

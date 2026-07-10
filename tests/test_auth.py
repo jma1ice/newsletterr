@@ -35,7 +35,7 @@ def test_setup_creates_admin_and_authenticates(anon_client, clean_credentials):
         "csrf_token": "setup-token", "username": "newadmin",
         "password": "strongpass1", "confirm": "strongpass1",
     })
-    assert resp.status_code == 302 and "/settings" not in resp.headers["Location"]  # -> index
+    assert resp.status_code == 302 and "/setup/email" in resp.headers["Location"]  # -> next wizard step
     assert admin_configured()
     # created account authenticates
     assert check_credentials("newadmin", "strongpass1")
@@ -51,9 +51,65 @@ def test_setup_rejects_short_or_mismatched_password(anon_client, clean_credentia
     mismatch = client.post("/setup", data={"csrf_token": "t", "username": "a", "password": "longenough1", "confirm": "different1"})
     assert b"do not match" in mismatch.data
 
-def test_setup_unreachable_once_admin_exists(anon_client, seeded_settings):
+def test_setup_continues_to_email_step_when_admin_exists_but_email_unset(anon_client, seeded_settings):
+    # seeded_settings only creates the admin account; the required email step
+    # is still outstanding, so /setup should resume the wizard, not bounce to login
     resp = anon_client.get("/setup")
-    assert resp.status_code == 302 and "/login" in resp.headers["Location"]
+    assert resp.status_code == 302 and "/setup/email" in resp.headers["Location"]
+
+def test_setup_unreachable_once_required_steps_complete(anon_client, seeded_settings):
+    conn = sqlite3.connect(config.DB_PATH)
+    conn.execute("UPDATE settings SET from_email = 'admin@example.com' WHERE id = 1")
+    conn.commit()
+    conn.close()
+    try:
+        resp = anon_client.get("/setup")
+        assert resp.status_code == 302 and "/login" in resp.headers["Location"]
+    finally:
+        conn = sqlite3.connect(config.DB_PATH)
+        conn.execute("UPDATE settings SET from_email = '' WHERE id = 1")
+        conn.commit()
+        conn.close()
+
+def test_setup_email_step_saves_and_advances_to_plex(anon_client, seeded_settings):
+    client = anon_client
+    with client.session_transaction() as sess:
+        sess["authenticated"] = True
+        sess["username"] = "admin"
+        sess["csrf_token"] = "wizard-token"
+    try:
+        resp = client.post("/setup/email", data={
+            "csrf_token": "wizard-token",
+            "from_email": "wizard@example.com",
+            "smtp_server": "smtp.example.com",
+            "smtp_port": "587",
+            "smtp_protocol": "TLS",
+            "password": "app-password-1",
+        })
+        assert resp.status_code == 302 and "/setup/plex" in resp.headers["Location"]
+
+        conn = sqlite3.connect(config.DB_PATH)
+        from_email, smtp_server = conn.execute(
+            "SELECT from_email, smtp_server FROM settings WHERE id = 1"
+        ).fetchone()
+        conn.close()
+        assert from_email == "wizard@example.com"
+        assert smtp_server == "smtp.example.com"
+    finally:
+        conn = sqlite3.connect(config.DB_PATH)
+        conn.execute("UPDATE settings SET from_email = '', smtp_server = '' WHERE id = 1")
+        conn.commit()
+        conn.close()
+
+def test_setup_optional_step_skip_does_not_require_data(anon_client, seeded_settings):
+    client = anon_client
+    with client.session_transaction() as sess:
+        sess["authenticated"] = True
+        sess["username"] = "admin"
+    # Skip links are plain GETs to the next step, no form data required
+    resp = client.get("/setup/tautulli")
+    assert resp.status_code == 200
+    assert b"Skip" in resp.data
 
 def test_password_stored_as_hash_not_plaintext(anon_client, clean_credentials):
     client = anon_client

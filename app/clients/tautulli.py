@@ -13,7 +13,7 @@ def run_tautulli_command(base_url, api_key, command, section_id, error, time_ran
     out_data = None
     _NO_Y_AXIS_COMMANDS = {'get_concurrent_streams_by_stream_type'}
 
-    if command == 'get_users' or command == 'get_library_names':
+    if command == 'get_users' or command == 'get_library_names' or command == 'get_libraries':
         api_url = f"{base_url}/api/v2?apikey={decrypt(api_key)}&cmd={command}"
     elif command == 'get_recently_added':
         api_url = f"{base_url}/api/v2?apikey={decrypt(api_key)}&cmd={command}&count={time_range}&section_id={section_id}&start={start}"

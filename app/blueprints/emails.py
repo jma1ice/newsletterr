@@ -7,7 +7,7 @@ from app.db import db_connect
 from app.settings_store import get_settings
 from app.security import require_csrf_for_json, requires_auth, json_body
 from app.store import get_saved_email_lists, save_email_list, delete_email_list
-from app.emails.send import SendRequest, send_standard_email_with_cids, send_recommendations_email_with_cids
+from app.emails.send import SendRequest, send_standard_email_with_cids, send_recommendations_email_with_cids, resend_email_from_history
 
 import logging
 
@@ -144,6 +144,17 @@ def clear_email_history():
     except Exception as e:
         logger.error(f"Error clearing email history: {e}")
         return redirect(url_for('emails.email_history'))
+
+@bp.route('/email_history/<int:email_id>/resend', methods=['POST'])
+@requires_auth
+def resend_email(email_id):
+    require_csrf_for_json()
+    settings = get_settings()
+    if "id" not in settings:
+        return jsonify({"status": "error", "message": "Please enter email info on settings page"}), 500
+
+    success, message = resend_email_from_history(email_id, settings)
+    return jsonify({"status": "ok" if success else "error", "message": message}), (200 if success else 500)
 
 @bp.route('/email_history/recipients/<int:email_id>', methods=['GET'])
 @requires_auth

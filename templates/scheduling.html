@@ -21,7 +21,7 @@
                         <th>Template</th>
                         <th>Frequency</th>
                         <th>Data Range</th>
-                        <th>Items Count</th>
+                        <th>{% if recently_added_mode == 'days' %}RA Days{% else %}Items Count{% endif %}</th>
                         <th>Start Date</th>
                         <th>Send Time</th>
                         <th>Next Send</th>
@@ -54,7 +54,7 @@
                                 <span class="badge bg-secondary">{{ schedule.date_range or 7 }} days</span>
                             </td>
                             <td>
-                                <span class="badge bg-dark">{{ schedule.items_count or 10 }} items</span>
+                                <span class="badge bg-dark">{{ schedule.items_count or 10 }} {% if recently_added_mode == 'days' %}days{% else %}items{% endif %}</span>
                             </td>
                             <td>
                                 <span class="text-muted" title="{{ schedule.start_date }}">{{ schedule.start_date_formatted or schedule.start_date }}</span>
@@ -232,17 +232,32 @@
                     </div>
 
                     <div class="mb-3">
-                        <label for="items-count-select" class="form-label">Recently Added Items Count</label>
+                        <label for="items-count-select" class="form-label" id="items-count-label">
+                            {% if recently_added_mode == 'days' %}Recently Added Days{% else %}Recently Added Items Count{% endif %}
+                        </label>
                         <select class="form-select theme-input" id="items-count-select" required>
-                            <option value="">Select item count...</option>
-                            <option value="5">5 items</option>
-                            <option value="10" selected>10 items</option>
-                            <option value="15">15 items</option>
-                            <option value="20">20 items</option>
-                            <option value="25">25 items</option>
-                            <option value="30">30 items</option>
+                            {% if recently_added_mode == 'days' %}
+                                <option value="">Select day count...</option>
+                                <option value="1">1 day</option>
+                                <option value="3">3 days</option>
+                                <option value="7" selected>7 days</option>
+                                <option value="14">14 days</option>
+                                <option value="30">30 days</option>
+                                <option value="60">60 days</option>
+                                <option value="90">90 days</option>
+                            {% else %}
+                                <option value="">Select item count...</option>
+                                <option value="5">5 items</option>
+                                <option value="10" selected>10 items</option>
+                                <option value="15">15 items</option>
+                                <option value="20">20 items</option>
+                                <option value="25">25 items</option>
+                                <option value="30">30 items</option>
+                            {% endif %}
                         </select>
-                        <div class="form-text text-info">How many recently added items to show (after deduplication)</div>
+                        <div class="form-text text-info" id="items-count-help">
+                            {% if recently_added_mode == 'days' %}How many days back to pull recently added items from{% else %}How many recently added items to show (after deduplication){% endif %}
+                        </div>
                     </div>
                     
                     <div class="row mb-3">

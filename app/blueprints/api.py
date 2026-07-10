@@ -17,65 +17,74 @@ logger = logging.getLogger(__name__)
 
 bp = Blueprint('api', __name__)
 
-@bp.route('/api/test/tautulli', methods=['POST'])
-@requires_auth
-def test_tautulli():
-    data = request.get_json()
-    url = (data.get('url') or '').rstrip('/')
-    api_key = (data.get('api_key') or '').strip()
+def test_tautulli_connection(url, api_key):
+    url = (url or '').rstrip('/')
+    api_key = (api_key or '').strip()
     if not url:
-        return jsonify({'status': 'error', 'message': 'Tautulli URL is required'})
+        return {'status': 'error', 'message': 'Tautulli URL is required'}
     if not api_key:
-        return jsonify({'status': 'error', 'message': 'Tautulli API key is required'})
+        return {'status': 'error', 'message': 'Tautulli API key is required'}
     try:
         r = requests.get(f"{url}/api/v2", params={'apikey': api_key, 'cmd': 'arnold'}, timeout=10)
         resp = r.json()
         if resp.get('response', {}).get('result') == 'success':
-            return jsonify({'status': 'ok', 'message': 'Connected to Tautulli'})
+            return {'status': 'ok', 'message': 'Connected to Tautulli'}
         msg = resp.get('response', {}).get('message') or 'Unexpected response, check your API key'
-        return jsonify({'status': 'error', 'message': msg})
+        return {'status': 'error', 'message': msg}
     except requests.exceptions.ConnectionError:
-        return jsonify({'status': 'error', 'message': 'Tautulli is unreachable at that URL'})
+        return {'status': 'error', 'message': 'Tautulli is unreachable at that URL'}
     except Exception as e:
-        return jsonify({'status': 'error', 'message': str(e)})
+        return {'status': 'error', 'message': str(e)}
+
+def test_conjurr_connection(url):
+    url = (url or '').rstrip('/')
+    if not url:
+        return {'status': 'error', 'message': 'Conjurr URL is required'}
+    try:
+        r = requests.get(f"{url}/", timeout=10, allow_redirects=True)
+        if urlparse(r.url).path.rstrip('/') == '/settings':
+            return {'status': 'warning', 'message': 'Conjurr is reachable but not configured, complete setup in Conjurr settings'}
+        return {'status': 'ok', 'message': 'Connected to Conjurr'}
+    except requests.exceptions.ConnectionError:
+        return {'status': 'error', 'message': 'Conjurr is unreachable at that URL'}
+    except Exception as e:
+        return {'status': 'error', 'message': str(e)}
+
+def test_droppedneedle_connection(url, api_key):
+    url = (url or '').rstrip('/')
+    api_key = api_key or ''
+    if not url:
+        return {'status': 'error', 'message': 'DroppedNeedle URL is required'}
+    if not api_key:
+        return {'status': 'error', 'message': 'DroppedNeedle Wrapped API key is required'}
+    try:
+        r = safe_get(f"{url}/api/v1/wrapped/users", timeout=10, headers={'X-Wrapped-Api-Key': api_key})
+        if r.status_code == 401:
+            return {'status': 'error', 'message': 'DroppedNeedle rejected the API key'}
+        r.raise_for_status()
+        return {'status': 'ok', 'message': 'Connected to DroppedNeedle'}
+    except requests.exceptions.ConnectionError:
+        return {'status': 'error', 'message': 'DroppedNeedle is unreachable at that URL'}
+    except Exception as e:
+        return {'status': 'error', 'message': str(e)}
+
+@bp.route('/api/test/tautulli', methods=['POST'])
+@requires_auth
+def test_tautulli():
+    data = request.get_json()
+    return jsonify(test_tautulli_connection(data.get('url'), data.get('api_key')))
 
 @bp.route('/api/test/conjurr', methods=['POST'])
 @requires_auth
 def test_conjurr():
     data = request.get_json()
-    url = (data.get('url') or '').rstrip('/')
-    if not url:
-        return jsonify({'status': 'error', 'message': 'Conjurr URL is required'})
-    try:
-        r = requests.get(f"{url}/", timeout=10, allow_redirects=True)
-        if urlparse(r.url).path.rstrip('/') == '/settings':
-            return jsonify({'status': 'warning', 'message': 'Conjurr is reachable but not configured, complete setup in Conjurr settings'})
-        return jsonify({'status': 'ok', 'message': 'Connected to Conjurr'})
-    except requests.exceptions.ConnectionError:
-        return jsonify({'status': 'error', 'message': 'Conjurr is unreachable at that URL'})
-    except Exception as e:
-        return jsonify({'status': 'error', 'message': str(e)})
+    return jsonify(test_conjurr_connection(data.get('url')))
 
 @bp.route('/api/test/droppedneedle', methods=['POST'])
 @requires_auth
 def test_droppedneedle():
     data = request.get_json()
-    url = (data.get('url') or '').rstrip('/')
-    api_key = data.get('api_key') or ''
-    if not url:
-        return jsonify({'status': 'error', 'message': 'DroppedNeedle URL is required'})
-    if not api_key:
-        return jsonify({'status': 'error', 'message': 'DroppedNeedle Wrapped API key is required'})
-    try:
-        r = safe_get(f"{url}/api/v1/wrapped/users", timeout=10, headers={'X-Wrapped-Api-Key': api_key})
-        if r.status_code == 401:
-            return jsonify({'status': 'error', 'message': 'DroppedNeedle rejected the API key'})
-        r.raise_for_status()
-        return jsonify({'status': 'ok', 'message': 'Connected to DroppedNeedle'})
-    except requests.exceptions.ConnectionError:
-        return jsonify({'status': 'error', 'message': 'DroppedNeedle is unreachable at that URL'})
-    except Exception as e:
-        return jsonify({'status': 'error', 'message': str(e)})
+    return jsonify(test_droppedneedle_connection(data.get('url'), data.get('api_key')))
 
 @bp.route('/api/gif/search', methods=['GET'])
 @requires_auth

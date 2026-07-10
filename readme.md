@@ -198,17 +198,12 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 ## Planned Changes
 
 ### For the v2026.3 sprint, these items are to be addressed:
-* Fix ra/recs card differing width issues
-* Add a 'pop-up blocked' to index for `save_template()` and similar
-* Some email clients show posters as small slivers instead of whole poster
-* Contributor area on about page can start clipping out on lower size screens
-* Update Plex authentication for PlexAPI v0.31.1 (plexapi.plex no longer supported)
 * Email click for recently added/available recommendations is going to browser on mobile instead of Plex app - this is an issue with the new Plex client, have not seen a fix yet and no info released by Plex at this time
 * Changing ra/recs grid width does not maintain the correct poster ratio and the description gets pushed out (<=5) or has too much bottom space (>5)
 
 ### And these items are feature requests:
 --- Settings ---
-* RA by days not implemented in 'new schedule creator'
+** RA by days not implemented in 'new schedule creator'
 * Option to show or hide description on recently added posters
 * Setting for collection group grid width
 
@@ -216,7 +211,7 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
  -- newsletterr GitHub / Discord --
 * GitHub webhook to pull submitted issues to Discord channel
 * Ko-fi -> Discord integration for contributor role
-* Export logs button | link to discord
+** Export logs button | link to discord
  -- Other --
 * Sonarr/Radarr calendar integration for 'coming soon' type email
 * [Plex Wrapped](https://github.com/netplexflix/Plex-Wrapped-for-Tautulli?tab=readme-ov-file) API call integration
@@ -234,18 +229,18 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Email preview: desktop/tablet/phone views
 
 --- Misc. ---
-* Stats for total items in library
+** Stats for total items in library
 * Date range for stats (i.e. 1.1.25 - 1.1.26) (instead of 'last X days')
 * Make collections clickable - is this possible?
 * More mobile CSS optimizations
 * Discord text should be stylized logo to match GitHub
 * Can Snap-Ins work with custom HTML?
-* Settings submit should audit the external tools api test
+** Settings submit should audit the external tools api test
 * Does this work with Emby/Jellyfin?
 * Tailwind Play CDN fix
 * CSP out of Report-Only after trial run
-* Add more to /setup to configure settings on first run
-* Resend from history
+** Add more to /setup to configure settings on first run
+** Resend from history
 
 ---
 
@@ -261,6 +256,11 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Bimonthly cadence fix
 * Schedule fix for recommendation emails
 * API fields in settings are now a password field
+* Fixed ra/recs card differing width issues when >5 columns used
+* Added a 'pop-up blocked' to index for `save_template()` and similar
+* Adjusted issue where some email clients show posters as small slivers
+* Fixed where contributor area would start clipping out on lower size screens
+* Removed plex-api-client as plexapi.plex was no longer supported
 
 #### New Features:
 * Added sections to settings page (email server | external services | data settings | email styling | email body defaults | security)

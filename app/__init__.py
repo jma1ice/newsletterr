@@ -9,11 +9,11 @@ from app.log import setup_logging
 def create_app():
     setup_logging()
 
-    from app.blueprints import api, auth, emails, main, scheduling, settings, stats
+    from app.blueprints import api, auth, emails, logs, main, scheduling, settings, stats
 
     app = Flask(__name__, template_folder = str(config.ASSET_ROOT / 'templates'), static_folder = str(config.ASSET_ROOT / 'static'))
 
-    for module in (api, auth, emails, main, scheduling, settings, stats):
+    for module in (api, auth, emails, logs, main, scheduling, settings, stats):
         app.register_blueprint(module.bp)
 
     app.config["GITHUB_OWNER"] = config.GITHUB_OWNER

@@ -60,6 +60,8 @@ function buildStatPreviewHTML(statId) {
             return ["Title", "Year", "Cert.", "Score"];
         } else if (title === "Most Active Libraries") {
             return ["Library", "Plays", "Hours Played"];
+        } else if (title === "Library Item Counts") {
+            return ["Library", "Item Count"];
         } else if (title === "Most Active Users") {
             return ["Username", "Plays", "Hours Played"];
         } else if (title === "Most Active Platforms") {
@@ -74,7 +76,7 @@ function buildStatPreviewHTML(statId) {
         const cells = [];
         const coverArtTypes = ["Most Watched Movies", "Most Watched TV Shows", "Most Popular Movies", "Most Popular TV Shows", "Most Played Artists", "Most Popular Artists", "Recently Watched"];
 
-        if (title === "Most Active Libraries") {
+        if (title === "Most Active Libraries" || title === "Library Item Counts") {
             cells.push(row.section_name || '');
         } else if (title === "Most Active Users") {
             cells.push(row.user || '');
@@ -88,36 +90,36 @@ function buildStatPreviewHTML(statId) {
             }
             cells.push(titleCell);
         }
-        
-        const skipYearStats = ["Most Active Libraries", "Most Active Users", "Most Active Platforms", "Most Concurrent Streams"];
+
+        const skipYearStats = ["Most Active Libraries", "Library Item Counts", "Most Active Users", "Most Active Platforms", "Most Concurrent Streams"];
         if (!skipYearStats.includes(title)) {
             cells.push(row.year || '');
         }
-        
-        if (!title.includes("Recently") && !title.includes("Concurrent")) {
+
+        if (!title.includes("Recently") && !title.includes("Concurrent") && title !== "Library Item Counts") {
             cells.push(row.total_plays || 0);
         }
-        
+
         const hoursStats = ["Most Watched Movies", "Most Watched TV Shows", "Most Played Artists", "Most Active Libraries", "Most Active Users", "Most Active Platforms"];
         const usersStats = ["Most Popular Movies", "Most Popular TV Shows", "Most Popular Artists"];
-        
+
         if (hoursStats.includes(title)) {
             const hours = Math.ceil((row.total_duration || 0) / 3600);
             cells.push(hours);
         } else if (usersStats.includes(title)) {
             cells.push(row.users_watched || '');
         }
-        
-        const skipRatingStats = ["Most Active Libraries", "Most Played Artists", "Most Popular Artists", "Most Active Users", "Most Active Platforms", "Most Concurrent Streams"];
+
+        const skipRatingStats = ["Most Active Libraries", "Library Item Counts", "Most Played Artists", "Most Popular Artists", "Most Active Users", "Most Active Platforms", "Most Concurrent Streams"];
         if (!skipRatingStats.includes(title)) {
             cells.push(row.content_rating || '');
             cells.push(row.rating ? `${row.rating}` : 'NA');
         }
-        
-        if (title === "Most Concurrent Streams") {
+
+        if (title === "Most Concurrent Streams" || title === "Library Item Counts") {
             cells.push(row.count || 0);
         }
-        
+
         return cells;
     }
     
@@ -130,11 +132,13 @@ function buildStatPreviewHTML(statId) {
         return `<tr>${cellsHTML}</tr>`;
     }).join('');
     
+    const dateSuffix = title === "Library Item Counts" ? "" : ` - Last ${currentTimeRange} days`;
+
     return `
         <div class="stats-card">
             ${backgroundElements}
             <div class="stats-content">
-                <div class="stats-header">${title} - Last ${currentTimeRange} days</div>
+                <div class="stats-header">${title}${dateSuffix}</div>
                 <table class="stats-table">
                     <thead><tr>${headerHTML}</tr></thead>
                     <tbody>${rowsHTML}</tbody>
@@ -367,26 +371,13 @@ function buildRecentlyAddedPreviewHTML(libraryFilter) {
             ">
                 <div style="position: relative; aspect-ratio: 2/3; background: #f8f9fa;">
                     <img src="${imgURL}" style="width: 100%; height: 100%; object-fit: cover; display: block;" alt="${item.title}">
-                    ${item.added ? `
-                        <div style="
-                            position: absolute;
-                            bottom: 1px;
-                            right: 1px;
-                            background: rgba(0, 0, 0, 0.6);
-                            color: rgba(255, 255, 255, 0.9);
-                            padding: 2px 6px;
-                            border-radius: 4px;
-                            font-size: 9px;
-                            line-height: 1;
-                        ">${item.added}</div>
-                    ` : ''}
                 </div>
                 <div style="padding: 6px;">
                     <div style="font-weight: bold; font-size: 14px; color: var(--email-text); margin-bottom: 4px; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
                         ${item.title}
                     </div>
                     <div style="font-size: 10px; color: var(--email-muted); margin-bottom: 8px; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
-                        ${item.sub ? item.sub + ' • ' : ''}${item.duration ? item.duration + ' • ' : ''}${item.contentRating}
+                        ${[item.sub, item.duration, item.contentRating, item.added ? 'Added ' + item.added : ''].filter(Boolean).join(' • ')}
                     </div>
                     ${item.summary ? `
                         <div style="font-size: 11px; color: var(--email-text); opacity: 0.8; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden;">
@@ -577,7 +568,8 @@ function buildRecommendationsSectionHTML(availableItems, unavailableItems, title
         }
         
         const unavailableStyle = isUnavailable ? 'opacity: 0.7; filter: grayscale(30%);' : '';
-        
+        const metaLine = [year, vote, runtime, isUnavailable ? 'Unavailable' : ''].filter(Boolean).join(' • ');
+
         return `
             <div style="
                 position: relative;
@@ -594,73 +586,29 @@ function buildRecommendationsSectionHTML(availableItems, unavailableItems, title
                 <a href="${href}" style="text-decoration: none; color: inherit; display: block;" target="_blank" title="${linkTitle}">
                     <div style="position: relative; aspect-ratio: 2/3; background: #f8f9fa;">
                         <img src="${posterURL}" style="width: 100%; height: 100%; object-fit: cover; display: block;" alt="${titleText}">
-                        
-                        ${(year || vote) ? `
-                            <div style="
-                                position: absolute;
-                                top: 1px;
-                                left: 1px;
-                                background: rgba(0, 0, 0, 0.7);
-                                color: white;
-                                padding: 2px 6px;
-                                border-radius: 4px;
-                                font-size: 9px;
-                                line-height: 1;
-                            ">${year} ${vote}</div>
-                        ` : ''}
-                        
-                        ${isUnavailable ? `
-                            <div style="
-                                position: absolute;
-                                top: 16px;
-                                left: 1px;
-                                background: rgba(255, 0, 0, 0.8);
-                                color: white;
-                                padding: 2px 6px;
-                                border-radius: 4px;
-                                font-size: 9px;
-                                line-height: 1;
-                            ">Unavailable</div>
-                        ` : ''}
-                        
-                        <div style="
-                            position: absolute;
-                            bottom: 0;
-                            left: 0;
-                            right: 0;
-                            padding: 8px;
-                            background: linear-gradient(to top, rgba(0, 0, 0, 0.7), transparent);
-                        ">
-                            <div style="font-weight: bold; font-size: 12px; color: white; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
-                                ${titleText}
-                            </div>
-                            ${runtime ? `<div style="font-size: 10px; color: rgba(255, 255, 255, 0.8); margin-top: 2px;">${runtime}</div>` : ''}
+                    </div>
+                    <div style="padding: 8px;">
+                        <div style="font-weight: bold; font-size: 12px; color: var(--email-text); line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                            ${titleText}
                         </div>
+                        ${metaLine ? `<div style="font-size: 10px; color: var(--email-muted); margin-top: 2px;">${metaLine}</div>` : ''}
+                        ${overview ? `
+                            <div style="
+                                font-size: 10px;
+                                color: var(--email-text);
+                                opacity: 0.8;
+                                line-height: 1.3;
+                                margin-top: 4px;
+                                padding-top: 4px;
+                                border-top: 1px solid var(--email-border);
+                                display: -webkit-box;
+                                -webkit-line-clamp: 3;
+                                -webkit-box-orient: vertical;
+                                overflow: hidden;
+                            ">${overview}</div>
+                        ` : ''}
                     </div>
                 </a>
-                
-                ${overview ? `
-                    <div style="
-                        position: absolute;
-                        left: 0;
-                        right: 0;
-                        bottom: 0;
-                        transform: translateY(100%);
-                        transition: transform 0.3s ease;
-                        background: rgba(0, 0, 0, 0.8);
-                        color: white;
-                        padding: 8px;
-                        font-size: 10px;
-                        line-height: 1.3;
-                        display: -webkit-box;
-                        -webkit-line-clamp: 3;
-                        -webkit-box-orient: vertical;
-                        overflow: hidden;
-                    " 
-                    onmouseover="this.style.transform='translateY(0)'"
-                    onmouseout="this.style.transform='translateY(100%)'"
-                    >${overview}</div>
-                ` : ''}
             </div>
         `;
     }).join('');
@@ -735,53 +683,33 @@ function buildCollectionCard(collection, themeColors) {
                 margin: 0 auto;
             ">
                 <tr>
-                    <td style="
-                        background-image: url('${posterURL}');
-                        background-size: cover;
-                        background-position: center;
-                        background-repeat: no-repeat;
-                        height: 180px;
-                        background-color: #f8f9fa;
-                        border-radius: 12px;
-                        position: relative;
-                        vertical-align: top;
-                    ">
-                        <table cellpadding="0" cellspacing="0" border="0" width="100%">
-                            <tr>
-                                <td style="text-align: right;">
-                                    <div style="
-                                        background-color: rgba(0, 0, 0, 0.8);
-                                        color: white;
-                                        padding: 4px 6px;
-                                        border-radius: 4px;
-                                        font-size: 10px;
-                                        font-family: 'IBM Plex Sans';
-                                        line-height: 1;
-                                        display: inline-block;
-                                        margin: 6px;
-                                    ">
-                                        ${typeIcon} ${count}
-                                    </div>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td style="height: 150px; vertical-align: bottom;">
-                                    <div style="
-                                        background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent);
-                                        border-radius: 0 0 11px 11px;
-                                        padding: 6px;
-                                    ">
-                                        <div style="
-                                            font-weight: bold;
-                                            font-size: 12px;
-                                            color: white;
-                                            line-height: 1.2;
-                                            font-family: 'IBM Plex Sans';
-                                        ">${collectionTitle}</div>
-                                    </div>
-                                </td>
-                            </tr>
-                        </table>
+                    <td style="padding: 0; line-height: 0; font-size: 0;">
+                        <img src="${posterURL}" alt="${collectionTitle}" width="120" height="180" style="
+                            display: block;
+                            width: 120px;
+                            height: 180px;
+                            object-fit: cover;
+                            border-radius: 12px 12px 0 0;
+                            background-color: #f8f9fa;
+                        ">
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding: 6px;">
+                        <div style="
+                            font-weight: bold;
+                            font-size: 12px;
+                            color: ${themeColors.text};
+                            line-height: 1.2;
+                            font-family: 'IBM Plex Sans';
+                        ">${collectionTitle}</div>
+                        <div style="
+                            font-size: 10px;
+                            color: ${themeColors.muted_text};
+                            line-height: 1.2;
+                            font-family: 'IBM Plex Sans';
+                            margin-top: 2px;
+                        ">${typeIcon} ${count} items</div>
                     </td>
                 </tr>
             </table>
@@ -862,62 +790,33 @@ function buildIndividualItemCard(item, themeColors) {
                 margin: 0 auto;
             ">
                 <tr>
-                    <td style="
-                        background-image: url('${posterURL}');
-                        background-size: cover;
-                        background-position: center;
-                        background-repeat: no-repeat;
-                        height: 180px;
-                        background-color: #f8f9fa;
-                        border-radius: 12px;
-                        position: relative;
-                        vertical-align: top;
-                    ">
-                        <table cellpadding="0" cellspacing="0" border="0" width="100%">
-                            <tr>
-                                <td style="text-align: right;">
-                                    <div style="
-                                        background-color: rgba(0, 0, 0, 0.8);
-                                        color: white;
-                                        padding: 4px 6px;
-                                        border-radius: 4px;
-                                        font-size: 10px;
-                                        font-family: 'IBM Plex Sans';
-                                        line-height: 1;
-                                        display: inline-block;
-                                        margin: 6px;
-                                    ">
-                                        ${typeIcon}
-                                    </div>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td style="height: 150px; vertical-align: bottom;">
-                                    <div style="
-                                        background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent);
-                                        border-radius: 0 0 11px 11px;
-                                        padding: 6px;
-                                    ">
-                                        <div style="
-                                            font-weight: bold;
-                                            font-size: 11px;
-                                            color: white;
-                                            line-height: 1.2;
-                                            font-family: 'IBM Plex Sans';
-                                        ">${itemTitle}${year}</div>
-                                        ${subtitle ? `
-                                            <div style="
-                                                font-size: 9px;
-                                                color: #ccc;
-                                                line-height: 1.2;
-                                                font-family: 'IBM Plex Sans';
-                                                margin-top: 2px;
-                                            ">${subtitle}</div>
-                                        ` : ''}
-                                    </div>
-                                </td>
-                            </tr>
-                        </table>
+                    <td style="padding: 0; line-height: 0; font-size: 0;">
+                        <img src="${posterURL}" alt="${itemTitle}${year}" width="120" height="180" style="
+                            display: block;
+                            width: 120px;
+                            height: 180px;
+                            object-fit: cover;
+                            border-radius: 12px 12px 0 0;
+                            background-color: #f8f9fa;
+                        ">
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding: 6px;">
+                        <div style="
+                            font-weight: bold;
+                            font-size: 11px;
+                            color: ${themeColors.text};
+                            line-height: 1.2;
+                            font-family: 'IBM Plex Sans';
+                        ">${itemTitle}${year}</div>
+                        <div style="
+                            font-size: 9px;
+                            color: ${themeColors.muted_text};
+                            line-height: 1.2;
+                            font-family: 'IBM Plex Sans';
+                            margin-top: 2px;
+                        ">${subtitle ? typeIcon + ' ' + subtitle : typeIcon}</div>
                     </td>
                 </tr>
             </table>

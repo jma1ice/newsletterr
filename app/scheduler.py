@@ -157,6 +157,19 @@ def refresh_daily_cache():
         error = None
         
         stats, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_home_stats', 'Stats', error, time_range, stats_type=stats_type)
+        stats = stats or []
+
+        libraries_with_counts, _ = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_libraries', None, None)
+        if libraries_with_counts:
+            stats.append({
+                'stat_id': 'library_item_counts',
+                'stat_title': 'Library Item Counts',
+                'rows': [
+                    {'section_name': lib.get('section_name', ''), 'count': lib.get('count', 0)}
+                    for lib in libraries_with_counts
+                ]
+            })
+
         if stats:
             set_cached_data('stats', stats, cache_params)
             logger.info("✓ Stats cache refreshed")

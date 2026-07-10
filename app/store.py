@@ -1,4 +1,4 @@
-import calendar, sqlite3
+import calendar, os, secrets, sqlite3
 from datetime import datetime, timedelta
 
 from app.db import db_connect
@@ -6,6 +6,43 @@ from app.db import db_connect
 import logging
 
 logger = logging.getLogger(__name__)
+
+HOSTED_IMAGES_DIR = os.path.join("database", "hosted_images")
+HOSTED_IMAGE_RETENTION_DAYS = 90
+
+def save_hosted_image(image_bytes, content_type):
+    token = secrets.token_urlsafe(24)
+    with open(os.path.join(HOSTED_IMAGES_DIR, token), 'wb') as f:
+        f.write(image_bytes)
+    conn = db_connect()
+    conn.execute("INSERT INTO hosted_images (token, content_type) VALUES (?, ?)", (token, content_type))
+    conn.commit()
+    conn.close()
+    return token
+
+def get_hosted_image(token):
+    conn = db_connect()
+    row = conn.execute("SELECT content_type FROM hosted_images WHERE token = ?", (token,)).fetchone()
+    conn.close()
+    if not row:
+        return None
+    path = os.path.join(HOSTED_IMAGES_DIR, token)
+    if not os.path.exists(path):
+        return None
+    return path, row[0]
+
+def cleanup_expired_hosted_images():
+    conn = db_connect()
+    cutoff = f'-{HOSTED_IMAGE_RETENTION_DAYS} days'
+    rows = conn.execute("SELECT token FROM hosted_images WHERE created_at < datetime('now', ?)", (cutoff,)).fetchall()
+    for (token,) in rows:
+        try:
+            os.remove(os.path.join(HOSTED_IMAGES_DIR, token))
+        except FileNotFoundError:
+            pass
+    conn.execute("DELETE FROM hosted_images WHERE created_at < datetime('now', ?)", (cutoff,))
+    conn.commit()
+    conn.close()
 
 def get_saved_email_lists():
     conn = db_connect()
@@ -41,6 +78,30 @@ def delete_email_list(list_id):
     conn.commit()
     conn.close()
 
+def is_suppressed(email):
+    conn = db_connect()
+    row = conn.execute("SELECT 1 FROM suppressed_emails WHERE email = ?", ((email or "").strip(),)).fetchone()
+    conn.close()
+    return row is not None
+
+def add_suppressed(email):
+    conn = db_connect()
+    conn.execute("INSERT OR IGNORE INTO suppressed_emails (email) VALUES (?)", ((email or "").strip().lower(),))
+    conn.commit()
+    conn.close()
+
+def filter_suppressed(emails):
+    """Returns (deliverable, suppressed). Called before any send content is
+    built, so suppressed recipients never cost a wasted render/image-fetch."""
+    conn = db_connect()
+    rows = conn.execute("SELECT email FROM suppressed_emails").fetchall()
+    conn.close()
+    blocked = {r[0].strip().lower() for r in rows}
+    deliverable, suppressed = [], []
+    for e in emails or []:
+        (suppressed if (e or "").strip().lower() in blocked else deliverable).append(e)
+    return deliverable, suppressed
+
 EMAIL_HISTORY_RETENTION = 1000
 
 # email_content stores the full raw MIME (msg_root.as_string()) so a send can
@@ -51,18 +112,19 @@ RECIPIENTS_MAX_CHARS = 50_000
 
 def record_email_history(subject, recipients, email_content, content_size_kb,
                          recipient_count, template_name="Manual",
-                         status="sent", error=None):
+                         status="sent", error=None, hosted_html=None):
     recipients = (recipients or "")[:RECIPIENTS_MAX_CHARS]
     email_content = (email_content or "")[:EMAIL_CONTENT_MAX_CHARS]
     try:
         conn = db_connect()
-        conn.execute(
+        cur = conn.execute(
             """INSERT INTO email_history
-               (subject, recipients, email_content, content_size_kb, recipient_count, template_name, status, error)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+               (subject, recipients, email_content, content_size_kb, recipient_count, template_name, status, error, hosted_html)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (subject, recipients, email_content, content_size_kb, recipient_count,
-             template_name, status, error),
+             template_name, status, error, hosted_html),
         )
+        last_id = cur.lastrowid
         conn.execute(
             """DELETE FROM email_history WHERE id NOT IN (
                    SELECT id FROM email_history ORDER BY sent_at DESC, id DESC LIMIT ?
@@ -71,8 +133,20 @@ def record_email_history(subject, recipients, email_content, content_size_kb,
         )
         conn.commit()
         conn.close()
+        return last_id
     except Exception:
         logger.warning("could not record email history", exc_info=True)
+        return None
+
+def get_most_recent_hosted_newsletter():
+    conn = db_connect()
+    row = conn.execute(
+        """SELECT subject, hosted_html, sent_at FROM email_history
+           WHERE status = 'sent' AND hosted_html IS NOT NULL
+           ORDER BY sent_at DESC, id DESC LIMIT 1"""
+    ).fetchone()
+    conn.close()
+    return row
 
 def get_email_schedules():
     MONTH_ABBR_PERIOD = ["Jan.", "Feb.", "Mar.", "Apr.", "May.", "Jun.", "Jul.", "Aug.", "Sep.", "Oct.", "Nov.", "Dec."]

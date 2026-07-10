@@ -95,9 +95,9 @@ def _build_calendar_grid_html(cards, msg_root, theme_colors, title, base_url, gr
         </div>
     """
 
-def _build_card_html(theme_colors, title, subtitle, meta_text, poster_cid):
-    if poster_cid:
-        poster_html = f'<img class="card-poster-img" src="cid:{poster_cid}" alt="{title}" width="100%" style="width: 100%; height: auto; display: block; object-fit: cover; border-radius: 10px 10px 0 0; background-color: #f8f9fa;">'
+def _build_card_html(theme_colors, title, subtitle, meta_text, poster_src):
+    if poster_src:
+        poster_html = f'<img class="card-poster-img" src="{poster_src}" alt="{title}" width="100%" style="width: 100%; height: auto; display: block; object-fit: cover; border-radius: 10px 10px 0 0; background-color: #f8f9fa;">'
     else:
         poster_html = ""
 
@@ -146,7 +146,7 @@ def _build_card_html(theme_colors, title, subtitle, meta_text, poster_cid):
         </div>
     """
 
-def build_sonarr_coming_soon_html_with_cids(episodes, msg_root, theme_colors, base_url="", grid_columns=5):
+def build_sonarr_coming_soon_html_with_cids(episodes, msg_root, theme_colors, base_url="", grid_columns=5, hosted_images_enabled=False, hosted_base_url=""):
     if not episodes:
         return _empty_state_html(theme_colors, "No upcoming episodes found.")
 
@@ -162,19 +162,19 @@ def build_sonarr_coming_soon_html_with_cids(episodes, msg_root, theme_colors, ba
         relative = _format_relative_date(air_date)
 
         poster = _poster_url(series.get('images')) or _poster_url(ep.get('images'))
-        poster_cid = None
+        poster_src = None
         if poster:
             poster_url = f"/proxy-sonarr-art{poster}" if not poster.startswith('/proxy-sonarr-art') else poster
-            poster_cid = fetch_and_attach_image(poster_url, msg_root, f"sonarr-{i}", base_url)
+            poster_src = fetch_and_attach_image(poster_url, msg_root, f"sonarr-{i}", base_url, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
 
         subtitle = truncate_text(' - '.join(filter(None, [se_label, episode_title])), 40)
         meta_text = truncate_text(' • '.join(filter(None, [f'Airs {relative}' if relative else ''])), 46)
 
-        cards.append(_build_card_html(theme_colors, truncate_text(series_title, 23), subtitle, meta_text, poster_cid))
+        cards.append(_build_card_html(theme_colors, truncate_text(series_title, 23), subtitle, meta_text, poster_src))
 
     return _build_calendar_grid_html(cards, msg_root, theme_colors, "Coming Soon (TV)", base_url, grid_columns)
 
-def build_radarr_coming_soon_html_with_cids(movies, msg_root, theme_colors, base_url="", grid_columns=5):
+def build_radarr_coming_soon_html_with_cids(movies, msg_root, theme_colors, base_url="", grid_columns=5, hosted_images_enabled=False, hosted_base_url=""):
     if not movies:
         return _empty_state_html(theme_colors, "No upcoming movies found.")
 
@@ -186,14 +186,14 @@ def build_radarr_coming_soon_html_with_cids(movies, msg_root, theme_colors, base
         relative = _format_relative_date(release_date)
 
         poster = _poster_url(movie.get('images'))
-        poster_cid = None
+        poster_src = None
         if poster:
             poster_url = f"/proxy-radarr-art{poster}" if not poster.startswith('/proxy-radarr-art') else poster
-            poster_cid = fetch_and_attach_image(poster_url, msg_root, f"radarr-{i}", base_url)
+            poster_src = fetch_and_attach_image(poster_url, msg_root, f"radarr-{i}", base_url, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
 
         subtitle = str(year) if year else ""
         meta_text = truncate_text(' • '.join(filter(None, [f'Releases {relative}' if relative else ''])), 46)
 
-        cards.append(_build_card_html(theme_colors, truncate_text(title, 23), subtitle, meta_text, poster_cid))
+        cards.append(_build_card_html(theme_colors, truncate_text(title, 23), subtitle, meta_text, poster_src))
 
     return _build_calendar_grid_html(cards, msg_root, theme_colors, "Coming Soon (Movies)", base_url, grid_columns)

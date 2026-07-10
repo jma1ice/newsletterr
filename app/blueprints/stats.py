@@ -177,8 +177,8 @@ def pull_recommendations():
 
     selected_emails = {e.strip().lower() for e in to_emails.split(',') if e.strip()}
     filtered_users = {
-    k: v for k, v in user_dict.items()
-    if v and str(v).strip().lower() in selected_emails
+        k: v for k, v in user_dict.items()
+        if v and str(v).strip().lower() in selected_emails
     }
 
     if request.method == 'POST':
@@ -244,7 +244,11 @@ def pull_droppedneedle_stats():
     droppedneedle_url = (row[0] or "").strip() if row else ""
     droppedneedle_api_key = decrypt(row[1]) if row and row[1] else ""
 
-    filtered_users = {k: v for k, v in user_dict.items() if v in to_emails}
+    selected_emails = {e.strip().lower() for e in to_emails.split(',') if e.strip()}
+    filtered_users = {
+        k: v for k, v in user_dict.items()
+        if v and str(v).strip().lower() in selected_emails
+    }
 
     if droppedneedle_url == "" or droppedneedle_api_key == "":
         return render_template('index.html', error='Please enter DroppedNeedle URL and API key on settings page',

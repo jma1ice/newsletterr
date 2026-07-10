@@ -61,6 +61,9 @@
                     <button type="button" class="settings-nav-btn" data-section="security">
                         Security
                     </button>
+                    <button type="button" class="settings-nav-btn" data-section="hosted-features">
+                        Hosted Features
+                    </button>
                 </nav>
             </div>
 
@@ -446,6 +449,43 @@
                         </p><br>
 
                         <button id="apply_settings_security" class="button">Apply Settings</button>
+                    </div>
+
+                    <div class="settings-section d-none" id="section-hosted-features">
+                        <h4 class="mb-4">Hosted Features</h4>
+
+                        <label for="hosted_enabled">Enable Hosted Features:</label><br>
+                        <select id="hosted_enabled" name="hosted_enabled">
+                            <option value="disabled" {% if settings.hosted_enabled == 'disabled' %}selected{% endif %}>Disabled</option>
+                            <option value="enabled" {% if settings.hosted_enabled == 'enabled' %}selected{% endif %}>Enabled</option>
+                        </select><br>
+                        <p class="text-info mt-2" style="font-size: 0.875rem;">
+                            Adds an unsubscribe link and header to outgoing emails, and a hosted "most recent newsletter" page.
+                            Requires the instance to be reachable at the URL below by your recipients. Once someone unsubscribes
+                            it always stays honored, even if this is later disabled.
+                        </p><br>
+
+                        <label for="hosted_base_url">Hosted Base URL:</label><br>
+                        <input type="text" id="hosted_base_url" name="hosted_base_url" style="width: 24rem;"
+                            {% if settings.hosted_base_url != "" %}value="{{ settings.hosted_base_url }}"{% endif %}
+                            placeholder="https://newsletterr.example.com"><br>
+                        <p class="text-info mt-2" style="font-size: 0.875rem;">
+                            The externally-reachable URL recipients use for unsubscribe links and the hosted newsletter page.
+                            Required when Hosted Features are enabled.
+                        </p><br>
+
+                        <label for="hosted_images_enabled">Hosted Images (optional):</label><br>
+                        <select id="hosted_images_enabled" name="hosted_images_enabled">
+                            <option value="disabled" {% if settings.hosted_images_enabled == 'disabled' %}selected{% endif %}>Disabled (embed images in each email)</option>
+                            <option value="enabled" {% if settings.hosted_images_enabled == 'enabled' %}selected{% endif %}>Enabled (link to hosted images)</option>
+                        </select><br>
+                        <p class="text-info mt-2" style="font-size: 0.875rem;">
+                            Serves poster art via tokenized public URLs instead of embedding it in each email, which shrinks
+                            message size. This exposes a proxy of your Plex art publicly (behind non-guessable per-image
+                            tokens) only enable if you're comfortable with that tradeoff. Requires Hosted Features to be enabled.
+                        </p><br>
+
+                        <button id="apply_settings_hosted" class="button">Apply Settings</button>
                     </div>
                 </form>
             </div>

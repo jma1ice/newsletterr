@@ -68,6 +68,7 @@ def send_test_email():
         custom_html=data.get('custom_html', ''),
         expanded_collections=data.get('expanded_collections', {}),
         user_dict=data.get('user_dict', {}),
+        is_test=True,
     )
     payload, status = send_standard_email_with_cids(req, settings, [test_recipient])
     if status == 200:

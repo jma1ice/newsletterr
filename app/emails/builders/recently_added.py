@@ -6,7 +6,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, library_filter=None, base_url="", max_items=None, recently_added_mode="items", ra_grid_columns=5, poster_max_height=0):
+def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, library_filter=None, base_url="", max_items=None, recently_added_mode="items", ra_grid_columns=5, poster_max_height=0, hosted_images_enabled=False, hosted_base_url=""):
     if not recent_data:
         return f"""
         <div style="background-color: {theme_colors['card_bg']}; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid {theme_colors['border']}; font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;">
@@ -66,7 +66,7 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
             else:
                 summary = item.get('tagline') or item.get('summary', '')
             
-            poster_cid = None
+            poster_src_result = None
             if item_type in ['episode', 'season']:
                 poster_candidates = [
                     item.get('grandparent_thumb'),
@@ -85,14 +85,16 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
             for candidate in poster_candidates:
                 if candidate:
                     poster_url = f"/proxy-art{candidate}" if not candidate.startswith('/proxy-art') else candidate
-                    poster_cid = fetch_and_attach_image(
+                    poster_src_result = fetch_and_attach_image(
                         poster_url,
                         msg_root,
                         f"recent-{i}-{j}",
                         base_url,
-                        max_height=poster_max_height if poster_max_height else None
+                        max_height=poster_max_height if poster_max_height else None,
+                        hosted_images_enabled=hosted_images_enabled,
+                        hosted_base_url=hosted_base_url
                     )
-                    if poster_cid:
+                    if poster_src_result:
                         break
                         
             if item.get('updated_at'):
@@ -178,8 +180,8 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
 
             plex_url = item.get('plex_url', '')
 
-            if poster_cid:
-                poster_src = f"cid:{poster_cid}"
+            if poster_src_result:
+                poster_src = poster_src_result
 
                 img_attrs = 'width="100%"'
                 img_style = "width: 100%; height: auto; display: block; object-fit: cover; border-radius: 10px 10px 0 0; background-color: #f8f9fa;"

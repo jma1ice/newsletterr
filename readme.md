@@ -100,7 +100,6 @@ or build locally:
 ```
 docker run -d --name newsletterr \
   -p 6397:6397 \
-  -e PUBLIC_BASE_URL=http://127.0.0.1:6397 \
   -v newsletterr-db:/app/database \
   -v newsletterr-env:/app/env \
   -v newsletterr-uploads:/app/static/uploads \
@@ -125,8 +124,7 @@ By default the app listens on **http://127.0.0.1:6397**. Set the `PORT` environm
 
 | Variable | Purpose | Default |
 |---|---|---|
-| `PUBLIC_BASE_URL` | URL the app uses to call itself for chart capture and image proxying | `http://127.0.0.1:6397` |
-| `PORT` | Listen port for `python newsletterr.py` | `6397` |
+| `PORT` | Listen port for `python newsletterr.py`; also determines the internal URL the app uses to call itself for chart capture and image proxying | `6397` |
 | `LOG_LEVEL` | Logging verbosity (`DEBUG` shows per-item traces, useful for support) | `INFO` |
 | `FLASK_DEBUG` | Set to `1` for the dev server with auto reload | `0` |
 | `DATA_ENC_KEY` | Fernet key encrypting stored credentials; auto-generated into `env/.env` on first run | generated |
@@ -211,30 +209,27 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * GitHub webhook to pull submitted issues to Discord channel
 * Ko-fi -> Discord integration for contributor role
  -- Other --
-** Sonarr/Radarr calendar integration for 'coming soon' type email
-** [Plex Wrapped](https://github.com/netplexflix/Plex-Wrapped-for-Tautulli?tab=readme-ov-file) API call integration
 * Ombi integration
 * Servarr PR
-* Clean up looks on DN stats
+* Clean up looks on DN stats, coming soon, and wrapped
 
 --- Hosted ---
-* Add a hosted 'most recent newsletter' webpage
-* Add opt out support
-* Add hosted images to reduce email size
+** Add a hosted 'most recent newsletter' webpage
+** Add opt out support
+** Add hosted images to reduce email size
 
 --- UI ---
 * General update/modernization
 * Email preview: desktop/tablet/phone views
 
 --- Misc. ---
-** Date range for stats (i.e. 1.1.25 - 1.1.26) (instead of 'last X days')
-** Make collections clickable - is this possible?
 * More mobile CSS optimizations
 * Discord text should be stylized logo to match GitHub
 * Can Snap-Ins work with custom HTML?
 * Does this work with Emby/Jellyfin?
 * Tailwind Play CDN fix
 * CSP out of Report-Only after trial run
+* 2wheelsdown into gh contrib
 
 ---
 
@@ -286,6 +281,10 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Settings submit audits the external tools api test
 * Setup Wizard
 * Resend from history
+* Sonarr/Radarr calendar integration for 'coming soon' type email
+* Plex Wrapped Yearly Review
+* Date range for stats (i.e. 1.1.25 - 1.1.26) (instead of 'last X days')
+* Made collections clickable
 
 ### v2026.1:
 

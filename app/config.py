@@ -34,6 +34,8 @@ DB_PATH = os.path.join("database", "data.db")
 
 INTERNAL_TOKEN = os.environ.get('INTERNAL_TOKEN', secrets.token_hex(32))
 
+INTERNAL_BASE_URL = f"http://127.0.0.1:{os.environ.get('PORT', 6397)}"
+
 k2 = "754c514b50483558474a5935514b7a45494165796866"
 CACHE_DURATION = 86400
 CACHE_EXTENDED_DURATION = 86400 * 7

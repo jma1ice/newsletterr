@@ -148,7 +148,7 @@ def build_separator_html(theme_colors=None):
                 </tr>
             </table>'''
 
-def build_image_html_with_cid(item, msg_root, base_url=""):
+def build_image_html_with_cid(item, msg_root, base_url="", hosted_images_enabled=False, hosted_base_url=""):
     src = item.get('src', '').strip()
     width = item.get('width', 400)
     align = item.get('align', 'center')
@@ -156,10 +156,10 @@ def build_image_html_with_cid(item, msg_root, base_url=""):
     if not src:
         return ''
 
-    cid = fetch_and_attach_image(src, msg_root, f"media-{item.get('id', 'img')}", base_url)
+    fetched_src = fetch_and_attach_image(src, msg_root, f"media-{item.get('id', 'img')}", base_url, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
 
-    if cid:
-        img_src = f"cid:{cid}"
+    if fetched_src:
+        img_src = fetched_src
     else:
         img_src = src
 

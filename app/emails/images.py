@@ -8,12 +8,13 @@ from urllib.parse import parse_qs, urlencode, urljoin, urlparse
 
 from app import config
 from app.security import safe_get
+from app.store import save_hosted_image
 
 import logging
 
 logger = logging.getLogger(__name__)
 
-def fetch_and_attach_image(image_url, msg_root, cid_name, base_url="", max_height=None):
+def fetch_and_attach_image(image_url, msg_root, cid_name, base_url="", max_height=None, hosted_images_enabled=False, hosted_base_url=""):
     try:
         logger.debug(f"fetch_and_attach_image called with: {image_url}")
         
@@ -101,16 +102,25 @@ def fetch_and_attach_image(image_url, msg_root, cid_name, base_url="", max_heigh
             except Exception as _e:
                 logger.error(f"PIL resize failed, using original: {_e}")
 
+        if hosted_images_enabled and hosted_base_url:
+            try:
+                token = save_hosted_image(image_bytes, f"image/{subtype}")
+                logger.debug(f"Successfully saved hosted image with token: {token}")
+                return f"{hosted_base_url.rstrip('/')}/i/{token}"
+            except Exception:
+                logger.warning("hosted image write failed, falling back to CID attachment", exc_info=True)
+                # fall through to CID attach below, using the bytes already fetched, no re-fetch
+
         cid = make_msgid(domain="newsletterr.local")[1:-1]
 
         img_part = MIMEImage(image_bytes, _subtype=subtype)
         img_part.add_header('Content-ID', f'<{cid}>')
         img_part.add_header('Content-Disposition', 'inline', filename=f'{cid_name}.{subtype}')
         msg_root.attach(img_part)
-        
+
         logger.debug(f"Successfully attached image with CID: {cid}")
-        return cid
-        
+        return f"cid:{cid}"
+
     except requests.exceptions.Timeout as e:
         logger.warning(f"Timeout fetching image {image_url}: {e}")
         return None
@@ -121,9 +131,9 @@ def fetch_and_attach_image(image_url, msg_root, cid_name, base_url="", max_heigh
         logger.exception(f"Error processing image {image_url}: {e}")
         return None
 
-def fetch_and_attach_blurred_image(image_url, msg_root, cid_name, base_url=""):
+def fetch_and_attach_blurred_image(image_url, msg_root, cid_name, base_url="", hosted_images_enabled=False, hosted_base_url=""):
     if image_url.lower().endswith('.gif'):
-        return fetch_and_attach_image(image_url, msg_root, cid_name, base_url)
+        return fetch_and_attach_image(image_url, msg_root, cid_name, base_url, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
     try:
         if image_url.startswith('/'):
             full_url = urljoin(base_url or "http://127.0.0.1:6397", image_url)
@@ -152,21 +162,28 @@ def fetch_and_attach_blurred_image(image_url, msg_root, cid_name, base_url=""):
         img_bytes = io.BytesIO()
         darkened.save(img_bytes, format='JPEG', quality=85)
         img_bytes.seek(0)
-        
+
+        if hosted_images_enabled and hosted_base_url:
+            try:
+                token = save_hosted_image(img_bytes.getvalue(), "image/jpeg")
+                return f"{hosted_base_url.rstrip('/')}/i/{token}"
+            except Exception:
+                logger.warning("hosted image write failed, falling back to CID attachment", exc_info=True)
+
         cid = make_msgid(domain="newsletterr.local")[1:-1]
-        
+
         img_part = MIMEImage(img_bytes.getvalue(), _subtype='jpeg')
         img_part.add_header('Content-ID', f'<{cid}>')
         img_part.add_header('Content-Disposition', 'inline', filename=f'{cid_name}-blurred.jpg')
         msg_root.attach(img_part)
-        
-        return cid
-        
+
+        return f"cid:{cid}"
+
     except Exception as e:
         logger.error(f"Error processing blurred image {image_url}: {e}")
-        return fetch_and_attach_image(image_url, msg_root, cid_name, base_url)
+        return fetch_and_attach_image(image_url, msg_root, cid_name, base_url, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
 
-def fetch_and_attach_small_thumbnail(image_url, msg_root, cid_name, base_url="", height=40):
+def fetch_and_attach_small_thumbnail(image_url, msg_root, cid_name, base_url="", height=40, hosted_images_enabled=False, hosted_base_url=""):
     try:
         if image_url.startswith('/'):
             full_url = urljoin(base_url or "http://127.0.0.1:6397", image_url)
@@ -201,13 +218,20 @@ def fetch_and_attach_small_thumbnail(image_url, msg_root, cid_name, base_url="",
         resized.save(img_bytes, format='JPEG', quality=65)
         img_bytes.seek(0)
 
+        if hosted_images_enabled and hosted_base_url:
+            try:
+                token = save_hosted_image(img_bytes.getvalue(), "image/jpeg")
+                return f"{hosted_base_url.rstrip('/')}/i/{token}"
+            except Exception:
+                logger.warning("hosted image write failed, falling back to CID attachment", exc_info=True)
+
         cid = make_msgid(domain="newsletterr.local")[1:-1]
         img_part = MIMEImage(img_bytes.getvalue(), _subtype='jpeg')
         img_part.add_header('Content-ID', f'<{cid}>')
         img_part.add_header('Content-Disposition', 'inline', filename=f'{cid_name}.jpg')
         msg_root.attach(img_part)
 
-        return cid
+        return f"cid:{cid}"
 
     except Exception as e:
         logger.error(f"Error fetching small thumbnail {image_url}: {e}")

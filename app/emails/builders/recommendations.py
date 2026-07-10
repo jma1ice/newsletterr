@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 from app.emails.builders.users import get_user_display_name
 
-def build_recommendations_html_with_cids(recs_data, msg_root, theme_colors, user_emails=None, base_url="", display_preference='email', users_full_data=None, recs_grid_columns=5, poster_max_height=0):
+def build_recommendations_html_with_cids(recs_data, msg_root, theme_colors, user_emails=None, base_url="", display_preference='email', users_full_data=None, recs_grid_columns=5, poster_max_height=0, hosted_images_enabled=False, hosted_base_url=""):
     if not recs_data:
         return ""
     
@@ -36,7 +36,9 @@ def build_recommendations_html_with_cids(recs_data, msg_root, theme_colors, user
             theme_colors,
             base_url,
             recs_grid_columns=recs_grid_columns,
-            poster_max_height=poster_max_height
+            poster_max_height=poster_max_height,
+            hosted_images_enabled=hosted_images_enabled,
+            hosted_base_url=hosted_base_url
         )
 
         shows_html = build_recommendations_section_with_cids(
@@ -48,7 +50,9 @@ def build_recommendations_html_with_cids(recs_data, msg_root, theme_colors, user
             theme_colors,
             base_url,
             recs_grid_columns=recs_grid_columns,
-            poster_max_height=poster_max_height
+            poster_max_height=poster_max_height,
+            hosted_images_enabled=hosted_images_enabled,
+            hosted_base_url=hosted_base_url
         )
         
         if movies_html or shows_html:
@@ -200,7 +204,7 @@ def build_droppedneedle_server_stats_html_with_cids(server_data, msg_root, theme
         </div>
     """
 
-def build_recommendations_section_with_cids(available_items, unavailable_items, title, msg_root, section_prefix, theme_colors, base_url="", recs_grid_columns=5, poster_max_height=0):
+def build_recommendations_section_with_cids(available_items, unavailable_items, title, msg_root, section_prefix, theme_colors, base_url="", recs_grid_columns=5, poster_max_height=0, hosted_images_enabled=False, hosted_base_url=""):
     if not available_items and not unavailable_items:
         return ""
 
@@ -216,14 +220,16 @@ def build_recommendations_section_with_cids(available_items, unavailable_items, 
         for j, item in enumerate(row_items):
             is_unavailable = (i + j) >= len(available_items)
             
-            poster_cid = None
+            poster_src_result = None
             if item.get('url'):
-                poster_cid = fetch_and_attach_image(
+                poster_src_result = fetch_and_attach_image(
                     f"/proxy-img?u={item['url']}",
                     msg_root,
                     f"{section_prefix}-{i}-{j}",
                     base_url,
-                    max_height=poster_max_height if poster_max_height else None
+                    max_height=poster_max_height if poster_max_height else None,
+                    hosted_images_enabled=hosted_images_enabled,
+                    hosted_base_url=hosted_base_url
                 )
             
             title_text = item.get('title', 'Unknown')
@@ -257,8 +263,8 @@ def build_recommendations_section_with_cids(available_items, unavailable_items, 
                 {'opacity: 0.7; filter: grayscale(30%);' if is_unavailable else ''}
             """
 
-            if poster_cid:
-                poster_src = f"cid:{poster_cid}"
+            if poster_src_result:
+                poster_src = poster_src_result
 
                 img_attrs = 'width="100%"'
                 img_style = (

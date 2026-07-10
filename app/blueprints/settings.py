@@ -107,6 +107,11 @@ def settings():
             radarr_api_key = _secret("radarr_api_key", existing_radarr_api_key)
             coming_soon_days_ahead = request.form.get("coming_soon_days_ahead", "14")
             coming_soon_grid_columns = request.form.get("coming_soon_grid_columns", "5")
+            hosted_enabled = request.form.get("hosted_enabled", "disabled")
+            hosted_base_url = (request.form.get("hosted_base_url") or "").strip().rstrip('/')
+            hosted_images_enabled = request.form.get("hosted_images_enabled", "disabled")
+            if hosted_enabled != "enabled":
+                hosted_images_enabled = "disabled"  # dependent toggle can't outlive its master
             recipient_display_name = request.form.get("recipient_display_name", "email")
             logo_filename = request.form.get("logo_filename")
             logo_width = request.form.get("logo_width")
@@ -144,6 +149,9 @@ def settings():
             elif logo_filename == 'none':
                 logo_filename = ""
 
+            if hosted_enabled == "enabled" and not hosted_base_url:
+                raise ValueError("Hosted Base URL is required when Hosted Features are enabled")
+
             if email_theme in theme_presets:
                 preset = theme_presets[email_theme]
                 primary_color = preset["primary_color"]
@@ -163,8 +171,8 @@ def settings():
                 INSERT INTO settings
                 (id, from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, plex_url, tautulli_url,
                     tautulli_api, conjurr_url, droppedneedle_url, droppedneedle_api_key, recipient_display_name, logo_filename, logo_width, email_theme, primary_color, secondary_color, accent_color, background_color,
-                    text_color, from_name, custom_logo_filename, login_toggle, nl_username, nl_password, default_intro_text, default_outro_text, hsts_enabled, scheduled_subject_prefix, logo_position, hide_stat_play_counts, hide_graph_play_counts, stats_type, recently_added_mode, recently_added_sort, ra_grid_columns, recs_grid_columns, stat_cover_art, send_mode, poster_max_height, discord_webhook_url, sonarr_url, sonarr_api_key, radarr_url, radarr_api_key, coming_soon_days_ahead, coming_soon_grid_columns)
-                VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    text_color, from_name, custom_logo_filename, login_toggle, nl_username, nl_password, default_intro_text, default_outro_text, hsts_enabled, scheduled_subject_prefix, logo_position, hide_stat_play_counts, hide_graph_play_counts, stats_type, recently_added_mode, recently_added_sort, ra_grid_columns, recs_grid_columns, stat_cover_art, send_mode, poster_max_height, discord_webhook_url, sonarr_url, sonarr_api_key, radarr_url, radarr_api_key, coming_soon_days_ahead, coming_soon_grid_columns, hosted_enabled, hosted_base_url, hosted_images_enabled)
+                VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT (id) DO UPDATE
                 SET from_email = excluded.from_email, alias_email = excluded.alias_email, reply_to_email = excluded.reply_to_email, password = excluded.password,
                     smtp_username = excluded.smtp_username, smtp_server = excluded.smtp_server, smtp_port = excluded.smtp_port, smtp_protocol = excluded.smtp_protocol,
@@ -187,12 +195,15 @@ def settings():
                     radarr_url = excluded.radarr_url,
                     radarr_api_key = excluded.radarr_api_key,
                     coming_soon_days_ahead = excluded.coming_soon_days_ahead,
-                    coming_soon_grid_columns = excluded.coming_soon_grid_columns
+                    coming_soon_grid_columns = excluded.coming_soon_grid_columns,
+                    hosted_enabled = excluded.hosted_enabled,
+                    hosted_base_url = excluded.hosted_base_url,
+                    hosted_images_enabled = excluded.hosted_images_enabled
             """, (from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, plex_url, tautulli_url, tautulli_api,
                   conjurr_url, droppedneedle_url, droppedneedle_api_key, recipient_display_name, logo_filename, logo_width, email_theme, primary_color, secondary_color, accent_color, background_color, text_color, from_name,
                   custom_logo_filename, login_toggle, nl_username, nl_password, default_intro_text, default_outro_text, hsts_enabled, scheduled_subject_prefix, logo_position,
                   hide_stat_play_counts, hide_graph_play_counts, stats_type, recently_added_mode, recently_added_sort, ra_grid_columns, recs_grid_columns, stat_cover_art, send_mode, poster_max_height, discord_webhook_url,
-                  sonarr_url, sonarr_api_key, radarr_url, radarr_api_key, coming_soon_days_ahead, coming_soon_grid_columns))
+                  sonarr_url, sonarr_api_key, radarr_url, radarr_api_key, coming_soon_days_ahead, coming_soon_grid_columns, hosted_enabled, hosted_base_url, hosted_images_enabled))
             conn.commit()
             cursor.execute("SELECT plex_token FROM settings WHERE id = 1")
             plex_token = cursor.fetchone()[0]
@@ -251,6 +262,9 @@ def settings():
                 "radarr_api_key": decrypt(radarr_api_key),
                 "coming_soon_days_ahead": coming_soon_days_ahead,
                 "coming_soon_grid_columns": coming_soon_grid_columns,
+                "hosted_enabled": hosted_enabled,
+                "hosted_base_url": hosted_base_url,
+                "hosted_images_enabled": hosted_images_enabled,
             }
 
             audit_results = []
@@ -349,6 +363,9 @@ def settings():
                 "stat_cover_art": request.form.get("stat_cover_art", "disabled"),
                 "send_mode": request.form.get("send_mode", "bcc"),
                 "poster_max_height": request.form.get("poster_max_height", ""),
+                "hosted_enabled": request.form.get("hosted_enabled", "disabled"),
+                "hosted_base_url": request.form.get("hosted_base_url", ""),
+                "hosted_images_enabled": request.form.get("hosted_images_enabled", "disabled"),
             }
             if not session.get("csrf_token"):
                 session["csrf_token"] = secrets.token_urlsafe(32)
@@ -407,6 +424,9 @@ def settings():
     radarr_api_key = s.get("radarr_api_key")
     coming_soon_days_ahead = s.get("coming_soon_days_ahead")
     coming_soon_grid_columns = s.get("coming_soon_grid_columns")
+    hosted_enabled = s.get("hosted_enabled")
+    hosted_base_url = s.get("hosted_base_url")
+    hosted_images_enabled = s.get("hosted_images_enabled")
 
     current_theme = email_theme or "newsletterr_blue"
     if current_theme in theme_presets and current_theme != "custom":
@@ -461,6 +481,9 @@ def settings():
         "radarr_url": radarr_url or "",
         "coming_soon_days_ahead": coming_soon_days_ahead or "14",
         "coming_soon_grid_columns": coming_soon_grid_columns or "5",
+        "hosted_enabled": hosted_enabled or "disabled",
+        "hosted_base_url": hosted_base_url or "",
+        "hosted_images_enabled": hosted_images_enabled or "disabled",
     }
     # secrets are never sent to the browser; the form shows a placeholder and
     # a blank submission keeps the stored value (write-only fields)

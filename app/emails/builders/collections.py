@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 from app.emails.builders.cards import build_collection_card_html, build_individual_item_card_html
 
-def build_collections_html_with_cids(all_collections, msg_root, theme_colors, base_url="", custom_title=None, expanded_collections=None, group_index=0, poster_max_height=0):
+def build_collections_html_with_cids(all_collections, msg_root, theme_colors, base_url="", custom_title=None, expanded_collections=None, group_index=0, poster_max_height=0, hosted_images_enabled=False, hosted_base_url=""):
     if not all_collections:
         return f"""
         <div style="background-color: {theme_colors['card_bg']}; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid {theme_colors['border']}; font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;">
@@ -81,9 +81,9 @@ def build_collections_html_with_cids(all_collections, msg_root, theme_colors, ba
                     cell_spacing = "8px" if j < items_count - 1 else "0"
 
                 if item.get('is_individual_item'):
-                    card_html = build_individual_item_card_html(item, theme_colors, msg_root, base_url, poster_max_height=poster_max_height)
+                    card_html = build_individual_item_card_html(item, theme_colors, msg_root, base_url, poster_max_height=poster_max_height, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
                 else:
-                    card_html = build_collection_card_html(item, theme_colors, msg_root, base_url, poster_max_height=poster_max_height)
+                    card_html = build_collection_card_html(item, theme_colors, msg_root, base_url, poster_max_height=poster_max_height, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
 
                 row_html += f'<td style="vertical-align: top; padding-right: {cell_spacing};">{card_html}</td>'
 
@@ -101,9 +101,9 @@ def build_collections_html_with_cids(all_collections, msg_root, theme_colors, ba
                 """
 
                 if item.get('is_individual_item'):
-                    card_html = build_individual_item_card_html(item, theme_colors, msg_root, base_url, poster_max_height=poster_max_height)
+                    card_html = build_individual_item_card_html(item, theme_colors, msg_root, base_url, poster_max_height=poster_max_height, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
                 else:
-                    card_html = build_collection_card_html(item, theme_colors, msg_root, base_url, poster_max_height=poster_max_height)
+                    card_html = build_collection_card_html(item, theme_colors, msg_root, base_url, poster_max_height=poster_max_height, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
                 
                 row_html += f'<td style="{cell_style}">{card_html}</td>'
             

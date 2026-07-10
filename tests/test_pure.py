@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import pytest
 
@@ -127,3 +127,46 @@ def test_ensure_secret_key_persists_and_is_stable(tmp_path, monkeypatch):
 def test_app_secret_key_comes_from_persisted_value(app):
     import os
     assert app.secret_key == os.environ["NEWSLETTERR_SECRET_KEY"]
+
+def test_collection_cards_link_to_plex_when_plex_url_present():
+    from email.mime.multipart import MIMEMultipart
+    from unittest.mock import patch
+    from app.emails.builders.cards import build_individual_item_card_html, build_collection_card_html
+
+    theme_colors = {'card_bg': '#2d2d2d', 'border': '#404040', 'text': '#fff', 'muted_text': '#ccc'}
+    msg_root = MIMEMultipart()
+    plex_url = 'https://app.plex.tv/web/app#!/server/abc/details?key=/library/metadata/1'
+
+    with patch('app.emails.builders.cards.fetch_and_attach_image', return_value='fakecid123'):
+        item = {'title': 'Test Movie', 'year': 2024, 'type': 'movie', 'thumb': '/library/x', 'key': '1', 'plex_url': plex_url}
+        html = build_individual_item_card_html(item, theme_colors, msg_root)
+        assert html.strip().startswith(f'<a href="{plex_url}"')
+        assert html.strip().endswith('</a>')
+
+        item_no_url = dict(item)
+        del item_no_url['plex_url']
+        html_no_link = build_individual_item_card_html(item_no_url, theme_colors, msg_root)
+        assert not html_no_link.strip().startswith('<a ')
+
+        collection = {'title': 'Marvel Collection', 'childCount': 12, 'subtype': 'movie', 'thumb': '/library/y', 'key': '2', 'plex_url': plex_url}
+        collection_html = build_collection_card_html(collection, theme_colors, msg_root)
+        assert collection_html.strip().startswith(f'<a href="{plex_url}"')
+
+def test_recently_added_days_mode_title_shows_date_range():
+    from email.mime.multipart import MIMEMultipart
+    from app.emails.builders.recently_added import build_recently_added_html_with_cids
+
+    theme_colors = {'card_bg': '#2d2d2d', 'border': '#404040', 'text': '#fff', 'muted_text': '#ccc'}
+    msg_root = MIMEMultipart()
+    # no thumb/art candidates -> no poster fetch, no network call
+    recent_data = [{'recently_added': [{'title': 'No Poster Show', 'media_type': 'show'}]}]
+
+    html = build_recently_added_html_with_cids(
+        recent_data, msg_root, theme_colors,
+        max_items=7, recently_added_mode="days"
+    )
+
+    since_date = (datetime.now() - timedelta(days=7)).strftime("%-m/%-d/%y")
+    end_date = datetime.now().strftime("%-m/%-d/%y")
+    assert f"{since_date} - {end_date}" in html
+    assert "since" not in html.split("Recently Added")[1].split("</h2>")[0].lower()

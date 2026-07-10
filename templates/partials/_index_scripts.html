@@ -21,6 +21,7 @@
                 recentlyAddedMode: {{ settings.get('recently_added_mode', 'items') | string | tojson }},
                 raGridColumns: {{ settings.get('ra_grid_columns', '5') | string | tojson }},
                 recsGridColumns: {{ settings.get('recs_grid_columns', '5') | string | tojson }},
+                comingSoonGridColumns: {{ settings.get('coming_soon_grid_columns', '5') | string | tojson }},
                 statCoverArt: {{ settings.get('stat_cover_art', 'disabled') | string | tojson }},
                 statsList: {{ (stats if stats else []) | tojson }},
                 userDict: {{ user_dict | tojson }},
@@ -46,6 +47,15 @@
         <script id="droppedneedle-server-json" type="application/json" nonce="{{ nonce }}">
             {{ (droppedneedle_server_json or none) | tojson | safe }}
         </script>
+        <script id="yearly-wrapped-json" type="application/json" nonce="{{ nonce }}">
+            {{ (yearly_wrapped_json or none) | tojson | safe }}
+        </script>
+        <script id="sonarr-coming-soon-json" type="application/json" nonce="{{ nonce }}">
+            {{ (sonarr_coming_soon_json or none) | tojson | safe }}
+        </script>
+        <script id="radarr-coming-soon-json" type="application/json" nonce="{{ nonce }}">
+            {{ (radarr_coming_soon_json or none) | tojson | safe }}
+        </script>
         <script src="{{ url_for('static', filename='js/app/08-user-data.js') }}" nonce="{{ nonce }}"></script>
         <script src="{{ url_for('static', filename='js/app/09-recs-wrapped.js') }}" nonce="{{ nonce }}"></script>
         <script src="{{ url_for('static', filename='js/app/10-pull-recommendations.js') }}" nonce="{{ nonce }}"></script>
@@ -61,4 +71,6 @@
         <script src="{{ url_for('static', filename='js/app/20-gif-picker.js') }}" nonce="{{ nonce }}"></script>
         <script src="{{ url_for('static', filename='js/app/21-ui-toggles.js') }}" nonce="{{ nonce }}"></script>
         <script src="{{ url_for('static', filename='js/app/22-autosave.js') }}" nonce="{{ nonce }}"></script>
+        <script src="{{ url_for('static', filename='js/app/23-coming-soon.js') }}" nonce="{{ nonce }}"></script>
+        <script src="{{ url_for('static', filename='js/app/24-pull-coming-soon.js') }}" nonce="{{ nonce }}"></script>
     </div>

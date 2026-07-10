@@ -14,6 +14,9 @@ function readJSONFromScript(id) {
 let recsPayload = readJSONFromScript('recommendations-json');
 let droppedneedleWrappedPayload = readJSONFromScript('droppedneedle-wrapped-json');
 let droppedneedleServerPayload = readJSONFromScript('droppedneedle-server-json');
+let yearlyWrappedPayload = readJSONFromScript('yearly-wrapped-json');
+let sonarrComingSoonPayload = readJSONFromScript('sonarr-coming-soon-json');
+let radarrComingSoonPayload = readJSONFromScript('radarr-coming-soon-json');
 let userDict = APP.userDict || {};
 
 let usersFullData = APP.usersFullData;

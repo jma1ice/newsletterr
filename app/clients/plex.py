@@ -465,6 +465,7 @@ def get_collection_items_for_email(collection_key, settings):
         
         collection_items_url = f"{plex_url}/library/collections/{collection_key}/children"
         headers = get_plex_headers({'X-Plex-Token': decrypt(plex_token)})
+        machine_id = get_plex_machine_id()
 
         logger.debug(f"Fetching collection items from: {collection_items_url}")
         response = safe_get(collection_items_url, headers=headers, timeout=30)
@@ -502,7 +503,8 @@ def get_collection_items_for_email(collection_key, settings):
                     'leafCount': item.get('leafCount', 0),
                     'parentTitle': item.get('parentTitle'),
                     'grandparentTitle': item.get('grandparentTitle'),
-                    'subtype': item.get('type')
+                    'subtype': item.get('type'),
+                    'plex_url': build_plex_web_link(item.get('ratingKey'), machine_id)
                 }
                 items.append(item_info)
         

@@ -252,3 +252,27 @@ function buildDroppedNeedleServerRow() {
     host.appendChild(row);
 };
 buildDroppedNeedleServerRow();
+
+function buildYearlyWrappedRow() {
+    yearlyWrappedPayload = readJSONFromScript('yearly-wrapped-json');
+    const host = document.getElementById('yearly-wrapped-list');
+    if (!host) return;
+    host.innerHTML = '';
+    if (!yearlyWrappedPayload) return;
+
+    const row = document.createElement('div');
+    row.className = 'col-12 mb-2';
+    row.innerHTML = `
+        <div class="d-flex justify-content-between align-items-center p-2 border rounded">
+            <span style="font-size: .9rem;">Year in Review</span>
+            <div>
+                <button type="button"
+                        class="btn button btn-sm yearly-wrapped-add-btn"
+                        data-type="yearly_wrapped" data-id="yearly-wrapped"
+                        data-name="Year in Review"
+                        style="font-size: .8rem; padding: .25rem .5rem;">Add</button>
+            </div>
+        </div>`;
+    host.appendChild(row);
+};
+buildYearlyWrappedRow();

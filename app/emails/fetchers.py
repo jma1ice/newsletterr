@@ -7,6 +7,10 @@ from app.clients.tautulli import run_tautulli_command
 from app.clients.plex import fetch_recently_added_using_plex_sdk
 from app.clients.conjurr import run_conjurr_command
 from app.clients.droppedneedle import run_droppedneedle_command, fetch_droppedneedle_server_stats
+from app.clients.sonarr import fetch_sonarr_calendar
+from app.clients.radarr import fetch_radarr_calendar
+
+from datetime import datetime, timedelta
 
 import logging
 
@@ -239,4 +243,92 @@ def get_droppedneedle_server_stats_cached(use_cache=True):
 
     except Exception as e:
         logger.error(f"Error getting DroppedNeedle server stats: {e}")
+        return None
+
+def get_yearly_wrapped_cached(use_cache=True):
+    try:
+        if use_cache:
+            cached = get_cached_data('yearly_wrapped_json', strict=True) or get_cached_data('yearly_wrapped_json', strict=False)
+            if cached:
+                return cached
+
+        _s = get_settings(decrypt_secrets=False)
+        row = (_s.get("tautulli_url"), _s.get("tautulli_api"), _s.get("stats_type")) if "id" in _s else None
+
+        if not row or not row[0] or not row[1]:
+            return None
+
+        tautulli_base_url = row[0].rstrip('/')
+        tautulli_api_key = decrypt(row[1])
+        stats_type = row[2] or 'plays'
+
+        stats_data, _ = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_home_stats', 'Stats', None, '365', stats_type=stats_type)
+
+        if use_cache and stats_data:
+            set_cached_data('yearly_wrapped_json', stats_data, {'timestamp': time.time(), 'manual_fetch': True})
+
+        return stats_data
+
+    except Exception as e:
+        logger.error(f"Error getting yearly wrapped stats: {e}")
+        return None
+
+def get_sonarr_coming_soon_cached(use_cache=True, days_ahead=14):
+    try:
+        if use_cache:
+            cached = get_cached_data('sonarr_coming_soon_json', strict=True) or get_cached_data('sonarr_coming_soon_json', strict=False)
+            if cached:
+                return cached
+
+        _s = get_settings(decrypt_secrets=False)
+        row = (_s.get("sonarr_url"), _s.get("sonarr_api_key")) if "id" in _s else None
+
+        if not row or not row[0] or not row[1]:
+            return None
+
+        sonarr_url = row[0].rstrip('/')
+        sonarr_api_key = decrypt(row[1])
+
+        start_date = datetime.now().strftime('%Y-%m-%d')
+        end_date = (datetime.now() + timedelta(days=int(days_ahead))).strftime('%Y-%m-%d')
+
+        episodes, _ = fetch_sonarr_calendar(sonarr_url, sonarr_api_key, start_date, end_date)
+
+        if use_cache and episodes:
+            set_cached_data('sonarr_coming_soon_json', episodes, {'timestamp': time.time(), 'manual_fetch': True})
+
+        return episodes
+
+    except Exception as e:
+        logger.error(f"Error getting Sonarr coming soon calendar: {e}")
+        return None
+
+def get_radarr_coming_soon_cached(use_cache=True, days_ahead=14):
+    try:
+        if use_cache:
+            cached = get_cached_data('radarr_coming_soon_json', strict=True) or get_cached_data('radarr_coming_soon_json', strict=False)
+            if cached:
+                return cached
+
+        _s = get_settings(decrypt_secrets=False)
+        row = (_s.get("radarr_url"), _s.get("radarr_api_key")) if "id" in _s else None
+
+        if not row or not row[0] or not row[1]:
+            return None
+
+        radarr_url = row[0].rstrip('/')
+        radarr_api_key = decrypt(row[1])
+
+        start_date = datetime.now().strftime('%Y-%m-%d')
+        end_date = (datetime.now() + timedelta(days=int(days_ahead))).strftime('%Y-%m-%d')
+
+        movies, _ = fetch_radarr_calendar(radarr_url, radarr_api_key, start_date, end_date)
+
+        if use_cache and movies:
+            set_cached_data('radarr_coming_soon_json', movies, {'timestamp': time.time(), 'manual_fetch': True})
+
+        return movies
+
+    except Exception as e:
+        logger.error(f"Error getting Radarr coming soon calendar: {e}")
         return None

@@ -68,6 +68,42 @@ def test_droppedneedle_connection(url, api_key):
     except Exception as e:
         return {'status': 'error', 'message': str(e)}
 
+def test_sonarr_connection(url, api_key):
+    url = (url or '').rstrip('/')
+    api_key = (api_key or '').strip()
+    if not url:
+        return {'status': 'error', 'message': 'Sonarr URL is required'}
+    if not api_key:
+        return {'status': 'error', 'message': 'Sonarr API key is required'}
+    try:
+        r = safe_get(f"{url}/api/v3/system/status", timeout=10, headers={'X-Api-Key': api_key})
+        if r.status_code == 401:
+            return {'status': 'error', 'message': 'Sonarr rejected the API key'}
+        r.raise_for_status()
+        return {'status': 'ok', 'message': 'Connected to Sonarr'}
+    except requests.exceptions.ConnectionError:
+        return {'status': 'error', 'message': 'Sonarr is unreachable at that URL'}
+    except Exception as e:
+        return {'status': 'error', 'message': str(e)}
+
+def test_radarr_connection(url, api_key):
+    url = (url or '').rstrip('/')
+    api_key = (api_key or '').strip()
+    if not url:
+        return {'status': 'error', 'message': 'Radarr URL is required'}
+    if not api_key:
+        return {'status': 'error', 'message': 'Radarr API key is required'}
+    try:
+        r = safe_get(f"{url}/api/v3/system/status", timeout=10, headers={'X-Api-Key': api_key})
+        if r.status_code == 401:
+            return {'status': 'error', 'message': 'Radarr rejected the API key'}
+        r.raise_for_status()
+        return {'status': 'ok', 'message': 'Connected to Radarr'}
+    except requests.exceptions.ConnectionError:
+        return {'status': 'error', 'message': 'Radarr is unreachable at that URL'}
+    except Exception as e:
+        return {'status': 'error', 'message': str(e)}
+
 @bp.route('/api/test/tautulli', methods=['POST'])
 @requires_auth
 def test_tautulli():
@@ -85,6 +121,18 @@ def test_conjurr():
 def test_droppedneedle():
     data = request.get_json()
     return jsonify(test_droppedneedle_connection(data.get('url'), data.get('api_key')))
+
+@bp.route('/api/test/sonarr', methods=['POST'])
+@requires_auth
+def test_sonarr():
+    data = request.get_json()
+    return jsonify(test_sonarr_connection(data.get('url'), data.get('api_key')))
+
+@bp.route('/api/test/radarr', methods=['POST'])
+@requires_auth
+def test_radarr():
+    data = request.get_json()
+    return jsonify(test_radarr_connection(data.get('url'), data.get('api_key')))
 
 @bp.route('/api/gif/search', methods=['GET'])
 @requires_auth

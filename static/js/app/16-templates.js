@@ -117,7 +117,7 @@ document.getElementById('reset-template-btn').addEventListener('click', function
         
         document.getElementById('delete-template-btn').style.display = 'none';
         
-        document.querySelectorAll('.add-stat-btn, .add-graph-btn, .ra-add-btn, .recs-add-btn, .droppedneedle-add-btn, .droppedneedle-server-add-btn').forEach(btn => {
+        document.querySelectorAll('.add-stat-btn, .add-graph-btn, .ra-add-btn, .recs-add-btn, .droppedneedle-add-btn, .droppedneedle-server-add-btn, .yearly-wrapped-add-btn, .sonarr-coming-soon-add-btn, .radarr-coming-soon-add-btn').forEach(btn => {
             btn.textContent = 'Add';
             btn.classList.remove('btn-success');
             btn.classList.add('button');
@@ -210,7 +210,7 @@ function loadTemplate(template) {
 
         selectedItems = [];
         
-        document.querySelectorAll('.add-stat-btn, .add-graph-btn, .ra-add-btn, .recs-add-btn, .droppedneedle-add-btn, .droppedneedle-server-add-btn').forEach(btn => {
+        document.querySelectorAll('.add-stat-btn, .add-graph-btn, .ra-add-btn, .recs-add-btn, .droppedneedle-add-btn, .droppedneedle-server-add-btn, .yearly-wrapped-add-btn, .sonarr-coming-soon-add-btn, .radarr-coming-soon-add-btn').forEach(btn => {
             btn.textContent = 'Add';
             btn.classList.remove('btn-success');
             btn.classList.add('button');

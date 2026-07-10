@@ -53,7 +53,7 @@ def _clear_failures(ip):
     with _attempts_lock:
         _attempts.pop(ip, None)
 
-SETUP_STEPS = ['admin', 'email', 'plex', 'tautulli', 'conjurr', 'droppedneedle']
+SETUP_STEPS = ['admin', 'email', 'plex', 'tautulli', 'conjurr', 'droppedneedle', 'sonarr', 'radarr']
 
 @bp.route('/setup', methods=['GET', 'POST'])
 def setup():
@@ -223,10 +223,58 @@ def setup_droppedneedle():
             conn.execute("UPDATE settings SET droppedneedle_url = ?, droppedneedle_api_key = ? WHERE id = 1", (droppedneedle_url, encrypt(droppedneedle_api_key)))
             conn.commit()
             conn.close()
+        return redirect(url_for('auth.setup_sonarr'))
+
+    return render_template('setup.html', step='droppedneedle', steps=SETUP_STEPS, settings=s, csrf_token=session["csrf_token"])
+
+@bp.route('/setup/sonarr', methods=['GET', 'POST'])
+@requires_auth
+def setup_sonarr():
+    if not session.get("csrf_token"):
+        session["csrf_token"] = secrets.token_urlsafe(32)
+    s = get_settings(decrypt_secrets=False)
+
+    if request.method == 'POST':
+        token = request.form.get("csrf_token", "").strip()
+        if not token or token != session.get("csrf_token"):
+            abort(400)
+
+        sonarr_url = request.form.get('sonarr_url', '').strip()
+        sonarr_api_key = request.form.get('sonarr_api_key', '').strip()
+        if sonarr_url and sonarr_api_key:
+            conn = db_connect()
+            conn.execute("INSERT OR IGNORE INTO settings (id) VALUES (1)")
+            conn.execute("UPDATE settings SET sonarr_url = ?, sonarr_api_key = ? WHERE id = 1", (sonarr_url, encrypt(sonarr_api_key)))
+            conn.commit()
+            conn.close()
+        return redirect(url_for('auth.setup_radarr'))
+
+    return render_template('setup.html', step='sonarr', steps=SETUP_STEPS, settings=s, csrf_token=session["csrf_token"])
+
+@bp.route('/setup/radarr', methods=['GET', 'POST'])
+@requires_auth
+def setup_radarr():
+    if not session.get("csrf_token"):
+        session["csrf_token"] = secrets.token_urlsafe(32)
+    s = get_settings(decrypt_secrets=False)
+
+    if request.method == 'POST':
+        token = request.form.get("csrf_token", "").strip()
+        if not token or token != session.get("csrf_token"):
+            abort(400)
+
+        radarr_url = request.form.get('radarr_url', '').strip()
+        radarr_api_key = request.form.get('radarr_api_key', '').strip()
+        if radarr_url and radarr_api_key:
+            conn = db_connect()
+            conn.execute("INSERT OR IGNORE INTO settings (id) VALUES (1)")
+            conn.execute("UPDATE settings SET radarr_url = ?, radarr_api_key = ? WHERE id = 1", (radarr_url, encrypt(radarr_api_key)))
+            conn.commit()
+            conn.close()
         logger.info("First-run setup wizard completed")
         return redirect(url_for('main.index'))
 
-    return render_template('setup.html', step='droppedneedle', steps=SETUP_STEPS, settings=s, csrf_token=session["csrf_token"])
+    return render_template('setup.html', step='radarr', steps=SETUP_STEPS, settings=s, csrf_token=session["csrf_token"])
 
 @bp.route('/login', methods=['GET', 'POST'])
 def login():

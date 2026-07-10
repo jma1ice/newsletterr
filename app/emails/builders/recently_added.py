@@ -349,10 +349,12 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
     if recently_added_mode == "days" and max_items:
         try:
             since_date = (datetime.now() - timedelta(days=int(max_items))).strftime("%-m/%-d/%y")
+            end_date = datetime.now().strftime("%-m/%-d/%y")
+            date_range = f"{since_date} - {end_date}"
         except Exception:
             logger.debug("suppressed exception; using fallback", exc_info=True)
-            since_date = ""
-        ra_title = (f"Added to {library_filter}" if library_filter else "Recently Added") + (f" since {since_date}" if since_date else "")
+            date_range = ""
+        ra_title = (f"Added to {library_filter}" if library_filter else "Recently Added") + (f" {date_range}" if date_range else "")
     else:
         ra_title = f"Recently Added{f' - {library_filter}' if library_filter else ''}"
 

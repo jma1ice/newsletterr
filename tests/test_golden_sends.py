@@ -61,6 +61,7 @@ def send_env(app, monkeypatch):
 
     conn = sqlite3.connect(config.DB_PATH)
     conn.execute("INSERT OR IGNORE INTO settings (id) VALUES (1)")
+    conn.execute("DELETE FROM suppressed_emails")
     conn.execute(
         """UPDATE settings SET
             from_email='news@example.com', alias_email='', reply_to_email='replies@example.com',
@@ -70,7 +71,7 @@ def send_env(app, monkeypatch):
             droppedneedle_url='', droppedneedle_api_key='', from_name='Newsletterr',
             logo_filename='Asset_94x.png', logo_width=80, custom_logo_filename='',
             scheduled_subject_prefix='enabled', send_mode='bcc', recipient_display_name='email',
-            login_toggle='disabled'
+            login_toggle='disabled', hosted_enabled='disabled', hosted_base_url=''
         WHERE id = 1""",
         (encrypt("smtp-pw"), encrypt("tt-key")),
     )
@@ -94,7 +95,7 @@ def send_env(app, monkeypatch):
     conn.close()
 
     # deterministic: logo/image fetches fail fast instead of reaching a live server
-    monkeypatch.setenv("PUBLIC_BASE_URL", "http://127.0.0.1:9")
+    monkeypatch.setattr(config, "INTERNAL_BASE_URL", "http://127.0.0.1:9")
 
     monkeypatch.setattr(scheduled, "capture_chart_images_via_headless", lambda *a, **k: {})
     monkeypatch.setattr(scheduled, "fetch_tautulli_data_for_email", _tautulli_data_stub)
@@ -176,6 +177,47 @@ def test_scheduled_user_email_golden(send_env):
     assert "Personal intro" in normalized["html"]
     _assert_golden("scheduled_user", normalized)
 
+@pytest.fixture()
+def hosted_scheduled_env(send_env):
+    from app import config
+    conn = sqlite3.connect(config.DB_PATH)
+    conn.execute(
+        "UPDATE settings SET hosted_enabled='enabled', hosted_base_url='https://nl.example.com' WHERE id = 1"
+    )
+    conn.commit()
+    conn.close()
+    return send_env
+
+def test_scheduled_single_email_hosted_gives_each_recipient_a_distinct_token(hosted_scheduled_env):
+    ok = hosted_scheduled_env.send_scheduled_email_with_cids(9001, 9001, 9001)
+    assert ok is True
+    sends = [s for inst in RecorderSMTP.instances for s in inst.sent]
+    assert len(sends) == 3  # from_addr + a@b.c + d@e.f, one transaction each
+
+    tokens = set()
+    for from_addr, to_addrs, content in sends:
+        assert len(to_addrs) == 1
+        msg = email_lib.message_from_string(content)
+        list_unsub = msg.get("List-Unsubscribe", "")
+        assert msg.get("List-Unsubscribe-Post") == "List-Unsubscribe=One-Click"
+        assert "/u/" in list_unsub
+        tokens.add(list_unsub.split("/u/")[1].split(">")[0])
+    assert len(tokens) == 3
+
+def test_scheduled_user_email_hosted_gives_each_recipient_a_distinct_token(hosted_scheduled_env):
+    ok = hosted_scheduled_env.send_scheduled_email_with_cids(9001, 9001, 9002)
+    assert ok is True
+    sends = [s for inst in RecorderSMTP.instances for s in inst.sent]
+    assert len(sends) == 2  # from_addr + a@b.c (only user 1's group matches)
+
+    tokens = set()
+    for from_addr, to_addrs, content in sends:
+        assert len(to_addrs) == 1
+        msg = email_lib.message_from_string(content)
+        assert "/u/" in msg.get("List-Unsubscribe", "")
+        tokens.add(msg.get("List-Unsubscribe").split("/u/")[1].split(">")[0])
+    assert len(tokens) == 2
+
 # --- standard (manual) send paths, driven through the HTTP route
 
 def _fixed_tautulli_data(*args, **kwargs):
@@ -207,6 +249,121 @@ def manual_send_env(send_env, client, monkeypatch):
 
 def _post_send(client, payload):
     return client.post("/send_email", json=payload, headers={"X-CSRF-Token": "golden-token"})
+
+@pytest.fixture()
+def hosted_send_env(manual_send_env):
+    from app import config
+    conn = sqlite3.connect(config.DB_PATH)
+    conn.execute(
+        "UPDATE settings SET hosted_enabled='enabled', hosted_base_url='https://nl.example.com' WHERE id = 1"
+    )
+    conn.commit()
+    conn.close()
+    return manual_send_env
+
+def test_bcc_send_gives_each_recipient_a_distinct_unsubscribe_token(hosted_send_env):
+    client = hosted_send_env
+    resp = _post_send(client, {
+        "to_emails": "a@b.c, d@e.f", "subject": "Manual News", "email_header_title": "The Header",
+        "selected_items": [{"type": "textblock", "content": "Manual hello"}],
+        "custom_html": "", "user_dict": {}, "expanded_collections": {},
+    })
+    assert resp.status_code == 200
+    assert resp.get_json().get("success") is True
+
+    sends = [s for inst in RecorderSMTP.instances for s in inst.sent]
+    # bcc mode + hosted: one SMTP transaction per recipient (incl. the
+    # operator's own from_addr copy), not one shared batched transaction
+    assert len(sends) == 3
+
+    tokens_by_recipient = {}
+    for from_addr, to_addrs, content in sends:
+        assert len(to_addrs) == 1
+        recipient = to_addrs[0]
+        msg = email_lib.message_from_string(content)
+        list_unsub = msg.get("List-Unsubscribe", "")
+        assert msg.get("List-Unsubscribe-Post") == "List-Unsubscribe=One-Click"
+        assert "/u/" in list_unsub
+        token = list_unsub.split("/u/")[1].split(">")[0]
+        html_part = next(p for p in msg.walk() if p.get_content_type() == "text/html")
+        html = html_part.get_payload(decode=True).decode("utf-8")
+        assert f"/u/{token}" in html  # body link uses the same token as the header
+        tokens_by_recipient[recipient] = token
+
+    assert len(set(tokens_by_recipient.values())) == 3  # all distinct
+
+    from app.tokens import verify_unsubscribe_token
+    for recipient, token in tokens_by_recipient.items():
+        assert verify_unsubscribe_token(token) == recipient.strip().lower()
+
+def test_recommendations_send_gives_each_recipient_a_distinct_unsubscribe_token(hosted_send_env):
+    client = hosted_send_env
+    resp = _post_send(client, {
+        "to_emails": "a@b.c, d@e.f", "subject": "Manual Picks", "email_header_title": "The Header",
+        "selected_items": [
+            {"type": "textblock", "content": "Manual personal intro"},
+            {"type": "recommendations", "userKey": "1"},
+        ],
+        "custom_html": "", "user_dict": {"1": "a@b.c", "2": "d@e.f"}, "expanded_collections": {},
+    })
+    assert resp.status_code == 200
+    assert resp.get_json().get("success") is True
+
+    sends = [s for inst in RecorderSMTP.instances for s in inst.sent]
+    # only user 1's group matches the recommendations block (from_addr + a@b.c)
+    assert len(sends) == 2
+
+    tokens = set()
+    for from_addr, to_addrs, content in sends:
+        assert len(to_addrs) == 1
+        msg = email_lib.message_from_string(content)
+        list_unsub = msg.get("List-Unsubscribe", "")
+        assert "/u/" in list_unsub
+        tokens.add(list_unsub.split("/u/")[1].split(">")[0])
+    assert len(tokens) == 2
+
+def test_suppressed_recipient_filtered_from_manual_send(manual_send_env):
+    from app.store import add_suppressed
+    add_suppressed("d@e.f")
+
+    client = manual_send_env
+    resp = _post_send(client, {
+        "to_emails": "a@b.c, d@e.f", "subject": "Manual News", "email_header_title": "The Header",
+        "selected_items": [{"type": "textblock", "content": "Manual hello"}],
+        "custom_html": "", "user_dict": {}, "expanded_collections": {},
+    })
+    assert resp.status_code == 200
+
+    sends = [s for inst in RecorderSMTP.instances for s in inst.sent]
+    assert len(sends) == 1
+    _, to_addrs, _ = sends[0]
+    assert to_addrs == ["news@example.com", "a@b.c"]  # d@e.f excluded
+
+def test_suppressed_recipient_filtered_from_scheduled_send(send_env):
+    from app.store import add_suppressed
+    add_suppressed("a@b.c")
+
+    ok = send_env.send_scheduled_email_with_cids(9001, 9001, 9001)
+    assert ok is True
+
+    sends = [s for inst in RecorderSMTP.instances for s in inst.sent]
+    assert len(sends) == 1
+    _, to_addrs, _ = sends[0]
+    assert to_addrs == ["news@example.com", "d@e.f"]  # a@b.c excluded
+
+def test_bcc_send_without_hosted_mode_is_single_batched_transaction(manual_send_env):
+    client = manual_send_env
+    resp = _post_send(client, {
+        "to_emails": "a@b.c, d@e.f", "subject": "Manual News", "email_header_title": "The Header",
+        "selected_items": [{"type": "textblock", "content": "Manual hello"}],
+        "custom_html": "", "user_dict": {}, "expanded_collections": {},
+    })
+    assert resp.status_code == 200
+    sends = [s for inst in RecorderSMTP.instances for s in inst.sent]
+    assert len(sends) == 1
+    _, to_addrs, content = sends[0]
+    assert len(to_addrs) == 3  # from_addr + 2 recipients, one shared transaction
+    assert "List-Unsubscribe" not in content
 
 def test_manual_standard_email_golden(manual_send_env):
     client = manual_send_env
@@ -456,4 +613,139 @@ def test_resend_from_history_rejects_failed_send(manual_send_env):
     body = resp.get_json()
     assert body["status"] == "error"
     assert "failed" in body["message"].lower()
-    assert len(RecorderSMTP.instances) == 0  # never attempted a connection
+
+# --- hosted newsletter page (/newsletter)
+
+def test_hosted_newsletter_disabled_by_default(manual_send_env):
+    client = manual_send_env
+    resp = client.get("/newsletter")
+    assert resp.status_code == 404
+
+def test_hosted_newsletter_empty_before_any_hosted_send(hosted_send_env):
+    from app import config
+    conn = sqlite3.connect(config.DB_PATH)
+    conn.execute("DELETE FROM email_history")
+    conn.commit()
+    conn.close()
+
+    client = hosted_send_env
+    resp = client.get("/newsletter")
+    assert resp.status_code == 200
+    assert b"No newsletter yet" in resp.data
+
+def test_hosted_newsletter_shows_most_recent_standard_send(hosted_send_env):
+    client = hosted_send_env
+    _post_send(client, {
+        "to_emails": "a@b.c, d@e.f", "subject": "Manual News", "email_header_title": "The Header",
+        "selected_items": [{"type": "textblock", "content": "Manual hello"}],
+        "custom_html": "", "user_dict": {}, "expanded_collections": {},
+    })
+
+    resp = client.get("/newsletter")
+    assert resp.status_code == 200
+    assert b"Manual hello" in resp.data
+    # the hosted copy must never carry a real per-recipient unsubscribe token
+    assert b"/u/__UNSUB_TOKEN_" not in resp.data
+    assert b"List-Unsubscribe" not in resp.data
+
+def test_hosted_newsletter_never_shows_personalized_recommendations_send(hosted_send_env):
+    client = hosted_send_env
+    _post_send(client, {
+        "to_emails": "a@b.c, d@e.f", "subject": "Manual Picks", "email_header_title": "The Header",
+        "selected_items": [
+            {"type": "textblock", "content": "Manual personal intro"},
+            {"type": "recommendations", "userKey": "1"},
+        ],
+        "custom_html": "", "user_dict": {"1": "a@b.c", "2": "d@e.f"}, "expanded_collections": {},
+    })
+
+    from app import config
+    conn = sqlite3.connect(config.DB_PATH)
+    row = conn.execute("SELECT hosted_html FROM email_history ORDER BY id DESC LIMIT 1").fetchone()
+    conn.close()
+    assert row[0] is None
+
+    resp = client.get("/newsletter")
+    assert resp.status_code == 200
+    assert b"Manual personal intro" not in resp.data  # personalized content never leaks to the public page
+
+def test_hosted_newsletter_never_populated_for_test_sends(hosted_send_env):
+    client = hosted_send_env
+    resp = client.post("/send_test_email", json={
+        "subject": "Manual News", "email_header_title": "The Header",
+        "selected_items": [{"type": "textblock", "content": "Test body"}],
+        "custom_html": "", "user_dict": {}, "expanded_collections": {},
+    }, headers={"X-CSRF-Token": "golden-token"})
+    assert resp.status_code == 200
+
+    from app import config
+    conn = sqlite3.connect(config.DB_PATH)
+    row = conn.execute("SELECT hosted_html FROM email_history ORDER BY id DESC LIMIT 1").fetchone()
+    conn.close()
+    assert row[0] is None
+
+# --- hosted images
+
+class _FakeImageResponse:
+    def __init__(self, content=b"\x89PNG\r\n\x1a\nfake-bytes-padded-out-past-the-100-byte-minimum-size-check-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", content_type="image/png"):
+        self.content = content
+        self.headers = {"Content-Type": content_type}
+        self.status_code = 200
+    def raise_for_status(self):
+        pass
+
+@pytest.fixture()
+def hosted_images_send_env(hosted_send_env, monkeypatch):
+    from app import config
+    conn = sqlite3.connect(config.DB_PATH)
+    conn.execute("UPDATE settings SET hosted_images_enabled='enabled' WHERE id = 1")
+    conn.commit()
+    conn.close()
+
+    from app.emails import images as images_mod
+    monkeypatch.setattr(images_mod, "safe_get", lambda *a, **k: _FakeImageResponse())
+    return hosted_send_env
+
+def test_manual_standard_email_hosted_images_golden(hosted_images_send_env):
+    client = hosted_images_send_env
+    resp = _post_send(client, {
+        "to_emails": "a@b.c, d@e.f", "subject": "Manual News", "email_header_title": "The Header",
+        "selected_items": [
+            {"type": "textblock", "content": "Manual hello"},
+            {"type": "image", "src": "https://example.com/test.png", "width": 400, "align": "center"},
+        ],
+        "custom_html": "", "user_dict": {}, "expanded_collections": {},
+    })
+    assert resp.status_code == 200
+    assert resp.get_json().get("success") is True
+
+    sends = [s for inst in RecorderSMTP.instances for s in inst.sent]
+    assert len(sends) >= 1
+    _, _, content = sends[0]
+    normalized = _normalize(content)
+    assert "https://nl.example.com/i/" in normalized["html"]
+    # no image MIME parts attached, everything went hosted, not CID
+    image_parts = [p for p in normalized["parts"] if p["content_type"].startswith("image/")]
+    assert image_parts == []
+
+def test_hosted_image_write_failure_falls_back_to_cid(hosted_images_send_env, monkeypatch):
+    from app.emails import images as images_mod
+    monkeypatch.setattr(images_mod, "save_hosted_image", lambda *a, **k: (_ for _ in ()).throw(OSError("disk full")))
+
+    client = hosted_images_send_env
+    resp = _post_send(client, {
+        "to_emails": "a@b.c, d@e.f", "subject": "Manual News", "email_header_title": "The Header",
+        "selected_items": [
+            {"type": "image", "src": "https://example.com/test.png", "width": 400, "align": "center"},
+        ],
+        "custom_html": "", "user_dict": {}, "expanded_collections": {},
+    })
+    assert resp.status_code == 200
+
+    sends = [s for inst in RecorderSMTP.instances for s in inst.sent]
+    _, _, content = sends[0]
+    normalized = _normalize(content)
+    assert "cid:" in normalized["html"]
+    assert "https://nl.example.com/i/" not in normalized["html"]
+    image_parts = [p for p in normalized["parts"] if p["content_type"].startswith("image/")]
+    assert len(image_parts) >= 1

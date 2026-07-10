@@ -6,7 +6,7 @@ from app import config, state
 from app.db import db_connect
 from app.settings_store import get_settings
 from app.cache import get_cache_info, set_cached_data
-from app.store import update_schedule_last_sent, advance_schedule_next_send
+from app.store import update_schedule_last_sent, advance_schedule_next_send, cleanup_expired_hosted_images
 from app.clients.tautulli import run_tautulli_command
 from app.clients.github import _background_update_checker
 from app.emails.fetchers import fetch_recent_data_for_index
@@ -28,12 +28,13 @@ def start_background_workers():
 def background_scheduler():
     logger.info("Background scheduler started...")
     last_cache_refresh = 0
-    
+    last_hosted_cleanup = 0
+
     while True:
         try:
             now = datetime.now()
             current_time = time.time()
-            
+
             if current_time - last_cache_refresh > config.CACHE_DURATION:
                 cache_info = get_cache_info('recent_data')
                 if cache_info.get('exists') and cache_info.get('age_hours', 999) * 3600 < 60:
@@ -43,7 +44,14 @@ def background_scheduler():
                     logger.info(f"Daily cache refresh triggered at {now.isoformat()}")
                     refresh_daily_cache()
                     last_cache_refresh = current_time
-            
+
+            if current_time - last_hosted_cleanup > config.CACHE_DURATION:
+                try:
+                    cleanup_expired_hosted_images()
+                except Exception as e:
+                    logger.error(f"Error cleaning up expired hosted images: {e}")
+                last_hosted_cleanup = current_time
+
             conn = db_connect()
             cursor = conn.cursor()
             

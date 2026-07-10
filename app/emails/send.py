@@ -1,4 +1,4 @@
-import json, os, smtplib
+import json, smtplib
 
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -6,9 +6,11 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.utils import formataddr
 
+from app import config
 from app.clients.tautulli import run_tautulli_command
 from app.db import db_connect
-from app.store import record_email_history
+from app.store import filter_suppressed, record_email_history
+from app.tokens import make_unsubscribe_placeholder, sign_unsubscribe_token
 from app.emails.assemble import convert_html_to_plain_text, build_email_html_with_all_cids
 from app.emails.fetchers import get_current_tautulli_data_for_email, get_recommendations_for_users, get_droppedneedle_wrapped_for_users, get_droppedneedle_server_stats_cached, get_yearly_wrapped_cached, get_sonarr_coming_soon_cached, get_radarr_coming_soon_cached
 
@@ -24,6 +26,36 @@ def group_recipients_by_user(to_emails_list, user_dict):
         groups[key].append(email)
     return groups
 
+def send_personalized_per_recipient(server, msg_root, from_addr, recipients, email_html, plain_text,
+                                     unsub_placeholder, hosted_base_url, send_mode):
+    """Sends msg_root once per recipient, swapping in that recipient's own
+    signed unsubscribe token for the shared placeholder embedded in
+    email_html/plain_text at build time."""
+    image_parts = msg_root.get_payload()[1:]
+    last_content = None
+    for recipient in recipients:
+        token = sign_unsubscribe_token(recipient)
+        personalized_html = email_html.replace(unsub_placeholder, token)
+        personalized_plain = plain_text.replace(unsub_placeholder, token)
+
+        alt = MIMEMultipart('alternative')
+        alt.attach(MIMEText(personalized_plain, 'plain', 'utf-8'))
+        alt.attach(MIMEText(personalized_html, 'html', 'utf-8'))
+        msg_root.set_payload([alt] + image_parts)
+
+        if 'List-Unsubscribe' in msg_root:
+            del msg_root['List-Unsubscribe']
+        msg_root['List-Unsubscribe'] = f'<mailto:{from_addr}?subject=unsubscribe>, <{hosted_base_url}/u/{token}>'
+        if 'List-Unsubscribe-Post' not in msg_root:
+            msg_root['List-Unsubscribe-Post'] = 'List-Unsubscribe=One-Click'
+
+        if send_mode == 'to':
+            msg_root.replace_header('To', recipient)
+
+        last_content = msg_root.as_string()
+        server.sendmail(from_addr, [recipient], last_content)
+    return last_content
+
 @dataclass
 class SendRequest:
     """Per-request data for a manual send; settings travel separately."""
@@ -33,10 +65,15 @@ class SendRequest:
     custom_html: str = ''
     expanded_collections: dict = field(default_factory=dict)
     user_dict: dict = field(default_factory=dict)
+    is_test: bool = False
 
 def send_standard_email_with_cids(req, settings, to_emails):
     """Returns (payload, http_status), the route wraps it in jsonify."""
     try:
+        to_emails, _suppressed = filter_suppressed(to_emails)
+        if not to_emails:
+            return {"error": "All recipients have unsubscribed"}, 400
+
         from_email = settings.get("from_email") or ""
         alias_email = settings.get("alias_email") or ""
         reply_to_email = settings.get("reply_to_email") or ""
@@ -99,9 +136,16 @@ def send_standard_email_with_cids(req, settings, to_emails):
             'custom_html': custom_html
         }
 
-        base_url = os.environ.get("PUBLIC_BASE_URL", "http://127.0.0.1:6397")
+        base_url = config.INTERNAL_BASE_URL
 
-        email_html = build_email_html_with_all_cids(
+        hosted_enabled = settings.get("hosted_enabled") == "enabled"
+        hosted_base_url = (settings.get("hosted_base_url") or "").rstrip('/')
+        hosted_images_enabled = settings.get("hosted_images_enabled") == "enabled"
+        use_personalized_send = hosted_enabled and bool(hosted_base_url)
+        unsub_placeholder = make_unsubscribe_placeholder() if use_personalized_send else None
+        build_hosted_variant = use_personalized_send and not req.is_test
+
+        email_html, hosted_html = build_email_html_with_all_cids(
             template_data,
             tautulli_data,
             msg_root,
@@ -119,12 +163,17 @@ def send_standard_email_with_cids(req, settings, to_emails):
             droppedneedle_server_data=droppedneedle_server_data,
             yearly_wrapped_data=yearly_wrapped_data,
             sonarr_coming_soon_data=sonarr_coming_soon_data,
-            radarr_coming_soon_data=radarr_coming_soon_data
+            radarr_coming_soon_data=radarr_coming_soon_data,
+            unsubscribe_placeholder=unsub_placeholder,
+            hosted_base_url=hosted_base_url,
+            hosted_images_enabled=hosted_images_enabled,
+            build_hosted_variant=build_hosted_variant
         )
 
         plain_text = convert_html_to_plain_text(email_html)
-        msg_alternative.attach(MIMEText(plain_text, 'plain', 'utf-8'))
-        msg_alternative.attach(MIMEText(email_html, 'html', 'utf-8'))
+        if not use_personalized_send:
+            msg_alternative.attach(MIMEText(plain_text, 'plain', 'utf-8'))
+            msg_alternative.attach(MIMEText(email_html, 'html', 'utf-8'))
 
         logger.info(f"Attempting SMTP connection...")
 
@@ -142,31 +191,37 @@ def send_standard_email_with_cids(req, settings, to_emails):
             server.login(login_username, password)
 
         logger.info("SMTP connection established successfully")
-            
-        email_content = msg_root.as_string()
-
-        content_size_kb = len(email_content.encode('utf-8')) / 1024
-        content_size_mb = len(email_content.encode('utf-8')) / (1024 * 1024)
-        logger.info(f"Email size: {content_size_mb:.2f} MB")
-        if content_size_mb > 25:
-            logger.warning("WARNING: Email exceeds typical size limits")
 
         logger.info("Sending email...")
 
         from_addr = alias_email if alias_email else from_email
-        if send_mode == 'to':
+        if use_personalized_send:
+            all_recipients = to_emails if send_mode == 'to' else [from_addr] + to_emails
+            email_content = send_personalized_per_recipient(
+                server, msg_root, from_addr, all_recipients, email_html, plain_text,
+                unsub_placeholder, hosted_base_url, send_mode
+            )
+        elif send_mode == 'to':
+            email_content = msg_root.as_string()
             for recipient in to_emails:
                 msg_root.replace_header('To', recipient)
                 server.sendmail(from_addr, [recipient], msg_root.as_string())
             all_recipients = to_emails
         else:
+            email_content = msg_root.as_string()
             server.sendmail(from_addr, [from_addr] + to_emails, email_content)
             all_recipients = [from_addr] + to_emails
+
+        content_size_kb = len((email_content or "").encode('utf-8')) / 1024
+        content_size_mb = content_size_kb / 1024
+        logger.info(f"Email size: {content_size_mb:.2f} MB")
+        if content_size_mb > 25:
+            logger.warning("WARNING: Email exceeds typical size limits")
 
         logger.info(f"Email sent successfully!")
 
         record_email_history(subject, ', '.join(all_recipients), email_content,
-                             round(content_size_kb, 2), len(all_recipients), 'Manual')
+                             round(content_size_kb, 2), len(all_recipients), 'Manual', hosted_html=hosted_html)
 
         server.quit()
         return {"success": True, "sent_to": ', '.join(all_recipients), "size": content_size_kb}, 200
@@ -190,6 +245,10 @@ def send_standard_email_with_cids(req, settings, to_emails):
 def send_recommendations_email_with_cids(req, settings, to_emails):
     """Returns (payload, http_status), the route wraps it in jsonify."""
     try:
+        to_emails, _suppressed = filter_suppressed(to_emails)
+        if not to_emails:
+            return {"error": "All recipients have unsubscribed"}, 400
+
         selected_items = req.selected_items
         user_dict = req.user_dict
         rec_user_keys = set()
@@ -321,13 +380,23 @@ def send_single_user_email_with_cids(req, settings, recipients, user_key, recomm
             'custom_html': custom_html
         }
         
-        base_url = os.environ.get("PUBLIC_BASE_URL", "http://127.0.0.1:6397")
-        
+        base_url = config.INTERNAL_BASE_URL
+
+        hosted_enabled = settings.get("hosted_enabled") == "enabled"
+        hosted_base_url = (settings.get("hosted_base_url") or "").rstrip('/')
+        hosted_images_enabled = settings.get("hosted_images_enabled") == "enabled"
+        use_personalized_send = hosted_enabled and bool(hosted_base_url)
+        unsub_placeholder = make_unsubscribe_placeholder() if use_personalized_send else None
+
         user_dict = {user_key: recipients[0]} if recipients else {}
-        
-        email_html = build_email_html_with_all_cids(
-            template_data, 
-            tautulli_data, 
+
+        # never build_hosted_variant here: this is a personalized per-user
+        # send (recommendations/wrapped data), and the hosted newsletter page
+        # is public/unauthenticated, must never receive one recipient's
+        # personal data (see build_email_html_with_all_cids docstring)
+        email_html, _hosted_html_unused = build_email_html_with_all_cids(
+            template_data,
+            tautulli_data,
             msg_root,
             display_preference,
             users_full_data,
@@ -344,12 +413,16 @@ def send_single_user_email_with_cids(req, settings, recipients, user_key, recomm
             droppedneedle_server_data=droppedneedle_server_data,
             yearly_wrapped_data=yearly_wrapped_data,
             sonarr_coming_soon_data=sonarr_coming_soon_data,
-            radarr_coming_soon_data=radarr_coming_soon_data
+            radarr_coming_soon_data=radarr_coming_soon_data,
+            unsubscribe_placeholder=unsub_placeholder,
+            hosted_base_url=hosted_base_url,
+            hosted_images_enabled=hosted_images_enabled
         )
 
         plain_text = convert_html_to_plain_text(email_html)
-        msg_alternative.attach(MIMEText(plain_text, 'plain', 'utf-8'))
-        msg_alternative.attach(MIMEText(email_html, 'html', 'utf-8'))
+        if not use_personalized_send:
+            msg_alternative.attach(MIMEText(plain_text, 'plain', 'utf-8'))
+            msg_alternative.attach(MIMEText(email_html, 'html', 'utf-8'))
 
         logger.info(f"Attempting SMTP connection...")
 
@@ -367,26 +440,32 @@ def send_single_user_email_with_cids(req, settings, recipients, user_key, recomm
             server.login(login_username, password)
 
         logger.info("SMTP connection established successfully")
-            
-        email_content = msg_root.as_string()
 
-        content_size_kb = len(email_content.encode('utf-8')) / 1024
-        content_size_mb = len(email_content.encode('utf-8')) / (1024 * 1024)
-        logger.info(f"Email size: {content_size_mb:.2f} MB")
-        if content_size_mb > 25:
-            logger.warning("WARNING: Email exceeds typical size limits")
-        
         logger.info("Sending email...")
 
         from_addr = alias_email if alias_email else from_email
-        if send_mode == 'to':
+        if use_personalized_send:
+            all_recipients = recipients if send_mode == 'to' else [from_addr] + recipients
+            email_content = send_personalized_per_recipient(
+                server, msg_root, from_addr, all_recipients, email_html, plain_text,
+                unsub_placeholder, hosted_base_url, send_mode
+            )
+        elif send_mode == 'to':
+            email_content = msg_root.as_string()
             for recipient in recipients:
                 msg_root.replace_header('To', recipient)
                 server.sendmail(from_addr, [recipient], msg_root.as_string())
             all_recipients = recipients
         else:
+            email_content = msg_root.as_string()
             server.sendmail(from_addr, [from_addr] + recipients, email_content)
             all_recipients = [from_addr] + recipients
+
+        content_size_kb = len((email_content or "").encode('utf-8')) / 1024
+        content_size_mb = content_size_kb / 1024
+        logger.info(f"Email size: {content_size_mb:.2f} MB")
+        if content_size_mb > 25:
+            logger.warning("WARNING: Email exceeds typical size limits")
 
         server.quit()
         logger.info(f"Email sent successfully!")

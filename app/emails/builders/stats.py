@@ -76,23 +76,25 @@ def get_stat_cells(title, row, hide_play_counts=False):
 
     return cells
 
-def build_stats_html_with_cid_background(stat_data, msg_root, theme_colors, base_url="", date_range="", hide_play_counts=False, show_cover_art=False):
+def build_stats_html_with_cid_background(stat_data, msg_root, theme_colors, base_url="", date_range="", hide_play_counts=False, show_cover_art=False, hosted_images_enabled=False, hosted_base_url=""):
     if not stat_data or not stat_data.get('rows'):
         return ""
-    
+
     title = stat_data.get('stat_title', 'Statistics')
     rows = stat_data['rows']
-    
-    background_cid = None
+
+    background_src = None
     if rows and (rows[0].get('art') or rows[0].get('grandparent_thumb')):
         artwork_path = rows[0].get('art') or rows[0].get('grandparent_thumb')
         if artwork_path:
             image_url = f"/proxy-art{artwork_path}" if not artwork_path.startswith('/proxy-art') else artwork_path
-            background_cid = fetch_and_attach_blurred_image(
-                image_url, 
-                msg_root, 
-                f"stat-bg-{len(msg_root.get_payload())}", 
-                base_url
+            background_src = fetch_and_attach_blurred_image(
+                image_url,
+                msg_root,
+                f"stat-bg-{len(msg_root.get_payload())}",
+                base_url,
+                hosted_images_enabled=hosted_images_enabled,
+                hosted_base_url=hosted_base_url
             )
     
     headers = get_stat_headers(title, hide_play_counts=hide_play_counts)
@@ -116,9 +118,9 @@ def build_stats_html_with_cid_background(stat_data, msg_root, theme_colors, base
             thumb_path = row.get('thumb', '') or row.get('grandparent_thumb', '')
             if thumb_path:
                 proxy_path = f"/proxy-art{thumb_path}" if not thumb_path.startswith('/proxy-art') else thumb_path
-                thumb_cid = fetch_and_attach_small_thumbnail(proxy_path, msg_root, f"stat-thumb-{len(msg_root.get_payload())}", base_url)
-                if thumb_cid:
-                    cells[0] = f'<img src="cid:{thumb_cid}" style="height:38px;width:auto;border-radius:3px;margin-right:7px;vertical-align:middle;">{cells[0]}'
+                thumb_src = fetch_and_attach_small_thumbnail(proxy_path, msg_root, f"stat-thumb-{len(msg_root.get_payload())}", base_url, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
+                if thumb_src:
+                    cells[0] = f'<img src="{thumb_src}" style="height:38px;width:auto;border-radius:3px;margin-right:7px;vertical-align:middle;">{cells[0]}'
         cells_html = "".join([
             f'<td style="padding: 12px; background-color: rgba(255, 255, 255, 0.5); color: #333; border-bottom: 1px solid rgba(222, 226, 230, 0.8); font-family: \'IBM Plex Sans\', \'Segoe UI\', Helvetica, Arial, sans-serif; font-size: 14px;">{cell}</td>'
             for cell in cells
@@ -135,18 +137,18 @@ def build_stats_html_with_cid_background(stat_data, msg_root, theme_colors, base
         font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
     """
     
-    if background_cid:
+    if background_src:
         container_style += f"""
-            background-image: url('cid:{background_cid}');
+            background-image: url('{background_src}');
             background-size: cover;
             background-position: center;
             background-repeat: no-repeat;
         """
     else:
         container_style += f"background-color: {theme_colors['card_bg']};"
-    
+
     overlay = ""
-    if background_cid:
+    if background_src:
         overlay = f"""
             <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; 
                         background-color: rgba(0, 0, 0, 0.3); z-index: 0;"></div>

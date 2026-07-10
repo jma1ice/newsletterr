@@ -9,11 +9,11 @@ from app.log import setup_logging
 def create_app():
     setup_logging()
 
-    from app.blueprints import api, auth, emails, logs, main, scheduling, settings, stats
+    from app.blueprints import api, auth, emails, logs, main, public, scheduling, settings, stats
 
     app = Flask(__name__, template_folder = str(config.ASSET_ROOT / 'templates'), static_folder = str(config.ASSET_ROOT / 'static'))
 
-    for module in (api, auth, emails, logs, main, scheduling, settings, stats):
+    for module in (api, auth, emails, logs, main, public, scheduling, settings, stats):
         app.register_blueprint(module.bp)
 
     app.config["GITHUB_OWNER"] = config.GITHUB_OWNER
@@ -27,6 +27,7 @@ def create_app():
     app.jinja_env.globals["get_cache_status"] = cache.get_global_cache_status
 
     os.makedirs("database", exist_ok=True)
+    os.makedirs(os.path.join("database", "hosted_images"), exist_ok=True)
 
     db.migrate_data_from_separate_dbs()
     db.migrate_musicseerr_to_droppedneedle()
@@ -43,6 +44,7 @@ def create_app():
     db.migrate_email_templates_for_expanded_collections()
     db.migrate_email_templates_for_header_title()
     db.migrate_email_templates_for_custom_html()
+    db.migrate_email_history_for_hosted_html()
 
     state.plex_headers = plex.get_plex_headers()
 

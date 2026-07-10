@@ -108,6 +108,22 @@ def init_db(db_path):
         logger.warning(f"Warning: could not ensure email_history columns exist: {_e}")
     
     cursor.execute("""
+        CREATE TABLE IF NOT EXISTS suppressed_emails (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT UNIQUE NOT NULL COLLATE NOCASE,
+            unsubscribed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS hosted_images (
+            token TEXT PRIMARY KEY,
+            content_type TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    cursor.execute("""
         CREATE TABLE IF NOT EXISTS email_schedules (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
@@ -204,7 +220,7 @@ def init_db(db_path):
 
     cursor.execute("PRAGMA table_info(settings)")
     columns = [column[1] for column in cursor.fetchall()]
-    for col_name, col_def in [('default_intro_text', 'TEXT DEFAULT ""'), ('default_outro_text', 'TEXT DEFAULT ""'), ('hsts_enabled', 'TEXT DEFAULT "disabled"'), ('scheduled_subject_prefix', 'TEXT DEFAULT "enabled"'), ('logo_position', 'TEXT DEFAULT "center"'), ('hide_stat_play_counts', 'TEXT DEFAULT "disabled"'), ('hide_graph_play_counts', 'TEXT DEFAULT "disabled"'), ('stats_type', 'TEXT DEFAULT "plays"'), ('recently_added_mode', 'TEXT DEFAULT "items"'), ('recently_added_sort', 'TEXT DEFAULT "date"'), ('ra_grid_columns', 'TEXT DEFAULT "5"'), ('recs_grid_columns', 'TEXT DEFAULT "5"'), ('stat_cover_art', 'TEXT DEFAULT "disabled"'), ('send_mode', 'TEXT DEFAULT "bcc"'), ('poster_max_height', 'TEXT DEFAULT ""'), ('droppedneedle_url', 'TEXT DEFAULT ""'), ('droppedneedle_api_key', 'TEXT DEFAULT ""'), ('discord_webhook_url', 'TEXT DEFAULT ""'), ('sonarr_url', 'TEXT DEFAULT ""'), ('sonarr_api_key', 'TEXT DEFAULT ""'), ('radarr_url', 'TEXT DEFAULT ""'), ('radarr_api_key', 'TEXT DEFAULT ""'), ('coming_soon_days_ahead', 'TEXT DEFAULT "14"'), ('coming_soon_grid_columns', 'TEXT DEFAULT "5"')]:
+    for col_name, col_def in [('default_intro_text', 'TEXT DEFAULT ""'), ('default_outro_text', 'TEXT DEFAULT ""'), ('hsts_enabled', 'TEXT DEFAULT "disabled"'), ('scheduled_subject_prefix', 'TEXT DEFAULT "enabled"'), ('logo_position', 'TEXT DEFAULT "center"'), ('hide_stat_play_counts', 'TEXT DEFAULT "disabled"'), ('hide_graph_play_counts', 'TEXT DEFAULT "disabled"'), ('stats_type', 'TEXT DEFAULT "plays"'), ('recently_added_mode', 'TEXT DEFAULT "items"'), ('recently_added_sort', 'TEXT DEFAULT "date"'), ('ra_grid_columns', 'TEXT DEFAULT "5"'), ('recs_grid_columns', 'TEXT DEFAULT "5"'), ('stat_cover_art', 'TEXT DEFAULT "disabled"'), ('send_mode', 'TEXT DEFAULT "bcc"'), ('poster_max_height', 'TEXT DEFAULT ""'), ('droppedneedle_url', 'TEXT DEFAULT ""'), ('droppedneedle_api_key', 'TEXT DEFAULT ""'), ('discord_webhook_url', 'TEXT DEFAULT ""'), ('sonarr_url', 'TEXT DEFAULT ""'), ('sonarr_api_key', 'TEXT DEFAULT ""'), ('radarr_url', 'TEXT DEFAULT ""'), ('radarr_api_key', 'TEXT DEFAULT ""'), ('coming_soon_days_ahead', 'TEXT DEFAULT "14"'), ('coming_soon_grid_columns', 'TEXT DEFAULT "5"'), ('hosted_enabled', 'TEXT DEFAULT "disabled"'), ('hosted_base_url', 'TEXT DEFAULT ""'), ('hosted_images_enabled', 'TEXT DEFAULT "disabled"')]:
         if col_name not in columns:
             logger.info(f"Adding {col_name} column to settings table...")
             cursor.execute(f'ALTER TABLE settings ADD COLUMN {col_name} {col_def}')
@@ -445,3 +461,17 @@ def migrate_email_templates_for_custom_html():
         conn.close()
     except Exception as e:
         logger.exception(f"Error migrating email_templates for custom_html: {e}")
+
+def migrate_email_history_for_hosted_html():
+    try:
+        conn = db_connect()
+        cursor = conn.cursor()
+        cursor.execute("PRAGMA table_info(email_history)")
+        columns = [column[1] for column in cursor.fetchall()]
+        if 'hosted_html' not in columns:
+            logger.info("Adding hosted_html column to email_history table...")
+            cursor.execute("ALTER TABLE email_history ADD COLUMN hosted_html TEXT")
+            conn.commit()
+        conn.close()
+    except Exception as e:
+        logger.exception(f"Error migrating email_history for hosted_html: {e}")

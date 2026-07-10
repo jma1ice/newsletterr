@@ -1,13 +1,14 @@
-import json, os, smtplib
+import json, smtplib
 
 from dataclasses import dataclass, field
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.utils import formataddr
 
+from app import config
 from app.db import db_connect
 from app.settings_store import get_settings
-from app.store import record_email_history
+from app.store import filter_suppressed, record_email_history
 from app.render import capture_chart_images_via_headless
 from app.clients.tautulli import run_tautulli_command, days_since_year_start
 from app.clients.conjurr import run_conjurr_command
@@ -16,9 +17,10 @@ from app.clients.sonarr import fetch_sonarr_calendar
 from app.clients.radarr import fetch_radarr_calendar
 
 from datetime import datetime, timedelta
+from app.tokens import make_unsubscribe_placeholder
 from app.emails.assemble import convert_html_to_plain_text, build_email_html_with_all_cids
 from app.emails.fetchers import fetch_tautulli_data_for_email
-from app.emails.send import group_recipients_by_user
+from app.emails.send import group_recipients_by_user, send_personalized_per_recipient
 
 import logging
 
@@ -94,7 +96,12 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
             
             to_emails = email_list_result[0]
             to_emails_list = [email.strip() for email in to_emails.split(",")]
-        
+
+        to_emails_list, _suppressed = filter_suppressed(to_emails_list)
+        if not to_emails_list:
+            logger.info("All recipients have unsubscribed; skipping scheduled send")
+            return False
+
         templates_conn = db_connect()
         templates_cursor = templates_conn.cursor()
         templates_cursor.execute("SELECT name, subject, email_text, selected_items, expanded_collections, email_header_title, custom_html FROM email_templates WHERE id = ?", (template_id,))
@@ -115,7 +122,7 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
             logger.error("SMTP settings not found in database")
             return False
 
-        public_base = os.environ.get("PUBLIC_BASE_URL", "http://127.0.0.1:6397")
+        public_base = config.INTERNAL_BASE_URL
         theme = 'dark'
         
         logger.info("Capturing chart images...")
@@ -380,11 +387,20 @@ def send_scheduled_user_email_with_cids(ctx, settings, recipients, user_key):
             'custom_html': custom_html
         }
 
-        base_url = os.environ.get("PUBLIC_BASE_URL", "http://127.0.0.1:6397")
+        base_url = config.INTERNAL_BASE_URL
+
+        hosted_enabled = settings.get("hosted_enabled") == "enabled"
+        hosted_base_url = (settings.get("hosted_base_url") or "").rstrip('/')
+        hosted_images_enabled = settings.get("hosted_images_enabled") == "enabled"
+        use_personalized_send = hosted_enabled and bool(hosted_base_url)
+        unsub_placeholder = make_unsubscribe_placeholder() if use_personalized_send else None
 
         user_dict = {user_key: recipients[0]} if recipients else {}
 
-        email_html = build_email_html_with_all_cids(
+        # never build_hosted_variant here: this is a personalized per-user
+        # scheduled send, and the hosted newsletter page is public/
+        # unauthenticated, must never receive one recipient's personal data
+        email_html, _hosted_html_unused = build_email_html_with_all_cids(
             template_data,
             tautulli_data,
             msg_root,
@@ -403,12 +419,16 @@ def send_scheduled_user_email_with_cids(ctx, settings, recipients, user_key):
             droppedneedle_server_data=droppedneedle_server_data,
             yearly_wrapped_data=yearly_wrapped_data,
             sonarr_coming_soon_data=sonarr_coming_soon_data,
-            radarr_coming_soon_data=radarr_coming_soon_data
+            radarr_coming_soon_data=radarr_coming_soon_data,
+            unsubscribe_placeholder=unsub_placeholder,
+            hosted_base_url=hosted_base_url,
+            hosted_images_enabled=hosted_images_enabled
         )
 
         plain_text = convert_html_to_plain_text(email_html)
-        msg_alternative.attach(MIMEText(plain_text, 'plain', 'utf-8'))
-        msg_alternative.attach(MIMEText(email_html, 'html', 'utf-8'))
+        if not use_personalized_send:
+            msg_alternative.attach(MIMEText(plain_text, 'plain', 'utf-8'))
+            msg_alternative.attach(MIMEText(email_html, 'html', 'utf-8'))
 
         logger.info(f"Attempting SMTP connection...")
 
@@ -424,28 +444,34 @@ def send_scheduled_user_email_with_cids(ctx, settings, recipients, user_key):
             server.starttls()
             login_username = smtp_username if smtp_username else from_email
             server.login(login_username, password)
-        
-        logger.info("SMTP connection established successfully")
-        
-        email_content = msg_root.as_string()
 
-        content_size_kb = len(email_content.encode('utf-8')) / 1024
-        content_size_mb = len(email_content.encode('utf-8')) / (1024 * 1024)
-        logger.info(f"Email size: {content_size_mb:.2f} MB")
-        if content_size_mb > 25:
-            logger.warning("WARNING: Email exceeds typical size limits")
+        logger.info("SMTP connection established successfully")
 
         logger.info("Sending email...")
 
         from_addr = alias_email if alias_email else from_email
-        if send_mode == 'to':
+        if use_personalized_send:
+            all_recipients = recipients if send_mode == 'to' else [from_addr] + recipients
+            email_content = send_personalized_per_recipient(
+                server, msg_root, from_addr, all_recipients, email_html, plain_text,
+                unsub_placeholder, hosted_base_url, send_mode
+            )
+        elif send_mode == 'to':
+            email_content = msg_root.as_string()
             for recipient in recipients:
                 msg_root.replace_header('To', recipient)
                 server.sendmail(from_addr, [recipient], msg_root.as_string())
             all_recipients = recipients
         else:
+            email_content = msg_root.as_string()
             server.sendmail(from_addr, [from_addr] + recipients, email_content)
             all_recipients = [from_addr] + recipients
+
+        content_size_kb = len((email_content or "").encode('utf-8')) / 1024
+        content_size_mb = content_size_kb / 1024
+        logger.info(f"Email size: {content_size_mb:.2f} MB")
+        if content_size_mb > 25:
+            logger.warning("WARNING: Email exceeds typical size limits")
 
         server.quit()
         logger.info(f"Email sent successfully!")
@@ -576,9 +602,15 @@ def send_scheduled_single_email_with_cids(ctx, settings, to_emails_list):
             'custom_html': custom_html
         }
 
-        base_url = os.environ.get("PUBLIC_BASE_URL", "http://127.0.0.1:6397")
+        base_url = config.INTERNAL_BASE_URL
 
-        email_html = build_email_html_with_all_cids(
+        hosted_enabled = settings.get("hosted_enabled") == "enabled"
+        hosted_base_url = (settings.get("hosted_base_url") or "").rstrip('/')
+        hosted_images_enabled = settings.get("hosted_images_enabled") == "enabled"
+        use_personalized_send = hosted_enabled and bool(hosted_base_url)
+        unsub_placeholder = make_unsubscribe_placeholder() if use_personalized_send else None
+
+        email_html, hosted_html = build_email_html_with_all_cids(
             template_data,
             tautulli_data,
             msg_root,
@@ -596,12 +628,17 @@ def send_scheduled_single_email_with_cids(ctx, settings, to_emails_list):
             droppedneedle_server_data=droppedneedle_server_data,
             yearly_wrapped_data=yearly_wrapped_data,
             sonarr_coming_soon_data=sonarr_coming_soon_data,
-            radarr_coming_soon_data=radarr_coming_soon_data
+            radarr_coming_soon_data=radarr_coming_soon_data,
+            unsubscribe_placeholder=unsub_placeholder,
+            hosted_base_url=hosted_base_url,
+            hosted_images_enabled=hosted_images_enabled,
+            build_hosted_variant=use_personalized_send
         )
 
         plain_text = convert_html_to_plain_text(email_html)
-        msg_alternative.attach(MIMEText(plain_text, 'plain', 'utf-8'))
-        msg_alternative.attach(MIMEText(email_html, 'html', 'utf-8'))
+        if not use_personalized_send:
+            msg_alternative.attach(MIMEText(plain_text, 'plain', 'utf-8'))
+            msg_alternative.attach(MIMEText(email_html, 'html', 'utf-8'))
 
         logger.info(f"Attempting SMTP connection...")
 
@@ -617,34 +654,40 @@ def send_scheduled_single_email_with_cids(ctx, settings, to_emails_list):
             server.starttls()
             login_username = smtp_username if smtp_username else from_email
             server.login(login_username, password)
-        
-        logger.info("SMTP connection established successfully")
-        
-        email_content = msg_root.as_string()
 
-        content_size_kb = len(email_content.encode('utf-8')) / 1024
-        content_size_mb = len(email_content.encode('utf-8')) / (1024 * 1024)
-        logger.info(f"Email size: {content_size_mb:.2f} MB")
-        if content_size_mb > 25:
-            logger.warning("WARNING: Email exceeds typical size limits")
+        logger.info("SMTP connection established successfully")
 
         logger.info("Sending email...")
 
         from_addr = alias_email if alias_email else from_email
-        if send_mode == 'to':
+        if use_personalized_send:
+            all_recipients = to_emails_list if send_mode == 'to' else [from_addr] + to_emails_list
+            email_content = send_personalized_per_recipient(
+                server, msg_root, from_addr, all_recipients, email_html, plain_text,
+                unsub_placeholder, hosted_base_url, send_mode
+            )
+        elif send_mode == 'to':
+            email_content = msg_root.as_string()
             for recipient in to_emails_list:
                 msg_root.replace_header('To', recipient)
                 server.sendmail(from_addr, [recipient], msg_root.as_string())
             all_recipients = to_emails_list
         else:
+            email_content = msg_root.as_string()
             server.sendmail(from_addr, [from_addr] + to_emails_list, email_content)
             all_recipients = [from_addr] + to_emails_list
+
+        content_size_kb = len((email_content or "").encode('utf-8')) / 1024
+        content_size_mb = content_size_kb / 1024
+        logger.info(f"Email size: {content_size_mb:.2f} MB")
+        if content_size_mb > 25:
+            logger.warning("WARNING: Email exceeds typical size limits")
 
         server.quit()
         logger.info(f"Email sent successfully!")
 
         record_email_history(f"[SCHEDULED] {subject}", ', '.join(all_recipients), email_content,
-                             content_size_kb, len(all_recipients), template_name)
+                             content_size_kb, len(all_recipients), template_name, hosted_html=hosted_html)
 
         logger.info(f"Scheduled email sent successfully to {len(all_recipients)} recipients")
         return True

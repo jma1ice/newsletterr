@@ -41,6 +41,9 @@ DEFAULTS = {
     "send_mode": "bcc",
     "hsts_enabled": "disabled",
     "coming_soon_days_ahead": "14",
+    "hosted_enabled": "disabled",
+    "hosted_base_url": "",
+    "hosted_images_enabled": "disabled",
 }
 
 INT_COLUMNS = {

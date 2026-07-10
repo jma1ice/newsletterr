@@ -1,7 +1,6 @@
 import uuid
 
 from datetime import datetime, timedelta
-from plex_api_client import PlexAPI
 from urllib.parse import quote_plus
 
 from app import config
@@ -54,16 +53,12 @@ def get_plex_machine_id():
         
         plex_url = plex_settings[0].rstrip('/')
         plex_token = decrypt(plex_settings[1])
-        
-        with PlexAPI(
-            access_token=plex_token,
-            server_url=plex_url
-        ) as plex_api:
-            res = plex_api.server.get_server_identity()
-            if res.object:
-                return res.object.media_container.machine_identifier
-        
-        return None
+
+        headers = get_plex_headers({'X-Plex-Token': plex_token})
+        response = safe_get(f"{plex_url}/identity", headers=headers, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+        return data.get('MediaContainer', {}).get('machineIdentifier')
     except Exception as e:
         logger.error(f"Error getting Plex machine ID: {e}")
         return None

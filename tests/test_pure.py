@@ -74,6 +74,37 @@ def test_sanitize_html_strips_event_handlers():
     out = sanitize_html('<img src="x" onerror="alert(1)">')
     assert "onerror" not in out
 
+def test_plain_text_decodes_entities():
+    from app.emails.assemble import convert_html_to_plain_text
+    out = convert_html_to_plain_text("<p>Hi &amp; welcome to <b>Marvel&#39;s</b> show</p>")
+    assert "&amp;" not in out and "&#39;" not in out
+    assert "Hi & welcome to Marvel's show" in out
+
+def test_plain_text_preserves_link_url():
+    from app.emails.assemble import convert_html_to_plain_text
+    out = convert_html_to_plain_text('<a href="https://plex.tv/watch">Watch Now</a>')
+    assert "Watch Now (https://plex.tv/watch)" in out
+
+def test_plain_text_separates_table_cells_and_lists():
+    from app.emails.assemble import convert_html_to_plain_text
+    table = convert_html_to_plain_text("<table><tr><td>A</td><td>B</td></tr></table>")
+    assert "A" in table and "B" in table and "AB" not in table  # not mashed together
+    lst = convert_html_to_plain_text("<ul><li>First</li><li>Second</li></ul>")
+    assert "- First" in lst and "- Second" in lst
+
+def test_plain_text_skips_script_style_and_surfaces_alt():
+    from app.emails.assemble import convert_html_to_plain_text
+    out = convert_html_to_plain_text('<style>.x{}</style><script>bad()</script><img alt="Poster"><p>Body</p>')
+    assert "bad()" not in out and ".x{}" not in out
+    assert "[Poster]" in out and "Body" in out
+
+def test_plain_text_handles_empty_and_malformed():
+    from app.emails.assemble import convert_html_to_plain_text
+    assert convert_html_to_plain_text("") == ""
+    assert convert_html_to_plain_text(None) == ""
+    # unclosed tags must not raise
+    assert "bold" in convert_html_to_plain_text("<p>unclosed <b>bold")
+
 def test_ensure_secret_key_persists_and_is_stable(tmp_path, monkeypatch):
     from app import config, crypto
 

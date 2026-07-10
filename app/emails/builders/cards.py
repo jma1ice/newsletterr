@@ -61,6 +61,7 @@ def build_individual_item_card_html(item, theme_colors, msg_root, base_url="", p
             logger.debug(f"Art CID result: {poster_cid}")
 
     if poster_cid:
+        meta_line = f"{type_icon} {subtitle}" if subtitle else type_icon
         return f"""
         <table cellpadding="0" cellspacing="0" border="0" style="
             background-color: {theme_colors['card_bg']};
@@ -69,60 +70,33 @@ def build_individual_item_card_html(item, theme_colors, msg_root, base_url="", p
             margin: 0;
         ">
             <tr>
-                <td style="
-                    background-image: url('cid:{poster_cid}');
-                    background-size: cover;
-                    background-position: center;
-                    background-repeat: no-repeat;
-                    height: 180px;
-                    background-color: #f8f9fa;
-                    border-radius: 12px;
-                    position: relative;
-                    vertical-align: top;
-                ">
-                    <table cellpadding="0" cellspacing="0" border="0" width="100%">
-                        <tr>
-                            <td style="text-align: right;">
-                                <div style="
-                                    background-color: rgba(0, 0, 0, 0.8);
-                                    color: white;
-                                    padding: 4px 6px;
-                                    border-radius: 4px;
-                                    font-size: 10px;
-                                    font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
-                                    line-height: 1;
-                                    display: inline-block;
-                                    margin: 6px;
-                                ">
-                                    {type_icon}
-                                </div>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td style="height: 148px; vertical-align: bottom;">
-                                <div style="
-                                    background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent);
-                                    border-radius: 0 0 11px 11px;
-                                    padding: 6px;
-                                ">
-                                    <div style="
-                                        font-weight: bold;
-                                        font-size: 11px;
-                                        color: white;
-                                        line-height: 1.2;
-                                        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
-                                    ">{display_title}</div>
-                                    {f'''<div style="
-                                        font-size: 9px;
-                                        color: #ccc;
-                                        line-height: 1.2;
-                                        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
-                                        margin-top: 2px;
-                                    ">{subtitle}</div>''' if subtitle else ''}
-                                </div>
-                            </td>
-                        </tr>
-                    </table>
+                <td style="padding: 0; line-height: 0; font-size: 0;">
+                    <img src="cid:{poster_cid}" alt="{display_title}" width="120" height="180" style="
+                        display: block;
+                        width: 120px;
+                        height: 180px;
+                        object-fit: cover;
+                        border-radius: 12px 12px 0 0;
+                        background-color: #f8f9fa;
+                    ">
+                </td>
+            </tr>
+            <tr>
+                <td style="padding: 6px;">
+                    <div style="
+                        font-weight: bold;
+                        font-size: 11px;
+                        color: {theme_colors['text']};
+                        line-height: 1.2;
+                        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
+                    ">{display_title}</div>
+                    <div style="
+                        font-size: 9px;
+                        color: {theme_colors['muted_text']};
+                        line-height: 1.2;
+                        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
+                        margin-top: 2px;
+                    ">{meta_line}</div>
                 </td>
             </tr>
         </table>
@@ -198,9 +172,9 @@ def build_collection_card_html(collection, theme_colors, msg_root, base_url="", 
     type_icon = '📽️' if subtype == 'movie' else '📺' if subtype == 'show' else '🎧'
     
     if poster_cid:
-        poster_bg_url = f"cid:{poster_cid}"
-        logger.debug(f"Final poster src for {collection_title}: {poster_bg_url}")
-        
+        poster_src = f"cid:{poster_cid}"
+        logger.debug(f"Final poster src for {collection_title}: {poster_src}")
+
         return f"""
             <table cellpadding="0" cellspacing="0" border="0" style="
                 background-color: {theme_colors['card_bg']};
@@ -209,53 +183,33 @@ def build_collection_card_html(collection, theme_colors, msg_root, base_url="", 
                 margin: 0;
             ">
                 <tr>
-                    <td style="
-                        background-image: url('{poster_bg_url}');
-                        background-size: cover;
-                        background-position: center;
-                        background-repeat: no-repeat;
-                        height: 180px;
-                        background-color: #f8f9fa;
-                        border-radius: 12px;
-                        position: relative;
-                        vertical-align: top;
-                    ">
-                        <table cellpadding="0" cellspacing="0" border="0" width="100%">
-                            <tr>
-                                <td style="text-align: right;">
-                                    <div style="
-                                        background-color: rgba(0, 0, 0, 0.8);
-                                        color: white;
-                                        padding: 4px 6px;
-                                        border-radius: 4px;
-                                        font-size: 10px;
-                                        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
-                                        line-height: 1;
-                                        display: inline-block;
-                                        margin: 6px;
-                                    ">
-                                        {type_icon} {count}
-                                    </div>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td style="height: 148px; vertical-align: bottom;">
-                                    <div style="
-                                        background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent);
-                                        border-radius: 0 0 11px 11px;
-                                        padding: 6px;
-                                    ">
-                                        <div style="
-                                            font-weight: bold;
-                                            font-size: 12px;
-                                            color: white;
-                                            line-height: 1.2;
-                                            font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
-                                        ">{collection_title}</div>
-                                    </div>
-                                </td>
-                            </tr>
-                        </table>
+                    <td style="padding: 0; line-height: 0; font-size: 0;">
+                        <img src="{poster_src}" alt="{collection_title}" width="120" height="180" style="
+                            display: block;
+                            width: 120px;
+                            height: 180px;
+                            object-fit: cover;
+                            border-radius: 12px 12px 0 0;
+                            background-color: #f8f9fa;
+                        ">
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding: 6px;">
+                        <div style="
+                            font-weight: bold;
+                            font-size: 12px;
+                            color: {theme_colors['text']};
+                            line-height: 1.2;
+                            font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
+                        ">{collection_title}</div>
+                        <div style="
+                            font-size: 10px;
+                            color: {theme_colors['muted_text']};
+                            line-height: 1.2;
+                            font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
+                            margin-top: 2px;
+                        ">{type_icon} {count} items</div>
                     </td>
                 </tr>
             </table>

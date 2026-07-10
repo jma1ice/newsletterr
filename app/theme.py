@@ -76,35 +76,13 @@ def build_email_css_from_theme(theme_colors, logo_width):
                 height: auto !important;
             }}
 
-            .card-poster-wrapper {{
-                position: relative !important;
-                display: block !important;
-            }}
-
-            .card-poster {{
-                background-size: cover !important;
-                background-position: center !important;
-                background-repeat: no-repeat !important;
+            .card-poster-img {{
                 width: 100% !important;
-                height: auto;
-                padding-top: 135%;
-                position: relative !important;
+                height: auto !important;
+                display: block !important;
+                object-fit: cover !important;
                 background-color: #f8f9fa !important;
                 border-radius: 10px 10px 0 0 !important;
-            }}
-
-            .card-poster-badge {{
-                position: absolute !important;
-                bottom: 1px !important;
-                right: 1px !important;
-                background-color: rgba(0, 0, 0, 0.6);
-                color: rgba(255, 255, 255, 0.9);
-                padding: 2px 6px;
-                border-radius: 4px;
-                font-size: 9px;
-                font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
-                line-height: 1;
-                max-width: fit-content;
             }}
 
             @media only screen and (max-width: 600px) {{
@@ -146,11 +124,6 @@ def build_email_css_from_theme(theme_colors, logo_width):
                     border-radius: 10px !important;
                 }}
 
-                .card-poster {{
-                    padding-top: 125% !important;
-                    min-height: 25px;
-                }}
-                
                 .card-content {{
                     height: auto !important;
                     min-height: 165px !important;

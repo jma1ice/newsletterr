@@ -426,7 +426,7 @@ function buildRecentlyAddedPreviewHTML(libraryFilter) {
             <h2>${raTitle}</h2>
             <div style="
                 display: grid;
-                grid-template-columns: repeat(${raGridColumns}, 1fr);
+                grid-template-columns: repeat(${raGridColumns}, minmax(0, 1fr));
                 gap: 12px;
                 margin: 15px auto 0 auto;
                 padding: 0;
@@ -481,7 +481,7 @@ function buildWrappedRankedListHTML(title, items, labelFn) {
     const rows = items.map((item, i) => `
         <li style="margin: 4px 0; color: var(--email-text);">
             <strong>#${i + 1}</strong> ${labelFn(item)}
-            <span style="color: var(--email-muted); font-size: 0.85em;"> — ${item.listen_count} plays</span>
+            <span style="color: var(--email-muted); font-size: 0.85em;"> - ${item.listen_count} plays</span>
         </li>`).join('');
     return `
         <div style="margin-bottom: 16px;">
@@ -499,8 +499,8 @@ function buildDroppedNeedleWrappedPreviewHTML(userKey) {
     const userDisplay = getUserDisplayName(userKey);
     const sections = [
         buildWrappedRankedListHTML('Top Artists', data.top_artists, a => a.name),
-        buildWrappedRankedListHTML('Top Tracks', data.top_tracks, t => `${t.name} — ${t.artist_name}`),
-        buildWrappedRankedListHTML('Top Albums', data.top_albums, al => `${al.name} — ${al.artist_name}`),
+        buildWrappedRankedListHTML('Top Tracks', data.top_tracks, t => `${t.name} - ${t.artist_name}`),
+        buildWrappedRankedListHTML('Top Albums', data.top_albums, al => `${al.name} - ${al.artist_name}`),
         buildWrappedRankedListHTML('Top Genres', data.top_genres, g => g.genre),
     ].join('');
 
@@ -528,12 +528,12 @@ function buildDroppedNeedleServerStatsPreviewHTML() {
     const topArtist = data.top_artist_sitewide
         ? `<p style="color: var(--email-text);"><strong>Top Artist:</strong> ${data.top_artist_sitewide.name} (${data.top_artist_sitewide.listen_count} plays)</p>` : '';
     const topAlbum = data.top_album_sitewide
-        ? `<p style="color: var(--email-text);"><strong>Top Album:</strong> ${data.top_album_sitewide.name} — ${data.top_album_sitewide.artist_name} (${data.top_album_sitewide.listen_count} plays)</p>` : '';
+        ? `<p style="color: var(--email-text);"><strong>Top Album:</strong> ${data.top_album_sitewide.name} - ${data.top_album_sitewide.artist_name} (${data.top_album_sitewide.listen_count} plays)</p>` : '';
 
     return `
         <div class="droppedneedle-server-block" style="padding: 0;">
             <h2 style="text-align: center; margin-top: 0; margin-bottom: 10px; color: var(--email-text);">
-                Server Stats — ${data.year}
+                Server Stats - ${data.year}
             </h2>
             <p style="text-align: center; color: var(--email-muted); margin-bottom: 16px;">
                 ~${data.total_listens_estimated} plays across ${data.total_users_tracked} listeners
@@ -670,7 +670,7 @@ function buildRecommendationsSectionHTML(availableItems, unavailableItems, title
             <h3 style="color: var(--email-text); margin-bottom: 5px; padding-bottom: 0;">${title}</h3>
             <div style="
                 display: grid;
-                grid-template-columns: repeat(${recsGridColumns}, 1fr);
+                grid-template-columns: repeat(${recsGridColumns}, minmax(0, 1fr));
                 gap: 12px;
                 padding: 0;
                 margin: 0 auto 0 auto;

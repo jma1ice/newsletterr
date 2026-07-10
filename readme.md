@@ -202,13 +202,15 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Add a 'pop-up blocked' to index for `save_template()` and similar
 * Some email clients show posters as small slivers instead of whole poster
 * Contributor area on about page can start clipping out on lower size screens
-* API fields in settings should be a password field
 * Update Plex authentication for PlexAPI v0.31.1 (plexapi.plex no longer supported)
 * Email click for recently added/available recommendations is going to browser on mobile instead of Plex app - this is an issue with the new Plex client, have not seen a fix yet and no info released by Plex at this time
+* Changing ra/recs grid width does not maintain the correct poster ratio and the description gets pushed out (<=5) or has too much bottom space (>5)
 
 ### And these items are feature requests:
 --- Settings ---
 * RA by days not implemented in 'new schedule creator'
+* Option to show or hide description on recently added posters
+* Setting for collection group grid width
 
 --- Integrations ---
  -- newsletterr GitHub / Discord --
@@ -220,6 +222,7 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * [Plex Wrapped](https://github.com/netplexflix/Plex-Wrapped-for-Tautulli?tab=readme-ov-file) API call integration
 * Ombi integration
 * Servarr PR
+* Clean up looks on DN stats
 
 --- Hosted ---
 * Add a hosted 'most recent newsletter' webpage
@@ -228,6 +231,7 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 
 --- UI ---
 * General update/modernization
+* Email preview: desktop/tablet/phone views
 
 --- Misc. ---
 * Stats for total items in library
@@ -256,6 +260,7 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Fixed possible double send on scheduled emails
 * Bimonthly cadence fix
 * Schedule fix for recommendation emails
+* API fields in settings are now a password field
 
 #### New Features:
 * Added sections to settings page (email server | external services | data settings | email styling | email body defaults | security)

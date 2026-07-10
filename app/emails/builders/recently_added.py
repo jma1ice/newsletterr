@@ -179,8 +179,24 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
             plex_url = item.get('plex_url', '')
 
             if poster_cid:
-                poster_bg_url = f"cid:{poster_cid}"
-                
+                poster_src = f"cid:{poster_cid}"
+
+                img_attrs = 'width="100%"'
+                img_style = "width: 100%; height: auto; display: block; object-fit: cover; border-radius: 10px 10px 0 0; background-color: #f8f9fa;"
+                if poster_max_height:
+                    img_attrs = f'width="100%" height="{poster_max_height}"'
+                    img_style = (
+                        f"width: 100%; height: {poster_max_height}px; display: block; object-fit: cover; "
+                        "border-radius: 10px 10px 0 0; background-color: #f8f9fa;"
+                    )
+
+                meta_text = truncate_text(' • '.join(filter(None, [
+                    str(year) if year else '',
+                    duration,
+                    content_rating,
+                    f'Added {added_date}' if added_date else ''
+                ])), 46)
+
                 card_html = f"""
                     <div class="recently-added-card" style="
                         background-color: {theme_colors['card_bg']};
@@ -191,19 +207,8 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
                         margin: 0 auto;
                         box-shadow: 0 6px 18px rgba(0, 0, 0, 0.6);
                     ">
-                        <div class="card-poster-wrapper" style="position: relative; display: block; text-align: right;">
-                            <div class="card-poster" style="
-                                background-image: url('{poster_bg_url}');
-                            ">
-                                {f'''
-                                <div class="card-poster-badge"
-                                    style="position: absolute; display: inline-block; bottom: 1px; right: 1px; max-width: fit-content; text-align: right; margin-left: auto;">
-                                    {added_date}
-                                </div>
-                                ''' if added_date else ''}
-                            </div>
-                        </div>
-                        
+                        <img class="card-poster-img" src="{poster_src}" alt="{title}" {img_attrs} style="{img_style}">
+
                         <div class="card-content" style="
                             padding: 6px;
                             background-color: {theme_colors['card_bg']};
@@ -220,14 +225,14 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
                                 word-wrap: break-word;
                                 overflow-wrap: break-word;
                             ">{title}</div>
-                            
+
                             <div style="
                                 font-size: 10px;
                                 color: {theme_colors['muted_text']};
                                 margin-bottom: 2px;
                                 font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
-                            ">{truncate_text(' • '.join(filter(None, [str(year) if year else '', duration, content_rating])), 36)}</div>
-                            
+                            ">{meta_text}</div>
+
                             {f'''
                             <div style="
                                 font-size: 11px;

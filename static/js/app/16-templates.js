@@ -452,6 +452,14 @@ document.getElementById('import-html-input').addEventListener('change', async (e
     e.target.value = '';
 });
 
+function showPopoutStatus(message) {
+    const statusEl = document.getElementById('popout-status');
+    if (!statusEl) return;
+    statusEl.textContent = message;
+    statusEl.style.display = message ? 'block' : 'none';
+    statusEl.style.color = '#f39c12';
+}
+
 document.getElementById('popout-preview-btn').addEventListener('click', function() {
     const frame = document.getElementById('preview');
     if (!frame || !frame.srcdoc) {
@@ -465,15 +473,16 @@ document.getElementById('popout-preview-btn').addEventListener('click', function
     }
 
     popoutWindow = window.open('', 'EmailPreview', 'width=800,height=600,scrollbars=yes,resizable=yes');
-    
+
     if (popoutWindow) {
+        showPopoutStatus('');
         popoutWindow.document.open();
         popoutWindow.document.write(frame.srcdoc);
         popoutWindow.document.close();
         popoutWindow.document.title = 'Email Preview';
         popoutWindow.focus();
     } else {
-        alert('Pop-up blocked! Please allow pop-ups for this site to use the preview feature.');
+        showPopoutStatus('Pop-up blocked! Please allow pop-ups for this site to use the preview feature.');
     }
 });
 

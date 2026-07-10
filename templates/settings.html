@@ -184,6 +184,44 @@
                             <span id="droppedneedle_test_result" style="font-size: 0.875rem;"></span>
                         </div>
 
+                        <hr>
+                        <h6 class="text-uppercase" style="font-size: 0.75rem; letter-spacing: 0.05em;">Sonarr</h6>
+                        <label for="sonarr_url">Sonarr Base URL (Optional - for the coming soon calendar):</label><br>
+                        <input type="text" id="sonarr_url" name="sonarr_url"
+                            {% if settings.sonarr_url != "" %}value="{{ settings.sonarr_url }}"{% endif %}
+                            placeholder="http://localhost:8989"><br><br>
+
+                        <label for="sonarr_api_key">Sonarr API Key:</label><br>
+                        <input type="password" id="sonarr_api_key" name="sonarr_api_key" autocomplete="new-password"
+                            placeholder="{% if settings.has_sonarr_api_key %}Saved - leave blank to keep{% else %}Settings > General > API Key in Sonarr{% endif %}"><br>
+                        <div style="margin-top: 6px; margin-bottom: 16px; display: flex; align-items: center; gap: 10px;">
+                            <button type="button" id="test_sonarr" class="btn button btn-sm">Test Connection</button>
+                            <span id="sonarr_test_result" style="font-size: 0.875rem;"></span>
+                        </div>
+
+                        <hr>
+                        <h6 class="text-uppercase" style="font-size: 0.75rem; letter-spacing: 0.05em;">Radarr</h6>
+                        <label for="radarr_url">Radarr Base URL (Optional - for the coming soon calendar):</label><br>
+                        <input type="text" id="radarr_url" name="radarr_url"
+                            {% if settings.radarr_url != "" %}value="{{ settings.radarr_url }}"{% endif %}
+                            placeholder="http://localhost:7878"><br><br>
+
+                        <label for="radarr_api_key">Radarr API Key:</label><br>
+                        <input type="password" id="radarr_api_key" name="radarr_api_key" autocomplete="new-password"
+                            placeholder="{% if settings.has_radarr_api_key %}Saved - leave blank to keep{% else %}Settings > General > API Key in Radarr{% endif %}"><br>
+                        <div style="margin-top: 6px; margin-bottom: 16px; display: flex; align-items: center; gap: 10px;">
+                            <button type="button" id="test_radarr" class="btn button btn-sm">Test Connection</button>
+                            <span id="radarr_test_result" style="font-size: 0.875rem;"></span>
+                        </div>
+
+                        <label for="coming_soon_days_ahead">Coming Soon Calendar Window (days ahead):</label><br>
+                        <input type="number" id="coming_soon_days_ahead" name="coming_soon_days_ahead" min="1" max="90"
+                            value="{{ settings.get('coming_soon_days_ahead', '14') }}"><br><br>
+
+                        <label for="coming_soon_grid_columns">Coming Soon Grid Columns:</label><br>
+                        <input type="number" id="coming_soon_grid_columns" name="coming_soon_grid_columns" min="1" max="10"
+                            value="{{ settings.get('coming_soon_grid_columns', '5') }}"><br><br>
+
                         <label for="recipient_display_name">Recipient Display Name (used in recommendation emails):</label><br>
                         <select id="recipient_display_name" name="recipient_display_name">
                             <option value="email" {% if settings.recipient_display_name == 'email' %}selected{% endif %}>Email Address</option>
@@ -888,6 +926,20 @@
             url: document.getElementById('droppedneedle_url').value.trim(),
             api_key: document.getElementById('droppedneedle_api_key').value.trim()
         }, 'droppedneedle_test_result', 'test_droppedneedle');
+    });
+
+    document.getElementById('test_sonarr')?.addEventListener('click', () => {
+        runConnectionTest('/api/test/sonarr', {
+            url: document.getElementById('sonarr_url').value.trim(),
+            api_key: document.getElementById('sonarr_api_key').value.trim()
+        }, 'sonarr_test_result', 'test_sonarr');
+    });
+
+    document.getElementById('test_radarr')?.addEventListener('click', () => {
+        runConnectionTest('/api/test/radarr', {
+            url: document.getElementById('radarr_url').value.trim(),
+            api_key: document.getElementById('radarr_api_key').value.trim()
+        }, 'radarr_test_result', 'test_radarr');
     });
 </script>
 

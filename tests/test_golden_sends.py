@@ -5,6 +5,7 @@
 # output against goldens in tests/goldens/. A missing golden is (re)created;
 # set UPDATE_GOLDENS=1 to regenerate deliberately after an intended change.
 
+import datetime as datetime_module
 import email as email_lib
 import json
 import smtplib
@@ -193,6 +194,9 @@ def manual_send_env(send_env, client, monkeypatch):
 
     monkeypatch.setattr(send_mod, "get_current_tautulli_data_for_email", _fixed_tautulli_data)
     monkeypatch.setattr(send_mod, "get_droppedneedle_server_stats_cached", lambda *a, **k: None)
+    monkeypatch.setattr(send_mod, "get_yearly_wrapped_cached", lambda *a, **k: None)
+    monkeypatch.setattr(send_mod, "get_sonarr_coming_soon_cached", lambda *a, **k: None)
+    monkeypatch.setattr(send_mod, "get_radarr_coming_soon_cached", lambda *a, **k: None)
     monkeypatch.setattr(send_mod, "get_recommendations_for_users", lambda *a, **k: {"1": {}})
     monkeypatch.setattr(send_mod, "get_droppedneedle_wrapped_for_users", lambda *a, **k: {})
     monkeypatch.setattr(send_mod, "run_tautulli_command", lambda *a, **k: (USERS_FIXTURE, None))
@@ -249,6 +253,155 @@ def test_manual_recommendations_email_golden(manual_send_env):
     assert normalized["envelope"]["to"] == ["news@example.com", "a@b.c"]
     assert "Manual personal intro" in normalized["html"]
     _assert_golden("manual_recommendations", normalized)
+
+def test_manual_yearly_wrapped_email_golden(manual_send_env, monkeypatch):
+    from app.emails import send as send_mod
+
+    yearly_wrapped_fixture = [
+        {"stat_title": "Most Watched Movies", "rows": [{"title": "Dune", "total_plays": 42}]},
+        {"stat_title": "Most Watched TV Shows", "rows": [{"title": "Severance", "total_plays": 30}]},
+    ]
+    monkeypatch.setattr(send_mod, "get_yearly_wrapped_cached", lambda *a, **k: yearly_wrapped_fixture)
+
+    client = manual_send_env
+    resp = _post_send(client, {
+        "to_emails": "a@b.c, d@e.f", "subject": "Manual Wrapped", "email_header_title": "The Header",
+        "selected_items": [
+            {"type": "textblock", "content": "Here's your year"},
+            {"type": "yearly_wrapped", "id": "yearly-wrapped"},
+        ],
+        "custom_html": "", "user_dict": {}, "expanded_collections": {},
+    })
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body.get("success") is True
+
+    sends = [s for inst in RecorderSMTP.instances for s in inst.sent]
+    assert len(sends) == 1
+    from_addr, to_addrs, content = sends[0]
+    normalized = _normalize(content)
+    normalized["envelope"] = {"from": from_addr, "to": to_addrs}
+    normalized["response"] = body
+    assert "Dune" in normalized["html"]
+    assert "Severance" in normalized["html"]
+    assert "Wrapped" in normalized["html"]
+    _assert_golden("manual_yearly_wrapped", normalized)
+
+SONARR_EPISODES_FIXTURE = [
+    {
+        "series": {"title": "Test Show", "images": [{"coverType": "poster", "url": "/mediacover/1/poster.jpg"}]},
+        "seasonNumber": 1, "episodeNumber": 2, "title": "Pilot Returns",
+        "airDateUtc": "2026-07-15T00:00:00Z",
+    },
+]
+
+RADARR_MOVIES_FIXTURE = [
+    {
+        "title": "Test Movie", "year": 2026, "digitalRelease": "2026-07-20",
+        "images": [{"coverType": "poster", "url": "/mediacover/2/poster.jpg"}],
+    },
+]
+
+class _FixedDatetime(datetime_module.datetime):
+    """A frozen 'now' so relative-date text ('in N days') in coming-soon
+    golden fixtures doesn't drift with the wall clock."""
+    @classmethod
+    def now(cls, tz=None):
+        return cls(2026, 7, 9, 12, 0, 0, tzinfo=tz)
+
+def _freeze_coming_soon_clock(monkeypatch, coming_soon_mod):
+    monkeypatch.setattr(coming_soon_mod, "datetime", _FixedDatetime)
+
+def test_manual_sonarr_coming_soon_email_golden(manual_send_env, monkeypatch):
+    from app.emails import send as send_mod
+    from app.emails.builders import coming_soon as coming_soon_mod
+
+    monkeypatch.setattr(send_mod, "get_sonarr_coming_soon_cached", lambda *a, **k: SONARR_EPISODES_FIXTURE)
+    monkeypatch.setattr(coming_soon_mod, "fetch_and_attach_image", lambda *a, **k: None)
+    _freeze_coming_soon_clock(monkeypatch, coming_soon_mod)
+
+    client = manual_send_env
+    resp = _post_send(client, {
+        "to_emails": "a@b.c, d@e.f", "subject": "Manual Coming Soon TV", "email_header_title": "The Header",
+        "selected_items": [
+            {"type": "textblock", "content": "What's coming up"},
+            {"type": "sonarr_coming_soon", "id": "sonarr-coming-soon"},
+        ],
+        "custom_html": "", "user_dict": {}, "expanded_collections": {},
+    })
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body.get("success") is True
+
+    sends = [s for inst in RecorderSMTP.instances for s in inst.sent]
+    assert len(sends) == 1
+    from_addr, to_addrs, content = sends[0]
+    normalized = _normalize(content)
+    normalized["envelope"] = {"from": from_addr, "to": to_addrs}
+    normalized["response"] = body
+    assert "Test Show" in normalized["html"]
+    assert "S01E02" in normalized["html"]
+    _assert_golden("manual_sonarr_coming_soon", normalized)
+
+def test_manual_radarr_coming_soon_email_golden(manual_send_env, monkeypatch):
+    from app.emails import send as send_mod
+    from app.emails.builders import coming_soon as coming_soon_mod
+
+    monkeypatch.setattr(send_mod, "get_radarr_coming_soon_cached", lambda *a, **k: RADARR_MOVIES_FIXTURE)
+    monkeypatch.setattr(coming_soon_mod, "fetch_and_attach_image", lambda *a, **k: None)
+    _freeze_coming_soon_clock(monkeypatch, coming_soon_mod)
+
+    client = manual_send_env
+    resp = _post_send(client, {
+        "to_emails": "a@b.c, d@e.f", "subject": "Manual Coming Soon Movies", "email_header_title": "The Header",
+        "selected_items": [
+            {"type": "textblock", "content": "What's coming up"},
+            {"type": "radarr_coming_soon", "id": "radarr-coming-soon"},
+        ],
+        "custom_html": "", "user_dict": {}, "expanded_collections": {},
+    })
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body.get("success") is True
+
+    sends = [s for inst in RecorderSMTP.instances for s in inst.sent]
+    assert len(sends) == 1
+    from_addr, to_addrs, content = sends[0]
+    normalized = _normalize(content)
+    normalized["envelope"] = {"from": from_addr, "to": to_addrs}
+    normalized["response"] = body
+    assert "Test Movie" in normalized["html"]
+    assert "2026" in normalized["html"]
+    _assert_golden("manual_radarr_coming_soon", normalized)
+
+def test_manual_coming_soon_degrades_when_only_one_service_configured(manual_send_env, monkeypatch):
+    from app.emails import send as send_mod
+    from app.emails.builders import coming_soon as coming_soon_mod
+
+    monkeypatch.setattr(send_mod, "get_sonarr_coming_soon_cached", lambda *a, **k: SONARR_EPISODES_FIXTURE)
+    monkeypatch.setattr(send_mod, "get_radarr_coming_soon_cached", lambda *a, **k: None)
+    monkeypatch.setattr(coming_soon_mod, "fetch_and_attach_image", lambda *a, **k: None)
+    _freeze_coming_soon_clock(monkeypatch, coming_soon_mod)
+
+    client = manual_send_env
+    resp = _post_send(client, {
+        "to_emails": "a@b.c, d@e.f", "subject": "Partial Coming Soon", "email_header_title": "The Header",
+        "selected_items": [
+            {"type": "sonarr_coming_soon", "id": "sonarr-coming-soon"},
+            {"type": "radarr_coming_soon", "id": "radarr-coming-soon"},
+        ],
+        "custom_html": "", "user_dict": {}, "expanded_collections": {},
+    })
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body.get("success") is True
+
+    sends = [s for inst in RecorderSMTP.instances for s in inst.sent]
+    assert len(sends) == 1
+    from_addr, to_addrs, content = sends[0]
+    normalized = _normalize(content)
+    assert "Test Show" in normalized["html"]
+    assert "Coming Soon (Movies)" not in normalized["html"]
 
 def test_resend_from_history_replays_stored_mime(manual_send_env):
     from app.store import record_email_history

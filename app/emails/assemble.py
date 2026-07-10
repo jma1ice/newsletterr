@@ -6,7 +6,7 @@ import html as _html_stdlib
 from app.cache import get_cache_info
 from app.emails.images import fetch_and_attach_image
 from app.emails.blocks import build_graph_html_with_frontend_image, build_text_block_html, build_separator_html, build_image_html_with_cid, build_emoji_html
-from app.emails.builders import build_stats_html_with_cid_background, build_recently_added_html_with_cids, build_recommendations_html_with_cids, build_droppedneedle_wrapped_html_with_cids, build_droppedneedle_server_stats_html_with_cids, build_collections_html_with_cids
+from app.emails.builders import build_stats_html_with_cid_background, build_recently_added_html_with_cids, build_recommendations_html_with_cids, build_droppedneedle_wrapped_html_with_cids, build_droppedneedle_server_stats_html_with_cids, build_collections_html_with_cids, build_yearly_wrapped_html_with_cids, build_sonarr_coming_soon_html_with_cids, build_radarr_coming_soon_html_with_cids
 from app.theme import get_email_theme_colors, build_email_css_from_theme
 
 _BLOCK_TAGS = {'p', 'div', 'tr', 'ul', 'ol', 'table', 'blockquote', 'section', 'article'}
@@ -105,7 +105,7 @@ def attach_logo_image(msg_root, logo_filename, custom_logo_filename, base_url=""
         logo_url = f"/static/img/{logo_filename}"
     return fetch_and_attach_image(logo_url, msg_root, "logo", base_url)
 
-def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, display_preference, users_data, recommendations_data=None, user_dict=None, base_url="", target_user_key=None, is_scheduled=False, items_count=None, date_range="", expanded_collections=None, email_header_title=None, droppedneedle_wrapped_data=None, droppedneedle_server_data=None):
+def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, display_preference, users_data, recommendations_data=None, user_dict=None, base_url="", target_user_key=None, is_scheduled=False, items_count=None, date_range="", expanded_collections=None, email_header_title=None, droppedneedle_wrapped_data=None, droppedneedle_server_data=None, yearly_wrapped_data=None, sonarr_coming_soon_data=None, radarr_coming_soon_data=None):
     custom_html = template_data.get('custom_html', '').strip()
     if custom_html:
         return custom_html
@@ -123,6 +123,7 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, displ
     ra_grid_columns = int(tautulli_data.get('settings', {}).get('ra_grid_columns', 5) or 5)
     recs_grid_columns = int(tautulli_data.get('settings', {}).get('recs_grid_columns', 5) or 5)
     poster_max_height = int(tautulli_data.get('settings', {}).get('poster_max_height') or 0)
+    coming_soon_grid_columns = int(tautulli_data.get('settings', {}).get('coming_soon_grid_columns', 5) or 5)
     _default_intro = tautulli_data.get('settings', {}).get('default_intro_text') or ''
     _default_outro = tautulli_data.get('settings', {}).get('default_outro_text') or ''
     _resolved_intro = _default_intro or f"You are receiving this email because you are a member of {server_name}."
@@ -226,6 +227,18 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, displ
         elif item_type == 'droppedneedle_server_stats':
             if droppedneedle_server_data:
                 content_html += build_droppedneedle_server_stats_html_with_cids(droppedneedle_server_data, msg_root, theme_colors)
+
+        elif item_type == 'yearly_wrapped':
+            if yearly_wrapped_data:
+                content_html += build_yearly_wrapped_html_with_cids(yearly_wrapped_data, msg_root, theme_colors)
+
+        elif item_type == 'sonarr_coming_soon':
+            if sonarr_coming_soon_data:
+                content_html += build_sonarr_coming_soon_html_with_cids(sonarr_coming_soon_data, msg_root, theme_colors, base_url, grid_columns=coming_soon_grid_columns)
+
+        elif item_type == 'radarr_coming_soon':
+            if radarr_coming_soon_data:
+                content_html += build_radarr_coming_soon_html_with_cids(radarr_coming_soon_data, msg_root, theme_colors, base_url, grid_columns=coming_soon_grid_columns)
 
         elif item_type == 'collection_group':
             group_title = item.get('title', 'Collections')

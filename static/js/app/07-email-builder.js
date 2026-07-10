@@ -1000,7 +1000,10 @@ document.addEventListener('click', async (e) => {
         btn.classList.contains('ra-add-btn') ||
         btn.classList.contains('recs-add-btn') ||
         btn.classList.contains('droppedneedle-add-btn') ||
-        btn.classList.contains('droppedneedle-server-add-btn');
+        btn.classList.contains('droppedneedle-server-add-btn') ||
+        btn.classList.contains('yearly-wrapped-add-btn') ||
+        btn.classList.contains('sonarr-coming-soon-add-btn') ||
+        btn.classList.contains('radarr-coming-soon-add-btn');
 
     if (!isAdd) return;
 

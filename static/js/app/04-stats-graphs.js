@@ -406,9 +406,9 @@ function buildRecentlyAddedPreviewHTML(libraryFilter) {
     const raCount = parseInt(document.getElementById('items_to_pull')?.value || '10');
     let raTitle;
     if (recentlyAddedMode === 'days' && raCount) {
+        const formatMDY = (d) => `${d.getMonth() + 1}/${d.getDate()}/${String(d.getFullYear()).slice(-2)}`;
         const sinceDate = new Date(Date.now() - raCount * 864e5);
-        const mm = sinceDate.getMonth() + 1, dd = sinceDate.getDate(), yy = String(sinceDate.getFullYear()).slice(-2);
-        raTitle = (libraryFilter ? `Added to ${libraryFilter}` : 'Recently Added') + ` since ${mm}/${dd}/${yy}`;
+        raTitle = (libraryFilter ? `Added to ${libraryFilter}` : 'Recently Added') + ` ${formatMDY(sinceDate)} - ${formatMDY(new Date())}`;
     } else {
         raTitle = `Recently Added${libraryFilter ? ` - ${libraryFilter}` : ''}`;
     }
@@ -533,6 +533,181 @@ function buildDroppedNeedleServerStatsPreviewHTML() {
             ${topAlbum}
             ${leaderboardHTML}
         </div>`;
+}
+
+// Kept in sync by hand with app/emails/builders/stats.py:build_yearly_wrapped_html_with_cids
+function buildYearlyWrappedPreviewHTML() {
+    const statsData = yearlyWrappedPayload;
+    if (!statsData || !statsData.length) {
+        return `<div><p style="text-align: center; color: var(--email-muted); padding: 20px;">No yearly wrapped data available</p></div>`;
+    }
+
+    const firstRow = (title) => {
+        const stat = statsData.find(s => s.stat_title === title && s.rows && s.rows.length);
+        return stat ? stat.rows[0] : null;
+    };
+
+    const topMovie = firstRow('Most Watched Movies');
+    const topShow = firstRow('Most Watched TV Shows');
+    const topArtist = firstRow('Most Played Artists');
+    const topUser = firstRow('Most Active Users');
+
+    let totalPlays = 0;
+    statsData.forEach(stat => {
+        if (['Most Watched Movies', 'Most Watched TV Shows', 'Most Played Artists'].includes(stat.stat_title)) {
+            (stat.rows || []).forEach(row => { totalPlays += parseInt(row.total_plays || 0, 10); });
+        }
+    });
+
+    const highlights = [];
+    if (topMovie) highlights.push(['🎬 Top Movie', topMovie.title || '']);
+    if (topShow) highlights.push(['📺 Top Show', topShow.title || '']);
+    if (topArtist) highlights.push(['🎵 Top Artist', topArtist.title || '']);
+    if (topUser) highlights.push(['👤 Most Active', topUser.user || '']);
+
+    if (!highlights.length && !totalPlays) {
+        return '';
+    }
+
+    const highlightCells = highlights.map(([label, value]) => `
+        <td style="text-align: center; padding: 12px; vertical-align: top; width: ${100 / Math.max(highlights.length, 1)}%;">
+            <div style="font-size: 12px; color: rgba(255,255,255,0.85); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">${label}</div>
+            <div style="font-size: 15px; font-weight: bold; color: white; line-height: 1.3;">${value}</div>
+        </td>
+    `).join('');
+
+    const displayYear = new Date().getFullYear();
+
+    return `
+        <div style="margin: 20px 0; border-radius: 12px; overflow: hidden; background: linear-gradient(135deg, var(--email-primary) 0%, var(--email-accent) 100%); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);">
+            <div style="padding: 20px 20px 4px 20px; text-align: center;">
+                <div style="font-size: 13px; color: rgba(255,255,255,0.85); text-transform: uppercase; letter-spacing: 0.1em;">Year in Review</div>
+                <div style="font-size: 26px; font-weight: bold; color: white; margin: 4px 0 4px 0;">${displayYear} Wrapped</div>
+                ${totalPlays ? `<div style="font-size: 14px; color: rgba(255,255,255,0.9); margin-bottom: 8px;">~${totalPlays} plays this year</div>` : ''}
+            </div>
+            <table cellpadding="0" cellspacing="0" border="0" width="100%">
+                <tr>${highlightCells}</tr>
+            </table>
+        </div>`;
+}
+
+function _comingSoonRelativeDate(dateStr) {
+    if (!dateStr) return '';
+    const dt = new Date(dateStr);
+    if (isNaN(dt.getTime())) return '';
+    const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    const diffDays = Math.round((startOfDay(dt) - startOfDay(new Date())) / 864e5);
+    if (diffDays === 0) return 'today';
+    if (diffDays === 1) return 'tomorrow';
+    if (diffDays > 1) return `in ${diffDays} days`;
+    if (diffDays === -1) return 'yesterday';
+    return `${Math.abs(diffDays)} days ago`;
+}
+
+function _comingSoonPosterUrl(images) {
+    if (!Array.isArray(images)) return null;
+    const poster = images.find(img => img.coverType === 'poster' && img.url);
+    if (poster) return poster.url;
+    const any = images.find(img => img.url);
+    return any ? any.url : null;
+}
+
+function _comingSoonCardHTML(title, subtitle, metaText, posterSrc) {
+    const posterHTML = posterSrc
+        ? `<div style="position: relative; aspect-ratio: 2/3; background: #f8f9fa;"><img src="${posterSrc}" style="width: 100%; height: 100%; object-fit: cover; display: block;" alt="${title}"></div>`
+        : '';
+    return `
+        <div style="
+            background: var(--email-card-bg);
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid var(--email-border);
+            width: 100%;
+            margin: 0 auto;
+            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.6);
+        ">
+            ${posterHTML}
+            <div style="padding: 6px; color: var(--email-text); min-height: 60px;">
+                <div style="font-weight: bold; font-size: 14px; color: var(--email-text); margin-bottom: 1px; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${title}</div>
+                ${subtitle ? `<div style="font-size: 11px; color: var(--email-text); opacity: 0.85; margin-bottom: 2px;">${subtitle}</div>` : ''}
+                <div style="font-size: 10px; color: var(--email-muted);">${metaText}</div>
+            </div>
+        </div>
+    `;
+}
+
+function _comingSoonGridHTML(cardsHTML, title, gridColumns) {
+    if (!cardsHTML.length) {
+        return `<div><p style="text-align: center; color: var(--email-muted); padding: 20px;">No upcoming items found.</p></div>`;
+    }
+    return `
+        <div>
+            <h2 style="text-align: center; margin: 0 0 10px 0; color: var(--email-text);">${title}</h2>
+            <div style="
+                display: grid;
+                grid-template-columns: repeat(${gridColumns}, minmax(0, 1fr));
+                gap: 12px;
+                margin: 15px auto 0 auto;
+                padding: 0;
+                width: 80%;
+            ">
+                ${cardsHTML.join('')}
+            </div>
+        </div>
+    `;
+}
+
+// Kept in sync by hand with app/emails/builders/coming_soon.py:build_sonarr_coming_soon_html_with_cids
+function buildSonarrComingSoonPreviewHTML() {
+    const episodes = sonarrComingSoonPayload;
+    if (!episodes || !episodes.length) {
+        return `<div><p style="text-align: center; color: var(--email-muted); padding: 20px;">No upcoming episodes found.</p></div>`;
+    }
+
+    const gridColumns = parseInt(APP.comingSoonGridColumns) || 5;
+
+    const cardsHTML = episodes.map(ep => {
+        const series = ep.series || {};
+        const seriesTitle = series.title || ep.title || 'Unknown';
+        const seLabel = (ep.seasonNumber != null && ep.episodeNumber != null)
+            ? `S${String(ep.seasonNumber).padStart(2, '0')}E${String(ep.episodeNumber).padStart(2, '0')}`
+            : '';
+        const subtitle = [seLabel, ep.title || ''].filter(Boolean).join(' - ');
+        const relative = _comingSoonRelativeDate(ep.airDateUtc || ep.airDate);
+        const metaText = relative ? `Airs ${relative}` : '';
+
+        const posterPath = _comingSoonPosterUrl(series.images) || _comingSoonPosterUrl(ep.images);
+        const posterSrc = posterPath ? `/proxy-sonarr-art${posterPath.startsWith('/') ? posterPath : '/' + posterPath}` : '';
+
+        return _comingSoonCardHTML(seriesTitle, subtitle, metaText, posterSrc);
+    });
+
+    return _comingSoonGridHTML(cardsHTML, 'Coming Soon (TV)', gridColumns);
+}
+
+// Kept in sync by hand with app/emails/builders/coming_soon.py:build_radarr_coming_soon_html_with_cids
+function buildRadarrComingSoonPreviewHTML() {
+    const movies = radarrComingSoonPayload;
+    if (!movies || !movies.length) {
+        return `<div><p style="text-align: center; color: var(--email-muted); padding: 20px;">No upcoming movies found.</p></div>`;
+    }
+
+    const gridColumns = parseInt(APP.comingSoonGridColumns) || 5;
+
+    const cardsHTML = movies.map(movie => {
+        const title = movie.title || 'Unknown';
+        const subtitle = movie.year ? String(movie.year) : '';
+        const releaseDate = movie.digitalRelease || movie.physicalRelease || movie.inCinemas;
+        const relative = _comingSoonRelativeDate(releaseDate);
+        const metaText = relative ? `Releases ${relative}` : '';
+
+        const posterPath = _comingSoonPosterUrl(movie.images);
+        const posterSrc = posterPath ? `/proxy-radarr-art${posterPath.startsWith('/') ? posterPath : '/' + posterPath}` : '';
+
+        return _comingSoonCardHTML(title, subtitle, metaText, posterSrc);
+    });
+
+    return _comingSoonGridHTML(cardsHTML, 'Coming Soon (Movies)', gridColumns);
 }
 
 function buildRecommendationsSectionHTML(availableItems, unavailableItems, title) {
@@ -674,8 +849,9 @@ function buildCollectionCard(collection, themeColors) {
         }
     }
     
+    let cardHtml;
     if (posterURL) {
-        return `
+        cardHtml = `
             <table cellpadding="0" cellspacing="0" border="0" style="
                 background-color: ${themeColors.card_bg};
                 border-radius: 12px;
@@ -715,7 +891,7 @@ function buildCollectionCard(collection, themeColors) {
             </table>
         `;
     } else {
-        return `
+        cardHtml = `
             <table cellpadding="0" cellspacing="0" border="0" style="
                 background-color: ${themeColors.card_bg};
                 border-radius: 12px;
@@ -748,6 +924,11 @@ function buildCollectionCard(collection, themeColors) {
             </table>
         `;
     }
+
+    if (collection.plex_url) {
+        return `<a href="${collection.plex_url}" style="text-decoration: none; color: inherit; display: block;" target="_blank">${cardHtml}</a>`;
+    }
+    return cardHtml;
 }
 
 function buildIndividualItemCard(item, themeColors) {
@@ -781,8 +962,9 @@ function buildIndividualItemCard(item, themeColors) {
         }
     }
     
+    let cardHtml;
     if (posterURL) {
-        return `
+        cardHtml = `
             <table cellpadding="0" cellspacing="0" border="0" style="
                 background-color: ${themeColors.card_bg};
                 border-radius: 12px;
@@ -822,7 +1004,7 @@ function buildIndividualItemCard(item, themeColors) {
             </table>
         `;
     } else {
-        return `
+        cardHtml = `
             <table cellpadding="0" cellspacing="0" border="0" style="
                 background-color: ${themeColors.card_bg};
                 border-radius: 12px;
@@ -861,6 +1043,11 @@ function buildIndividualItemCard(item, themeColors) {
             </table>
         `;
     }
+
+    if (item.plex_url) {
+        return `<a href="${item.plex_url}" style="text-decoration: none; color: inherit; display: block;" target="_blank">${cardHtml}</a>`;
+    }
+    return cardHtml;
 }
 
 function getTypeIcon(type) {

@@ -1,3 +1,4 @@
+from datetime import datetime
 
 from app.cache import get_cache_info
 from app.emails.images import fetch_and_attach_blurred_image, fetch_and_attach_small_thumbnail
@@ -191,5 +192,73 @@ def build_stats_html_with_cid_background(stat_data, msg_root, theme_colors, base
                     </tbody>
                 </table>
             </div>
+        </div>
+    """
+
+def build_yearly_wrapped_html_with_cids(stats_data, msg_root, theme_colors, year=None):
+    if not stats_data:
+        return ""
+
+    def _first_row(title):
+        for stat in stats_data:
+            if stat.get('stat_title') == title and stat.get('rows'):
+                return stat['rows'][0]
+        return None
+
+    top_movie = _first_row('Most Watched Movies')
+    top_show = _first_row('Most Watched TV Shows')
+    top_artist = _first_row('Most Played Artists')
+    top_user = _first_row('Most Active Users')
+
+    total_plays = 0
+    for stat in stats_data:
+        if stat.get('stat_title') in ('Most Watched Movies', 'Most Watched TV Shows', 'Most Played Artists'):
+            for row in stat.get('rows', []):
+                total_plays += int(row.get('total_plays', 0) or 0)
+
+    highlights = []
+    if top_movie:
+        highlights.append(('🎬 Top Movie', top_movie.get('title', '')))
+    if top_show:
+        highlights.append(('📺 Top Show', top_show.get('title', '')))
+    if top_artist:
+        highlights.append(('🎵 Top Artist', top_artist.get('title', '')))
+    if top_user:
+        highlights.append(('👤 Most Active', top_user.get('user', '')))
+
+    if not highlights and not total_plays:
+        return ""
+
+    highlight_cells = "".join([
+        f"""
+        <td style="text-align: center; padding: 12px; vertical-align: top; width: {100 // max(len(highlights), 1)}%;">
+            <div style="font-size: 12px; color: {theme_colors['muted_text']}; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">{label}</div>
+            <div style="font-size: 15px; font-weight: bold; color: white; line-height: 1.3;">{value}</div>
+        </td>
+        """
+        for label, value in highlights
+    ])
+
+    display_year = year or datetime.now().year
+
+    container_style = f"""
+        margin: 20px 0;
+        border-radius: 12px;
+        overflow: hidden;
+        background: linear-gradient(135deg, {theme_colors['primary']} 0%, {theme_colors['accent']} 100%);
+        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    """
+
+    return f"""
+        <div style="{container_style}">
+            <div style="padding: 20px 20px 4px 20px; text-align: center;">
+                <div style="font-size: 13px; color: rgba(255,255,255,0.85); text-transform: uppercase; letter-spacing: 0.1em;">Year in Review</div>
+                <div style="font-size: 26px; font-weight: bold; color: white; margin: 4px 0 4px 0;">{display_year} Wrapped</div>
+                {f'<div style="font-size: 14px; color: rgba(255,255,255,0.9); margin-bottom: 8px;">~{total_plays} plays this year</div>' if total_plays else ''}
+            </div>
+            <table cellpadding="0" cellspacing="0" border="0" width="100%">
+                <tr>{highlight_cells}</tr>
+            </table>
         </div>
     """

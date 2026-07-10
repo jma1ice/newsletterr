@@ -10,7 +10,7 @@ from app.clients.tautulli import run_tautulli_command
 from app.db import db_connect
 from app.store import record_email_history
 from app.emails.assemble import convert_html_to_plain_text, build_email_html_with_all_cids
-from app.emails.fetchers import get_current_tautulli_data_for_email, get_recommendations_for_users, get_droppedneedle_wrapped_for_users, get_droppedneedle_server_stats_cached
+from app.emails.fetchers import get_current_tautulli_data_for_email, get_recommendations_for_users, get_droppedneedle_wrapped_for_users, get_droppedneedle_server_stats_cached, get_yearly_wrapped_cached, get_sonarr_coming_soon_cached, get_radarr_coming_soon_cached
 
 import logging
 
@@ -88,6 +88,9 @@ def send_standard_email_with_cids(req, settings, to_emails):
         logger.info("Building email content...")
         tautulli_data = get_current_tautulli_data_for_email(settings)
         droppedneedle_server_data = get_droppedneedle_server_stats_cached(use_cache=True)
+        yearly_wrapped_data = get_yearly_wrapped_cached(use_cache=True)
+        sonarr_coming_soon_data = get_sonarr_coming_soon_cached(use_cache=True, days_ahead=settings.get("coming_soon_days_ahead") or 14)
+        radarr_coming_soon_data = get_radarr_coming_soon_cached(use_cache=True, days_ahead=settings.get("coming_soon_days_ahead") or 14)
 
         template_data = {
             'selected_items': json.dumps(selected_items),
@@ -113,7 +116,10 @@ def send_standard_email_with_cids(req, settings, to_emails):
             "",
             expanded_collections,
             email_header_title,
-            droppedneedle_server_data=droppedneedle_server_data
+            droppedneedle_server_data=droppedneedle_server_data,
+            yearly_wrapped_data=yearly_wrapped_data,
+            sonarr_coming_soon_data=sonarr_coming_soon_data,
+            radarr_coming_soon_data=radarr_coming_soon_data
         )
 
         plain_text = convert_html_to_plain_text(email_html)
@@ -202,6 +208,9 @@ def send_recommendations_email_with_cids(req, settings, to_emails):
         recommendations_data = get_recommendations_for_users(rec_user_keys, to_emails, user_dict, use_cache=True) if rec_user_keys else {}
         droppedneedle_wrapped_data = get_droppedneedle_wrapped_for_users(wrapped_user_keys, to_emails, user_dict, use_cache=True) if wrapped_user_keys else {}
         droppedneedle_server_data = get_droppedneedle_server_stats_cached(use_cache=True)
+        yearly_wrapped_data = get_yearly_wrapped_cached(use_cache=True)
+        sonarr_coming_soon_data = get_sonarr_coming_soon_cached(use_cache=True, days_ahead=settings.get("coming_soon_days_ahead") or 14)
+        radarr_coming_soon_data = get_radarr_coming_soon_cached(use_cache=True, days_ahead=settings.get("coming_soon_days_ahead") or 14)
 
         if rec_user_keys and not recommendations_data:
             return {"error": "No recommendations data available. Please pull recommendations first."}, 400
@@ -223,6 +232,9 @@ def send_recommendations_email_with_cids(req, settings, to_emails):
                 recommendations_data=recommendations_data,
                 droppedneedle_wrapped_data=droppedneedle_wrapped_data,
                 droppedneedle_server_data=droppedneedle_server_data,
+                yearly_wrapped_data=yearly_wrapped_data,
+                sonarr_coming_soon_data=sonarr_coming_soon_data,
+                radarr_coming_soon_data=radarr_coming_soon_data,
             )
 
             if success:
@@ -238,7 +250,7 @@ def send_recommendations_email_with_cids(req, settings, to_emails):
         logger.error("%s %s", "Error in send_recommendations_email_with_cids:", e)
         return {"error": str(e)}, 500
 
-def send_single_user_email_with_cids(req, settings, recipients, user_key, recommendations_data=None, droppedneedle_wrapped_data=None, droppedneedle_server_data=None):
+def send_single_user_email_with_cids(req, settings, recipients, user_key, recommendations_data=None, droppedneedle_wrapped_data=None, droppedneedle_server_data=None, yearly_wrapped_data=None, sonarr_coming_soon_data=None, radarr_coming_soon_data=None):
     try:
         from_email = settings.get("from_email") or ""
         alias_email = settings.get("alias_email") or ""
@@ -329,7 +341,10 @@ def send_single_user_email_with_cids(req, settings, recipients, user_key, recomm
             expanded_collections=expanded_collections,
             email_header_title=email_header_title,
             droppedneedle_wrapped_data=droppedneedle_wrapped_data,
-            droppedneedle_server_data=droppedneedle_server_data
+            droppedneedle_server_data=droppedneedle_server_data,
+            yearly_wrapped_data=yearly_wrapped_data,
+            sonarr_coming_soon_data=sonarr_coming_soon_data,
+            radarr_coming_soon_data=radarr_coming_soon_data
         )
 
         plain_text = convert_html_to_plain_text(email_html)

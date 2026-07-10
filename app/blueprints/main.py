@@ -57,6 +57,9 @@ def index():
     filtered_users = {}
     droppedneedle_wrapped_json = {}
     droppedneedle_server_json = None
+    yearly_wrapped_json = None
+    sonarr_coming_soon_json = None
+    radarr_coming_soon_json = None
     error = None
     alert = None
 
@@ -85,6 +88,8 @@ def index():
         "stat_cover_art": s["stat_cover_art"],
         "poster_max_height": s["poster_max_height"],
         "logo_position": s["logo_position"],
+        "coming_soon_days_ahead": s["coming_soon_days_ahead"],
+        "coming_soon_grid_columns": s["coming_soon_grid_columns"],
     }
 
     conn = db_connect()
@@ -131,7 +136,10 @@ def index():
         filtered_users = get_cached_data('filtered_users', strict=True) or get_cached_data('filtered_users', strict=False) or {}
         droppedneedle_wrapped_json = get_cached_data('droppedneedle_wrapped_json', strict=True) or get_cached_data('droppedneedle_wrapped_json', strict=False) or {}
         droppedneedle_server_json = get_cached_data('droppedneedle_server_json', strict=True) or get_cached_data('droppedneedle_server_json', strict=False)
-        
+        yearly_wrapped_json = get_cached_data('yearly_wrapped_json', strict=True) or get_cached_data('yearly_wrapped_json', strict=False)
+        sonarr_coming_soon_json = get_cached_data('sonarr_coming_soon_json', strict=True) or get_cached_data('sonarr_coming_soon_json', strict=False)
+        radarr_coming_soon_json = get_cached_data('radarr_coming_soon_json', strict=True) or get_cached_data('radarr_coming_soon_json', strict=False)
+
         if users:
             users_full_data = users
             for user in users:
@@ -179,6 +187,8 @@ def index():
                            cache_info=cache_info, recommendations_json=recommendations_json,
                            filtered_users=filtered_users, theme_settings=theme_settings,
                            droppedneedle_wrapped_json=droppedneedle_wrapped_json, droppedneedle_server_json=droppedneedle_server_json,
+                           yearly_wrapped_json=yearly_wrapped_json,
+                           sonarr_coming_soon_json=sonarr_coming_soon_json, radarr_coming_soon_json=radarr_coming_soon_json,
                            csrf_token=session["csrf_token"], username=username
                         )
 
@@ -247,6 +257,50 @@ def proxy_art(art_path):
         })
     except Exception as e:
         logger.error(f"proxy-art: Error fetching {_redact_token(full_url)}: {e}")
+        return Response("Image not found", status=404)
+
+@bp.route('/proxy-sonarr-art/<path:art_path>')
+@requires_auth
+def proxy_sonarr_art(art_path):
+    s = get_settings(decrypt_secrets=False)
+    sonarr_url = (s.get('sonarr_url') or '').rstrip('/')
+    sonarr_api_key = decrypt(s.get('sonarr_api_key') or '')
+    if not sonarr_url or not sonarr_api_key:
+        return Response("Sonarr is not configured.", status=400)
+
+    full_url = f"{sonarr_url}/{art_path}"
+    full_url += ('&' if '?' in full_url else '?') + f"apikey={sonarr_api_key}"
+
+    try:
+        r = safe_get(full_url, stream=True, timeout=15, headers={'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8'})
+        r.raise_for_status()
+        return Response(r.content, content_type=r.headers.get('Content-Type', 'image/jpeg'), headers={
+            'Cache-Control': 'public, max-age=86400'
+        })
+    except Exception as e:
+        logger.error(f"proxy-sonarr-art: Error fetching {art_path}: {e}")
+        return Response("Image not found", status=404)
+
+@bp.route('/proxy-radarr-art/<path:art_path>')
+@requires_auth
+def proxy_radarr_art(art_path):
+    s = get_settings(decrypt_secrets=False)
+    radarr_url = (s.get('radarr_url') or '').rstrip('/')
+    radarr_api_key = decrypt(s.get('radarr_api_key') or '')
+    if not radarr_url or not radarr_api_key:
+        return Response("Radarr is not configured.", status=400)
+
+    full_url = f"{radarr_url}/{art_path}"
+    full_url += ('&' if '?' in full_url else '?') + f"apikey={radarr_api_key}"
+
+    try:
+        r = safe_get(full_url, stream=True, timeout=15, headers={'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8'})
+        r.raise_for_status()
+        return Response(r.content, content_type=r.headers.get('Content-Type', 'image/jpeg'), headers={
+            'Cache-Control': 'public, max-age=86400'
+        })
+    except Exception as e:
+        logger.error(f"proxy-radarr-art: Error fetching {art_path}: {e}")
         return Response("Image not found", status=404)
 
 @bp.get("/proxy-img")

@@ -13,6 +13,8 @@ SECRET_COLUMNS = frozenset({
     "tautulli_api",
     "droppedneedle_api_key",
     "discord_webhook_url",
+    "sonarr_api_key",
+    "radarr_api_key",
 })
 
 # Empty/NULL columns are normalized with `or`-semantics, matching the
@@ -38,12 +40,14 @@ DEFAULTS = {
     "stat_cover_art": "disabled",
     "send_mode": "bcc",
     "hsts_enabled": "disabled",
+    "coming_soon_days_ahead": "14",
 }
 
 INT_COLUMNS = {
     "ra_grid_columns": 5,
     "recs_grid_columns": 5,
     "poster_max_height": 0,
+    "coming_soon_grid_columns": 5,
 }
 
 def get_settings(decrypt_secrets=True):

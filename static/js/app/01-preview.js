@@ -307,6 +307,12 @@ async function updatePreview() {
                 contentHTML += buildDroppedNeedleWrappedPreviewHTML(item.userKey);
             } else if (item.type === 'droppedneedle_server_stats') {
                 contentHTML += buildDroppedNeedleServerStatsPreviewHTML();
+            } else if (item.type === 'yearly_wrapped') {
+                contentHTML += buildYearlyWrappedPreviewHTML();
+            } else if (item.type === 'sonarr_coming_soon') {
+                contentHTML += buildSonarrComingSoonPreviewHTML();
+            } else if (item.type === 'radarr_coming_soon') {
+                contentHTML += buildRadarrComingSoonPreviewHTML();
             } else if (item.type === 'collection_group') {
                 if (item.collections && item.collections.length > 0) {
                     const stableGroupId = item.id || `group-${itemIndex}`;

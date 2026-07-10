@@ -62,7 +62,7 @@ def build_individual_item_card_html(item, theme_colors, msg_root, base_url="", p
 
     if poster_cid:
         meta_line = f"{type_icon} {subtitle}" if subtitle else type_icon
-        return f"""
+        card_html = f"""
         <table cellpadding="0" cellspacing="0" border="0" style="
             background-color: {theme_colors['card_bg']};
             border-radius: 12px;
@@ -102,7 +102,7 @@ def build_individual_item_card_html(item, theme_colors, msg_root, base_url="", p
         </table>
         """
     else:
-        return f"""
+        card_html = f"""
         <table cellpadding="0" cellspacing="0" border="0" style="
             background-color: {theme_colors['card_bg']};
             border-radius: 12px;
@@ -140,6 +140,10 @@ def build_individual_item_card_html(item, theme_colors, msg_root, base_url="", p
         </table>
         """
 
+    if item.get('plex_url'):
+        return f'<a href="{item["plex_url"]}" style="text-decoration: none; color: inherit; display: block;" target="_blank">{card_html}</a>'
+    return card_html
+
 def build_collection_card_html(collection, theme_colors, msg_root, base_url="", poster_max_height=0):
     _pmh = poster_max_height if poster_max_height else None
     poster_cid = None
@@ -175,7 +179,7 @@ def build_collection_card_html(collection, theme_colors, msg_root, base_url="", 
         poster_src = f"cid:{poster_cid}"
         logger.debug(f"Final poster src for {collection_title}: {poster_src}")
 
-        return f"""
+        card_html = f"""
             <table cellpadding="0" cellspacing="0" border="0" style="
                 background-color: {theme_colors['card_bg']};
                 border-radius: 12px;
@@ -216,7 +220,7 @@ def build_collection_card_html(collection, theme_colors, msg_root, base_url="", 
         """
     else:
         logger.debug(f"No valid image data for {collection_title}, using placeholder")
-        return f"""
+        card_html = f"""
             <table cellpadding="0" cellspacing="0" border="0" style="
                 background-color: {theme_colors['card_bg']};
                 border-radius: 12px;
@@ -248,3 +252,7 @@ def build_collection_card_html(collection, theme_colors, msg_root, base_url="", 
                 </tr>
             </table>
         """
+
+    if collection.get('plex_url'):
+        return f'<a href="{collection["plex_url"]}" style="text-decoration: none; color: inherit; display: block;" target="_blank">{card_html}</a>'
+    return card_html

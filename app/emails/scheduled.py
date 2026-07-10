@@ -9,9 +9,13 @@ from app.db import db_connect
 from app.settings_store import get_settings
 from app.store import record_email_history
 from app.render import capture_chart_images_via_headless
-from app.clients.tautulli import run_tautulli_command
+from app.clients.tautulli import run_tautulli_command, days_since_year_start
 from app.clients.conjurr import run_conjurr_command
 from app.clients.droppedneedle import run_droppedneedle_command, fetch_droppedneedle_server_stats
+from app.clients.sonarr import fetch_sonarr_calendar
+from app.clients.radarr import fetch_radarr_calendar
+
+from datetime import datetime, timedelta
 from app.emails.assemble import convert_html_to_plain_text, build_email_html_with_all_cids
 from app.emails.fetchers import fetch_tautulli_data_for_email
 from app.emails.send import group_recipients_by_user
@@ -37,6 +41,9 @@ class ScheduleContext:
     recommendations_data: dict = field(default_factory=dict)
     droppedneedle_wrapped_data: dict = field(default_factory=dict)
     droppedneedle_server_data: dict = None
+    yearly_wrapped_data: list = None
+    sonarr_coming_soon_data: list = None
+    radarr_coming_soon_data: list = None
     email_text: str = ""
 
 def send_scheduled_email(schedule_id, email_list_id, template_id):
@@ -143,6 +150,22 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
         droppedneedle_api_key = s.get("droppedneedle_api_key") or ""
         droppedneedle_server_data, _ = fetch_droppedneedle_server_stats(droppedneedle_url, droppedneedle_api_key) if (droppedneedle_url and droppedneedle_api_key) else (None, None)
 
+        yearly_wrapped_data, _ = run_tautulli_command(
+            s.get("tautulli_url"), s.get("tautulli_api"), 'get_home_stats', 'Stats', None, days_since_year_start(), stats_type=s.get("stats_type") or "plays"
+        ) if (s.get("tautulli_url") and s.get("tautulli_api")) else (None, None)
+
+        coming_soon_days_ahead = int(s.get("coming_soon_days_ahead") or 14)
+        coming_soon_start = datetime.now().strftime('%Y-%m-%d')
+        coming_soon_end = (datetime.now() + timedelta(days=coming_soon_days_ahead)).strftime('%Y-%m-%d')
+
+        sonarr_url = (s.get("sonarr_url") or "").strip()
+        sonarr_api_key = s.get("sonarr_api_key") or ""
+        sonarr_coming_soon_data, _ = fetch_sonarr_calendar(sonarr_url, sonarr_api_key, coming_soon_start, coming_soon_end) if (sonarr_url and sonarr_api_key) else (None, None)
+
+        radarr_url = (s.get("radarr_url") or "").strip()
+        radarr_api_key = s.get("radarr_api_key") or ""
+        radarr_coming_soon_data, _ = fetch_radarr_calendar(radarr_url, radarr_api_key, coming_soon_start, coming_soon_end) if (radarr_url and radarr_api_key) else (None, None)
+
         ctx = ScheduleContext(
             schedule_id=schedule_id,
             template_name=template_name,
@@ -156,6 +179,9 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
             use_prefix=s["scheduled_subject_prefix"] == 'enabled',
             users_data=users_data,
             droppedneedle_server_data=droppedneedle_server_data,
+            yearly_wrapped_data=yearly_wrapped_data,
+            sonarr_coming_soon_data=sonarr_coming_soon_data,
+            radarr_coming_soon_data=radarr_coming_soon_data,
         )
 
         if has_recs or has_wrapped:
@@ -277,6 +303,7 @@ def send_scheduled_user_email_with_cids(ctx, settings, recipients, user_key):
         stat_cover_art = settings["stat_cover_art"]
         send_mode = settings["send_mode"]
         poster_max_height = settings["poster_max_height"]
+        coming_soon_grid_columns = settings["coming_soon_grid_columns"]
         subject = ctx.subject
         email_header_title = ctx.email_header_title
         custom_html = ctx.custom_html
@@ -290,6 +317,9 @@ def send_scheduled_user_email_with_cids(ctx, settings, recipients, user_key):
         recommendations_data = ctx.recommendations_data
         droppedneedle_wrapped_data = ctx.droppedneedle_wrapped_data
         droppedneedle_server_data = ctx.droppedneedle_server_data
+        yearly_wrapped_data = ctx.yearly_wrapped_data
+        sonarr_coming_soon_data = ctx.sonarr_coming_soon_data
+        radarr_coming_soon_data = ctx.radarr_coming_soon_data
         logger.info(f"SMTP Config: {smtp_server}:{smtp_port} using {smtp_protocol}")
 
         if smtp_port == 465 and smtp_protocol == 'TLS':
@@ -341,6 +371,7 @@ def send_scheduled_user_email_with_cids(ctx, settings, recipients, user_key):
         tautulli_data["settings"]["recs_grid_columns"] = recs_grid_columns
         tautulli_data["settings"]["stat_cover_art"] = stat_cover_art
         tautulli_data["settings"]["poster_max_height"] = poster_max_height
+        tautulli_data["settings"]["coming_soon_grid_columns"] = coming_soon_grid_columns
 
         template_data = {
             'selected_items': json.dumps(selected_items),
@@ -352,10 +383,10 @@ def send_scheduled_user_email_with_cids(ctx, settings, recipients, user_key):
         base_url = os.environ.get("PUBLIC_BASE_URL", "http://127.0.0.1:6397")
 
         user_dict = {user_key: recipients[0]} if recipients else {}
-        
+
         email_html = build_email_html_with_all_cids(
-            template_data, 
-            tautulli_data, 
+            template_data,
+            tautulli_data,
             msg_root,
             display_preference,
             users_data,
@@ -369,7 +400,10 @@ def send_scheduled_user_email_with_cids(ctx, settings, recipients, user_key):
             expanded_collections=expanded_collections,
             email_header_title=email_header_title,
             droppedneedle_wrapped_data=droppedneedle_wrapped_data,
-            droppedneedle_server_data=droppedneedle_server_data
+            droppedneedle_server_data=droppedneedle_server_data,
+            yearly_wrapped_data=yearly_wrapped_data,
+            sonarr_coming_soon_data=sonarr_coming_soon_data,
+            radarr_coming_soon_data=radarr_coming_soon_data
         )
 
         plain_text = convert_html_to_plain_text(email_html)
@@ -466,6 +500,7 @@ def send_scheduled_single_email_with_cids(ctx, settings, to_emails_list):
         stat_cover_art = settings["stat_cover_art"]
         send_mode = settings["send_mode"]
         poster_max_height = settings["poster_max_height"]
+        coming_soon_grid_columns = settings["coming_soon_grid_columns"]
         subject = ctx.subject
         email_header_title = ctx.email_header_title
         custom_html = ctx.custom_html
@@ -477,6 +512,9 @@ def send_scheduled_single_email_with_cids(ctx, settings, to_emails_list):
         use_prefix = ctx.use_prefix
         users_data = ctx.users_data
         droppedneedle_server_data = ctx.droppedneedle_server_data
+        yearly_wrapped_data = ctx.yearly_wrapped_data
+        sonarr_coming_soon_data = ctx.sonarr_coming_soon_data
+        radarr_coming_soon_data = ctx.radarr_coming_soon_data
         email_text = ctx.email_text
         logger.info(f"SMTP Config: {smtp_server}:{smtp_port} using {smtp_protocol}")
 
@@ -529,6 +567,7 @@ def send_scheduled_single_email_with_cids(ctx, settings, to_emails_list):
         tautulli_data["settings"]["recs_grid_columns"] = recs_grid_columns
         tautulli_data["settings"]["stat_cover_art"] = stat_cover_art
         tautulli_data["settings"]["poster_max_height"] = poster_max_height
+        tautulli_data["settings"]["coming_soon_grid_columns"] = coming_soon_grid_columns
 
         template_data = {
             'selected_items': json.dumps(selected_items),
@@ -538,10 +577,10 @@ def send_scheduled_single_email_with_cids(ctx, settings, to_emails_list):
         }
 
         base_url = os.environ.get("PUBLIC_BASE_URL", "http://127.0.0.1:6397")
-        
+
         email_html = build_email_html_with_all_cids(
-            template_data, 
-            tautulli_data, 
+            template_data,
+            tautulli_data,
             msg_root,
             display_preference,
             users_data,
@@ -554,7 +593,10 @@ def send_scheduled_single_email_with_cids(ctx, settings, to_emails_list):
             date_range,
             expanded_collections,
             email_header_title=email_header_title,
-            droppedneedle_server_data=droppedneedle_server_data
+            droppedneedle_server_data=droppedneedle_server_data,
+            yearly_wrapped_data=yearly_wrapped_data,
+            sonarr_coming_soon_data=sonarr_coming_soon_data,
+            radarr_coming_soon_data=radarr_coming_soon_data
         )
 
         plain_text = convert_html_to_plain_text(email_html)

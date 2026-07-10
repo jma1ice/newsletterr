@@ -11,7 +11,7 @@ from app.crypto import encrypt, decrypt
 from werkzeug.security import generate_password_hash
 from app.hooks import refresh_hsts_setting
 from app.security import require_csrf_for_json, requires_auth
-from app.blueprints.api import test_tautulli_connection, test_conjurr_connection, test_droppedneedle_connection
+from app.blueprints.api import test_tautulli_connection, test_conjurr_connection, test_droppedneedle_connection, test_sonarr_connection, test_radarr_connection
 
 import logging
 
@@ -67,7 +67,7 @@ def settings():
             db_custom_logo = cursor.fetchone()
             existing_custom_logo = db_custom_logo[0] if db_custom_logo and db_custom_logo[0] else ""
 
-            cursor.execute("SELECT login_toggle, nl_username, nl_password, password, tautulli_api, droppedneedle_api_key, discord_webhook_url FROM settings WHERE id = 1")
+            cursor.execute("SELECT login_toggle, nl_username, nl_password, password, tautulli_api, droppedneedle_api_key, discord_webhook_url, sonarr_api_key, radarr_api_key FROM settings WHERE id = 1")
             db_login_info = cursor.fetchone()
             existing_login_toggle = db_login_info[0] if db_login_info and db_login_info[0] else ""
             existing_nl_username = db_login_info[1] if db_login_info and db_login_info[1] else ""
@@ -76,6 +76,8 @@ def settings():
             existing_tautulli_api = db_login_info[4] if db_login_info and db_login_info[4] else ""
             existing_droppedneedle_api_key = db_login_info[5] if db_login_info and db_login_info[5] else ""
             existing_discord_webhook_url = db_login_info[6] if db_login_info and db_login_info[6] else ""
+            existing_sonarr_api_key = db_login_info[7] if db_login_info and db_login_info[7] else ""
+            existing_radarr_api_key = db_login_info[8] if db_login_info and db_login_info[8] else ""
 
             # secret fields are write-only: a blank submission keeps the stored
             # value rather than overwriting it with an empty string
@@ -99,6 +101,12 @@ def settings():
             droppedneedle_url = request.form.get("droppedneedle_url")
             droppedneedle_api_key = _secret("droppedneedle_api_key", existing_droppedneedle_api_key)
             discord_webhook_url = _secret("discord_webhook_url", existing_discord_webhook_url)
+            sonarr_url = request.form.get("sonarr_url")
+            sonarr_api_key = _secret("sonarr_api_key", existing_sonarr_api_key)
+            radarr_url = request.form.get("radarr_url")
+            radarr_api_key = _secret("radarr_api_key", existing_radarr_api_key)
+            coming_soon_days_ahead = request.form.get("coming_soon_days_ahead", "14")
+            coming_soon_grid_columns = request.form.get("coming_soon_grid_columns", "5")
             recipient_display_name = request.form.get("recipient_display_name", "email")
             logo_filename = request.form.get("logo_filename")
             logo_width = request.form.get("logo_width")
@@ -155,8 +163,8 @@ def settings():
                 INSERT INTO settings
                 (id, from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, plex_url, tautulli_url,
                     tautulli_api, conjurr_url, droppedneedle_url, droppedneedle_api_key, recipient_display_name, logo_filename, logo_width, email_theme, primary_color, secondary_color, accent_color, background_color,
-                    text_color, from_name, custom_logo_filename, login_toggle, nl_username, nl_password, default_intro_text, default_outro_text, hsts_enabled, scheduled_subject_prefix, logo_position, hide_stat_play_counts, hide_graph_play_counts, stats_type, recently_added_mode, recently_added_sort, ra_grid_columns, recs_grid_columns, stat_cover_art, send_mode, poster_max_height, discord_webhook_url)
-                VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    text_color, from_name, custom_logo_filename, login_toggle, nl_username, nl_password, default_intro_text, default_outro_text, hsts_enabled, scheduled_subject_prefix, logo_position, hide_stat_play_counts, hide_graph_play_counts, stats_type, recently_added_mode, recently_added_sort, ra_grid_columns, recs_grid_columns, stat_cover_art, send_mode, poster_max_height, discord_webhook_url, sonarr_url, sonarr_api_key, radarr_url, radarr_api_key, coming_soon_days_ahead, coming_soon_grid_columns)
+                VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT (id) DO UPDATE
                 SET from_email = excluded.from_email, alias_email = excluded.alias_email, reply_to_email = excluded.reply_to_email, password = excluded.password,
                     smtp_username = excluded.smtp_username, smtp_server = excluded.smtp_server, smtp_port = excluded.smtp_port, smtp_protocol = excluded.smtp_protocol,
@@ -173,11 +181,18 @@ def settings():
                     stat_cover_art = excluded.stat_cover_art,
                     send_mode = excluded.send_mode,
                     poster_max_height = excluded.poster_max_height,
-                    discord_webhook_url = excluded.discord_webhook_url
+                    discord_webhook_url = excluded.discord_webhook_url,
+                    sonarr_url = excluded.sonarr_url,
+                    sonarr_api_key = excluded.sonarr_api_key,
+                    radarr_url = excluded.radarr_url,
+                    radarr_api_key = excluded.radarr_api_key,
+                    coming_soon_days_ahead = excluded.coming_soon_days_ahead,
+                    coming_soon_grid_columns = excluded.coming_soon_grid_columns
             """, (from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, plex_url, tautulli_url, tautulli_api,
                   conjurr_url, droppedneedle_url, droppedneedle_api_key, recipient_display_name, logo_filename, logo_width, email_theme, primary_color, secondary_color, accent_color, background_color, text_color, from_name,
                   custom_logo_filename, login_toggle, nl_username, nl_password, default_intro_text, default_outro_text, hsts_enabled, scheduled_subject_prefix, logo_position,
-                  hide_stat_play_counts, hide_graph_play_counts, stats_type, recently_added_mode, recently_added_sort, ra_grid_columns, recs_grid_columns, stat_cover_art, send_mode, poster_max_height, discord_webhook_url))
+                  hide_stat_play_counts, hide_graph_play_counts, stats_type, recently_added_mode, recently_added_sort, ra_grid_columns, recs_grid_columns, stat_cover_art, send_mode, poster_max_height, discord_webhook_url,
+                  sonarr_url, sonarr_api_key, radarr_url, radarr_api_key, coming_soon_days_ahead, coming_soon_grid_columns))
             conn.commit()
             cursor.execute("SELECT plex_token FROM settings WHERE id = 1")
             plex_token = cursor.fetchone()[0]
@@ -230,6 +245,12 @@ def settings():
                 "send_mode": send_mode,
                 "poster_max_height": poster_max_height,
                 "discord_webhook_url": decrypt(discord_webhook_url),
+                "sonarr_url": sonarr_url,
+                "sonarr_api_key": decrypt(sonarr_api_key),
+                "radarr_url": radarr_url,
+                "radarr_api_key": decrypt(radarr_api_key),
+                "coming_soon_days_ahead": coming_soon_days_ahead,
+                "coming_soon_grid_columns": coming_soon_grid_columns,
             }
 
             audit_results = []
@@ -239,6 +260,10 @@ def settings():
                 audit_results.append({"service": "Conjurr", **test_conjurr_connection(settings["conjurr_url"])})
             if settings["droppedneedle_url"]:
                 audit_results.append({"service": "DroppedNeedle", **test_droppedneedle_connection(settings["droppedneedle_url"], settings["droppedneedle_api_key"])})
+            if settings["sonarr_url"]:
+                audit_results.append({"service": "Sonarr", **test_sonarr_connection(settings["sonarr_url"], settings["sonarr_api_key"])})
+            if settings["radarr_url"]:
+                audit_results.append({"service": "Radarr", **test_radarr_connection(settings["radarr_url"], settings["radarr_api_key"])})
             audit_json = json.dumps(audit_results) if audit_results else None
 
             refresh_hsts_setting()
@@ -288,6 +313,13 @@ def settings():
                 "conjurr_url": request.form.get("conjurr_url", ""),
                 "droppedneedle_url": request.form.get("droppedneedle_url", ""),
                 "droppedneedle_api_key": request.form.get("droppedneedle_api_key", ""),
+                "discord_webhook_url": request.form.get("discord_webhook_url", ""),
+                "sonarr_url": request.form.get("sonarr_url", ""),
+                "sonarr_api_key": request.form.get("sonarr_api_key", ""),
+                "radarr_url": request.form.get("radarr_url", ""),
+                "radarr_api_key": request.form.get("radarr_api_key", ""),
+                "coming_soon_days_ahead": request.form.get("coming_soon_days_ahead", "14"),
+                "coming_soon_grid_columns": request.form.get("coming_soon_grid_columns", "5"),
                 "recipient_display_name": request.form.get("recipient_display_name", "email"),
                 "logo_filename": request.form.get("logo_filename", ""),
                 "logo_width": request.form.get("logo_width", ""),
@@ -369,6 +401,12 @@ def settings():
     send_mode = s.get("send_mode")
     poster_max_height = s.get("poster_max_height")
     discord_webhook_url = s.get("discord_webhook_url")
+    sonarr_url = s.get("sonarr_url")
+    sonarr_api_key = s.get("sonarr_api_key")
+    radarr_url = s.get("radarr_url")
+    radarr_api_key = s.get("radarr_api_key")
+    coming_soon_days_ahead = s.get("coming_soon_days_ahead")
+    coming_soon_grid_columns = s.get("coming_soon_grid_columns")
 
     current_theme = email_theme or "newsletterr_blue"
     if current_theme in theme_presets and current_theme != "custom":
@@ -419,6 +457,10 @@ def settings():
         "stat_cover_art": stat_cover_art or "disabled",
         "send_mode": send_mode or "bcc",
         "poster_max_height": poster_max_height or "",
+        "sonarr_url": sonarr_url or "",
+        "radarr_url": radarr_url or "",
+        "coming_soon_days_ahead": coming_soon_days_ahead or "14",
+        "coming_soon_grid_columns": coming_soon_grid_columns or "5",
     }
     # secrets are never sent to the browser; the form shows a placeholder and
     # a blank submission keeps the stored value (write-only fields)
@@ -432,6 +474,10 @@ def settings():
     settings["has_nl_password"] = bool(nl_password)
     settings["discord_webhook_url"] = ""
     settings["has_discord_webhook_url"] = bool(discord_webhook_url)
+    settings["sonarr_api_key"] = ""
+    settings["has_sonarr_api_key"] = bool(sonarr_api_key)
+    settings["radarr_api_key"] = ""
+    settings["has_radarr_api_key"] = bool(radarr_api_key)
     if smtp_port == '' or smtp_port is None:
         settings["smtp_port"] = 587
         cursor.execute("""

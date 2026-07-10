@@ -65,6 +65,11 @@ document.getElementById('stats_form').addEventListener('submit', async (e) => {
             statsList = data.stats;
             buildStatsRows();
         }
+        if (data.yearly_wrapped_json) {
+            const yearlyWrappedScript = document.getElementById('yearly-wrapped-json');
+            if (yearlyWrappedScript) yearlyWrappedScript.textContent = JSON.stringify(data.yearly_wrapped_json);
+            buildYearlyWrappedRow();
+        }
         if (data.graph_data) {
             graphDataList = data.graph_data;
             buildGraphsRows();

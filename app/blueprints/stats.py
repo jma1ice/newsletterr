@@ -8,11 +8,15 @@ from app.cache import set_cached_data, get_cache_info
 from app.crypto import decrypt
 from app.security import require_csrf_for_json, requires_auth, safe_get, json_body
 from app.theme import get_theme_settings
-from app.clients.plex import get_plex_headers
-from app.clients.tautulli import run_tautulli_command
+from app.clients.plex import get_plex_headers, get_plex_machine_id, build_plex_web_link
+from app.clients.tautulli import run_tautulli_command, days_since_year_start
 from app.clients.conjurr import run_conjurr_command
 from app.clients.droppedneedle import run_droppedneedle_command, fetch_droppedneedle_server_stats
+from app.clients.sonarr import fetch_sonarr_calendar
+from app.clients.radarr import fetch_radarr_calendar
 from app.emails.fetchers import fetch_recent_data_for_index
+
+from datetime import datetime, timedelta
 
 import logging
 
@@ -65,6 +69,10 @@ def pull_stats():
 
     set_cached_data('stats', stats, cache_params)
 
+    yearly_wrapped_data, _ = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_home_stats', 'Stats', None, days_since_year_start(), stats_type=stats_type)
+    if yearly_wrapped_data:
+        set_cached_data('yearly_wrapped_json', yearly_wrapped_data, cache_params)
+
     users, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_users', 'Users', error)
     set_cached_data('users', users, cache_params)
 
@@ -116,6 +124,7 @@ def pull_stats():
         "success": True,
         "alert": f"Fresh data loaded! Stats/graphs for {time_range} days, and recently added {'within last ' + count + ' days' if recently_added_mode == 'days' else count + ' items'}.",
         "stats": stats or [],
+        "yearly_wrapped_json": yearly_wrapped_data or [],
         "graph_data": graph_data,
         "graph_commands": graph_commands,
         "recent_data": recent_data,
@@ -272,6 +281,92 @@ def pull_droppedneedle_stats():
                             alert=alert, error=error, theme_settings=theme_settings,
                             csrf_token=session.get("csrf_token", ""))
 
+@bp.route('/pull_coming_soon', methods=['POST'])
+@requires_auth
+def pull_coming_soon():
+    require_csrf_for_json()
+    sonarr_coming_soon_json = None
+    radarr_coming_soon_json = None
+    error = None
+    alert = None
+
+    data, err = json_body()
+    if err:
+        return err
+    stats = data.get('stats')
+    user_dict = data.get('user_dict', {})
+    graph_data = data.get('graph_data')
+    graph_commands = data.get('graph_commands')
+    recent_data = data.get('recent_data')
+    libs = data.get('libs')
+    settings = data.get('settings', {})
+
+    _s = get_settings(decrypt_secrets=False)
+    row = (
+        _s.get("sonarr_url"), _s.get("sonarr_api_key"),
+        _s.get("radarr_url"), _s.get("radarr_api_key"),
+        _s.get("coming_soon_days_ahead"),
+    ) if "id" in _s else None
+
+    sonarr_url = (row[0] or "").strip() if row else ""
+    sonarr_api_key = decrypt(row[1]) if row and row[1] else ""
+    radarr_url = (row[2] or "").strip() if row else ""
+    radarr_api_key = decrypt(row[3]) if row and row[3] else ""
+    days_ahead = int(row[4] or 14) if row else 14
+
+    if not sonarr_url and not radarr_url:
+        return render_template('index.html', error='Please enter a Sonarr and/or Radarr URL and API key on settings page',
+                                stats=stats, user_dict=user_dict, graph_data=graph_data,
+                                graph_commands=graph_commands, recent_data=recent_data,
+                                libs=libs, settings=settings, theme_settings=get_theme_settings(),
+                                csrf_token=session.get("csrf_token", ""))
+
+    start_date = datetime.now().strftime('%Y-%m-%d')
+    end_date = (datetime.now() + timedelta(days=days_ahead)).strftime('%Y-%m-%d')
+
+    if sonarr_url and sonarr_api_key:
+        sonarr_coming_soon_json, sonarr_error = fetch_sonarr_calendar(sonarr_url, sonarr_api_key, start_date, end_date)
+        if sonarr_error:
+            error = (error + ", " if error else "") + sonarr_error
+
+    if radarr_url and radarr_api_key:
+        radarr_coming_soon_json, radarr_error = fetch_radarr_calendar(radarr_url, radarr_api_key, start_date, end_date)
+        if radarr_error:
+            error = (error + ", " if error else "") + radarr_error
+
+    if error:
+        alert = None
+    else:
+        alert = "Coming soon calendar pulled!"
+
+    cache_params = {'timestamp': time.time()}
+    set_cached_data('sonarr_coming_soon_json', sonarr_coming_soon_json, cache_params)
+    set_cached_data('radarr_coming_soon_json', radarr_coming_soon_json, cache_params)
+
+    cache_info = {
+        'stats': get_cache_info('stats'),
+        'users': get_cache_info('users'),
+        'graph_data': get_cache_info('graph_data'),
+        'recent_data': get_cache_info('recent_data'),
+        'recommendations_json': get_cache_info('recommendations_json'),
+        'filtered_users': get_cache_info('filtered_users')
+    }
+
+    if not cache_info['graph_data'] or 'params' not in cache_info['graph_data']:
+        if not cache_info['graph_data']:
+            cache_info['graph_data'] = {}
+        cache_info['graph_data']['params'] = {
+            'time_range': 30
+        }
+
+    theme_settings = get_theme_settings()
+
+    return render_template('index.html', stats=stats, user_dict=user_dict, graph_data=graph_data, cache_info=cache_info,
+                            graph_commands=graph_commands, recent_data=recent_data, libs=libs, settings=settings,
+                            sonarr_coming_soon_json=sonarr_coming_soon_json, radarr_coming_soon_json=radarr_coming_soon_json,
+                            alert=alert, error=error, theme_settings=theme_settings,
+                            csrf_token=session.get("csrf_token", ""))
+
 @bp.route('/fetch_collections/<collection_type>', methods=['GET'])
 @requires_auth
 def fetch_collections(collection_type):
@@ -284,6 +379,7 @@ def fetch_collections(collection_type):
 
         plex_url = row[0].rstrip('/')
         plex_token = row[1]
+        machine_id = get_plex_machine_id()
 
         sections_url = f"{plex_url}/library/sections"
         
@@ -329,7 +425,8 @@ def fetch_collections(collection_type):
                             "childCount": collection.get("childCount", 0),
                             "subtype": collection.get("subtype", target_type),
                             "sectionTitle": section_title,
-                            "sectionId": section_id
+                            "sectionId": section_id,
+                            "plex_url": build_plex_web_link(collection.get("ratingKey"), machine_id)
                         })
 
         return jsonify({

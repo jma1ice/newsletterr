@@ -1,5 +1,7 @@
 import math
 
+from datetime import datetime
+
 import requests
 
 from app.crypto import decrypt
@@ -8,6 +10,10 @@ from app.security import safe_get
 import logging
 
 logger = logging.getLogger(__name__)
+
+def days_since_year_start():
+    now = datetime.now()
+    return str(max(1, (now - datetime(now.year, 1, 1)).days))
 
 def run_tautulli_command(base_url, api_key, command, section_id, error, time_range='30', start='0', y_axis='plays', stats_type='plays'):
     out_data = None

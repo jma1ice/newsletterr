@@ -203,7 +203,6 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 
 ### And these items are feature requests:
 --- Settings ---
-** RA by days not implemented in 'new schedule creator'
 * Option to show or hide description on recently added posters
 * Setting for collection group grid width
 
@@ -211,10 +210,9 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
  -- newsletterr GitHub / Discord --
 * GitHub webhook to pull submitted issues to Discord channel
 * Ko-fi -> Discord integration for contributor role
-** Export logs button | link to discord
  -- Other --
-* Sonarr/Radarr calendar integration for 'coming soon' type email
-* [Plex Wrapped](https://github.com/netplexflix/Plex-Wrapped-for-Tautulli?tab=readme-ov-file) API call integration
+** Sonarr/Radarr calendar integration for 'coming soon' type email
+** [Plex Wrapped](https://github.com/netplexflix/Plex-Wrapped-for-Tautulli?tab=readme-ov-file) API call integration
 * Ombi integration
 * Servarr PR
 * Clean up looks on DN stats
@@ -229,18 +227,14 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Email preview: desktop/tablet/phone views
 
 --- Misc. ---
-** Stats for total items in library
-* Date range for stats (i.e. 1.1.25 - 1.1.26) (instead of 'last X days')
-* Make collections clickable - is this possible?
+** Date range for stats (i.e. 1.1.25 - 1.1.26) (instead of 'last X days')
+** Make collections clickable - is this possible?
 * More mobile CSS optimizations
 * Discord text should be stylized logo to match GitHub
 * Can Snap-Ins work with custom HTML?
-** Settings submit should audit the external tools api test
 * Does this work with Emby/Jellyfin?
 * Tailwind Play CDN fix
 * CSP out of Report-Only after trial run
-** Add more to /setup to configure settings on first run
-** Resend from history
 
 ---
 
@@ -286,7 +280,12 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Test send button
 * Email builder auto-save
 * Pagination in email history, history capped to 1000
-
+* RA by days implemented in 'new schedule creator'
+* Export logs button with send to discord
+* Stats for total items in library
+* Settings submit audits the external tools api test
+* Setup Wizard
+* Resend from history
 
 ### v2026.1:
 

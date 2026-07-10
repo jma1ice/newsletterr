@@ -9,7 +9,7 @@ from app.db import db_connect
 from app.settings_store import get_settings
 from app.store import record_email_history
 from app.render import capture_chart_images_via_headless
-from app.clients.tautulli import run_tautulli_command
+from app.clients.tautulli import run_tautulli_command, days_since_year_start
 from app.clients.conjurr import run_conjurr_command
 from app.clients.droppedneedle import run_droppedneedle_command, fetch_droppedneedle_server_stats
 from app.clients.sonarr import fetch_sonarr_calendar
@@ -151,7 +151,7 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
         droppedneedle_server_data, _ = fetch_droppedneedle_server_stats(droppedneedle_url, droppedneedle_api_key) if (droppedneedle_url and droppedneedle_api_key) else (None, None)
 
         yearly_wrapped_data, _ = run_tautulli_command(
-            s.get("tautulli_url"), s.get("tautulli_api"), 'get_home_stats', 'Stats', None, '365', stats_type=s.get("stats_type") or "plays"
+            s.get("tautulli_url"), s.get("tautulli_api"), 'get_home_stats', 'Stats', None, days_since_year_start(), stats_type=s.get("stats_type") or "plays"
         ) if (s.get("tautulli_url") and s.get("tautulli_api")) else (None, None)
 
         coming_soon_days_ahead = int(s.get("coming_soon_days_ahead") or 14)

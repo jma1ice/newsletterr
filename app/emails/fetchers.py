@@ -3,7 +3,7 @@ import time
 from app.settings_store import get_settings
 from app.cache import get_cached_data, set_cached_data
 from app.crypto import decrypt
-from app.clients.tautulli import run_tautulli_command
+from app.clients.tautulli import run_tautulli_command, days_since_year_start
 from app.clients.plex import fetch_recently_added_using_plex_sdk
 from app.clients.conjurr import run_conjurr_command
 from app.clients.droppedneedle import run_droppedneedle_command, fetch_droppedneedle_server_stats
@@ -262,7 +262,7 @@ def get_yearly_wrapped_cached(use_cache=True):
         tautulli_api_key = decrypt(row[1])
         stats_type = row[2] or 'plays'
 
-        stats_data, _ = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_home_stats', 'Stats', None, '365', stats_type=stats_type)
+        stats_data, _ = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_home_stats', 'Stats', None, days_since_year_start(), stats_type=stats_type)
 
         if use_cache and stats_data:
             set_cached_data('yearly_wrapped_json', stats_data, {'timestamp': time.time(), 'manual_fetch': True})

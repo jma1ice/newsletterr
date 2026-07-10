@@ -9,7 +9,7 @@ from app.crypto import decrypt
 from app.security import require_csrf_for_json, requires_auth, safe_get, json_body
 from app.theme import get_theme_settings
 from app.clients.plex import get_plex_headers, get_plex_machine_id, build_plex_web_link
-from app.clients.tautulli import run_tautulli_command
+from app.clients.tautulli import run_tautulli_command, days_since_year_start
 from app.clients.conjurr import run_conjurr_command
 from app.clients.droppedneedle import run_droppedneedle_command, fetch_droppedneedle_server_stats
 from app.clients.sonarr import fetch_sonarr_calendar
@@ -69,7 +69,7 @@ def pull_stats():
 
     set_cached_data('stats', stats, cache_params)
 
-    yearly_wrapped_data, _ = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_home_stats', 'Stats', None, '365', stats_type=stats_type)
+    yearly_wrapped_data, _ = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_home_stats', 'Stats', None, days_since_year_start(), stats_type=stats_type)
     if yearly_wrapped_data:
         set_cached_data('yearly_wrapped_json', yearly_wrapped_data, cache_params)
 

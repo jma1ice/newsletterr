@@ -23,7 +23,7 @@ jobs:
         run: |
           FILE_VERSION="$(head -n 1 VERSION)"
           TAG="${{ github.event.release.tag_name }}"
-          if [ "$FILE_VERSION" != "$TAG" ]; then
+          if [[ "$TAG" != "$FILE_VERSION" && "$TAG" != "$FILE_VERSION"-* ]]; then
             echo "Release tag $TAG does not match VERSION file $FILE_VERSION" >&2
             exit 1
           fi

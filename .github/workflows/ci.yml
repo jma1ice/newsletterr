@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+    branches: [main, nightly]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Lint (ruff)
+        run: ruff check app/ newsletterr.py tests/
+
+      - name: JS syntax check
+        run: |
+          for f in static/js/app/*.js; do
+            node --check "$f"
+          done
+
+      - name: Tests
+        run: pytest

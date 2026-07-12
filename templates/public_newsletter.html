@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <title>newsletter</title>
+        {% include 'partials/_head_min.html' %}
+    </head>
+    <body class="auth-body">
+        <div class="auth-card text-center">
+            <img src="/static/img/Asset_94x.png" alt="newsletterr" class="auth-logo-img" />
+
+            {% if state == 'disabled' %}
+                <h5 class="auth-title">Not available</h5>
+                <p class="auth-sub">Hosted newsletters aren't enabled for this instance.</p>
+            {% elif state == 'empty' %}
+                <h5 class="auth-title">No newsletter yet</h5>
+                <p class="auth-sub">Nothing has been sent yet.</p>
+            {% endif %}
+        </div>
+    </body>
+</html>

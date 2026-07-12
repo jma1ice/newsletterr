@@ -1,0 +1,23 @@
+{# Shared minimal head for standalone pages (login, setup, public_*). These
+   pages deliberately do NOT extend base.html (no app shell for pre-auth /
+   anonymous views), so this include gives them the token system, base reset,
+   components, the auth stylesheet, and the theme flash-prevention script -
+   which also gives them the dark mode they previously lacked. #}
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script nonce="{{ nonce }}">
+    try {
+        const pref = localStorage.getItem('theme');
+        const dark = pref ? (pref === 'dark') :
+            window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        document.documentElement.classList.toggle('dark', dark);
+    } catch (_) {}
+</script>
+<link rel="icon" type="image/x-icon" href="/static/img/favicon.ico">
+<link href="{{ url_for('static', filename='css/ui/tokens.css') }}" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/ui/base.css') }}" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/ui/utilities.css') }}" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/ui/compat.css') }}" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/ui/components.css') }}" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/pages/auth.css') }}" rel="stylesheet">
+<meta name="color-scheme" content="light dark">

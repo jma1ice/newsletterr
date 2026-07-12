@@ -1,646 +1,983 @@
 {% extends "base.html" %}
 {% block title %}settings{% endblock %}
+{% block page_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/settings.css') }}">{% endblock %}
+{% block page_header %}
+<header class="page-header">
+    <h1>settings</h1>
+</header>
+{% endblock %}
 {% block content %}
-<div class="container-fluid">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h1>settings</h1>
-    </div>
+<div class="container-fluid settings-page">
     {% if settings.from_email == '' %}
-        <p style="color: #770010; text-shadow: 1px 0 #000, 0 1px #000, -1px 0 #000, 0 -1px #000;">
+        <p class="nl-alert nl-alert--info mb-3">
             Welcome to newsletterr! Please enter in your settings below, if you have any questions about them please see the readme.md file for an explanation.
         </p>
     {% else %}
-        <p class="text-info mb-4">Configure your application settings, Plex connection, and email preferences.</p>
+        <p class="settings-intro mb-4">Configure your application settings, Plex connection, and email preferences.</p>
     {% endif %}
+
     {% if alert %}
-        <p style="color: #01b301; text-shadow: 1px 0 #000, 0 1px #000, -1px 0 #000, 0 -1px #000;">{{ alert }}</p>
+        <p class="nl-alert nl-alert--success mb-3">{{ alert }}</p>
     {% endif %}
-    {% if error %}
-        <p style="color: #770010; text-shadow: 1px 0 #000, 0 1px #000, -1px 0 #000, 0 -1px #000;">{{ error }}</p>
-    {% endif %}
-    <div class="foreground">
-        <div style="margin: 0px 0px 0px 15px;">
-            <div>
-                <h3>Plex Account</h3>
-                <button id="connect_plex" class="button">Connect Plex</button>
-                <div id="plex_status">{% if settings.plex_token %}<p style="padding-left: 8px; color: #01b301; text-shadow: 1px 0 #000, 0 1px #000, -1px 0 #000, 0 -1px #000;">Connected</p>{% endif %}</div>
-            </div><br>
 
-            <form method="POST" id="settings_form">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token }} " />
-                <label for="from_email">From:</label><br>
-                <input type="email" id="from_email" name="from_email"
-                    {% if settings.from_email != "" %}value="{{ settings.from_email }}"{% endif %}
-                    placeholder="Your email" required><br><br>
-
-                <label for="from_name">From Name (Optional - used to specify a name for who the email is from, shows next to email address):</label><br>
-                <input type="text" id="from_name" name="from_name"
-                    {% if settings.from_name != "" %}value="{{ settings.from_name }}"{% endif %}
-                    placeholder="Your name"><br><br>
-
-                <label for="alias_email">Send-As Alias (Optional - used for domain specific email addresses):</label><br>
-                <input type="email" id="alias_email" name="alias_email"
-                    {% if settings.alias_email != "" %}value="{{ settings.alias_email }}"{% endif %}
-                    placeholder="Blank if no alias"><br><br>
-
-                <label for="reply_to_email">Reply-To (Optional - used to specify a specific email address for replies):</label><br>
-                <input type="email" id="reply_to_email" name="reply_to_email"
-                    {% if settings.reply_to_email != "" %}value="{{ settings.reply_to_email }}"{% endif %}
-                    placeholder="Optional reply-to email"><br><br>
-
-                <label for="password">Password:</label><br>
-                <input type="password" id="password" name="password"
-                    {% if settings.password != "" %}value="{{ settings.password }}"{% endif %}
-                    placeholder="Email Password or App Password" required><br><br>
-
-                <label for="smtp_username">SMTP Username (Optional - used for SMTP clients that need username login):</label><br>
-                <input type="text" id="smtp_username" name="smtp_username"
-                    {% if settings.smtp_username != "" %}value="{{ settings.smtp_username }}"{% endif %}
-                    placeholder="Leave blank to use your email address"><br><br>
-
-                <label for="smtp_server">SMTP Server:</label><br>
-                <input type="text" id="smtp_server" name="smtp_server"
-                    {% if settings.smtp_server != "" %}value="{{ settings.smtp_server }}"{% endif %}
-                    placeholder="SMTP Server (e.g. smtp.gmail.com)" required><br><br>
-
-                <label for="smtp_port">SMTP Port:</label><br>
-                <input type="number" id="smtp_port" name="smtp_port"
-                    {% if settings.smtp_port != "" %}value="{{ settings.smtp_port }}"{% endif %}
-                    placeholder="SMTP Port (i.e. 465 or 587)" required><br><br>
-
-                <label for="smtp_protocol">SMTP Protocol (SSL typically used with port 465, TLS typically used with port 587):</label><br>
-                <select id="smtp_protocol" name="smtp_protocol">
-                    <option value="SSL" {% if settings.smtp_protocol == "SSL" %}selected{% endif %}>SSL</option>
-                    <option value="TLS" {% if settings.smtp_protocol == "TLS" %}selected{% endif %}>TLS</option>
-                </select><br><br>
-
-                <label for="server_name">Plex Server Name:</label><br>
-                <input type="text" id="server_name" name="server_name"
-                    {% if settings.server_name != "" %}value="{{ settings.server_name }}"{% endif %}
-                    placeholder="Paramount Plex" required><br><br>
-
-                <label for="plex_url">Plex URL (Optional - used for posters on 'recently added' and 'stats'):</label><br>
-                <input type="text" id="plex_url" name="plex_url"
-                    {% if settings.plex_url != "" %}value="{{ settings.plex_url }}"{% endif %}
-                    placeholder="http://localhost:32400"><br><br>
-
-                <label for="tautulli_url">Tautulli Base URL (Optional - used for user emails, stats, graphs, and recently added):</label><br>
-                <input type="text" id="tautulli_url" name="tautulli_url"
-                    {% if settings.tautulli_url != "" %}value="{{ settings.tautulli_url }}"{% endif %}
-                    placeholder="http://localhost:8181"><br><br>
-
-                <label for="tautulli_api">Tautulli API Key (Optional - see above):</label><br>
-                <input type="text" id="tautulli_api" name="tautulli_api"
-                    {% if settings.tautulli_api != "" %}value="{{ settings.tautulli_api }}"{% endif %}
-                    placeholder="Tautulli API Key"><br><br>
-
-                <label for="conjurr_url">Conjurr Base URL (Optional - used for recommendations):</label><br>
-                <input type="text" id="conjurr_url" name="conjurr_url"
-                    {% if settings.conjurr_url != "" %}value="{{ settings.conjurr_url }}"{% endif %}
-                    placeholder="http://localhost:2665"><br><br>
-
-                <label for="recipient_display_name">Recipient Display Name (used in recommendation emails):</label><br>
-                <select id="recipient_display_name" name="recipient_display_name">
-                    <option value="email" {% if settings.recipient_display_name == 'email' %}selected{% endif %}>Email Address</option>
-                    <option value="username" {% if settings.recipient_display_name == 'username' %}selected{% endif %}>Username</option>
-                    <option value="friendly_name" {% if settings.recipient_display_name == 'friendly_name' %}selected{% endif %}>Friendly Name</option>
-                </select><br><br>
-
-                <label for="logo_filename">Logo File (Optional - used for custom logos at the top of emails. Email Theme must be custom to change!):</label><br>
-                <select id="logo_filename" name="logo_filename">
-                    <option value="newsletterr_blue_small"
-                        {% if settings.logo_filename == 'Asset_54x.png' %}selected{% endif %}
-                    >Newsletterr Square Blue</option>
-                    <option value="newsletterr_orange_small"
-                        {% if settings.logo_filename == 'Asset_46x.png' %}selected{% endif %}
-                    >Newsletterr Square Orange</option>
-                    <option value="newsletterr_blue_banner"
-                        {% if settings.email_theme == 'newsletterr_blue' or settings.logo_filename == 'Asset_94x.png' %}selected{% endif %}
-                    >Newsletterr Banner Blue</option>
-                    <option value="newsletterr_orange_banner"
-                        {% if settings.email_theme == 'plex_orange' or settings.logo_filename == 'Asset_45x.png' %}selected{% endif %}
-                    >Newsletterr Banner Orange</option>
-                    <option value="custom"
-                        {% if settings.logo_filename == 'custom' %}selected{% endif %}
-                    >Custom</option>
-                    <option value="none"
-                        {% if settings.logo_filename == '' %}selected{% endif %}
-                    >No Logo</option>
-                </select><br>
-
-                <div class="logo-preview-small">
-                    {% if settings.logo_filename %}
-                        {% if settings.logo_filename == 'custom' %}
-                            <img src="/static/uploads/logos/{{ settings.logo_filename }}" alt="Current Logo" class="logo-preview-img-small" />
-                        {% else %}
-                            <img src="/static/img/{{ settings.logo_filename }}" alt="Current Logo" class="logo-preview-img-small" />
-                        {% endif %}
-                        <span class="logo-filename-small">{{ settings.logo_filename }}</span>
-                    {% endif %}
-                </div><br>
-
-                <div id="upload_logo_div" style="display: {% if settings.logo_filename == 'custom' %}block{% else %}none{% endif %};">
-                    <label for="logo_file">Upload Custom Logo:</label><br>
-                    <input type="file" id="logo_file" name="logo_file" accept="image/png,image/jpg,image/jpeg,image/webp" />
-                    <button type="button" id="upload_logo" class="btn button btn-sm" disabled>Upload</button>
-                    {% if settings.logo_filename == 'custom' and settings.custom_logo_filename %}
-                        <button type="button" id="delete_logo" class="btn button btn-sm" style="display: inline-block;">Delete</button>
-                    {% else %}
-                        <button type="button" id="delete_logo" class="btn button btn-sm" style="display: none;">Delete</button>
-                    {% endif %}
-
-                    <input type="hidden" id="custom_logo_filename" name="custom_logo_filename" 
-                        {% if settings.custom_logo_filename %}value="{{ settings.custom_logo_filename }}"{% endif %} /><br><br>
-                </div>
-
-                <label for="logo_width">Logo Width (Optional - used to size custom logos):</label><br>
-                <input type="number" id="logo_width" name="logo_width"
-                    {% if settings.logo_width != "" %}value="{{ settings.logo_width }}"{% endif %}
-                    placeholder="80"><br><br>
-
-                <label for="email_theme">Email Theme (must choose custom to change the logo file):</label><br>
-                <select id="email_theme" name="email_theme">
-                    <option value="newsletterr_blue" {% if settings.email_theme == 'newsletterr_blue' %}selected{% endif %}>Newsletterr Blue</option>
-                    <option value="plex_orange" {% if settings.email_theme == 'plex_orange' %}selected{% endif %}>Plex Orange</option>
-                    <option value="custom" {% if settings.email_theme == 'custom' %}selected{% endif %}>Custom</option>
-                </select><br><br>
-
-                <div id="color_inputs" style="display: {% if settings.email_theme == 'custom' %}block{% else %}none{% endif %};">
-                    <label for="primary_color">Primary Color (Main brand color for headers and accents):</label>
-                    <div class="input-group">
-                        <input type="color" id="primary_color" name="primary_color" value="{{ settings.primary_color }}">
-                        <input type="text" value="{{ settings.primary_color }}" readonly>
-                    </div><br>
-
-                    <label for="secondary_color">Secondary Color (Secondary color for footers and borders):</label>
-                    <div class="input-group">
-                        <input type="color" id="secondary_color" name="secondary_color" value="{{ settings.secondary_color }}">
-                        <input type="text" value="{{ settings.secondary_color }}" readonly>
-                    </div><br>
-
-                    <label for="accent_color">Accent Color (Accent color for links and highlights):</label>
-                    <div class="input-group">
-                        <input type="color" id="accent_color" name="accent_color" value="{{ settings.accent_color }}">
-                        <input type="text" value="{{ settings.accent_color }}" readonly>
-                    </div><br>
-
-                    <label for="background_color">Background Color:</label>
-                    <div class="input-group">
-                        <input type="color" id="background_color" name="background_color" value="{{ settings.background_color }}">
-                        <input type="text" value="{{ settings.background_color }}" readonly>
-                    </div><br>
-
-                    <label for="text_color">Text Color:</label>
-                    <div class="input-group">
-                        <input type="color" id="text_color" name="text_color" value="{{ settings.text_color }}">
-                        <input type="text" value="{{ settings.text_color }}" readonly>
-                    </div><br>
-                </div>
-
-                <label for="login_toggle">Login Page:</label><br>
-                <select id="login_toggle" name="login_toggle">
-                    <option value="disabled" {% if settings.login_toggle == 'disabled' %}selected{% endif %}>Disabled</option>
-                    <option value="enabled" {% if settings.login_toggle == 'enabled' %}selected{% endif %}>Enabled</option>
-                </select><br><br>
-
-                <div id="login_options" style="display: {% if settings.login_toggle == 'enabled' %}block{% else %}none{% endif %};">
-                    <label for="nl_username">Username:</label><br>
-                    <input type="text" id="nl_username" name="nl_username"
-                        {% if settings.nl_username != "" %}value="{{ settings.nl_username }}"{% endif %}
-                        placeholder="Newsletterr Username" {% if settings.login_toggle == 'enabled' %}required{% endif %}><br><br>
-
-                    <label for="nl_password">Password:</label><br>
-                    <input type="password" id="nl_password" name="nl_password"
-                        {% if settings.nl_password != "" %}value="{{ settings.nl_password }}"{% endif %}
-                        placeholder="Newsletterr Password" {% if settings.login_toggle == 'enabled' %}required{% endif %}><br><br>
-                </div>
-
-                <button id="apply_settings" class="button">Apply Settings</button>
-            </form>
+    {% if audit_results %}
+        <div class="mb-3">
+            {% set audit_class = {'ok': 'nl-alert--success', 'error': 'nl-alert--danger', 'warning': 'nl-alert--warning'} %}
+            {% for result in audit_results %}
+                <p class="nl-alert {{ audit_class.get(result.status, '') }} mb-1">
+                    {{ result.service }}: {{ result.message }}
+                </p>
+            {% endfor %}
         </div>
-        <script nonce="{{ nonce }}">
-            document.getElementById('settings_form').addEventListener('submit', (e) => {
-                showSpinner('Applying settings...');
-            });
-        </script>
-        <script nonce="{{ nonce }}">
-            document.querySelectorAll('input[type="color"]').forEach(colorInput => {
-                const textInput = colorInput.parentElement.querySelector('input[type="text"]');
-                
-                colorInput.addEventListener('change', function() {
-                    textInput.value = this.value;
-                });
-                
-                textInput.addEventListener('change', function() {
-                    if (this.value.match(/^#[0-9A-F]{6}$/i)) {
-                        colorInput.value = this.value;
-                    }
-                });
-            });
-        </script>
-        <script nonce="{{ nonce }}">
-            document.getElementById('email_theme').addEventListener('change', function() {
-                const colorInputs = document.getElementById('color_inputs');
-                if (this.value === 'custom') {
-                    colorInputs.style.display = 'block';
-                } else {
-                    colorInputs.style.display = 'none';
-                }
-            });
-        </script>
-        <script nonce="{{ nonce }}">
-            document.getElementById('login_toggle').addEventListener('change', function() {
-                const loginOptions = document.getElementById('login_options');
-                const nlUser = document.getElementById('nl_username');
-                const nlPass = document.getElementById('nl_password');
-                if (this.value === 'enabled') {
-                    loginOptions.style.display = 'block';
+    {% endif %}
 
-                    nlUser.setAttribute('required', true);
-                    nlPass.setAttribute('required', true);
-                } else {
-                    loginOptions.style.display = 'none';
+    {% if error %}
+        <p class="nl-alert nl-alert--danger mb-3">{{ error }}</p>
+    {% endif %}
 
-                    nlUser.removeAttribute('required');
-                    nlUser.value = "";
-                    
-                    nlPass.removeAttribute('required');
-                    nlPass.value = "";
-                }
-            });
-        </script>
-        <script nonce="{{ nonce }}">
-            function openCenteredPopup(url, w = 520, h = 680, name = 'plex-auth', offsetX = 0, offsetY = 0) {
-                const dualLeft = window.screenLeft ?? window.screenX;
-                const dualTop  = window.screenTop  ?? window.screenY;
+    <div class="foreground">
+        <div class="settings-layout">
 
-                const vw = window.innerWidth  || document.documentElement.clientWidth  || screen.width;
-                const vh = window.innerHeight || document.documentElement.clientHeight || screen.height;
+            <div class="settings-nav">
+                <nav>
+                    <button type="button" class="settings-nav-btn active" data-section="email-server">
+                        Email Server
+                    </button>
+                    <button type="button" class="settings-nav-btn" data-section="external-services">
+                        External Services
+                    </button>
+                    <button type="button" class="settings-nav-btn" data-section="data-settings">
+                        Data Settings
+                    </button>
+                    <button type="button" class="settings-nav-btn" data-section="email-styling">
+                        Email Styling
+                    </button>
+                    <button type="button" class="settings-nav-btn" data-section="email-body-defaults">
+                        Email Body Defaults
+                    </button>
+                    <button type="button" class="settings-nav-btn" data-section="security">
+                        Security
+                    </button>
+                    <button type="button" class="settings-nav-btn" data-section="hosted-features">
+                        Hosted Features
+                    </button>
+                </nav>
+            </div>
 
-                let left = dualLeft + (vw - w) / 2 + offsetX;
-                let top  = dualTop  + (vh - h) / 2 + offsetY;
+            <div class="settings-content">
+                <form method="POST" id="settings_form">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
 
-                left = Math.max(dualLeft, Math.min(left, dualLeft + vw - w));
-                top  = Math.max(dualTop,  Math.min(top,  dualTop  + vh - h));
+                    <div class="settings-section" id="section-email-server">
+                        <h4 class="mb-4">Email Server</h4>
 
-                const features = `width=${w},height=${h},left=${Math.round(left)},top=${Math.round(top)},` +
-                                `resizable=yes,scrollbars=yes,toolbar=no,menubar=no,location=yes,noopener,noreferrer`;
+                        <label for="from_email">From:</label><br>
+                        <input type="email" id="from_email" name="from_email"
+                            {% if settings.from_email != "" %}value="{{ settings.from_email }}"{% endif %}
+                            placeholder="Your email" required><br><br>
 
-                const win = window.open(url, name, features);
+                        <label for="from_name">From Name (Optional - shows next to email address):</label><br>
+                        <input type="text" id="from_name" name="from_name"
+                            {% if settings.from_name != "" %}value="{{ settings.from_name }}"{% endif %}
+                            placeholder="Your name"><br><br>
 
-                try {
-                    win.focus();
-                } catch (e) {
-                    console.warn('Could not focus popup window');
-                    if (!win) {
-                        return null;
-                    }
-                }
+                        <label for="alias_email">Send-As Alias (Optional - for domain-specific addresses):</label><br>
+                        <input type="email" id="alias_email" name="alias_email"
+                            {% if settings.alias_email != "" %}value="{{ settings.alias_email }}"{% endif %}
+                            placeholder="Blank if no alias"><br><br>
 
-                return win;
-            }
+                        <label for="reply_to_email">Reply-To (Optional):</label><br>
+                        <input type="email" id="reply_to_email" name="reply_to_email"
+                            {% if settings.reply_to_email != "" %}value="{{ settings.reply_to_email }}"{% endif %}
+                            placeholder="Optional reply-to email"><br><br>
 
-            function showPopupBlockedWarning() {
-                const statusEl = document.getElementById('plex_status');
-                statusEl.innerHTML = `
-                    <div style="color: #f39c12; margin: 10px 0;">
-                        <strong>Popup Blocked!</strong><br>
-                        Please allow popups for this site and try again.<br>
-                        <small>Look for a popup blocker icon in your browser's address bar.</small>
+                        <label for="password">Password:</label><br>
+                        <input type="password" id="password" name="password" autocomplete="new-password"
+                            placeholder="{% if settings.has_password %}Saved - leave blank to keep{% else %}Email Password or App Password{% endif %}"><br><br>
+
+                        <label for="smtp_username">SMTP Username (Optional - for SMTP clients needing username login):</label><br>
+                        <input type="text" id="smtp_username" name="smtp_username"
+                            {% if settings.smtp_username != "" %}value="{{ settings.smtp_username }}"{% endif %}
+                            placeholder="Leave blank to use your email address"><br><br>
+
+                        <label for="smtp_server">SMTP Server:</label><br>
+                        <input type="text" id="smtp_server" name="smtp_server"
+                            {% if settings.smtp_server != "" %}value="{{ settings.smtp_server }}"{% endif %}
+                            placeholder="e.g. smtp.gmail.com" required><br><br>
+
+                        <label for="smtp_port">SMTP Port:</label><br>
+                        <input type="number" id="smtp_port" name="smtp_port"
+                            {% if settings.smtp_port != "" %}value="{{ settings.smtp_port }}"{% endif %}
+                            placeholder="465 or 587" required><br><br>
+
+                        <label for="smtp_protocol">SMTP Protocol (SSL for port 465, TLS for port 587):</label><br>
+                        <select id="smtp_protocol" name="smtp_protocol">
+                            <option value="SSL" {% if settings.smtp_protocol == "SSL" %}selected{% endif %}>SSL</option>
+                            <option value="TLS" {% if settings.smtp_protocol == "TLS" %}selected{% endif %}>TLS</option>
+                        </select><br><br>
+
+                        <label for="send_mode">Send Mode:</label><br>
+                        <select id="send_mode" name="send_mode">
+                            <option value="bcc" {% if settings.get('send_mode', 'bcc') != 'to' %}selected{% endif %}>BCC: recipients hidden from each other (recommended)</option>
+                            <option value="to"  {% if settings.get('send_mode', 'bcc') == 'to' %}selected{% endif %}>To: one email per recipient, address shown in To: field</option>
+                        </select><br>
+                        <p class="text-info mt-2 field-hint">In <strong>To:</strong> mode each recipient gets an individual send with their own address in the To: header. No automatic sender copy.</p><br>
+
+                        <button id="apply_settings" class="nl-btn nl-btn--primary">Apply Settings</button>
                     </div>
-                `;
-            }
 
-            function createManualLinkFallback(authUrl, code) {
-                const statusEl = document.getElementById('plex_status');
-                statusEl.innerHTML = `
-                    <div style="color: #3498db; margin: 10px 0;">
-                        <strong>Manual Authorization May Be Required</strong><br>
-                        Enter this code into Plex: <strong style="background: #f8f9fa; padding: 2px 6px; border-radius: 3px;">${code}</strong><br>
-                        <a href="${authUrl}" target="_blank" rel="noopener noreferrer" style="color: #007bff; text-decoration: underline;">
-                            Click here to open Plex authorization page if it did not pop up
-                        </a>
-                    </div>
-                `;
-            }
-            
-            const button = document.getElementById('connect_plex');
-            const statusEl = document.getElementById('plex_status');
-            let pollTimer = null;
-            let connected_to_plex = false;
+                    <div class="settings-section d-none" id="section-external-services">
+                        <h4 class="mb-4">External Services</h4>
 
-            button?.addEventListener('click', async () => {
-                button.disabled = true;
-                statusEl.textContent = '';
-                showSpinner('Waiting for Plex approval...');
+                        <h6 class="text-uppercase">Plex</h6>
+                        <button id="connect_plex" type="button" class="nl-btn nl-btn--primary mb-2">Connect Plex</button>
+                        <div id="plex_status" class="mb-3">{% if settings.plex_token %}<p class="plex-connected">Connected</p>{% endif %}</div>
 
-                try {
-                    const r = await fetch('/api/plex/pin', {method: 'POST'});
-                    if (!r.ok) throw new Error('Failed to create PIN');
-                    const data = await r.json();
+                        <label for="server_name">Plex Server Name:</label><br>
+                        <input type="text" id="server_name" name="server_name"
+                            {% if settings.server_name != "" %}value="{{ settings.server_name }}"{% endif %}
+                            placeholder="Paramount Plex" required><br><br>
 
-                    hideSpinner();
-                    showSpinner(`Enter this code into Plex: ${data.code}`);
-                    const authWin = openCenteredPopup(data.auth_url, 520, 480, 'plex-auth', 520);
+                        <label for="plex_url">Plex URL (Optional - for posters on recently added and stats):</label><br>
+                        <input type="text" id="plex_url" name="plex_url"
+                            {% if settings.plex_url != "" %}value="{{ settings.plex_url }}"{% endif %}
+                            placeholder="http://localhost:32400"><br><br>
 
-                    if (!authWin) {
-                        hideSpinner();
-                        showPopupBlockedWarning();
-                        setTimeout(() => {
-                            createManualLinkFallback(data.auth_url, data.code);
-                        }, 2000);
-                        
-                        startPolling(data, null);
-                        return;
-                    }
+                        <hr>
+                        <h6 class="text-uppercase">Tautulli</h6>
+                        <label for="tautulli_url">Tautulli Base URL (Optional - for user emails, stats, graphs, recently added):</label><br>
+                        <input type="text" id="tautulli_url" name="tautulli_url"
+                            {% if settings.tautulli_url != "" %}value="{{ settings.tautulli_url }}"{% endif %}
+                            placeholder="http://localhost:8181"><br><br>
 
-                    startPolling(data, authWin);
-                } catch (e) {
-                    hideSpinner();
-                    statusEl.innerHTML = `
-                        <div style="color: #e74c3c;">
-                            <strong>Error starting Plex connection:</strong><br>
-                            ${e.message}
+                        <label for="tautulli_api">Tautulli API Key (Optional):</label><br>
+                        <input type="password" id="tautulli_api" name="tautulli_api" autocomplete="new-password"
+                            placeholder="{% if settings.has_tautulli_api %}Saved - leave blank to keep{% else %}Tautulli API Key{% endif %}"><br>
+                        <div class="svc-test">
+                            <button type="button" id="test_tautulli" class="nl-btn nl-btn--primary nl-btn--sm">Test Connection</button>
+                            <span id="tautulli_test_result"></span>
                         </div>
-                    `;
-                    button.disabled = false;
-                }
-            });
 
-            function startPolling(data, authWin) {
-                const start = Date.now();
-                const timeoutMs = (data.expires_in ?? 600) * 1000;
+                        <hr>
+                        <h6 class="text-uppercase">Conjurr</h6>
+                        <label for="conjurr_url">Conjurr Base URL (Optional - for recommendations):</label><br>
+                        <input type="text" id="conjurr_url" name="conjurr_url"
+                            {% if settings.conjurr_url != "" %}value="{{ settings.conjurr_url }}"{% endif %}
+                            placeholder="http://localhost:2665"><br>
+                        <div class="svc-test">
+                            <button type="button" id="test_conjurr" class="nl-btn nl-btn--primary nl-btn--sm">Test Connection</button>
+                            <span id="conjurr_test_result"></span>
+                        </div>
 
-                async function waitForPIN() {
-                    return new Promise((resolve, reject) => {
-                        const poll = async () => {
-                            const pollr = await fetch(`/api/plex/pin/${data.pin_id}`);
-                            const polld = await pollr.json();
-                            if (polld.connected) {
-                                hideSpinner();
-                                statusEl.textContent = 'Connected! Your Plex token is saved.';
-                                clearInterval(pollTimer);
-                                button.disabled = false;
-                                resolve(polld);
-                                return;
-                            }
-                            if (Date.now() - start > timeoutMs) {
-                                hideSpinner();
-                                statusEl.textContent = 'PIN expired. Please try again.';
-                                clearInterval(pollTimer);
-                                button.disabled = false;
-                                reject(new Error('PIN expired.'));
-                            }
-                        };
-                        pollTimer = setInterval(poll, 1500);
-                        poll();
-                    });
-                }
+                        <hr>
+                        <h6 class="text-uppercase">DroppedNeedle</h6>
+                        <label for="droppedneedle_url">DroppedNeedle Base URL (Optional - for year-in-review stats):</label><br>
+                        <input type="text" id="droppedneedle_url" name="droppedneedle_url"
+                            {% if settings.droppedneedle_url != "" %}value="{{ settings.droppedneedle_url }}"{% endif %}
+                            placeholder="http://localhost:8688"><br><br>
 
-                async function getPlexInfo(authWin) {
-                    const polld = await waitForPIN();
+                        <label for="droppedneedle_api_key">DroppedNeedle Wrapped API Key:</label><br>
+                        <input type="password" id="droppedneedle_api_key" name="droppedneedle_api_key" autocomplete="new-password"
+                            placeholder="{% if settings.has_droppedneedle_api_key %}Saved - leave blank to keep{% else %}Matches WRAPPED_API_KEY in DroppedNeedle{% endif %}"><br>
+                        <div class="svc-test">
+                            <button type="button" id="test_droppedneedle" class="nl-btn nl-btn--primary nl-btn--sm">Test Connection</button>
+                            <span id="droppedneedle_test_result"></span>
+                        </div>
 
-                    showSpinner('Retreiving Plex information...');
-                    const infor = await fetch('/api/plex/info', {method: 'GET'});
-                    if (!infor.ok) throw new Error('Failed to get info');
-                    const infod = await infor.json();
+                        <hr>
+                        <h6 class="text-uppercase">Sonarr</h6>
+                        <label for="sonarr_url">Sonarr Base URL (Optional - for the coming soon calendar):</label><br>
+                        <input type="text" id="sonarr_url" name="sonarr_url"
+                            {% if settings.sonarr_url != "" %}value="{{ settings.sonarr_url }}"{% endif %}
+                            placeholder="http://localhost:8989"><br><br>
 
-                    if (infod.connected) {
-                        try { if (authWin && !authWin.closed) authWin.close(); } catch {}
-                        hideSpinner();
-                        statusEl.textContent = 'Plex information retrieved.';
-                        setTimeout(() => location.replace(location.href), 2000);
-                        return;
-                    }
-                }
+                        <label for="sonarr_api_key">Sonarr API Key:</label><br>
+                        <input type="password" id="sonarr_api_key" name="sonarr_api_key" autocomplete="new-password"
+                            placeholder="{% if settings.has_sonarr_api_key %}Saved - leave blank to keep{% else %}Settings > General > API Key in Sonarr{% endif %}"><br>
+                        <div class="svc-test">
+                            <button type="button" id="test_sonarr" class="nl-btn nl-btn--primary nl-btn--sm">Test Connection</button>
+                            <span id="sonarr_test_result"></span>
+                        </div>
 
-                getPlexInfo(authWin);
-            }
+                        <hr>
+                        <h6 class="text-uppercase">Radarr</h6>
+                        <label for="radarr_url">Radarr Base URL (Optional - for the coming soon calendar):</label><br>
+                        <input type="text" id="radarr_url" name="radarr_url"
+                            {% if settings.radarr_url != "" %}value="{{ settings.radarr_url }}"{% endif %}
+                            placeholder="http://localhost:7878"><br><br>
 
-            document.addEventListener('keydown', function(event) {
-                if (event.ctrlKey && event.key === 's') {
-                    event.preventDefault();
-                    
-                    const settingsForm = document.getElementById('settings_form');
-                    const applyButton = document.getElementById('apply_settings');
-                    
-                    if (settingsForm && applyButton) {
-                        showSpinner('Applying settings...');
-                        settingsForm.submit();
-                    }
-                }
-            });
-        </script>
-        <script nonce="{{ nonce }}">
-            const logoFileInput = document.getElementById('logo_file');
-            const logoFilenameSelect = document.getElementById('logo_filename');
-            const customLogoFilenameHidden = document.getElementById('custom_logo_filename');
-            const uploadLogoBtn = document.getElementById('upload_logo');
-            const deleteLogoBtn = document.getElementById('delete_logo');
-            const uploadLogoDiv = document.getElementById('upload_logo_div');
+                        <label for="radarr_api_key">Radarr API Key:</label><br>
+                        <input type="password" id="radarr_api_key" name="radarr_api_key" autocomplete="new-password"
+                            placeholder="{% if settings.has_radarr_api_key %}Saved - leave blank to keep{% else %}Settings > General > API Key in Radarr{% endif %}"><br>
+                        <div class="svc-test">
+                            <button type="button" id="test_radarr" class="nl-btn nl-btn--primary nl-btn--sm">Test Connection</button>
+                            <span id="radarr_test_result"></span>
+                        </div>
 
-            const preset_logo_name_to_file = {
-                "newsletterr_blue_small": "Asset_54x.png",
-                "newsletterr_orange_small": "Asset_46x.png",
-                "newsletterr_blue_banner": "Asset_94x.png",
-                "newsletterr_orange_banner": "Asset_45x.png"
-            }
+                        <label for="coming_soon_days_ahead">Coming Soon Calendar Window (days ahead):</label><br>
+                        <input type="number" id="coming_soon_days_ahead" name="coming_soon_days_ahead" min="1" max="90"
+                            value="{{ settings.get('coming_soon_days_ahead', '14') }}"><br><br>
 
-            const serverCustomLogoFilename = "{{ settings.custom_logo_filename if settings.custom_logo_filename else '' }}";
+                        <label for="coming_soon_grid_columns">Coming Soon Grid Columns:</label><br>
+                        <input type="number" id="coming_soon_grid_columns" name="coming_soon_grid_columns" min="1" max="10"
+                            value="{{ settings.get('coming_soon_grid_columns', '5') }}"><br><br>
 
-            logoFilenameSelect?.addEventListener('change', function() {
-                const isCustomSelected = this.value === 'custom';
-                const isNoneSelected = this.value === 'none' || this.value === '';
-                
-                uploadLogoDiv.style.display = isCustomSelected ? 'block' : 'none';
-                
-                if (!isCustomSelected) {
-                    customLogoFilenameHidden.value = '';
-                } else {
-                    if (serverCustomLogoFilename && !customLogoFilenameHidden.value) {
-                        customLogoFilenameHidden.value = serverCustomLogoFilename;
-                    }
-                }
-                
-                if (isCustomSelected) {
-                    const customFilename = customLogoFilenameHidden.value || serverCustomLogoFilename;
-                    if (customFilename) {
-                        updateLogoPreview(customFilename, true);
-                    } else {
-                        updateLogoPreview('');
-                    }
-                } else if (isNoneSelected) {
-                    updateLogoPreview('');
-                } else {
-                    updateLogoPreview(this.value, false);
-                }
-            });
+                        <label for="recipient_display_name">Recipient Display Name (used in recommendation emails):</label><br>
+                        <select id="recipient_display_name" name="recipient_display_name">
+                            <option value="email" {% if settings.recipient_display_name == 'email' %}selected{% endif %}>Email Address</option>
+                            <option value="username" {% if settings.recipient_display_name == 'username' %}selected{% endif %}>Username</option>
+                            <option value="friendly_name" {% if settings.recipient_display_name == 'friendly_name' %}selected{% endif %}>Friendly Name</option>
+                        </select><br><br>
 
-            function updateLogoPreview(filename, isCustom = false) {
-                const previewImg = document.querySelector('.logo-preview-img-small');
-                const filenameSpan = document.querySelector('.logo-filename-small');
-                const previewContainer = document.querySelector('.logo-preview-small');
+                        <button id="apply_settings_ext" class="nl-btn nl-btn--primary">Apply Settings</button>
+                    </div>
 
-                if (previewImg) previewImg.remove();
-                if (filenameSpan) filenameSpan.remove();
+                    <div class="settings-section d-none" id="section-data-settings">
+                        <h4 class="mb-4">Data Settings</h4>
 
-                if (!filename || filename === 'none') {
-                    const noLogoSpan = document.createElement('span');
-                    noLogoSpan.className = 'logo-filename-small';
-                    noLogoSpan.textContent = 'No logo';
-                    previewContainer.appendChild(noLogoSpan);
-                    return;
-                }
+                        <label for="recently_added_mode">Recently Added Mode:</label><br>
+                        <select id="recently_added_mode" name="recently_added_mode">
+                            <option value="items" {% if settings.recently_added_mode != 'days' %}selected{% endif %}>Items: pull a fixed number of recently added items</option>
+                            <option value="days"  {% if settings.recently_added_mode == 'days'  %}selected{% endif %}>Days: pull all items added within the last N days</option>
+                        </select><br>
+                        <p class="text-info mt-2 field-hint">
+                            Controls how the "Recently Added Items" input on the dashboard is interpreted.
+                            In <strong>Items</strong> mode the number is a count; in <strong>Days</strong> mode it is a day range and the section title will show "Added to [Library] since MM/DD/YY".
+                        </p><br>
 
-                const imgEl = document.createElement('img');
-                imgEl.className = 'logo-preview-img-small';
+                        <label for="recently_added_sort">Recently Added Sort:</label><br>
+                        <select id="recently_added_sort" name="recently_added_sort">
+                            <option value="date"   {% if settings.get('recently_added_sort', 'date') != 'rating' %}selected{% endif %}>Date Added: most recently added first</option>
+                            <option value="rating" {% if settings.get('recently_added_sort', 'date') == 'rating' %}selected{% endif %}>Rating: highest rated first</option>
+                        </select><br>
+                        <p class="text-info mt-2 field-hint">
+                            Controls the sort order of recently added items. In <strong>Rating</strong> mode, items are fetched by date then re-sorted by their Plex rating.
+                        </p><br>
 
-                let displayFilename = filename;
-                
-                if (isCustom) {
-                    imgEl.src = `/static/uploads/logos/${filename}`;
-                    imgEl.alt = 'Custom logo';
-                    displayFilename = 'Custom logo';
-                } else if (preset_logo_name_to_file[filename]) {
-                    const actualFilename = preset_logo_name_to_file[filename];
-                    imgEl.src = `/static/img/${actualFilename}`;
-                    imgEl.alt = filename;
-                    displayFilename = filename.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-                } else {
-                    imgEl.src = `/static/img/${filename}`;
-                    imgEl.alt = filename;
-                }
-                
-                const newFilenameSpan = document.createElement('span');
-                newFilenameSpan.className = 'logo-filename-small';
-                newFilenameSpan.textContent = isCustom ? 'Custom logo' : filename;
-                
-                previewContainer.appendChild(imgEl);
-                previewContainer.appendChild(newFilenameSpan);
-            }
+                        <label for="ra_grid_columns">Recently Added Grid Columns:</label><br>
+                        <input type="number" id="ra_grid_columns" name="ra_grid_columns" min="1" max="10"
+                               value="{{ settings.get('ra_grid_columns', '5') }}"
+                               class="w-num"><br>
+                        <p class="text-info mt-2 field-hint">Number of columns in the Recently Added grid (default: 5).</p><br>
 
-            logoFileInput?.addEventListener('change', function() {
-                const file = this.files[0];
-                if (file) {
-                    uploadLogoBtn.disabled = false;
-                    uploadLogoBtn.textContent = `Upload ${file.name}`;
-                } else {
-                    uploadLogoBtn.disabled = true;
-                    uploadLogoBtn.textContent = 'Upload';
-                }
-            });
+                        <label for="recs_grid_columns">Recommendations Grid Columns:</label><br>
+                        <input type="number" id="recs_grid_columns" name="recs_grid_columns" min="1" max="10"
+                               value="{{ settings.get('recs_grid_columns', '5') }}"
+                               class="w-num"><br>
+                        <p class="text-info mt-2 field-hint">Number of columns in the Recommendations grid (default: 5).</p><br>
 
-            uploadLogoBtn?.addEventListener('click', async function() {
-                const file = logoFileInput.files[0];
-                if (!file) return;
+                        <label for="poster_max_height">Poster Max Height (px):</label><br>
+                        <input type="number" id="poster_max_height" name="poster_max_height" min="50" max="2000"
+                               value="{{ settings.get('poster_max_height', '') }}"
+                               placeholder="Original" class="w-num-lg"><br>
+                        <p class="text-info mt-2 field-hint">Caps the pixel height of posters embedded in emails (Recently Added, Recommendations, Collections). Width scales automatically to preserve aspect ratio. Leave blank to use original resolution.</p><br>
 
-                showSpinner('Uploading logo...');
-                uploadLogoBtn.disabled = true;
+                        <label for="stats_type">Stats &amp; Graph Metric:</label><br>
+                        <select id="stats_type" name="stats_type">
+                            <option value="plays"    {% if settings.stats_type != 'duration' %}selected{% endif %}>Plays</option>
+                            <option value="duration" {% if settings.stats_type == 'duration' %}selected{% endif %}>Duration</option>
+                        </select><br><br>
 
-                try {
-                    const formData = new FormData();
-                    formData.append('logo', file);
+                        <label for="stat_cover_art">Show Cover Art in Stat Tables:</label><br>
+                        <select id="stat_cover_art" name="stat_cover_art">
+                            <option value="disabled" {% if settings.get('stat_cover_art', 'disabled') != 'enabled' %}selected{% endif %}>Disabled</option>
+                            <option value="enabled"  {% if settings.get('stat_cover_art', 'disabled') == 'enabled' %}selected{% endif %}>Enabled</option>
+                        </select><br>
+                        <p class="text-info mt-2 field-hint">Shows a small poster thumbnail inline with each item's title in media stat tables (Movies, TV Shows, Artists, Recently Watched).</p><br>
 
-                    const response = await fetch('/upload-logo', {
-                        method: 'POST',
-                        body: (() => {
-                            formData.append('csrf_token', '{{ csrf_token }}');
-                            return formData;
-                        })()
-                    });
+                        <label for="hide_stat_play_counts">Hide Play Counts in Stat Cards:</label><br>
+                        <select id="hide_stat_play_counts" name="hide_stat_play_counts">
+                            <option value="disabled" {% if settings.hide_stat_play_counts != 'enabled' %}selected{% endif %}>Show</option>
+                            <option value="enabled"  {% if settings.hide_stat_play_counts == 'enabled' %}selected{% endif %}>Hide</option>
+                        </select><br><br>
 
-                    if (!response.ok) {
-                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                    }
+                        <label for="hide_graph_play_counts">Hide Play Counts in Graphs (y-axis labels &amp; tooltips):</label><br>
+                        <select id="hide_graph_play_counts" name="hide_graph_play_counts">
+                            <option value="disabled" {% if settings.hide_graph_play_counts != 'enabled' %}selected{% endif %}>Show</option>
+                            <option value="enabled"  {% if settings.hide_graph_play_counts == 'enabled' %}selected{% endif %}>Hide</option>
+                        </select><br><br>
 
-                    const result = await response.json();
+                        <button id="apply_settings_data" class="nl-btn nl-btn--primary">Apply Settings</button>
+                    </div>
 
-                    if (result.status === 'success') {
-                        hideSpinner();
-                        logoFilenameSelect.value = 'custom';
-                        customLogoFilenameHidden.value = result.filename;
-                        updateLogoPreview(result.filename, true);
-                        uploadLogoBtn.disabled = true;
-                        uploadLogoBtn.textContent = 'Upload';
-                        logoFileInput.value = '';
-                        if (deleteLogoBtn) {
-                            deleteLogoBtn.style.display = 'inline-block';
-                        }
-                        alert('Logo uploaded successfully!');
-                    } else {
-                        hideSpinner();
-                        alert(`Upload failed: ${result.message}`);
-                        uploadLogoBtn.disabled = false;
-                    }
-                } catch (error) {
-                    hideSpinner();
-                    alert(`Upload error: ${error.message || error.toString()}`);
-                    uploadLogoBtn.disabled = false;
-                }
-            });
+                    <div class="settings-section d-none" id="section-email-styling">
+                        <h4 class="mb-4">Email Styling</h4>
 
-            deleteLogoBtn?.addEventListener('click', async function() {
-                if (!confirm('Are you sure you want to delete the current custom logo?')) return;
+                        <label for="logo_filename">Logo (Optional - for custom logos in emails. Email Theme must be custom to change!):</label><br>
+                        <select id="logo_filename" name="logo_filename">
+                            <option value="newsletterr_blue_small" {% if settings.logo_filename == 'Asset_54x.png' %}selected{% endif %}>Newsletterr Square Blue</option>
+                            <option value="newsletterr_orange_small" {% if settings.logo_filename == 'Asset_46x.png' %}selected{% endif %}>Newsletterr Square Orange</option>
+                            <option value="newsletterr_blue_banner" {% if settings.email_theme == 'newsletterr_blue' or settings.logo_filename == 'Asset_94x.png' %}selected{% endif %}>Newsletterr Banner Blue</option>
+                            <option value="newsletterr_orange_banner" {% if settings.email_theme == 'plex_orange' or settings.logo_filename == 'Asset_45x.png' %}selected{% endif %}>Newsletterr Banner Orange</option>
+                            <option value="custom" {% if settings.logo_filename == 'custom' %}selected{% endif %}>Custom</option>
+                            <option value="none" {% if settings.logo_filename == '' %}selected{% endif %}>No Logo</option>
+                        </select><br>
 
-                showSpinner('Deleting logo...');
-                deleteLogoBtn.disabled = true;
+                        <div class="logo-preview-small">
+                            {% if settings.logo_filename %}
+                                {% if settings.logo_filename == 'custom' %}
+                                    <img src="/static/uploads/logos/{{ settings.custom_logo_filename }}" alt="Current Logo" class="logo-preview-img-small" />
+                                {% else %}
+                                    <img src="/static/img/{{ settings.logo_filename }}" alt="Current Logo" class="logo-preview-img-small" />
+                                {% endif %}
+                                <span class="logo-filename-small">{{ settings.logo_filename }}</span>
+                            {% endif %}
+                        </div><br>
 
-                try {
-                    const response = await fetch('/delete-logo', {
-                        method: 'POST',
-                        headers: { 'X-CSRF-Token': '{{ csrf_token }}' }
-                    });
+                        <div id="upload_logo_div" style="display: {% if settings.logo_filename == 'custom' %}block{% else %}none{% endif %};">
+                            <label for="logo_file">Upload Custom Logo:</label><br>
+                            <input type="file" id="logo_file" name="logo_file" accept="image/png,image/jpg,image/jpeg,image/webp" />
+                            <button type="button" id="upload_logo" class="nl-btn nl-btn--primary nl-btn--sm" disabled>Upload</button>
+                            {% if settings.logo_filename == 'custom' and settings.custom_logo_filename %}
+                                <button type="button" id="delete_logo" class="nl-btn nl-btn--primary nl-btn--sm" style="display: inline-block;">Delete</button>
+                            {% else %}
+                                <button type="button" id="delete_logo" class="nl-btn nl-btn--primary nl-btn--sm" style="display: none;">Delete</button>
+                            {% endif %}
+                            <input type="hidden" id="custom_logo_filename" name="custom_logo_filename"
+                                {% if settings.custom_logo_filename %}value="{{ settings.custom_logo_filename }}"{% endif %} /><br><br>
+                        </div>
 
-                    const result = await response.json();
+                        <label for="logo_width">Logo Width (Optional - size custom logos):</label><br>
+                        <input type="number" id="logo_width" name="logo_width"
+                            {% if settings.logo_width != "" %}value="{{ settings.logo_width }}"{% endif %}
+                            placeholder="80"><br><br>
 
-                    if (result.status === 'success') {
-                        hideSpinner();
-                        logoFilenameSelect.value = 'none';
-                        customLogoFilenameHidden.value = '';
-                        updateLogoPreview('');
-                        uploadLogoDiv.style.display = 'none';
-                        deleteLogoBtn.style.display = 'none';
-                        alert('Custom logo deleted successfully!');
-                    } else {
-                        hideSpinner();
-                        alert(`Delete failed: ${result.message}`);
-                        deleteLogoBtn.disabled = false;
-                    }
-                } catch (error) {
-                    hideSpinner();
-                    alert(`Delete error: ${error.message || error.toString()}`);
-                    deleteLogoBtn.disabled = false;
-                }
-            });
+                        <label for="logo_position">Logo Position:</label><br>
+                        <select id="logo_position" name="logo_position">
+                            <option value="left"   {% if settings.logo_position == 'left'   %}selected{% endif %}>Left</option>
+                            <option value="center" {% if settings.logo_position == 'center' or not settings.logo_position %}selected{% endif %}>Center</option>
+                            <option value="right"  {% if settings.logo_position == 'right'  %}selected{% endif %}>Right</option>
+                        </select><br><br>
 
-            document.addEventListener('DOMContentLoaded', function() {
-                const currentLogoSelection = logoFilenameSelect.value;
-                const currentCustomFilename = customLogoFilenameHidden.value;
-                
-                if (currentLogoSelection === 'custom') {
-                    uploadLogoDiv.style.display = 'block';
-                    if (currentCustomFilename) {
-                        updateLogoPreview(currentCustomFilename, true);
-                        if (deleteLogoBtn) {
-                            deleteLogoBtn.style.display = 'inline-block';
-                        }
-                    }
-                } else {
-                    uploadLogoDiv.style.display = 'none';
-                    if (deleteLogoBtn) {
-                        deleteLogoBtn.style.display = 'none';
-                    }
-                }
-                
-                if (currentLogoSelection === 'custom' && currentCustomFilename) {
-                    updateLogoPreview(currentCustomFilename, true);
-                } else if (currentLogoSelection && currentLogoSelection !== 'none') {
-                    updateLogoPreview(currentLogoSelection, false);
-                } else {
-                    updateLogoPreview('');
-                }
-            });
-        </script>
+                        <label for="email_theme">Email Theme (must choose custom to change the logo file):</label><br>
+                        <select id="email_theme" name="email_theme">
+                            <option value="newsletterr_blue" {% if settings.email_theme == 'newsletterr_blue' %}selected{% endif %}>Newsletterr Blue</option>
+                            <option value="plex_orange" {% if settings.email_theme == 'plex_orange' %}selected{% endif %}>Plex Orange</option>
+                            <option value="custom" {% if settings.email_theme == 'custom' %}selected{% endif %}>Custom</option>
+                        </select><br><br>
+
+                        <div id="color_inputs" style="display: {% if settings.email_theme == 'custom' %}block{% else %}none{% endif %};">
+                            <label for="primary_color">Primary Color (headers and accents):</label>
+                            <div class="input-group">
+                                <input type="color" id="primary_color" name="primary_color" value="{{ settings.primary_color }}">
+                                <input type="text" value="{{ settings.primary_color }}" readonly>
+                            </div><br>
+
+                            <label for="secondary_color">Secondary Color (footers and borders):</label>
+                            <div class="input-group">
+                                <input type="color" id="secondary_color" name="secondary_color" value="{{ settings.secondary_color }}">
+                                <input type="text" value="{{ settings.secondary_color }}" readonly>
+                            </div><br>
+
+                            <label for="accent_color">Accent Color (links and highlights):</label>
+                            <div class="input-group">
+                                <input type="color" id="accent_color" name="accent_color" value="{{ settings.accent_color }}">
+                                <input type="text" value="{{ settings.accent_color }}" readonly>
+                            </div><br>
+
+                            <label for="background_color">Background Color:</label>
+                            <div class="input-group">
+                                <input type="color" id="background_color" name="background_color" value="{{ settings.background_color }}">
+                                <input type="text" value="{{ settings.background_color }}" readonly>
+                            </div><br>
+
+                            <label for="text_color">Text Color:</label>
+                            <div class="input-group">
+                                <input type="color" id="text_color" name="text_color" value="{{ settings.text_color }}">
+                                <input type="text" value="{{ settings.text_color }}" readonly>
+                            </div><br>
+                        </div>
+
+                        <button id="apply_settings_styling" class="nl-btn nl-btn--primary">Apply Settings</button>
+                    </div>
+
+                    <div class="settings-section d-none" id="section-email-body-defaults">
+                        <h4 class="mb-4">Email Body Defaults</h4>
+                        <p class="text-info mb-4">These texts pre-fill when you click the intro/outro buttons in the email composer. Leave blank to use the built-in defaults.</p>
+
+                        <label for="default_intro_text">Default Intro Text:</label><br>
+                        <textarea id="default_intro_text" name="default_intro_text" rows="4" class="ta-resize"
+                            placeholder="You are receiving this email because you are a member of [server name].">{{ settings.default_intro_text }}</textarea><br><br>
+
+                        <label for="default_outro_text">Default Outro Text:</label><br>
+                        <textarea id="default_outro_text" name="default_outro_text" rows="4" class="ta-resize"
+                            placeholder="Thanks for using Plex and for reading this newsletterr email!">{{ settings.default_outro_text }}</textarea><br><br>
+
+                        <label for="scheduled_subject_prefix">[SCHEDULED] Subject Prefix:</label><br>
+                        <select id="scheduled_subject_prefix" name="scheduled_subject_prefix">
+                            <option value="enabled" {% if settings.scheduled_subject_prefix == 'enabled' %}selected{% endif %}>Enabled: subjects read "[SCHEDULED] Your Subject"</option>
+                            <option value="disabled" {% if settings.scheduled_subject_prefix == 'disabled' %}selected{% endif %}>Disabled: subjects read "Your Subject"</option>
+                        </select><br><br>
+
+                        <button id="apply_settings_body_defaults" class="nl-btn nl-btn--primary">Apply Settings</button>
+                    </div>
+
+                    <div class="settings-section d-none" id="section-security">
+                        <h4 class="mb-4">Security</h4>
+
+                        <label>Login Account:</label><br>
+                        <p class="login-note">Login is required. Update your account credentials below.</p>
+                        <div id="login_options">
+                            <label for="nl_username">Username:</label><br>
+                            <input type="text" id="nl_username" name="nl_username" autocomplete="username"
+                                {% if settings.nl_username != "" %}value="{{ settings.nl_username }}"{% endif %}
+                                placeholder="Newsletterr Username"><br><br>
+
+                            <label for="nl_password">Password:</label><br>
+                            <input type="password" id="nl_password" name="nl_password" autocomplete="new-password"
+                                placeholder="{% if settings.has_nl_password %}Saved - leave blank to keep{% else %}Newsletterr Password{% endif %}"><br><br>
+                        </div>
+
+                        <label for="hsts_enabled">HTTP Strict Transport Security (HSTS):</label><br>
+                        <select id="hsts_enabled" name="hsts_enabled">
+                            <option value="disabled" {% if settings.hsts_enabled == 'disabled' %}selected{% endif %}>Disabled</option>
+                            <option value="enabled" {% if settings.hsts_enabled == 'enabled' %}selected{% endif %}>Enabled</option>
+                        </select><br>
+                        <p class="text-info mt-2 field-hint">
+                            Only enable HSTS if this app is running behind HTTPS (e.g. a reverse proxy with a valid certificate).
+                            Enabling it on plain HTTP will cause browsers to block access to the site until the max-age expires (2 years).
+                        </p><br>
+
+                        <label for="discord_webhook_url">Discord Webhook URL (optional):</label><br>
+                        <input type="password" id="discord_webhook_url" name="discord_webhook_url" autocomplete="off" class="w-field"
+                            placeholder="{% if settings.has_discord_webhook_url %}Saved - leave blank to keep{% else %}https://discord.com/api/webhooks/...{% endif %}"><br>
+                        <p class="text-info mt-2 field-hint">
+                            Used by the "Send to Discord" button on the Export Logs page to attach a redacted log file to a channel or forum thread of your choosing.
+                        </p><br>
+
+                        <button id="apply_settings_security" class="nl-btn nl-btn--primary">Apply Settings</button>
+                    </div>
+
+                    <div class="settings-section d-none" id="section-hosted-features">
+                        <h4 class="mb-4">Hosted Features</h4>
+
+                        <label for="hosted_enabled">Enable Hosted Features:</label><br>
+                        <select id="hosted_enabled" name="hosted_enabled">
+                            <option value="disabled" {% if settings.hosted_enabled == 'disabled' %}selected{% endif %}>Disabled</option>
+                            <option value="enabled" {% if settings.hosted_enabled == 'enabled' %}selected{% endif %}>Enabled</option>
+                        </select><br>
+                        <p class="text-info mt-2 field-hint">
+                            Adds an unsubscribe link and header to outgoing emails, and a hosted "most recent newsletter" page.
+                            Requires the instance to be reachable at the URL below by your recipients. Once someone unsubscribes
+                            it always stays honored, even if this is later disabled.
+                        </p><br>
+
+                        <label for="hosted_base_url">Hosted Base URL:</label><br>
+                        <input type="text" id="hosted_base_url" name="hosted_base_url" class="w-field"
+                            {% if settings.hosted_base_url != "" %}value="{{ settings.hosted_base_url }}"{% endif %}
+                            placeholder="https://newsletterr.example.com"><br>
+                        <p class="text-info mt-2 field-hint">
+                            The externally-reachable URL recipients use for unsubscribe links and the hosted newsletter page.
+                            Required when Hosted Features are enabled.
+                        </p><br>
+
+                        <label for="hosted_images_enabled">Hosted Images (optional):</label><br>
+                        <select id="hosted_images_enabled" name="hosted_images_enabled">
+                            <option value="disabled" {% if settings.hosted_images_enabled == 'disabled' %}selected{% endif %}>Disabled (embed images in each email)</option>
+                            <option value="enabled" {% if settings.hosted_images_enabled == 'enabled' %}selected{% endif %}>Enabled (link to hosted images)</option>
+                        </select><br>
+                        <p class="text-info mt-2 field-hint">
+                            Serves poster art via tokenized public URLs instead of embedding it in each email, which shrinks
+                            message size. This exposes a proxy of your Plex art publicly (behind non-guessable per-image
+                            tokens) only enable if you're comfortable with that tradeoff. Requires Hosted Features to be enabled.
+                        </p><br>
+
+                        <button id="apply_settings_hosted" class="nl-btn nl-btn--primary">Apply Settings</button>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
 </div>
+
+<script nonce="{{ nonce }}">
+    function switchSection(sectionId) {
+        document.querySelectorAll('.settings-section').forEach(s => s.classList.add('d-none'));
+        document.querySelectorAll('.settings-nav-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById('section-' + sectionId).classList.remove('d-none');
+        document.querySelector(`[data-section="${sectionId}"]`).classList.add('active');
+        sessionStorage.setItem('settings_section', sectionId);
+    }
+
+    document.querySelectorAll('.settings-nav-btn').forEach(btn => {
+        btn.addEventListener('click', () => switchSection(btn.dataset.section));
+    });
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const saved = sessionStorage.getItem('settings_section');
+        if (saved && document.getElementById('section-' + saved)) {
+            switchSection(saved);
+        }
+    });
+
+    document.getElementById('settings_form').addEventListener('submit', (e) => {
+        const requiredFields = e.target.querySelectorAll('[required]');
+        for (const field of requiredFields) {
+            if (!field.validity.valid) {
+                const section = field.closest('.settings-section');
+                if (section) {
+                    switchSection(section.id.replace('section-', ''));
+                }
+                field.focus();
+                field.reportValidity();
+                e.preventDefault();
+                return;
+            }
+        }
+        showSpinner('Applying settings...');
+    });
+</script>
+
+<script nonce="{{ nonce }}">
+    document.querySelectorAll('input[type="color"]').forEach(colorInput => {
+        const textInput = colorInput.parentElement.querySelector('input[type="text"]');
+        colorInput.addEventListener('change', function() {
+            textInput.value = this.value;
+        });
+        textInput.addEventListener('change', function() {
+            if (this.value.match(/^#[0-9A-F]{6}$/i)) {
+                colorInput.value = this.value;
+            }
+        });
+    });
+</script>
+
+<script nonce="{{ nonce }}">
+    document.getElementById('email_theme').addEventListener('change', function() {
+        document.getElementById('color_inputs').style.display = this.value === 'custom' ? 'block' : 'none';
+    });
+</script>
+
+<script nonce="{{ nonce }}">
+    function openCenteredPopup(url, w = 520, h = 680, name = 'plex-auth', offsetX = 0, offsetY = 0) {
+        const dualLeft = window.screenLeft ?? window.screenX;
+        const dualTop  = window.screenTop  ?? window.screenY;
+
+        const vw = window.innerWidth  || document.documentElement.clientWidth  || screen.width;
+        const vh = window.innerHeight || document.documentElement.clientHeight || screen.height;
+
+        let left = dualLeft + (vw - w) / 2 + offsetX;
+        let top = dualTop + (vh - h) / 2 + offsetY;
+
+        left = Math.max(dualLeft, Math.min(left, dualLeft + vw - w));
+        top = Math.max(dualTop, Math.min(top, dualTop + vh - h));
+
+        const features = `width=${w},height=${h},left=${Math.round(left)},top=${Math.round(top)},` +
+                        `resizable=yes,scrollbars=yes,toolbar=no,menubar=no,location=yes,noopener,noreferrer`;
+
+        const win = window.open(url, name, features);
+
+        try {
+            win.focus();
+        } catch (e) {
+            console.warn('Could not focus popup window');
+            if (!win) {
+                return null;
+            }
+        }
+
+        return win;
+    }
+
+    function showPopupBlockedWarning() {
+        const statusEl = document.getElementById('plex_status');
+        statusEl.innerHTML = `
+            <div style="color: #f39c12; margin: 10px 0;">
+                <strong>Popup Blocked!</strong><br>
+                Please allow popups for this site and try again.<br>
+                <small>Look for a popup blocker icon in your browser's address bar.</small>
+            </div>
+        `;
+    }
+
+    function createManualLinkFallback(authUrl, code) {
+        const statusEl = document.getElementById('plex_status');
+        statusEl.innerHTML = `
+            <div style="color: #3498db; margin: 10px 0;">
+                <strong>Manual Authorization May Be Required</strong><br>
+                Enter this code into Plex: <strong style="background: #f8f9fa; padding: 2px 6px; border-radius: 3px;">${code}</strong><br>
+                <a href="${authUrl}" target="_blank" rel="noopener noreferrer" style="color: #007bff; text-decoration: underline;">
+                    Click here to open Plex authorization page if it did not pop up
+                </a>
+            </div>
+        `;
+    }
+    
+    const button = document.getElementById('connect_plex');
+    const statusEl = document.getElementById('plex_status');
+    let pollTimer = null;
+    let connected_to_plex = false;
+
+    button?.addEventListener('click', async () => {
+        button.disabled = true;
+        statusEl.textContent = '';
+        showSpinner('Waiting for Plex approval...');
+
+        try {
+            const r = await fetch('/api/plex/pin', {method: 'POST'});
+            if (!r.ok) throw new Error('Failed to create PIN');
+            const data = await r.json();
+
+            hideSpinner();
+            showSpinner(`Enter this code into Plex: ${data.code}`);
+            const authWin = openCenteredPopup(data.auth_url, 520, 480, 'plex-auth', 520);
+
+            if (!authWin) {
+                hideSpinner();
+                showPopupBlockedWarning();
+                setTimeout(() => {
+                    createManualLinkFallback(data.auth_url, data.code);
+                }, 2000);
+                
+                startPolling(data, null);
+                return;
+            }
+
+            startPolling(data, authWin);
+        } catch (e) {
+            hideSpinner();
+            statusEl.innerHTML = `
+                <div style="color: #e74c3c;">
+                    <strong>Error starting Plex connection:</strong><br>
+                    ${e.message}
+                </div>
+            `;
+            button.disabled = false;
+        }
+    });
+
+    function startPolling(data, authWin) {
+        const start = Date.now();
+        const timeoutMs = (data.expires_in ?? 600) * 1000;
+
+        async function waitForPIN() {
+            return new Promise((resolve, reject) => {
+                const poll = async () => {
+                    const pollr = await fetch(`/api/plex/pin/${data.pin_id}`);
+                    const polld = await pollr.json();
+                    if (polld.connected) {
+                        hideSpinner();
+                        statusEl.textContent = 'Connected! Your Plex token is saved.';
+                        clearInterval(pollTimer);
+                        button.disabled = false;
+                        resolve(polld);
+                        return;
+                    }
+                    if (Date.now() - start > timeoutMs) {
+                        hideSpinner();
+                        statusEl.textContent = 'PIN expired. Please try again.';
+                        clearInterval(pollTimer);
+                        button.disabled = false;
+                        reject(new Error('PIN expired.'));
+                    }
+                };
+                pollTimer = setInterval(poll, 1500);
+                poll();
+            });
+        }
+
+        async function getPlexInfo(authWin) {
+            const polld = await waitForPIN();
+
+            showSpinner('Retreiving Plex information...');
+            const infor = await fetch('/api/plex/info', {method: 'GET'});
+            if (!infor.ok) throw new Error('Failed to get info');
+            const infod = await infor.json();
+
+            if (infod.connected) {
+                try { if (authWin && !authWin.closed) authWin.close(); } catch {}
+                hideSpinner();
+                statusEl.textContent = 'Plex information retrieved.';
+                setTimeout(() => location.replace(location.href), 2000);
+                return;
+            }
+        }
+
+        getPlexInfo(authWin);
+    }
+
+    document.addEventListener('keydown', function(event) {
+        if (event.ctrlKey && event.key === 's') {
+            event.preventDefault();
+            
+            const settingsForm = document.getElementById('settings_form');
+            const applyButton = document.getElementById('apply_settings');
+            
+            if (settingsForm && applyButton) {
+                settingsForm.requestSubmit();
+            }
+        }
+    });
+</script>
+
+<script nonce="{{ nonce }}">
+    const logoFileInput = document.getElementById('logo_file');
+    const logoFilenameSelect = document.getElementById('logo_filename');
+    const customLogoFilenameHidden = document.getElementById('custom_logo_filename');
+    const uploadLogoBtn = document.getElementById('upload_logo');
+    const deleteLogoBtn = document.getElementById('delete_logo');
+    const uploadLogoDiv = document.getElementById('upload_logo_div');
+
+    const preset_logo_name_to_file = {
+        "newsletterr_blue_small": "Asset_54x.png",
+        "newsletterr_orange_small": "Asset_46x.png",
+        "newsletterr_blue_banner": "Asset_94x.png",
+        "newsletterr_orange_banner": "Asset_45x.png"
+    }
+
+    const serverCustomLogoFilename = "{{ settings.custom_logo_filename if settings.custom_logo_filename else '' }}";
+
+    logoFilenameSelect?.addEventListener('change', function() {
+        const isCustomSelected = this.value === 'custom';
+        const isNoneSelected = this.value === 'none' || this.value === '';
+        
+        uploadLogoDiv.style.display = isCustomSelected ? 'block' : 'none';
+        
+        if (!isCustomSelected) {
+            customLogoFilenameHidden.value = '';
+        } else {
+            if (serverCustomLogoFilename && !customLogoFilenameHidden.value) {
+                customLogoFilenameHidden.value = serverCustomLogoFilename;
+            }
+        }
+        
+        if (isCustomSelected) {
+            const customFilename = customLogoFilenameHidden.value || serverCustomLogoFilename;
+            if (customFilename) {
+                updateLogoPreview(customFilename, true);
+            } else {
+                updateLogoPreview('');
+            }
+        } else if (isNoneSelected) {
+            updateLogoPreview('');
+        } else {
+            updateLogoPreview(this.value, false);
+        }
+    });
+
+    function updateLogoPreview(filename, isCustom = false) {
+        const previewImg = document.querySelector('.logo-preview-img-small');
+        const filenameSpan = document.querySelector('.logo-filename-small');
+        const previewContainer = document.querySelector('.logo-preview-small');
+
+        if (previewImg) previewImg.remove();
+        if (filenameSpan) filenameSpan.remove();
+
+        if (!filename || filename === 'none') {
+            const noLogoSpan = document.createElement('span');
+            noLogoSpan.className = 'logo-filename-small';
+            noLogoSpan.textContent = 'No logo';
+            previewContainer.appendChild(noLogoSpan);
+            return;
+        }
+
+        const imgEl = document.createElement('img');
+        imgEl.className = 'logo-preview-img-small';
+
+        let displayFilename = filename;
+        
+        if (isCustom) {
+            imgEl.src = `/static/uploads/logos/${filename}`;
+            imgEl.alt = 'Custom logo';
+            displayFilename = 'Custom logo';
+        } else if (preset_logo_name_to_file[filename]) {
+            const actualFilename = preset_logo_name_to_file[filename];
+            imgEl.src = `/static/img/${actualFilename}`;
+            imgEl.alt = filename;
+            displayFilename = filename.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+        } else {
+            imgEl.src = `/static/img/${filename}`;
+            imgEl.alt = filename;
+        }
+        
+        const newFilenameSpan = document.createElement('span');
+        newFilenameSpan.className = 'logo-filename-small';
+        newFilenameSpan.textContent = isCustom ? 'Custom logo' : filename;
+        
+        previewContainer.appendChild(imgEl);
+        previewContainer.appendChild(newFilenameSpan);
+    }
+
+    logoFileInput?.addEventListener('change', function() {
+        const file = this.files[0];
+        if (file) {
+            uploadLogoBtn.disabled = false;
+            uploadLogoBtn.textContent = `Upload ${file.name}`;
+        } else {
+            uploadLogoBtn.disabled = true;
+            uploadLogoBtn.textContent = 'Upload';
+        }
+    });
+
+    uploadLogoBtn?.addEventListener('click', async function() {
+        const file = logoFileInput.files[0];
+        if (!file) return;
+
+        showSpinner('Uploading logo...');
+        uploadLogoBtn.disabled = true;
+
+        try {
+            const formData = new FormData();
+            formData.append('logo', file);
+
+            const response = await fetch('/upload-logo', {
+                method: 'POST',
+                body: (() => {
+                    formData.append('csrf_token', '{{ csrf_token }}');
+                    return formData;
+                })()
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const result = await response.json();
+
+            if (result.status === 'success') {
+                hideSpinner();
+                logoFilenameSelect.value = 'custom';
+                customLogoFilenameHidden.value = result.filename;
+                updateLogoPreview(result.filename, true);
+                uploadLogoBtn.disabled = true;
+                uploadLogoBtn.textContent = 'Upload';
+                logoFileInput.value = '';
+                if (deleteLogoBtn) {
+                    deleteLogoBtn.style.display = 'inline-block';
+                }
+                alert('Logo uploaded successfully!');
+            } else {
+                hideSpinner();
+                alert(`Upload failed: ${result.message}`);
+                uploadLogoBtn.disabled = false;
+            }
+        } catch (error) {
+            hideSpinner();
+            alert(`Upload error: ${error.message || error.toString()}`);
+            uploadLogoBtn.disabled = false;
+        }
+    });
+
+    deleteLogoBtn?.addEventListener('click', async function() {
+        if (!confirm('Are you sure you want to delete the current custom logo?')) return;
+
+        showSpinner('Deleting logo...');
+        deleteLogoBtn.disabled = true;
+
+        try {
+            const response = await fetch('/delete-logo', {
+                method: 'POST',
+                headers: { 'X-CSRF-Token': '{{ csrf_token }}' }
+            });
+
+            const result = await response.json();
+
+            if (result.status === 'success') {
+                hideSpinner();
+                logoFilenameSelect.value = 'none';
+                customLogoFilenameHidden.value = '';
+                updateLogoPreview('');
+                uploadLogoDiv.style.display = 'none';
+                deleteLogoBtn.style.display = 'none';
+                alert('Custom logo deleted successfully!');
+            } else {
+                hideSpinner();
+                alert(`Delete failed: ${result.message}`);
+                deleteLogoBtn.disabled = false;
+            }
+        } catch (error) {
+            hideSpinner();
+            alert(`Delete error: ${error.message || error.toString()}`);
+            deleteLogoBtn.disabled = false;
+        }
+    });
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const currentLogoSelection = logoFilenameSelect.value;
+        const currentCustomFilename = customLogoFilenameHidden.value;
+        
+        if (currentLogoSelection === 'custom') {
+            uploadLogoDiv.style.display = 'block';
+            if (currentCustomFilename) {
+                updateLogoPreview(currentCustomFilename, true);
+                if (deleteLogoBtn) {
+                    deleteLogoBtn.style.display = 'inline-block';
+                }
+            }
+        } else {
+            uploadLogoDiv.style.display = 'none';
+            if (deleteLogoBtn) {
+                deleteLogoBtn.style.display = 'none';
+            }
+        }
+        
+        if (currentLogoSelection === 'custom' && currentCustomFilename) {
+            updateLogoPreview(currentCustomFilename, true);
+        } else if (currentLogoSelection && currentLogoSelection !== 'none') {
+            updateLogoPreview(currentLogoSelection, false);
+        } else {
+            updateLogoPreview('');
+        }
+    });
+</script>
+
+<script nonce="{{ nonce }}">
+    async function runConnectionTest(endpoint, payload, resultSpanId, btnId) {
+        const btn = document.getElementById(btnId);
+        const span = document.getElementById(resultSpanId);
+        btn.disabled = true;
+        span.style.color = '';
+        span.textContent = 'Testing…';
+        try {
+            const r = await fetch(endpoint, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            });
+            const d = await r.json();
+            const colors = {ok: '#01b301', error: '#770010', warning: '#e5a00d'};
+            span.style.color = colors[d.status] || '';
+            span.textContent = d.message;
+        } catch (e) {
+            span.style.color = '#770010';
+            span.textContent = 'Request failed';
+        }
+        btn.disabled = false;
+    }
+
+    document.getElementById('test_tautulli')?.addEventListener('click', () => {
+        runConnectionTest('/api/test/tautulli', {
+            url: document.getElementById('tautulli_url').value.trim(),
+            api_key: document.getElementById('tautulli_api').value.trim()
+        }, 'tautulli_test_result', 'test_tautulli');
+    });
+
+    document.getElementById('test_conjurr')?.addEventListener('click', () => {
+        runConnectionTest('/api/test/conjurr', {
+            url: document.getElementById('conjurr_url').value.trim()
+        }, 'conjurr_test_result', 'test_conjurr');
+    });
+
+    document.getElementById('test_droppedneedle')?.addEventListener('click', () => {
+        runConnectionTest('/api/test/droppedneedle', {
+            url: document.getElementById('droppedneedle_url').value.trim(),
+            api_key: document.getElementById('droppedneedle_api_key').value.trim()
+        }, 'droppedneedle_test_result', 'test_droppedneedle');
+    });
+
+    document.getElementById('test_sonarr')?.addEventListener('click', () => {
+        runConnectionTest('/api/test/sonarr', {
+            url: document.getElementById('sonarr_url').value.trim(),
+            api_key: document.getElementById('sonarr_api_key').value.trim()
+        }, 'sonarr_test_result', 'test_sonarr');
+    });
+
+    document.getElementById('test_radarr')?.addEventListener('click', () => {
+        runConnectionTest('/api/test/radarr', {
+            url: document.getElementById('radarr_url').value.trim(),
+            api_key: document.getElementById('radarr_api_key').value.trim()
+        }, 'radarr_test_result', 'test_radarr');
+    });
+</script>
+
 {% endblock %}

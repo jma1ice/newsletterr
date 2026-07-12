@@ -73,7 +73,7 @@ Newsletterr is a lightweight Flask application that talks to **[Tautulli](https:
 
 ### 1. Prerequisites
 
-* Python **3.9** or higher  
+* Python **3.12** or higher  
 * A running **Tautulli** instance with an API key  
 * SMTP credentials (username & password _or_ an app‑password if using Gmail)
 
@@ -91,13 +91,15 @@ python -m pip install -r requirements.txt
 python -m playwright install chromium
 ```
 
+#### Release binaries
+Download the zip for your platform from the latest [GitHub release](https://github.com/jma1ice/newsletterr/releases) (newsletterr-linux-x64.zip or newsletterr-windows-x64.zip), unzip it, and run the `newsletterr` executable inside. The app creates its `database/` and `env/` folders next to the executable. For chart images in scheduled emails, install the Playwright browser once with `pip install playwright && playwright install chromium`; without it, emails send without chart images.
+
 #### Docker
 On docker hub: jma1ice/newsletterr:latest
 or build locally: 
 ```
 docker run -d --name newsletterr \
   -p 6397:6397 \
-  -e PUBLIC_BASE_URL=http://127.0.0.1:6397 \
   -v newsletterr-db:/app/database \
   -v newsletterr-env:/app/env \
   -v newsletterr-uploads:/app/static/uploads \
@@ -106,11 +108,28 @@ docker run -d --name newsletterr \
 
 ### 3. Run
 
+For development:
 ```bash
 python newsletterr.py
 ```
 
-By default the app listens on **http://127.0.0.1:6397**.
+For production, use gunicorn (a single worker is required because the send scheduler runs in-process; threads provide request concurrency):
+```bash
+gunicorn -w 1 -k gthread --threads 8 --timeout 180 -b 0.0.0.0:6397 newsletterr:app
+```
+
+By default the app listens on **http://127.0.0.1:6397**. Set the `PORT` environment variable to change the port when running `python newsletterr.py`.
+
+#### Environment variables
+
+| Variable | Purpose | Default |
+|---|---|---|
+| `PORT` | Listen port for `python newsletterr.py`; also determines the internal URL the app uses to call itself for chart capture and image proxying | `6397` |
+| `LOG_LEVEL` | Logging verbosity (`DEBUG` shows per-item traces, useful for support) | `INFO` |
+| `FLASK_DEBUG` | Set to `1` for the dev server with auto reload | `0` |
+| `DATA_ENC_KEY` | Fernet key encrypting stored credentials; auto-generated into `env/.env` on first run | generated |
+| `NEWSLETTERR_SECRET_KEY` | Session signing key; auto-generated into `env/.env` so sessions survive restarts | generated |
+| `INTERNAL_TOKEN` | Token for the app's internal self-requests | generated per boot |
 
 ---
 
@@ -152,6 +171,22 @@ By default the app listens on **http://127.0.0.1:6397**.
 
 ---
 
+## Development
+
+```bash
+pip install -r requirements-dev.txt
+ruff check app/ newsletterr.py tests/   # lint
+pytest                                  # test suite, runs in seconds
+```
+
+The email pipeline is covered by golden-master tests: full MIME output is compared against fixtures in `tests/goldens/`. After an intentional change to email output, regenerate them with `UPDATE_GOLDENS=1 pytest tests/test_golden_sends.py` and review the diff.
+
+CI runs lint and tests on every pull request. Docker images publish automatically: pushes to the `nightly` branch build `:nightly`, pushes to `main` build `:pre-release`, and published releases build `:latest`, `:nightly`, `:pre-release`, and the version tag. Release binaries for Linux and Windows are built and attached to each release. The release tag must match the repo `VERSION` file or the build fails.
+
+To back up your data, stop the container (or app) and copy the `database/` and `env/` volumes/folders, or use `sqlite3 database/data.db ".backup backup.db"` while running.
+
+---
+
 ## License
 
 Released under the **MIT License** - see [LICENSE](LICENSE) for details.
@@ -160,56 +195,98 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 
 ## Planned Changes
 
-### For the v2026.2 sprint, these items are to be addressed:
-* Some email clients show posters as small slivers instead of whole poster
-* Contributor area on about page can start clipping out on lower size screens
-* API fields in settings should be a password field
-* Update Plex authentication for PlexAPI v0.31.1 (plexapi.plex no longer supported)
+### For the v2026.3 sprint, these items are to be addressed:
 * Email click for recently added/available recommendations is going to browser on mobile instead of Plex app - this is an issue with the new Plex client, have not seen a fix yet and no info released by Plex at this time
+* Changing ra/recs grid width does not maintain the correct poster ratio and the description gets pushed out (<=5) or has too much bottom space (>5)
 
-#### And these items are feature requests:
+### And these items are feature requests:
 --- Settings ---
-* Add sections to settings page (email server | external services | email styling | login page)
-* Keep settings details on error so user won't have to re-enter them
-* Test api button
-* Setting for custom intro/outro text so custom does not have to be set every time
-* Add HSTS option in settings
-* Option for small cover art of each item in a stat table
-* Setting to choose duration or play counts for stats/graphs
-* Setting to hide play counts in stats/graphs
-* Option to pull recently added by # of days - when this is in should be able to show 'new items since x date' in email
-* Option to sort recently added by IMDb rating (when pulled by days)
-* Option in settings for width of RA/Recs grids
-* Logo positioning setting
-* Add in To: vs BCC: option
-* Option to use or not use [SCHEDULED] in scheduled email subject
+* Option to show or hide description on recently added posters
+* Setting for collection group grid width
+* 'Coming Soon' days ahead and grid width should move to Data Settings
 
 --- Integrations ---
- -- GitHub / Discord --
+ -- newsletterr GitHub / Discord --
 * GitHub webhook to pull submitted issues to Discord channel
 * Ko-fi -> Discord integration for contributor role
-* Export logs button | link to discord
  -- Other --
-* Sonarr/Radarr calendar integration for 'coming soon' type email
-* [Plex Wrapped](https://github.com/netplexflix/Plex-Wrapped-for-Tautulli?tab=readme-ov-file) API call integration
 * Ombi integration
+* Does this work with Emby/Jellyfin? - jellyfin doesn't use tautulli
 * Servarr PR
+* Clean up looks on DN stats, coming soon, and wrapped
 
---- Hosted ---
-* Add a hosted 'most recent newsletter' webpage
-* Add opt out support
-* Add hosted images to reduce email size
+--- UI ---
+* Email preview: desktop/tablet/phone views
+* Swap version and copyright in footer
+* Top right logo should link to site or GH
+* Discord text should be stylized logo to match GitHub
+* Footer always visible
 
 --- Misc. ---
-* Stats for total items in library
-* Date range for stats (i.e. 1.1.25 - 1.1.26) (instead of 'last X days')
-* Make collections clickable - is this possible?
-* More mobile CSS optimizations
-* Discord text should be stylized logo to match GitHub
+* Can Snap-Ins work with custom HTML?
+* CSP out of Report-Only after trial run
+* 2wheelsdown into gh contrib
 
 ---
 
 ## Recent Changes
+
+### v2026.2:
+
+#### Fixed:
+* Fixed issue where fresh setup `migrate_email_templates_for_header_title()` calls for `server_name` failed creating a missing `email_header_title` column
+* Patched up some SSRF/secrete containment
+* CSRF fixes
+* Fixed possible double send on scheduled emails
+* Bimonthly cadence fix
+* Schedule fix for recommendation emails
+* API fields in settings are now a password field
+* Fixed ra/recs card differing width issues when >5 columns used
+* Added a 'pop-up blocked' to index for `save_template()` and similar
+* Adjusted issue where some email clients show posters as small slivers
+* Fixed where contributor area would start clipping out on lower size screens
+* Removed plex-api-client as plexapi.plex was no longer supported
+
+#### New Features:
+* Added sections to settings page (email server | external services | data settings | email styling | email body defaults | security)
+* Settings changes are now kept on error so user won't have to re-enter them
+* Added test api buttons for conjurr and tautulli
+* Added setting for custom intro/outro text
+* Added HSTS option in security settings
+* Added option to use or not use [SCHEDULED] in scheduled email subject
+* Added setting for logo positioning
+* Added setting to hide play counts in stats and graphs
+* Added setting to choose if duration or play counts is used for stats/graphs
+* Added an option to pull recently added by # of days. When this is used, "Recently Added" snap-in header now shows 'Added since X date'
+* Added option to sort recently added by rating
+* Added option for item width of recently added and recommendations grids
+* Added option for small cover art of each item in stats tables
+* Added To: vs BCC: option for email send
+* Added option for setting max image heights to reduce email size
+* Added API functionality to pull wrapped stats from DroppedNeedle
+* Complete codebase overhaul -> app factory
+* SQLite hardened with WAL
+* Auth required and extra setup page added for first sign-in
+* Visibility for failed sends
+* Test send button
+* Email builder auto-save
+* Pagination in email history, history capped to 1000
+* RA by days implemented in 'new schedule creator'
+* Export logs button with send to discord
+* Stats for total items in library
+* Settings submit audits the external tools api test
+* Setup Wizard
+* Resend from history
+* Sonarr/Radarr calendar integration for 'coming soon' type email
+* Plex Wrapped Yearly Review
+* Date range for stats (i.e. 1.1.25 - 1.1.26) (instead of 'last X days')
+* Made collections clickable
+* Added a hosted 'most recent newsletter' webpage
+* Added opt out support
+* Added hosted images to reduce email size
+* General UI update/modernization
+* More mobile CSS optimizations
+* Removed use of Tailwind Play CDN
 
 ### v2026.1:
 
@@ -241,36 +318,6 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Added emoji support to various Text Block Snap-ins
 * Pop out preview now updates with changes to the email
 
-
-### v2025.2.1:
-
-#### Fixed:
-* Fixed small issue with expanded collections not showing in received email if the Collection Group name is changed
-
-#### New Features:
-* Added a collapse UI button to expanded collections that leaves the collection expanded in the email but preserves space in the Snap-Ins UI
-
-
-### v2025.2:
-
-#### Fixed:
-
-#### New Features:
-* Added 'Expand' option on collections to switch to showing items in collection
-* Require CSRF token when POSTing to routes
-* Login page for self hosting
-* Safe 'get' function replaced requests.get
-
-
-### v2025.1
-
-#### Fixed:
-* Added a wait for certain variables in schedule sender that was affecting some users
-* A lot of logic moved into if/main to prep for exe release
-
-#### New Features:
-* Compiled EXE and ELF files
-
 ---
 
 ## Acknowledgements
@@ -279,5 +326,6 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * [Highcharts](https://www.highcharts.com/) for charting  
 * [Tailwind CSS](https://tailwindcss.com/) & [Bootstrap](https://getbootstrap.com/) for styling
 * [conjurr](https://github.com/yungsnuzzy/conjurr) for user watchlist based recommendations  
+* [DroppedNeedle](https://github.com/HabiRabbu/DroppedNeedle) for user yearly wrapped music  
 
 Happy streaming!

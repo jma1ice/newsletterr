@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}logs{% endblock %}
+{% block page_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/info.css') }}">{% endblock %}
+{% block page_header %}
+<header class="page-header">
+    <h1>logs</h1>
+</header>
+{% endblock %}
+{% block content %}
+<div class="container-fluid info-page">
+    <p class="info-intro mb-4">Export application logs for troubleshooting or bug reports. Sensitive values (API keys, tokens, webhook URLs, email addresses) are redacted before export.</p>
+
+    <div class="info-card">
+        <a href="{{ url_for('logs.export_logs') }}" class="nl-btn nl-btn--primary" download>&#8681; Download Logs</a>
+
+        <hr class="info-hr">
+
+        {% if has_discord_webhook %}
+            <p class="mb-2">Send the redacted log as a file attachment to your configured Discord webhook.</p>
+            <label for="discord_thread_id" class="form-label">Thread/Post ID (optional):</label>
+            <input type="text" id="discord_thread_id" class="form-control theme-input mb-2" placeholder="Leave blank to post to the webhook's default channel">
+            <div class="form-check mb-2" id="same-as-last-row" style="display: none;">
+                <input class="form-check-input" type="checkbox" id="same_as_last">
+                <label class="form-check-label" for="same_as_last">Same thread as last time</label>
+            </div>
+            <button id="send-discord-btn" class="nl-btn nl-btn--primary">Send to Discord</button>
+            <span id="discord-result" class="ms-2"></span>
+        {% else %}
+            <p class="text-muted">No Discord webhook configured. Add one in <a href="{{ url_for('settings.settings') }}">Settings &gt; Security</a> to enable sending logs directly to a Discord channel or thread.</p>
+        {% endif %}
+    </div>
+</div>
+
+<script nonce="{{ nonce }}">
+    const LOGS_CSRF_TOKEN = {{ csrf_token | tojson }};
+    const LAST_THREAD_KEY = 'newsletterr_last_discord_thread_id';
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const lastThreadId = localStorage.getItem(LAST_THREAD_KEY);
+        const sameAsLastRow = document.getElementById('same-as-last-row');
+        const sameAsLastCheckbox = document.getElementById('same_as_last');
+        const threadInput = document.getElementById('discord_thread_id');
+
+        if (lastThreadId && sameAsLastRow) {
+            sameAsLastRow.style.display = '';
+            sameAsLastCheckbox.addEventListener('change', () => {
+                if (sameAsLastCheckbox.checked) {
+                    threadInput.value = lastThreadId;
+                    threadInput.disabled = true;
+                } else {
+                    threadInput.disabled = false;
+                }
+            });
+        }
+
+        document.getElementById('send-discord-btn')?.addEventListener('click', async () => {
+            const btn = document.getElementById('send-discord-btn');
+            const resultSpan = document.getElementById('discord-result');
+            const threadId = threadInput.value.trim();
+
+            btn.disabled = true;
+            resultSpan.style.color = '';
+            resultSpan.textContent = 'Sending…';
+
+            try {
+                const r = await fetch('{{ url_for("logs.send_discord") }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-Token': LOGS_CSRF_TOKEN,
+                    },
+                    body: JSON.stringify({ thread_id: threadId }),
+                    credentials: 'same-origin'
+                });
+                const d = await r.json();
+                const colors = { ok: '#01b301', error: '#770010' };
+                resultSpan.style.color = colors[d.status] || '';
+                resultSpan.textContent = d.message;
+                if (d.status === 'ok' && threadId) {
+                    localStorage.setItem(LAST_THREAD_KEY, threadId);
+                }
+            } catch (e) {
+                resultSpan.style.color = '#770010';
+                resultSpan.textContent = 'Request failed';
+            }
+            btn.disabled = false;
+        });
+    });
+</script>
+{% endblock %}

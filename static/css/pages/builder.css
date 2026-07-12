@@ -1,0 +1,551 @@
+/*
+ * Builder page layout (index). Replaces the old cross-partial <table> skeleton
+ * with a CSS grid owned by index.html. The three columns keep their ids
+ * (config-row, preview-row, content-row) that 18-mobile-nav.js and render.py
+ * depend on.
+ */
+
+/* snap-in add-button padding + stat/graph add buttons */
+#add-html-text-block-btn, #add-text-block-btn, #add-title-btn, #add-header-btn, #add-intro-btn, #add-separator-btn, #add-outro-btn {
+    padding: 0.25rem 0.25rem;
+}
+
+.quick-range-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 10px 0 8px;
+    padding: 6px 4px 5px;
+    background: rgba(0,0,0,0.06);
+    border-radius: 6px;
+}
+
+.dark .quick-range-buttons {
+    background: rgba(255,255,255,0.08);
+}
+
+.quick-range-buttons .nl-btn {
+    flex: 0 0 auto;
+    padding: 6px 10px;
+}
+
+.add-stat-btn, .add-graph-btn {
+    margin: 0;
+}
+
+/* drag-and-drop selected items list */
+.selected-item {
+    cursor: move;
+    transition: background-color 0.2s;
+}
+
+.selected-item.dragging {
+    opacity: 0.6;
+    transform: rotate(2deg) scale(1.02);
+    box-shadow: var(--shadow-3);
+    border: 2px solid var(--accent);
+    z-index: 1000;
+    cursor: grabbing !important;
+    transition: none;
+}
+
+.selected-item {
+    cursor: grab;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.selected-item:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.selected-item.drag-over {
+    border-top: 3px solid var(--accent);
+    transform: translateY(2px);
+}
+
+.selected-item::before {
+    content: "⋮⋮";
+    position: absolute;
+    left: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-faint);
+    font-size: 14px;
+    line-height: 0.8;
+    opacity: 0.7;
+}
+
+.selected-item[data-fixed="top"] {
+    cursor: auto;
+}
+
+.selected-item[data-fixed="top"]::before {
+    content: "";
+}
+
+.selected-item:hover::before {
+    opacity: 1;
+    color: var(--accent);
+}
+
+#selected-items-list {
+    max-height: 400px;
+    min-height: 100px;
+    overflow-y: auto;
+}
+
+#cache-status-badge {
+    font-size: 11px !important;
+    padding: 4px 8px !important;
+    border-radius: 12px !important;
+    cursor: help !important;
+    align-items: center !important;
+    gap: 3px !important;
+    font-weight: 500 !important;
+    border: 1px solid !important;
+}
+
+#cache-status-badge i {
+    font-size: 9px !important;
+}
+
+#custom-html-editor {
+    background-color: var(--surface-2);
+    color: var(--text);
+    border-color: var(--border);
+    height: 500px;
+    font-size: 0.8rem;
+    resize: vertical;
+}
+
+#custom-html-editor:focus {
+    background-color: var(--surface-2);
+    color: var(--text);
+}
+
+.builder-grid {
+    display: grid;
+    grid-template-columns: minmax(220px, 0.8fr) minmax(0, 1.9fr) minmax(0, 1.7fr);
+    gap: var(--space-4);
+    align-items: start;
+}
+
+.builder-col {
+    min-width: 0;
+}
+
+/* Preview stays in view while the content column scrolls. */
+#preview-row {
+    position: sticky;
+    top: var(--space-5);
+}
+
+@media (max-width: 768px) {
+    .builder-grid {
+        display: block;
+    }
+    #preview-row {
+        position: static;
+    }
+}
+
+/* .container-fluid.builder-page beats .dark .container-fluid so the legacy
+   surface never shows behind the builder in either theme. */
+.container-fluid.builder-page {
+    background: transparent;
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    border-radius: 0;
+}
+.builder-page .foreground {
+    background: transparent;
+}
+
+/* Config and composer columns read as cards; the preview column floats its
+   own message-bar and email-card so it does not need an outer card. */
+#config-row,
+#content-row {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-5);
+    align-self: start;
+}
+
+/* buttons: .nl-btn variants (components.css) own these now; the page-scoped
+   .button definitions retired with the Phase 8d rename. */
+.builder-page .quick-range-buttons {
+    background: var(--surface-2);
+    border-radius: var(--radius-md);
+}
+
+/* form controls */
+.builder-page input[type="text"],
+.builder-page input[type="number"],
+.builder-page input[type="email"],
+.builder-page input:not([type]),
+.builder-page select,
+.builder-page textarea {
+    background: var(--surface-1);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 8px 10px;
+}
+.builder-page input[type="text"]:focus,
+.builder-page input[type="number"]:focus,
+.builder-page input[type="email"]:focus,
+.builder-page input:not([type]):focus,
+.builder-page select:focus,
+.builder-page textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: var(--focus-ring);
+}
+.builder-page .form-select,
+.builder-page .form-control {
+    background-color: var(--surface-1);
+    color: var(--text);
+    border-color: var(--border);
+}
+.builder-page .form-label,
+.builder-page label {
+    color: var(--text-muted);
+}
+
+/* preview + selected items */
+.builder-page .frame {
+    background: var(--surface-2) !important;
+    border: 1px solid var(--border);
+}
+.builder-page #selected-items-list {
+    background: var(--surface-2);
+    border-color: var(--border);
+}
+.builder-page #selected-items-empty {
+    color: var(--text-faint);
+}
+
+/* empty-state notes (no stats/graph data, recently-added hints) */
+.builder-page .alert-info {
+    background: var(--surface-2);
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius-md);
+    color: var(--text-muted);
+}
+.builder-page .selected-item {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+}
+.builder-page .selected-item:hover {
+    background: var(--surface-3) !important;
+}
+
+/* snap-in preview cards */
+.builder-page .card {
+    background: var(--surface-1);
+    border-color: var(--border);
+}
+.builder-page .card-header {
+    background: var(--surface-2) !important;
+    color: var(--text) !important;
+    border-bottom: 1px solid var(--border);
+}
+.builder-page .card-body {
+    background: var(--surface-1);
+}
+
+/* custom-html mode toggle chrome */
+.builder-page #custom-html-toggle-row {
+    border-color: var(--border) !important;
+    border-radius: var(--radius-md);
+}
+
+/* recently-added preview cards */
+.ra-card {
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-1);
+    transition: box-shadow .15s ease;
+    list-style: none;
+}
+.ra-card:hover { box-shadow: var(--shadow-2); }
+.ra-card-imgwrap { position: relative; aspect-ratio: 2 / 3; background: var(--surface-3); }
+.ra-card-imgwrap img { height: 100%; width: 100%; object-fit: cover; display: block; }
+.ra-pill { display: inline-flex; align-items: center; justify-content: center; line-height: 1; }
+.ra-pill--lib {
+    position: absolute; top: 4px; right: 4px;
+    font-size: 12px; padding: 2px 8px; border-radius: var(--radius-full);
+    background: rgba(0, 0, 0, .7); color: #fff;
+}
+.ra-pill--added {
+    position: absolute; bottom: 4px; right: 4px;
+    font-size: 11px; padding: 1px 6px; border-radius: 4px;
+    background: rgba(0, 0, 0, .6); color: rgba(255, 255, 255, .9);
+}
+.ra-card-body { padding: var(--space-3); }
+.ra-card-title {
+    font-weight: 600; color: var(--text);
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.ra-card-sub { font-size: var(--text-xs); color: var(--text-muted); }
+.ra-card-summary {
+    margin-top: var(--space-2); font-size: var(--text-xs); color: var(--text-muted);
+    display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden;
+}
+
+/* collection group items */
+.collection-group-items { color: var(--text); }
+.collection-group-items em { color: var(--text-muted); }
+
+/* recommendations preview */
+.recommendations-block { display: flex; flex-direction: column; gap: var(--space-4); }
+.rec-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: var(--space-3);
+    margin-bottom: var(--space-5);
+}
+.rec-empty {
+    border-radius: var(--radius-md);
+    padding: var(--space-4);
+    background: var(--surface-2);
+    color: var(--text-muted);
+}
+.rec-grid { display: grid; grid-template-columns: 1fr; gap: var(--space-5); }
+.rec-user-card {
+    border-radius: var(--radius-md);
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    padding: var(--space-4);
+    box-shadow: var(--shadow-1);
+    transition: box-shadow .15s ease;
+}
+.rec-user-card:hover { box-shadow: var(--shadow-2); }
+.rec-user-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--space-3);
+}
+.rec-poster-row {
+    display: grid;
+    grid-template-columns: repeat(10, minmax(0, 1fr));
+    gap: var(--space-3);
+    list-style: none;
+    padding: 0;
+    margin: 0 0 var(--space-3);
+}
+.rec-row-full { grid-column: 1 / -1; }
+.rec-poster {
+    position: relative;
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    background: var(--surface-2);
+}
+.rec-poster > a { display: block; text-decoration: none; }
+.rec-poster-imgwrap { aspect-ratio: 2 / 3; }
+.rec-poster-imgwrap img,
+.rec-poster-noimg { height: 100%; width: 100%; object-fit: cover; display: block; }
+.rec-poster-noimg {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+}
+.rec-poster-meta {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    font-size: 11px;
+    color: rgba(255, 255, 255, .9);
+}
+.rec-poster-meta .pill,
+.rec-poster-unavail { border-radius: 4px; padding: 1px 6px; }
+.rec-poster-meta .pill { background: rgba(0, 0, 0, .7); }
+.rec-poster-unavail {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    font-size: 10px;
+    background: rgba(220, 53, 69, .85);
+    color: #fff;
+}
+.rec-poster-caption {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding: 8px;
+    background: linear-gradient(to top, rgba(0, 0, 0, .7), transparent);
+}
+.rec-poster-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: #fff;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+.rec-poster-runtime { font-size: 11px; color: rgba(255, 255, 255, .8); }
+.rec-poster-overview {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    transform: translateY(100%);
+    transition: transform .2s ease;
+    font-size: 10px;
+    background: rgba(0, 0, 0, .8);
+    color: #fff;
+    padding: 4px 8px;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+.rec-poster:hover .rec-poster-overview { transform: translateY(0); }
+
+/* gif modal */
+#gif-results-grid .gif-result-item {
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: border-color .12s ease;
+}
+#gif-results-grid .gif-result-item:hover {
+    border-color: var(--accent);
+}
+
+/* migrated inline styles */
+.builder-page #subject { width: 100%; }
+.builder-page #email_header_title { width: 100%; }
+.builder-page label[for="custom-html-toggle"] { font-size: 0.9rem; max-width: 5rem; }
+.builder-page #template-selector { width: 200px; }
+.builder-page .send-form { margin-top: 0; }
+#sendEmailBtn { font-weight: 700; min-width: 180px; }
+.builder-page #items_to_pull { width: 8.5rem; margin-bottom: 8px; }
+.builder-page #cache-card-header,
+.builder-page #bcc-card-header { cursor: pointer; }
+.builder-page #cache-card-header { padding: 8px 12px; }
+.builder-page #cache-card-header h6 { font-size: 0.85rem; }
+.builder-page #cache-card-header > span { font-size: 0.8rem; }
+.builder-page .bcc-card { margin-top: 20px; }
+.builder-page #bcc-toggle-icon { transition: transform 0.3s; }
+.builder-page .cache-cap { text-transform: capitalize; }
+.builder-page .snapin-note { font-size: 0.9rem; padding: 0.75rem; }
+
+/* gif picker modal */
+.gif-modal-backdrop { position: fixed; inset: 0; z-index: 9999; background: rgba(3, 8, 10, 0.6); }
+.gif-modal-dialog {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: min(600px, 95vw);
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    border-radius: 12px;
+    overflow: hidden;
+    background: var(--surface-1);
+    color: var(--text);
+    border: 1px solid var(--border);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+.gif-modal-head { padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
+.gif-modal-grid { flex: 1; overflow-y: auto; padding: 10px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; min-height: 200px; }
+#gif-results-empty { grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--text-faint); }
+.gif-modal-foot { padding: 8px 16px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
+.gif-modal-foot-left { display: flex; gap: 8px; align-items: center; }
+#gif-page-label { font-size: 0.8rem; color: var(--text-faint); }
+.gif-modal-credit { font-size: 0.75rem; color: var(--text-faint); text-decoration: none; opacity: 0.8; }
+
+/* message bar: Subject + Header Title, docked above the preview */
+.builder-page .msg-bar {
+    display: flex;
+    gap: var(--space-4);
+    margin-bottom: var(--space-4);
+    padding: var(--space-4);
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-1);
+}
+.builder-page .msg-field {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+}
+.builder-page .msg-field label {
+    font-size: var(--text-xs);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: var(--text-muted);
+    margin: 0;
+}
+.builder-page .msg-field input { width: 100%; }
+
+/* preview toolbar (Export / Import / Pop-out) reads as a caption row */
+.builder-page .preview-toolbar span { color: var(--text-muted); font-weight: 600; }
+
+/* hero preview: fills the wide center column and floats as an email card */
+.builder-page .frame {
+    width: 100%;
+    max-width: none;
+    min-height: 36rem;
+    height: 36rem;
+    max-height: calc(100vh - 200px);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-2);
+}
+
+/* data rail: action buttons stack full width so nothing overflows the
+   narrow column; their explainer notes read as compact captions. */
+.builder-page #config-row .nl-btn {
+    width: 100%;
+    white-space: normal;
+    margin-top: var(--space-2);
+}
+.builder-page #config-row .quick-range-buttons .nl-btn {
+    width: auto;
+    white-space: nowrap;
+    margin-top: 0;
+}
+.builder-page #config-row .rail-heading {
+    font-size: var(--text-xs);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: var(--text-muted);
+    margin: 0 0 var(--space-3);
+}
+.builder-page #config-row .rail-note {
+    font-size: var(--text-xs);
+    line-height: 1.4;
+    color: var(--text-faint);
+    margin: var(--space-2) 0 var(--space-4);
+}
+
+/* composer column: snap-in sections wrap instead of overflowing the narrower
+   column (the add-button groups were a single non-wrapping flex row). */
+.builder-page #content-row .d-flex.justify-content-between { flex-wrap: wrap; row-gap: var(--space-2); }
+.builder-page #content-row .d-flex.gap-2 { flex-wrap: wrap; }
+
+@media (max-width: 768px) {
+    /* stack the message fields and let the preview size to content on mobile */
+    .builder-page .msg-bar { flex-direction: column; gap: var(--space-3); }
+}

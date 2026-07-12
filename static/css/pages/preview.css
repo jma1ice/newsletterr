@@ -1,0 +1,43 @@
+/*
+ * Schedule preview page chrome. Scoped to .preview-page and
+ * restricted to the visible page chrome only: the outer
+ * cards, header, and error banner.
+ */
+
+.container-fluid.preview-page {
+    background: transparent;
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    border-radius: 0;
+}
+
+.preview-page .theme-card {
+    background: var(--surface-1);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+}
+/* !important to beat the legacy global .dark .card-header { !important }. */
+.preview-page .theme-card-header {
+    background: var(--surface-2) !important;
+    color: var(--text) !important;
+    border-bottom: 1px solid var(--border);
+}
+.preview-page .theme-card-header h3,
+.preview-page .theme-card-header h5 {
+    color: var(--text);
+}
+.preview-page .card-body {
+    background: var(--surface-1);
+}
+
+/* error banner chrome (not the email content) */
+.preview-page #error.alert-danger {
+    background: var(--danger-soft);
+    border: 1px solid var(--danger);
+    color: var(--danger);
+}
+.preview-page #loading .text-info {
+    color: var(--text-muted);
+}

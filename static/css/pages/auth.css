@@ -1,0 +1,159 @@
+/*
+ * Standalone page styling (login, setup, public_newsletter, public_unsubscribe).
+ * Token-driven and theme-aware. These pages carry no app shell.
+ */
+
+.auth-body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-5);
+    background: linear-gradient(160deg, var(--bg), var(--surface-2));
+    color: var(--text);
+    font-family: var(--font-sans);
+}
+
+.auth-card {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-3);
+    padding: var(--space-6);
+    width: 100%;
+    max-width: 420px;
+}
+.auth-card--wide { max-width: 640px; }
+
+.auth-logo { text-align: center; margin-bottom: var(--space-4); }
+.auth-logo-img { height: 64px; margin-bottom: var(--space-3); }
+.auth-sub { margin: 0; color: var(--text-muted); }
+.auth-title { text-align: center; margin: 0 0 var(--space-4); font-size: var(--text-xl); font-weight: 700; }
+
+.auth-field { margin-bottom: var(--space-4); }
+.auth-field > label {
+    display: block;
+    font-size: var(--text-sm);
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-bottom: var(--space-2);
+}
+.auth-hint { color: var(--text-faint); font-size: var(--text-sm); margin: var(--space-2) 0 0; }
+
+.auth-submit {
+    width: 100%;
+    margin-top: var(--space-2);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+/* One control scale for every auth surface: login (nl-*) and the setup
+   wizard (form-control/btn) render at identical sizes. */
+.auth-card .nl-input,
+.auth-card .nl-select {
+    padding: 11px 14px;
+}
+.auth-card .nl-btn {
+    padding: 12px 18px;
+    font-size: var(--text-base);
+}
+
+.auth-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+    margin-top: var(--space-4);
+}
+
+/* setup wizard step indicator */
+.auth-steps {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    margin-bottom: var(--space-5);
+    list-style: none;
+    padding: 0;
+    font-size: var(--text-sm);
+}
+.auth-step {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: var(--radius-full);
+    background: var(--surface-2);
+    color: var(--text-muted);
+}
+.auth-step.is-active { background: var(--accent); color: var(--on-accent); font-weight: 600; }
+.auth-step.is-done { background: var(--accent-soft); color: var(--accent-strong); }
+
+/* generic content area for the public pages */
+.auth-prose { color: var(--text); }
+.auth-prose a { color: var(--accent); }
+
+/* --- setup wizard keeps Bootstrap-shaped classes; token them in-card --- */
+.auth-card .form-control,
+.auth-card .form-select,
+.auth-card select {
+    width: 100%;
+    background: var(--surface-1);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 11px 14px;
+}
+.auth-card .form-control:focus,
+.auth-card select:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: var(--focus-ring);
+}
+.auth-card .form-label {
+    display: block;
+    font-size: var(--text-sm);
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-bottom: var(--space-2);
+}
+.auth-card .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px 18px;
+    border-radius: var(--radius-md);
+    border: 1px solid transparent;
+    cursor: pointer;
+    text-decoration: none;
+    font: inherit;
+    font-weight: 600;
+}
+.auth-card .btn-primary,
+.auth-card .btn-login {
+    background: var(--accent);
+    color: var(--on-accent);
+}
+.auth-card .btn-primary:hover,
+.auth-card .btn-login:hover { background: var(--accent-strong); }
+.auth-card .btn-outline-secondary {
+    background: transparent;
+    border-color: var(--border);
+    color: var(--text);
+}
+.auth-card .btn-outline-secondary:hover { background: var(--surface-2); }
+.auth-card .btn-sm { padding: 5px 10px; font-size: var(--text-sm); }
+.auth-card .alert { border-radius: var(--radius-md); padding: var(--space-3) var(--space-4); }
+.auth-card .alert-danger { background: var(--danger-soft); border: 1px solid var(--danger); color: var(--danger); }
+.auth-card .alert-success { background: var(--success-soft); border: 1px solid var(--success); color: var(--success); }
+
+.step-title { text-align: center; margin-bottom: var(--space-4); color: var(--text); }
+.step-subtitle { text-align: center; color: var(--text-muted); font-size: 0.9rem; margin-bottom: var(--space-4); }
+.test-result { font-size: 0.85rem; margin-top: var(--space-2); display: block; }
+.step-dots { display: flex; justify-content: center; gap: 8px; margin-top: var(--space-5); }
+.step-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--surface-3); }
+.step-dot.active { background: var(--accent); }
+
+/* migrated inline style (Phase 8d-1) */
+.plex-connected { color: #01b301; }

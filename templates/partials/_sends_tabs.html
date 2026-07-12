@@ -1,0 +1,9 @@
+{# Shared tab bar for the Sends area: scheduling and email history read as two
+   facets of one destination. Active tab from request.endpoint. Frozen URLs and
+   separate blueprints are kept. #}
+<div class="nl-tabs sends-tabs mb-4">
+    <a href="{{ url_for('scheduling.scheduling') }}"
+       class="nl-tabs__tab{% if request.endpoint == 'scheduling.scheduling' %} is-active{% endif %}">Scheduling</a>
+    <a href="{{ url_for('emails.email_history') }}"
+       class="nl-tabs__tab{% if request.endpoint == 'emails.email_history' %} is-active{% endif %}">Email history</a>
+</div>

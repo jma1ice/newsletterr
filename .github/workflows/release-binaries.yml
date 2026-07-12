@@ -1,0 +1,53 @@
+name: Release Binaries
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            artifact: newsletterr-linux-x64
+          - os: windows-latest
+            artifact: newsletterr-windows-x64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt pyinstaller
+
+      - name: Build
+        run: pyinstaller newsletterr.spec
+
+      - name: Smoke test (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          cd dist/newsletterr
+          ./newsletterr &
+          APP_PID=$!
+          sleep 12
+          curl -fsS -o /dev/null http://127.0.0.1:6397/about
+          kill $APP_PID
+
+      - name: Package (Linux)
+        if: runner.os == 'Linux'
+        run: cd dist && zip -qr "../${{ matrix.artifact }}.zip" newsletterr
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        run: Compress-Archive -Path dist/newsletterr -DestinationPath "${{ matrix.artifact }}.zip"
+
+      - name: Attach to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ github.event.release.tag_name }}" "${{ matrix.artifact }}.zip" --clobber

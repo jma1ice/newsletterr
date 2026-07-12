@@ -1,129 +1,160 @@
 {% extends "base.html" %}
 {% block title %}about{% endblock %}
+{% block page_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/info.css') }}">{% endblock %}
+{% block page_header %}
+<header class="page-header">
+    <h1>about</h1>
+</header>
+{% endblock %}
 {% block content %}
-<div class="container-fluid">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h1>about</h1>
-    </div>
-    <p class="text-info mb-4">Learn more about this application, version information, and licensing details.</p>
+<div class="container-fluid info-page">
+    <p class="info-intro mb-4">Learn more about this application, version information, and licensing details.</p>
 
-    <hr class="my-8 border-dashed border-gray-300 dark:border-gray-600">
+    <hr class="info-hr">
 
-    <h2 class="text-2xl font-bold mb-4">🍪 Contributors 🍪</h2>
-    <p class="text-sm text-gray-600 dark:text-gray-400 mb-2">
+    <h2>🍪 Contributors 🍪</h2>
+    <p class="info-intro mb-2">
         Special thanks to everyone who has supported this project, your support helps keep this project alive and growing!
     </p>
-    <p class="text-sm text-gray-600 dark:text-gray-400 mb-6">
+    <p class="info-intro mb-4">
         Whether monetarily or through pull requests, we appreciate you!
     </p>
 
-    <div class="border-1 border-yellow-400 dark:border-yellow-500 rounded-lg p-2 w-25 mb-2">
-        <div class="grid grid-cols-2 gap-2 w-100">
-            <div class="flex w-100 items-center space-x-3 p-3 bg-[#8acbd4] dark:bg-[#62a1a4] rounded-lg">
-                <div class="w-20 h-10 bg-[#62a1a4] dark:bg-[#8acbd4] rounded-full flex items-center justify-center text-[#333] font-bold">
-                    Ko-Fi
-                </div>
-                <div class="font-semibold text-[#333]">@baggins</div>
+    <div class="contrib-group contrib-group--gold">
+        <div class="contrib-grid">
+            <div class="contrib-card">
+                <span class="contrib-badge">Ko-Fi</span>
+                <span class="contrib-name">@baggins</span>
             </div>
-            <div class="flex w-100 items-center space-x-3 p-3 bg-[#8acbd4] dark:bg-[#62a1a4] rounded-lg">
-                <div class="w-20 h-10 bg-[#62a1a4] dark:bg-[#8acbd4] rounded-full flex items-center justify-center text-[#333] font-bold">
-                    GitHub
-                </div>
-                <div class="font-semibold text-[#333]">@dreondre</div>
+            <div class="contrib-card">
+                <span class="contrib-badge">GitHub</span>
+                <span class="contrib-name">@dreondre</span>
             </div>
         </div>
     </div>
 
-    <div class="border-1 border-green-400 dark:border-green-500 rounded-lg p-2 w-25 mb-2">
-        <div class="grid grid-cols-2 gap-2 w-100">
-            <div class="flex w-100 items-center space-x-3 p-3 bg-[#8acbd4] dark:bg-[#62a1a4] rounded-lg">
-                <div class="w-20 h-10 bg-[#62a1a4] dark:bg-[#8acbd4] rounded-full flex items-center justify-center text-[#333] font-bold">
-                    Ko-Fi
-                </div>
-                <div class="font-semibold text-[#333]">@taehatypes</div>
+    <div class="contrib-group contrib-group--green">
+        <div class="contrib-grid">
+            <div class="contrib-card">
+                <span class="contrib-badge">Ko-Fi</span>
+                <span class="contrib-name">@taehatypes</span>
             </div>
-            <div class="flex w-100 items-center space-x-3 p-3 bg-[#8acbd4] dark:bg-[#62a1a4] rounded-lg">
-                <div class="w-20 h-10 bg-[#62a1a4] dark:bg-[#8acbd4] rounded-full flex items-center justify-center text-[#333] font-bold">
-                    GitHub
-                </div>
-                <div class="font-semibold text-[#333]">@quinneydavid</div>
+            <div class="contrib-card">
+                <span class="contrib-badge">GitHub</span>
+                <span class="contrib-name">@quinneydavid</span>
+            </div>
+            <div class="contrib-card">
+                <span class="contrib-badge">Ko-Fi</span>
+                <span class="contrib-name">@bferd</span>
             </div>
         </div>
     </div>
 
-    <hr class="my-8 border-dashed border-gray-300 dark:border-gray-600">
-  
-    <dl class="grid grid-cols-1 sm:grid-cols-1 gap-3 text-lg leading-tight">
-        <div class="sm:col-span-2">
-            <dt class="font-semibold dark:border-gray-300">Version</dt>
-            <dd class="mt-1 text-sm">{{ version }}</dd>
-        </div>
-        <div class="sm:col-span-2">
-            <dt class="font-semibold dark:border-gray-300">Published</dt>
-            <dd class="mt-1 text-sm">{{ publish_date }}</dd>
-        </div>
-        <div class="sm:col-span-2">
-            <dt class="font-semibold dark:border-gray-300">License</dt>
-            <dd class="mt-1 text-sm">MIT</dd>
+    <hr class="info-hr">
+
+    <dl class="info-dl">
+        <div>
+            <dt>Version</dt>
+            <dd>{{ version }}</dd>
         </div>
         <div>
-            <dt class="font-semibold dark:border-gray-300">Check out our other projects:</dt>
-            <a target="_blank" href="https://github.com/yungsnuzzy/conjurr">conjurr</a>
-            <p>AI Recommendations for your users</p>
-            <a target="_blank" href="https://github.com/yungsnuzzy/autoytdlp">autoytdlp</a>
-            <p>Automated YouTube downloader and processor</p>
-            <a target="_blank" href="https://github.com/jma1ice/scorepad">ScorePad</a>
-            <p>Scorekeeping site for card games</p>
-            <a target="_blank" href="https://github.com/jma1ice/focus">FOCUS</a>
-            <p>Productivity app to help keep your projects on track</p>
-            <a target="_blank" href="https://github.com/jma1ice/onairr">OnAirr</a>
-            <p>Minimal Plex 'Now Streaming' interface</p>
-            <a target="_blank" href="https://ko-fi.com/newsletterr">Tip the developers!</a>
+            <dt>Published</dt>
+            <dd>{{ publish_date }}</dd>
+        </div>
+        <div>
+            <dt>License</dt>
+            <dd>MIT</dd>
+        </div>
+        <div>
+            <dt>Found a bug?</dt>
+            <dd>
+                <a href="{{ url_for('logs.logs_page') }}">Export logs</a> to attach to a
+                <a target="_blank" href="https://discord.gg/7Skcsqs4uT">support post on Discord</a>.
+            </dd>
+        </div>
+        <div>
+            <dt>Check out our other projects:</dt>
+            <dd>
+                <a target="_blank" href="https://github.com/yungsnuzzy/conjurr">conjurr</a> - AI Recommendations for your users<br>
+                <a target="_blank" href="https://github.com/yungsnuzzy/autoytdlp">autoytdlp</a> - Automated YouTube downloader and processor<br>
+                <a target="_blank" href="https://github.com/jma1ice/scorepad">ScorePad</a> - Scorekeeping site for card games<br>
+                <a target="_blank" href="https://github.com/jma1ice/focus">FOCUS</a> - Productivity app to help keep your projects on track<br>
+                <a target="_blank" href="https://github.com/jma1ice/onairr">OnAirr</a> - Minimal Plex 'Now Streaming' interface<br>
+                <a target="_blank" href="https://ko-fi.com/newsletterr">Tip the developers!</a>
+            </dd>
         </div>
     </dl>
 
-    <hr class="my-8 border-dashed border-gray-300 dark:border-gray-600">
+    <hr class="info-hr">
 
-    <h2 class="text-2xl font-bold mb-4">Credits & Libraries</h2>
-    <ul class="list-disc list-inside space-y-2 text-sm">
-        <li>Python Flask 3.x</li>
+    <h2>Credits &amp; Libraries</h2>
+    <ul class="info-list">
+        <li>DroppedNeedle 'Wrapped' API</li>
         <li>Tautulli API</li>
         <li>Highcharts for interactive graphs</li>
         <li>Tailwind CSS + Bootstrap utilities</li>
+        <li>Python Flask 3.x</li>
     </ul>
 
-    <hr class="my-8 border-dashed border-gray-300 dark:border-gray-600">
+    <hr class="info-hr">
 
-    <h2 class="text-2xl font-bold mb-2">Recent Changes</h2>
-    <dt class="font-semibold dark:border-gray-300">Fixes:</dt>
-    <ul class="list-disc list-inside space-y-2 text-sm mb-2">
-        <li>Some CSS Optimizations for mobile - more still in the works</li>
-        <li>Timeout on safe_get() extended to 120s so that conjurr api call has enough time to generate the recommendations</li>
-        <li>Fixed authentication issue with /proxy-art that made art unavailble in the sent email if a login page was set up</li>
-        <li>Fixed a bug where libraries that share name similarities were causing both libraries to be pulled into the 'recently added' snap in</li>
-        <li>Fixed graph hanging bug by moving some variable declarations higher and packaging highcharts with the app instead of calls to the CDN</li>
-        <li>While we're at it, moved all CDN calls to local files</li>
-        <li>Fixed missing smtp_username variable from scheduled email send logic</li>
-        <li>Added consistent headers to avoid repeated 'New Device Connected' notifications on Plex API calls</li>
-        <li>Fixed bug where recommendations pull would hang for a short period if conjurr is not running</li>
-        <li>Fixed bug where missing theme_settings in an early return to index was causing an error updating the preview</li>
+    <h2>Recent Changes</h2>
+    <p class="info-subhead">Fixes:</p>
+    <ul class="info-list mb-4">
+        <li>Fixed issue where fresh setup `migrate_email_templates_for_header_title()` calls for `server_name` failed creating a missing `email_header_title` column</li>
+        <li>Patched up some SSRF/secrete containment</li>
+        <li>CSRF fixes</li>
+        <li>Fixed possible double send on scheduled emails</li>
+        <li>Bimonthly cadence fix</li>
+        <li>Schedule fix for recommendation emails</li>
+        <li>API fields in settings are now a password field</li>
+        <li>Fixed ra/recs card differing width issues when &gt;5 columns used</li>
+        <li>Added a 'pop-up blocked' to index for `save_template()` and similar</li>
+        <li>Adjusted issue where some email clients show posters as small slivers</li>
+        <li>Fixed where contributor area would start clipping out on lower size screens</li>
+        <li>Removed plex-api-client as plexapi.plex was no longer supported</li>
     </ul>
-    <dt class="font-semibold dark:border-gray-300">New Features:</dt>
-    <ul class="list-disc list-inside space-y-2 text-sm mb-2">
-        <li>GitHub link is now a stylized logo</li>
-        <li>Page no longer reloads on stats/users pull</li>
-        <li>Added separator blocks to add lines between sections in emails</li>
-        <li>Made the header title into a text input (under subject) so that it is editable/removable</li>
-        <li>Made 'Title' Text Block drag-able and not pinned to top</li>
-        <li>Recently Added now filters out 0 length run time items</li>
-        <li>Added functionality for full custom HTML templates</li>
-        <li>Added an export email HTML button</li>
-        <li>Added an import email template button</li>
-        <li>Ratings (G, PG, etc) are now listed on recently added</li>
-        <li>Added IMDb ratings in stat tables - requires Tautulli PR approval and then update</li>
-        <li>Added snap-ins for images/gifs</li>
-        <li>Added emoji support to various Text Block Snap-ins</li>
-        <li>Pop out preview now updates with changes to the email</li>
+    <p class="info-subhead">New Features:</p>
+    <ul class="info-list">
+        <li>Added sections to settings page (email server | external services | data settings | email styling | email body defaults | login | security)</li>
+        <li>Settings changes are now kept on error so user won't have to re-enter them</li>
+        <li>Added test api buttons for conjurr and tautulli</li>
+        <li>Added setting for custom intro/outro text</li>
+        <li>Added HSTS option in security settings</li>
+        <li>Added option to use or not use [SCHEDULED] in scheduled email subject</li>
+        <li>Added setting for logo positioning</li>
+        <li>Added setting to hide play counts in stats and graphs</li>
+        <li>Added setting to choose if duration or play counts is used for stats/graphs</li>
+        <li>Added an option to pull recently added by # of days. When this is used, "Recently Added" snap-in header now shows 'Added since X date'</li>
+        <li>Added option to sort recently added by rating</li>
+        <li>Added option for item width of recently added and recommendations grids</li>
+        <li>Added option for small cover art of each item in stats tables</li>
+        <li>Added To: vs BCC: option for email send</li>
+        <li>Added option for setting max image heights to reduce email size</li>
+        <li>Added API functionality to pull wrapped stats from DroppedNeedle</li>
+        <li>Complete codebase overhaul -&gt; app factory</li>
+        <li>SQLite hardened with WAL</li>
+        <li>Auth required and extra setup page added for first sign-in</li>
+        <li>Visibility for failed sends</li>
+        <li>Test send button</li>
+        <li>Email builder auto-save</li>
+        <li>Pagination in email history, history capped to 1000</li>
+        <li>RA by days implemented in 'new schedule creator'</li>
+        <li>Export logs button with send to discord</li>
+        <li>Stats for total items in library</li>
+        <li>Settings submit audits the external tools api test</li>
+        <li>Setup Wizard</li>
+        <li>Resend from history</li>
+        <li>Sonarr/Radarr calendar integration for 'coming soon' type email</li>
+        <li>Plex Wrapped Yearly Review</li>
+        <li>Date range for stats (i.e. 1.1.25 - 1.1.26) (instead of 'last X days')</li>
+        <li>Made collections clickable</li>
+        <li>Added a hosted 'most recent newsletter' webpage</li>
+        <li>Added opt out support</li>
+        <li>Added hosted images to reduce email size</li>
+        <li>General UI update/modernization</li>
+        <li>More mobile CSS optimizations</li>
+        <li>Removed use of Tailwind Play CDN</li>
     </ul>
 </div>
 {% endblock %}

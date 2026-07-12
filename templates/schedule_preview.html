@@ -1,14 +1,15 @@
 {% extends "base.html" %}
 {% block title %}Email Preview{% endblock %}
+{% block page_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/preview.css') }}">{% endblock %}
 
 {% block content %}
-<div class="container-fluid">
+<div class="container-fluid preview-page">
     <div class="row">
         <div class="col-lg-12">
             <div class="card theme-card">
                 <div class="card-header theme-card-header d-flex justify-content-between align-items-center">
-                    <h3 class="mb-0">📧 Email Preview - <span id="schedule-name"></span></h3>
-                    <button class="btn btn-primary" onclick="window.close()">Close Preview</button>
+                    <h3 class="mb-0">Email Preview - <span id="schedule-name"></span></h3>
+                    <button class="btn btn-primary" id="close-preview-btn">Close Preview</button>
                 </div>
                 <div class="card-body">
                     <div id="loading" class="text-center p-4">
@@ -31,7 +32,7 @@
                             <div class="col-lg-12">
                                 <div class="card theme-card">
                                     <div class="card-header theme-card-header">
-                                        <h5 class="mb-0">📧 Email Preview</h5>
+                                        <h5 class="mb-0">Email Preview</h5>
                                     </div>
                                     <div class="card-body">
                                         <iframe id="preview" style="width: 100%; height: 600px; border: 1px solid #dee2e6; border-radius: 4px; background: white;"></iframe>
@@ -50,15 +51,22 @@
     </div>
 </div>
 
-<script src="{{ url_for('static', filename='js/html2canvas.min.js') }}" nonce="{{ nonce }}"></script>
-<script src="{{ url_for('static', filename='js/highcharts.js') }}" nonce="{{ nonce }}"></script>
-<script src="{{ url_for('static', filename='js/highcharts-exporting.js') }}" nonce="{{ nonce }}"></script>
+<script src="{{ url_for('static', filename='js/vendor/html2canvas.min.js') }}" nonce="{{ nonce }}"></script>
+<script src="{{ url_for('static', filename='js/vendor/highcharts.js') }}" nonce="{{ nonce }}"></script>
+<script src="{{ url_for('static', filename='js/vendor/highcharts-exporting.js') }}" nonce="{{ nonce }}"></script>
 
 <script nonce="{{ nonce }}">
+    document.getElementById('close-preview-btn').addEventListener('click', () => window.close());
     const urlParams = new URLSearchParams(window.location.search);
     const scheduleId = urlParams.get('schedule_id');
     const themeSettings = {{ theme_settings | tojson }};
     const displayPreference = "{{ settings.recipient_display_name }}";
+    const hideGraphPlayCounts = {{ 'true' if settings.get('hide_graph_play_counts') == 'enabled' else 'false' }};
+    const statType = "{{ settings.get('stats_type', 'plays') }}";
+    const recentlyAddedMode = "{{ settings.get('recently_added_mode', 'items') }}";
+    const raGridColumns = parseInt("{{ settings.get('ra_grid_columns', '5') }}") || 5;
+    const recsGridColumns = parseInt("{{ settings.get('recs_grid_columns', '5') }}") || 5;
+    const showStatCoverArt = "{{ settings.get('stat_cover_art', 'disabled') }}" === "enabled";
 
     let templateData = {};
     let stats = [];
@@ -418,7 +426,14 @@
         const rating = row.content_rating || '';
         const usersWatch = row.users_watched;
 
-        let tds = `<td>${esc(firstCol||'')}</td>`;
+        const coverArtTypes = ["Most Watched Movies", "Most Watched TV Shows", "Most Popular Movies", "Most Popular TV Shows", "Most Played Artists", "Most Popular Artists", "Recently Watched"];
+        let thumbHtml = '';
+        if (showStatCoverArt && coverArtTypes.includes(title) && (row.thumb || row.grandparent_thumb)) {
+            const thumbPath = row.thumb || row.grandparent_thumb;
+            thumbHtml = `<img src="/proxy-art${esc(thumbPath)}" style="height:38px;width:auto;border-radius:3px;margin-right:7px;vertical-align:middle;">`;
+        }
+
+        let tds = `<td>${thumbHtml}${esc(firstCol||'')}</td>`;
         if (showYear) tds += `<td>${esc(row.year||'')}</td>`;
         if (showPlays) tds += `<td>${esc(row.total_plays ?? row.plays ?? row.count ?? 0)}</td>`;
 
@@ -604,7 +619,8 @@
                         title: { text: cmd.name + ' - Last ' + `${dateRange}` + ' days' },
                         exporting: { enabled: true },
                         xAxis: { categories: g.categories || [] },
-                        yAxis: { title: { text: 'Plays' } },
+                        yAxis: { title: { text: hideGraphPlayCounts ? null : (statType === 'duration' ? 'Duration' : 'Plays') }, labels: { enabled: !hideGraphPlayCounts } },
+                        tooltip: hideGraphPlayCounts ? { enabled: false } : {},
                         series: g.series || []
                     };
                     
@@ -1021,7 +1037,7 @@
         }
 
         const maxItems = templateData.items_count ? parseInt(templateData.items_count) : 10;
-        allItems = deduplicated.slice(0, maxItems);
+        allItems = recentlyAddedMode === 'days' ? deduplicated : deduplicated.slice(0, maxItems);
         
         if (allItems.length === 0) {
             return `<div class="recently-added"><p style="text-align: center; color: var(--email-muted); padding: 20px;">No recently added items found${libraryFilter ? ` for ${libraryFilter}` : ''}</p></div>`;
@@ -1082,26 +1098,13 @@
                 ">
                     <div style="position: relative; aspect-ratio: 2/3; background: #f8f9fa;">
                         <img src="${imgURL}" style="width: 100%; height: 100%; object-fit: cover; display: block;" alt="${item.title}">
-                        ${item.added ? `
-                            <div style="
-                                position: absolute;
-                                bottom: 1px;
-                                right: 1px;
-                                background: rgba(0, 0, 0, 0.6);
-                                color: rgba(255, 255, 255, 0.9);
-                                padding: 2px 6px;
-                                border-radius: 4px;
-                                font-size: 9px;
-                                line-height: 1;
-                            ">${item.added}</div>
-                        ` : ''}
                     </div>
                     <div style="padding: 6px;">
                         <div style="font-weight: bold; font-size: 14px; color: var(--email-text); margin-bottom: 4px; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
                             ${item.title}
                         </div>
                         <div style="font-size: 10px; color: var(--email-muted); margin-bottom: 8px; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
-                            ${item.sub ? item.sub + ' • ' : ''}${item.duration ? item.duration + ' • ' : ''}${item.contentRating}
+                            ${[item.sub, item.duration, item.contentRating, item.added ? 'Added ' + item.added : ''].filter(Boolean).join(' • ')}
                         </div>
                         ${item.summary ? `
                             <div style="font-size: 11px; color: var(--email-text); opacity: 0.8; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden;">
@@ -1127,12 +1130,20 @@
             return cardContent;
         }).join('');
         
+        let raTitle;
+        if (recentlyAddedMode === 'days' && maxItems) {
+            const formatMDY = (d) => `${d.getMonth() + 1}/${d.getDate()}/${String(d.getFullYear()).slice(-2)}`;
+            const sinceDate = new Date(Date.now() - maxItems * 864e5);
+            raTitle = (libraryFilter ? `Added to ${libraryFilter}` : 'Recently Added') + ` ${formatMDY(sinceDate)} - ${formatMDY(new Date())}`;
+        } else {
+            raTitle = `Recently Added${libraryFilter ? ` - ${libraryFilter}` : ''}`;
+        }
         return `
             <div class="recently-added">
-                <h2>Recently Added${libraryFilter ? ` - ${libraryFilter}` : ''}</h2>
+                <h2>${raTitle}</h2>
                 <div style="
                     display: grid;
-                    grid-template-columns: repeat(5, 1fr);
+                    grid-template-columns: repeat(${raGridColumns}, minmax(0, 1fr));
                     gap: 12px;
                     margin: 15px auto 0 auto;
                     padding: 0;
@@ -1215,7 +1226,8 @@
             }
             
             const unavailableStyle = isUnavailable ? 'opacity: 0.7; filter: grayscale(30%);' : '';
-            
+            const metaLine = [year, vote, runtime, isUnavailable ? 'Unavailable' : ''].filter(Boolean).join(' • ');
+
             return `
                 <div style="
                     position: relative;
@@ -1232,48 +1244,12 @@
                     <a href="${href}" style="text-decoration: none; color: inherit; display: block;" target="_blank" title="${linkTitle}">
                         <div style="position: relative; aspect-ratio: 2/3; background: #f8f9fa;">
                             <img src="${posterURL}" style="width: 100%; height: 100%; object-fit: cover; display: block;" alt="${titleText}">
-                            
-                            ${(year || vote) ? `
-                                <div style="
-                                    position: absolute;
-                                    top: 1px;
-                                    left: 1px;
-                                    background: rgba(0, 0, 0, 0.7);
-                                    color: white;
-                                    padding: 2px 6px;
-                                    border-radius: 4px;
-                                    font-size: 9px;
-                                    line-height: 1;
-                                ">${year} ${vote}</div>
-                            ` : ''}
-                            
-                            ${isUnavailable ? `
-                                <div style="
-                                    position: absolute;
-                                    top: 16px;
-                                    left: 1px;
-                                    background: rgba(255, 0, 0, 0.8);
-                                    color: white;
-                                    padding: 2px 6px;
-                                    border-radius: 4px;
-                                    font-size: 9px;
-                                    line-height: 1;
-                                ">Unavailable</div>
-                            ` : ''}
-                            
-                            <div style="
-                                position: absolute;
-                                bottom: 0;
-                                left: 0;
-                                right: 0;
-                                padding: 8px;
-                                background: linear-gradient(to top, rgba(0, 0, 0, 0.7), transparent);
-                            ">
-                                <div style="font-weight: bold; font-size: 12px; color: white; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
-                                    ${titleText}
-                                </div>
-                                ${runtime ? `<div style="font-size: 10px; color: rgba(255, 255, 255, 0.8); margin-top: 2px;">${runtime}</div>` : ''}
+                        </div>
+                        <div style="padding: 8px;">
+                            <div style="font-weight: bold; font-size: 12px; color: var(--email-text); line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                                ${titleText}
                             </div>
+                            ${metaLine ? `<div style="font-size: 10px; color: var(--email-muted); margin-top: 2px;">${metaLine}</div>` : ''}
                         </div>
                     </a>
                 </div>
@@ -1285,7 +1261,7 @@
                 <h3 style="color: var(--email-text); margin-bottom: 5px;">${title}</h3>
                 <div style="
                     display: grid;
-                    grid-template-columns: repeat(5, 1fr);
+                    grid-template-columns: repeat(${recsGridColumns}, minmax(0, 1fr));
                     gap: 12px;
                     padding: 0;
                     margin: 0 auto 0 auto;
@@ -1331,8 +1307,9 @@
             }
         }
         
+        let cardHtml;
         if (posterURL) {
-            return `
+            cardHtml = `
                 <table cellpadding="0" cellspacing="0" border="0" style="
                     background-color: ${themeColors.card_bg};
                     border-radius: 12px;
@@ -1340,59 +1317,39 @@
                     margin: 0 auto;
                 ">
                     <tr>
-                        <td style="
-                            background-image: url('${posterURL}');
-                            background-size: cover;
-                            background-position: center;
-                            background-repeat: no-repeat;
-                            height: 180px;
-                            background-color: #f8f9fa;
-                            border-radius: 12px;
-                            position: relative;
-                            vertical-align: top;
-                        ">
-                            <table cellpadding="0" cellspacing="0" border="0" width="100%">
-                                <tr>
-                                    <td style="text-align: right;">
-                                        <div style="
-                                            background-color: rgba(0, 0, 0, 0.8);
-                                            color: white;
-                                            padding: 4px 6px;
-                                            border-radius: 4px;
-                                            font-size: 10px;
-                                            font-family: 'IBM Plex Sans';
-                                            line-height: 1;
-                                            display: inline-block;
-                                            margin: 6px;
-                                        ">
-                                            ${typeIcon} ${count}
-                                        </div>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td style="height: 150px; vertical-align: bottom;">
-                                        <div style="
-                                            background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent);
-                                            border-radius: 0 0 11px 11px;
-                                            padding: 6px;
-                                        ">
-                                            <div style="
-                                                font-weight: bold;
-                                                font-size: 12px;
-                                                color: white;
-                                                line-height: 1.2;
-                                                font-family: 'IBM Plex Sans';
-                                            ">${collectionTitle}</div>
-                                        </div>
-                                    </td>
-                                </tr>
-                            </table>
+                        <td style="padding: 0; line-height: 0; font-size: 0;">
+                            <img src="${posterURL}" alt="${collectionTitle}" width="120" height="180" style="
+                                display: block;
+                                width: 120px;
+                                height: 180px;
+                                object-fit: cover;
+                                border-radius: 12px 12px 0 0;
+                                background-color: #f8f9fa;
+                            ">
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 6px;">
+                            <div style="
+                                font-weight: bold;
+                                font-size: 12px;
+                                color: ${themeColors.text};
+                                line-height: 1.2;
+                                font-family: 'IBM Plex Sans';
+                            ">${collectionTitle}</div>
+                            <div style="
+                                font-size: 10px;
+                                color: ${themeColors.muted_text};
+                                line-height: 1.2;
+                                font-family: 'IBM Plex Sans';
+                                margin-top: 2px;
+                            ">${typeIcon} ${count} items</div>
                         </td>
                     </tr>
                 </table>
             `;
         } else {
-            return `
+            cardHtml = `
                 <table cellpadding="0" cellspacing="0" border="0" style="
                     background-color: ${themeColors.card_bg};
                     border-radius: 12px;
@@ -1425,6 +1382,11 @@
                 </table>
             `;
         }
+
+        if (collection.plex_url) {
+            return `<a href="${collection.plex_url}" style="text-decoration: none; color: inherit; display: block;" target="_blank">${cardHtml}</a>`;
+        }
+        return cardHtml;
     }
 
     function buildIndividualItemCardForSchedule(item, themeColors) {
@@ -1491,8 +1453,9 @@
             }
         }
         
+        let cardHtml;
         if (posterURL) {
-            return `
+            cardHtml = `
             <table cellpadding="0" cellspacing="0" border="0" style="
                 background-color: ${themeColors.card_bg};
                 border-radius: 12px;
@@ -1500,68 +1463,39 @@
                 margin: 0 auto;
             ">
                 <tr>
-                    <td style="
-                        background-image: url('${posterURL}');
-                        background-size: cover;
-                        background-position: center;
-                        background-repeat: no-repeat;
-                        height: 180px;
-                        background-color: #f8f9fa;
-                        border-radius: 12px;
-                        position: relative;
-                        vertical-align: top;
-                    ">
-                        <table cellpadding="0" cellspacing="0" border="0" width="100%">
-                            <tr>
-                                <td style="text-align: right;">
-                                    <div style="
-                                        background-color: rgba(0, 0, 0, 0.8);
-                                        color: white;
-                                        padding: 4px 6px;
-                                        border-radius: 4px;
-                                        font-size: 10px;
-                                        font-family: 'IBM Plex Sans';
-                                        line-height: 1;
-                                        display: inline-block;
-                                        margin: 6px;
-                                    ">
-                                        ${typeIcon}
-                                    </div>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td style="height: 150px; vertical-align: bottom;">
-                                    <div style="
-                                        background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent);
-                                        border-radius: 0 0 11px 11px;
-                                        padding: 6px;
-                                    ">
-                                        <div style="
-                                            font-weight: bold;
-                                            font-size: 12px;
-                                            color: white;
-                                            line-height: 1.2;
-                                            font-family: 'IBM Plex Sans';
-                                        ">${displayTitle}</div>
-                                        ${subtitle ? `
-                                            <div style="
-                                                font-size: 9px;
-                                                color: #ccc;
-                                                line-height: 1.2;
-                                                font-family: 'IBM Plex Sans';
-                                                margin-top: 2px;
-                                            ">${subtitle}</div>
-                                        ` : ''}
-                                    </div>
-                                </td>
-                            </tr>
-                        </table>
+                    <td style="padding: 0; line-height: 0; font-size: 0;">
+                        <img src="${posterURL}" alt="${displayTitle}" width="120" height="180" style="
+                            display: block;
+                            width: 120px;
+                            height: 180px;
+                            object-fit: cover;
+                            border-radius: 12px 12px 0 0;
+                            background-color: #f8f9fa;
+                        ">
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding: 6px;">
+                        <div style="
+                            font-weight: bold;
+                            font-size: 12px;
+                            color: ${themeColors.text};
+                            line-height: 1.2;
+                            font-family: 'IBM Plex Sans';
+                        ">${displayTitle}</div>
+                        <div style="
+                            font-size: 9px;
+                            color: ${themeColors.muted_text};
+                            line-height: 1.2;
+                            font-family: 'IBM Plex Sans';
+                            margin-top: 2px;
+                        ">${subtitle ? typeIcon + ' ' + subtitle : typeIcon}</div>
                     </td>
                 </tr>
             </table>
             `;
         } else {
-            return `
+            cardHtml = `
             <table cellpadding="0" cellspacing="0" border="0" style="
                 background-color: ${themeColors.card_bg};
                 border-radius: 12px;
@@ -1601,6 +1535,11 @@
             </table>
             `;
         }
+
+        if (item.plex_url) {
+            return `<a href="${item.plex_url}" style="text-decoration: none; color: inherit; display: block;" target="_blank">${cardHtml}</a>`;
+        }
+        return cardHtml;
     }
 
     function buildCollectionPreviewHTMLForEmail(title, collections, groupIndex = 0) {
@@ -1749,14 +1688,17 @@
         const logoFilename = "{{ settings.logo_filename }}";
         const logoWidth = "{{ settings.logo_width }}";
         const customLogoFilename = "{{ settings.custom_logo_filename }}"
+        const logoPosition = "{{ settings.get('logo_position', 'center') }}";
         const themedCSS = getThemedEmailCSS();
 
         let logoHTML = "";
         if (logoFilename && logoWidth) {
+            const _ml = logoPosition === 'left' ? '0' : 'auto';
+            const _mr = logoPosition === 'right' ? '0' : 'auto';
             if (logoFilename == 'custom') {
-                logoHTML = `<img src="/static/uploads/logos/${customLogoFilename}" alt="${serverName}" class="email-logo" style="max-width: ${logoWidth}px; width: auto; height: auto;">`;
+                logoHTML = `<img src="/static/uploads/logos/${customLogoFilename}" alt="${serverName}" class="email-logo" style="max-width: ${logoWidth}px; width: auto; height: auto; display: block; margin-left: ${_ml}; margin-right: ${_mr};">`;
             } else {
-                logoHTML = `<img src="/static/img/${logoFilename}" alt="${serverName}" class="email-logo" style="max-width: ${logoWidth}px; width: auto; height: auto;">`;
+                logoHTML = `<img src="/static/img/${logoFilename}" alt="${serverName}" class="email-logo" style="max-width: ${logoWidth}px; width: auto; height: auto; display: block; margin-left: ${_ml}; margin-right: ${_mr};">`;
             }
         }
         

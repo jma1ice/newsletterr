@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <title>unsubscribe</title>
+        {% include 'partials/_head_min.html' %}
+    </head>
+    <body class="auth-body">
+        <div class="auth-card text-center">
+            <img src="/static/img/Asset_94x.png" alt="newsletterr" class="auth-logo-img" />
+
+            {% if state == 'invalid' %}
+                <h5 class="auth-title">Link not recognized</h5>
+                <p class="auth-sub">This unsubscribe link is invalid or has already been used.</p>
+            {% elif state == 'confirm' %}
+                <h5 class="auth-title">Unsubscribe {{ email }}?</h5>
+                <p class="auth-sub mb-4">You'll stop receiving newsletter emails at this address.</p>
+                <form method="POST">
+                    <button type="submit" class="nl-btn nl-btn--primary">Unsubscribe</button>
+                </form>
+            {% elif state == 'done' %}
+                <h5 class="auth-title">You're unsubscribed</h5>
+                <p class="auth-sub">{{ email }} won't receive newsletter emails anymore.</p>
+            {% endif %}
+        </div>
+    </body>
+</html>

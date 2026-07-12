@@ -1,66 +1,106 @@
 {% extends "base.html" %}
 {% block title %}email history{% endblock %}
-
+{% block page_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/history.css') }}">{% endblock %}
+{% block page_header %}
+<header class="page-header">
+    <h1>email history</h1>
+    {% if emails %}
+    <div class="page-actions">
+        <form method="POST" action="/email_history/clear" id="clear-history-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+            <button type="submit" class="btn btn-danger">Clear History</button>
+        </form>
+    </div>
+    {% endif %}
+</header>
+{% endblock %}
 {% block content %}
-    <div class="container-fluid">
-        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
-            <div>
-                <h1 class="mb-1">email history</h1>
-                <p class="text-info mb-0">View all sent emails and their recipients</p>
-            </div>
-            {% if emails %}
-                <form method="POST" action="/email_history/clear" onsubmit="return confirm('Are you sure you want to permanently delete all email history entries? This cannot be undone.');">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token }} " />
-                    <button type="submit" class="btn btn-danger">
-                        🗑️ Clear History
-                    </button>
-                </form>
-            {% endif %}
-        </div>
+    <div class="container-fluid history-page">
+        {% include 'partials/_sends_tabs.html' %}
+        <p class="text-muted mb-3">View all sent emails and their recipients.</p>
 
         {% if emails %}
             <div class="table-responsive">
                 <table class="table table-striped table-hover">
                     <thead class="table-dark">
                         <tr>
+                            <th>Status</th>
                             <th>Subject</th>
                             <th>Date & Time Sent</th>
                             <th>Template</th>
                             <th>Size (KB)</th>
                             <th>Recipients</th>
                             <th>View Recipients</th>
+                            <th>Resend</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for email in emails %}
                             <tr>
-                                <td><strong>{{ email.subject }}</strong></td>
+                                <td>
+                                    {% if email.status == 'failed' %}
+                                        <span class="badge bg-danger" title="{{ email.error or 'Send failed' }}">Failed</span>
+                                    {% else %}
+                                        <span class="badge bg-success">Sent</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <strong>{{ email.subject }}</strong>
+                                    {% if email.status == 'failed' and email.error %}
+                                        <div class="small text-danger">{{ email.error }}</div>
+                                    {% endif %}
+                                </td>
                                 <td><span class="text-muted">{{ email.sent_at }}</span></td>
                                 <td><span class="badge bg-secondary">{{ email.template_name }}</span></td>
                                 <td>
-                                    <span class="badge bg-info">{{ "%.2f"|format(email.content_size_kb) }} KB</span>
+                                    <span class="badge bg-info">{{ "%.2f"|format(email.content_size_kb or 0) }} KB</span>
                                 </td>
                                 <td>
                                     <span class="badge bg-primary">{{ email.recipient_count }} recipient{{ 's' if email.recipient_count != 1 else '' }}</span>
                                 </td>
                                 <td>
-                                    <button class="btn btn-secondary btn-sm view-recipients-btn" 
-                                            data-email-id="{{ email.id }}" 
+                                    <button class="btn btn-secondary btn-sm view-recipients-btn"
+                                            data-email-id="{{ email.id }}"
                                             data-subject="{{ email.subject }}">
                                         👥 Recipients
                                     </button>
+                                </td>
+                                <td>
+                                    {% if email.status != 'failed' %}
+                                        <button class="btn btn-outline-secondary btn-sm resend-btn"
+                                                data-email-id="{{ email.id }}"
+                                                data-subject="{{ email.subject }}"
+                                                data-recipient-count="{{ email.recipient_count }}">
+                                            🔁 Resend
+                                        </button>
+                                    {% else %}
+                                        <span class="text-muted small">n/a</span>
+                                    {% endif %}
                                 </td>
                             </tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
+
+            {% if total_pages > 1 %}
+                <nav class="d-flex justify-content-between align-items-center mt-2">
+                    <span class="text-muted small">{{ total }} total, page {{ page }} of {{ total_pages }}</span>
+                    <div class="btn-group">
+                        {% if page > 1 %}
+                            <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('emails.email_history', page=page-1) }}">Previous</a>
+                        {% endif %}
+                        {% if page < total_pages %}
+                            <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('emails.email_history', page=page+1) }}">Next</a>
+                        {% endif %}
+                    </div>
+                </nav>
+            {% endif %}
         {% else %}
-            <div class="alert alert-info" role="alert">
-                <h4 class="alert-heading">No Email History</h4>
+            <div class="nl-alert nl-alert--info" role="alert">
+                <h4 class="mb-2">No Email History</h4>
                 <p>No emails have been sent yet. Email history will appear here after you send your first newsletter.</p>
-                <hr>
-                <p class="mb-0"><a href="{{ url_for('index') }}" class="button">Send Your First Newsletter</a></p>
+                <p class="mb-0 mt-3"><a href="{{ url_for('main.index') }}" class="nl-btn nl-btn--primary">Send Your First Newsletter</a></p>
             </div>
         {% endif %}
     </div>
@@ -83,8 +123,17 @@
         </div>
     </div>
 
-    <script>
+    <script nonce="{{ nonce }}">
         document.addEventListener('DOMContentLoaded', function() {
+            const clearForm = document.getElementById('clear-history-form');
+            if (clearForm) {
+                clearForm.addEventListener('submit', (e) => {
+                    if (!confirm('Are you sure you want to permanently delete all email history entries? This cannot be undone.')) {
+                        e.preventDefault();
+                    }
+                });
+            }
+
             const recipientsButtons = document.querySelectorAll('.view-recipients-btn');
             
             recipientsButtons.forEach(button => {
@@ -120,11 +169,52 @@
                             recipientsList.appendChild(col);
                         });
                         
-                        const modal = new bootstrap.Modal(document.getElementById('recipientsModal'));
-                        modal.show();
+                        window.NLModal.show('recipientsModal');
                         
                     } catch (error) {
                         alert('Error loading recipients: ' + error.message);
+                    }
+                });
+            });
+
+            const resendButtons = document.querySelectorAll('.resend-btn');
+
+            resendButtons.forEach(button => {
+                button.addEventListener('click', async function() {
+                    const emailId = this.dataset.emailId;
+                    const subject = this.dataset.subject;
+                    const recipientCount = this.dataset.recipientCount;
+
+                    if (!confirm(`Resend "${subject}" to ${recipientCount} recipient${recipientCount != 1 ? 's' : ''}? This sends the email again right now.`)) {
+                        return;
+                    }
+
+                    const originalText = this.textContent;
+                    this.disabled = true;
+                    this.textContent = 'Sending…';
+
+                    try {
+                        const response = await fetch(`/email_history/${emailId}/resend`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-Token': '{{ csrf_token }}',
+                            },
+                            credentials: 'same-origin'
+                        });
+                        const data = await response.json();
+
+                        if (data.status === 'ok') {
+                            alert('Resent successfully.');
+                            location.reload();
+                        } else {
+                            alert('Resend failed: ' + data.message);
+                        }
+                    } catch (error) {
+                        alert('Resend failed: ' + error.message);
+                    } finally {
+                        this.disabled = false;
+                        this.textContent = originalText;
                     }
                 });
             });

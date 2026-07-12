@@ -1,93 +1,17 @@
 <!DOCTYPE html>
 <html lang="en">
     <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>setup</title>
-        <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
-        <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-        <style>
-            body {
-                background: linear-gradient(160deg, #8acbd4 0%, #62a1a4 100%);
-                min-height: 100vh;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                padding: 2rem 1rem;
-            }
-            .login-card {
-                background: rgba(255, 255, 255, 0.95);
-                border-radius: 15px;
-                padding: 2rem;
-                box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
-                width: 100%;
-                max-width: 480px;
-            }
-            .logo {
-                text-align: center;
-                margin-bottom: 10px;
-            }
-            .logo-png {
-                height: 75px;
-                margin: 0 0 18px 0;
-            }
-            .form-control {
-                border-radius: 10px;
-                border: 1px solid #ddd;
-                padding: 0.75rem;
-            }
-            .btn-login {
-                background: linear-gradient(160deg, #8acbd4 0%, #62a1a4 100%);
-                border: none;
-                border-radius: 10px;
-                padding: 0.75rem;
-                font-weight: 600;
-                text-transform: uppercase;
-                letter-spacing: 1px;
-            }
-            .alert {
-                border-radius: 10px;
-            }
-            .step-dots {
-                display: flex;
-                justify-content: center;
-                gap: 8px;
-                margin-top: 1.5rem;
-            }
-            .step-dot {
-                width: 8px;
-                height: 8px;
-                border-radius: 50%;
-                background: #ddd;
-            }
-            .step-dot.active {
-                background: #62a1a4;
-            }
-            .step-title {
-                text-align: center;
-                margin-bottom: 1.25rem;
-            }
-            .step-subtitle {
-                text-align: center;
-                color: #666;
-                font-size: 0.9rem;
-                margin-bottom: 1.25rem;
-            }
-            .test-result {
-                font-size: 0.85rem;
-                margin-top: 0.5rem;
-                display: block;
-            }
-        </style>
+        {% include 'partials/_head_min.html' %}
     </head>
-    <body>
+    <body class="auth-body">
         <div id="spinner" class="spinner" style="display: none;">
             <img src="/static/img/load.gif" alt="Loading..." />
             <p id="loading-text"></p>
         </div>
-        <div class="login-card">
-            <div class="logo">
-                <img src="/static/img/Asset_94x.png" alt="Logo" class="logo-png" />
+        <div class="auth-card">
+            <div class="auth-logo">
+                <img src="/static/img/Asset_94x.png" alt="newsletterr" class="auth-logo-img" />
             </div>
 
             {% if error %}
@@ -134,12 +58,12 @@
                         <label for="smtp_server" class="form-label">SMTP Server</label>
                         <input type="text" class="form-control" id="smtp_server" name="smtp_server" value="{{ settings.smtp_server or '' }}" placeholder="e.g. smtp.gmail.com" required>
                     </div>
-                    <div class="row">
-                        <div class="col-6 mb-3">
+                    <div class="d-flex gap-2">
+                        <div class="mb-3 flex-1">
                             <label for="smtp_port" class="form-label">Port</label>
                             <input type="number" class="form-control" id="smtp_port" name="smtp_port" value="{{ settings.smtp_port or 587 }}">
                         </div>
-                        <div class="col-6 mb-3">
+                        <div class="mb-3 flex-1">
                             <label for="smtp_protocol" class="form-label">Protocol</label>
                             <select class="form-control" id="smtp_protocol" name="smtp_protocol">
                                 <option value="TLS" {% if settings.smtp_protocol != 'SSL' %}selected{% endif %}>TLS</option>
@@ -164,7 +88,7 @@
 
                 <div class="text-center mb-3">
                     <button id="connect_plex" type="button" class="btn btn-primary btn-login">Connect Plex</button>
-                    <div id="plex_status" class="mt-2">{% if settings.plex_token %}<p style="color: #01b301;">Connected</p>{% endif %}</div>
+                    <div id="plex_status" class="mt-2">{% if settings.plex_token %}<p class="plex-connected">Connected</p>{% endif %}</div>
                 </div>
 
                 <form method="POST">
@@ -294,7 +218,6 @@
             </div>
         </div>
 
-        <script src="{{ url_for('static', filename='js/vendor/bootstrap.bundle.min.js') }}" nonce="{{ nonce }}"></script>
         <script nonce="{{ nonce }}">
             function showSpinner(passedText) {
                 document.getElementById('spinner').style.display = 'flex';

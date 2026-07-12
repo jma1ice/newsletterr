@@ -1,3 +1,4 @@
+{% from '_icons.html' import icon %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -7,30 +8,25 @@
             const dark = pref ? (pref === 'dark') :
             window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
             document.documentElement.classList.toggle('dark', dark);
+            if (localStorage.getItem('sidebar') === 'collapsed') {
+                document.documentElement.classList.add('sidebar-collapsed');
+            }
         } catch (_) {}
     </script>
     <meta charset="UTF-8" name="viewport" content="width=device-width, initial-scale=1">
     <link rel="icon" type="image/x-icon" href="/static/img/favicon.ico">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css?family=IBM+Plex+Sans:400,700&display=swap" rel="stylesheet">
-    <link href="{{ url_for('static', filename='css/tailwind.min.css') }}" rel="stylesheet">
-    <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
-    <script src="{{ url_for('static', filename='js/vendor/bootstrap.bundle.min.js') }}" nonce="{{ nonce }}"></script>
+    <link href="{{ url_for('static', filename='css/ui/tokens.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/ui/compat.css') }}" rel="stylesheet">
     <script src="{{ url_for('static', filename='js/vendor/html2canvas.min.js') }}" nonce="{{ nonce }}"></script>
     <script src="{{ url_for('static', filename='js/vendor/highcharts.js') }}" nonce="{{ nonce }}"></script>
     <script src="{{ url_for('static', filename='js/vendor/highcharts-exporting.js') }}" nonce="{{ nonce }}"></script>
     <script src="{{ url_for('static', filename='js/vendor/highcharts-offline-exporting.js') }}" nonce="{{ nonce }}"></script>
     <script type="module" src="{{ url_for('static', filename='js/vendor/emoji-picker-element.js') }}" nonce="{{ nonce }}"></script>
-    <!-- Tailwind Play CDN - downloaded [03.15.26], re-run: curl -L -o static/js/vendor/tailwind-play-cdn.js https://cdn.tailwindcss.com -->
-    <script src="{{ url_for('static', filename='js/vendor/tailwind-play-cdn.js') }}" nonce="{{ nonce }}"></script>
-    <script nonce="{{ nonce }}">
-        tailwind.config = {
-            darkMode: 'class',
-            corePlugins: { preflight: false }
-        };
-    </script>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/ui/base.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/ui/utilities.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/ui/components.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/ui/layout.css') }}">
+    {% block page_css %}{% endblock %}
     <meta name="color-scheme" content="light dark">
     <title>{% block title %}newsletterr{% endblock %}</title>
 </head>
@@ -39,65 +35,82 @@
         <img src="/static/img/load.gif" alt="Loading..." />
         <p id="loading-text"></p>
     </div>
-    <nav class="navbar">
-        <ul id="navLinks">
-            <li><a href="{{ url_for('main.index') }}" class="hover:underline">newsletterr</a></li>
-            <li><a href="{{ url_for('emails.email_history') }}" class="hover:underline">email history</a></li>
-            <li><a href="{{ url_for('scheduling.scheduling') }}" class="hover:underline">scheduling</a></li>
-            <li><a href="{{ url_for('settings.settings') }}" class="hover:underline">settings</a></li>
-            <li><a href="{{ url_for('main.about') }}" class="hover:underline">about</a></li>
-            {% if session["username"] %}
-                <li><a href="{{ url_for('auth.logout') }}" class="hover:underline">logout</a></li>
-            {% endif %}
-            <li id="cache-li" style="margin-left: 20px;">
+    <div class="app-shell">
+        <aside id="app-sidebar">
+            <a class="sidebar-brand" href="{{ url_for('main.index') }}">
+                <img class="brand-full" src="/static/img/Asset_94x.png" alt="newsletterr logo" />
+                <img class="brand-mark" src="/static/img/Asset_54x.png" alt="newsletterr logo" />
+            </a>
+            <ul id="navLinks">
+                <li><a href="{{ url_for('main.index') }}"{% if request.endpoint == 'main.index' %} class="is-active"{% endif %}>{{ icon('home') }}<span class="nav-label">build newsletter</span></a></li>
+                <li><a href="{{ url_for('scheduling.scheduling') }}"{% if request.endpoint in ['scheduling.scheduling', 'emails.email_history'] %} class="is-active"{% endif %}>{{ icon('clock') }}<span class="nav-label">sends</span></a></li>
+                <li class="nav-group-gap"><a href="{{ url_for('settings.settings') }}"{% if request.endpoint == 'settings.settings' %} class="is-active"{% endif %}>{{ icon('settings') }}<span class="nav-label">settings</span></a></li>
+                <li><a href="{{ url_for('main.about') }}"{% if request.endpoint == 'main.about' %} class="is-active"{% endif %}>{{ icon('info') }}<span class="nav-label">about</span></a></li>
+                {% if session["username"] %}
+                <li><a href="{{ url_for('auth.logout') }}">{{ icon('log-out') }}<span class="nav-label">logout</span></a></li>
+                {% endif %}
+            </ul>
+            <div class="sidebar-foot">
                 {% set cache_status = get_cache_status() %}
-                <span class="cache-badge-base {{ cache_status.class }}" 
+                <span class="sidebar-cache cache-badge-base {{ cache_status.class }}"
                       title="{{ cache_status.status }}\nPresent: {{ cache_status.present|join(', ') if cache_status.present else 'none' }}\nMissing: {{ cache_status.missing|join(', ') if cache_status.missing else 'none' }}">
                     <strong id="cache-badge">Cache:
-                        {% if cache_status.has_data %}
-                            {{ cache_status.age_display }}
-                        {% else %}
-                            none
-                        {% endif %}
+                        {% if cache_status.has_data %}{{ cache_status.age_display }}{% else %}none{% endif %}
                     </strong>
                 </span>
-            </li>
-        </ul>
-        {% if update_info.is_newer %}
-            <div style="
-                position: sticky; top: 0; z-index: 1000;
-                background: #fff3cd; color: #664d03; border: 1px solid #ffecb5;
-                padding: 10px 14px; font-size: 14px;">
-                A new version {{ update_info.latest }} is available.
+                <div class="sidebar-foot-row">
+                    <button id="theme-toggle" type="button" role="switch" aria-checked="false" aria-label="Toggle dark mode" class="nl-theme-toggle">
+                        <svg class="tt-icon tt-sun" viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true">
+                            <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.5">
+                                <path d="M8 1.11133V2.00022"></path>
+                                <path d="M12.8711 3.12891L12.2427 3.75735"></path>
+                                <path d="M14.8889 8H14"></path>
+                                <path d="M12.8711 12.8711L12.2427 12.2427"></path>
+                                <path d="M8 14.8889V14"></path>
+                                <path d="M3.12891 12.8711L3.75735 12.2427"></path>
+                                <path d="M1.11133 8H2.00022"></path>
+                                <path d="M3.12891 3.12891L3.75735 3.75735"></path>
+                                <path d="M8.00043 11.7782C10.0868 11.7782 11.7782 10.0868 11.7782 8.00043C11.7782 5.91402 10.0868 4.22266 8.00043 4.22266C5.91402 4.22266 4.22266 5.91402 4.22266 8.00043C4.22266 10.0868 5.91402 11.7782 8.00043 11.7782Z" stroke-width="1"></path>
+                            </g>
+                        </svg>
+                        <svg class="tt-icon tt-moon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                            <path d="M21 12.79A9 9 0 1111.21 3a7 7 0 109.79 9.79z"/>
+                        </svg>
+                        <span class="tt-thumb"></span>
+                    </button>
+                    <button id="sidebar-toggle" type="button" class="sidebar-collapse-btn" aria-label="Collapse sidebar" aria-expanded="true">
+                        {{ icon('chevron-left') }}
+                    </button>
+                </div>
+            </div>
+        </aside>
+        <div class="app-main">
+            {% if update_info.is_newer %}
+            <div class="nl-banner">
+                <span>A new version {{ update_info.latest }} is available.</span>
                 <a href="{{ update_info.release_url }}" target="_blank" rel="noopener">See release notes</a>
             </div>
-        {% endif %}
-        <div id="nav-right" style="display: flex;">
-            <button id="theme-toggle" type="button" role="switch" aria-checked="false" aria-label="Toggle dark mode" class="relative inline-flex h-8 w-16 items-center rounded-full bg-gray-200 dark:bg-gray-700 transition-colors focus:outline-none transform -translate-x-2 translate-y-2.5">
-                <span class="pointer-events-none absolute inset-0 z-20 flex items-center justify-between px-1">
-                    <svg class="h-5 w-5 text-amber-400 transition-opacity duration-100 ease-in-out dark:!opacity-0 transform translate-x-1 translate-y-0.5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                        <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.5">
-                            <path d="M8 1.11133V2.00022" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path>
-                            <path d="M12.8711 3.12891L12.2427 3.75735" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path>
-                            <path d="M14.8889 8H14" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path>
-                            <path d="M12.8711 12.8711L12.2427 12.2427" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path>
-                            <path d="M8 14.8889V14" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path>
-                            <path d="M3.12891 12.8711L3.75735 12.2427" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path>
-                            <path d="M1.11133 8H2.00022" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path>
-                            <path d="M3.12891 3.12891L3.75735 3.75735" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path>
-                            <path d="M8.00043 11.7782C10.0868 11.7782 11.7782 10.0868 11.7782 8.00043C11.7782 5.91402 10.0868 4.22266 8.00043 4.22266C5.91402 4.22266 4.22266 5.91402 4.22266 8.00043C4.22266 10.0868 5.91402 11.7782 8.00043 11.7782Z" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"></path>
-                        </g>
-                    </svg>
-                    <svg class="h-5 w-5 text-blue-100 transition-opacity duration-100 ease-in-out opacity-0 dark:!opacity-100 transform -translate-x-1.5 translate-y-0" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                        <path d="M21 12.79A9 9 0 1111.21 3a7 7 0 109.79 9.79z"/>
-                    </svg>
-                </span>
-                <span class="absolute z-10 inline-block h-6 w-6 rounded-full bg-white shadow transform transition will-change-transform translate-x-1 dark:translate-x-8"></span>
-            </button>
-            <img src="/static/img/Asset_94x.png" alt="Logo" class="logo" />
+            {% endif %}
+            <div class="mobile-topbar">
+                <button id="mobile-menu-btn" type="button" aria-label="Open menu" aria-expanded="false">{{ icon('menu') }}</button>
+                <span class="mobile-topbar-brand">newsletterr</span>
+            </div>
+            {# Pages opt into a header (title + actions) by overriding page_header.
+               Pages not yet restyled render no header, avoiding an empty bar. #}
+            {% block page_header %}{% endblock %}
+            <main>{% block content %}{% endblock %}</main>
+            <footer class="site-foot-flow">
+                <span class="foot-left">Newsletterr © 2026. <a target="_blank" href="https://discord.gg/7Skcsqs4uT">Join the discussion on Discord!</a></span>
+                <a class="foot-mid" target="_blank" href="https://ko-fi.com/newsletterr">
+                    <img src="{{ url_for('static', filename='img/kofi.png') }}" alt="Ko-fi"><span>Tip the devs</span>
+                </a>
+                <a class="foot-right" target="_blank" href="https://github.com/jma1ice/newsletterr">
+                    <span>{{ version }}</span><img src="{{ url_for('static', filename='img/github.png') }}" alt="GitHub">
+                </a>
+            </footer>
         </div>
-    </nav>
-    {% block content %}{% endblock %}
+        <div class="sidebar-scrim"></div>
+    </div>
     <script nonce="{{ nonce }}">
         function showSpinner(passedText) {
             document.getElementById('spinner').style.display = 'flex';
@@ -109,12 +122,6 @@
         }
     </script>
     <script nonce="{{ nonce }}">
-        (function initTheme() {
-            const saved = localStorage.getItem('theme');
-            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-            document.documentElement.classList.toggle('dark', saved ? saved === 'dark' : prefersDark);
-        })();
-
         const btn = document.getElementById('theme-toggle');
         function syncAria() {
             btn?.setAttribute('aria-checked', document.documentElement.classList.contains('dark'));
@@ -126,25 +133,10 @@
             const isDark = root.classList.toggle('dark');
             localStorage.setItem('theme', isDark ? 'dark' : 'light');
             syncAria();
-            updatePreview();
+            if (typeof updatePreview === 'function') updatePreview();
         });
     </script>
+    <script src="{{ url_for('static', filename='js/app/25-shell.js') }}" nonce="{{ nonce }}"></script>
+    <script src="{{ url_for('static', filename='js/app/26-modals.js') }}" nonce="{{ nonce }}"></script>
 </body>
-<footer class="site-foot">
-    <p class="left-foot">
-        Newsletterr © 2026. <a target="_blank" href="https://discord.gg/7Skcsqs4uT">Join the discussion on Discord!</a>
-    </p>
-    <p class="middle-foot">
-        <a target="_blank" href="https://ko-fi.com/newsletterr" style="display: inline-flex; align-items: center; text-decoration: none;">
-            <img src="{{ url_for('static', filename='img/kofi.png') }}" alt="Ko-fi" style="height: 22px; margin-right: 6px;">
-            <span>Tip the devs</span>
-        </a>
-    </p>
-    <p class="right-foot">
-        <a target="_blank" href="https://github.com/jma1ice/newsletterr" style="display: inline-flex; align-items: center; text-decoration: none;">
-            <span>{{ version }}</span>
-            <img src="{{ url_for('static', filename='img/github.png') }}" alt="GitHub" style="height: 22px; margin-left: 6px;">
-        </a>
-    </p>
-</footer>
 </html>

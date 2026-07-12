@@ -1,19 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
-    const bccHeader = document.querySelector('[onclick*="bcc-collapse"]');
-    if (bccHeader) {
-        bccHeader.addEventListener('click', () => {
-            const icon = document.getElementById('bcc-toggle-icon');
-            const collapse = document.getElementById('bcc-collapse');
-            if (collapse.classList.contains('d-none')) {
-                icon.style.transform = 'rotate(0deg)';
-                icon.textContent = '▼';
-            } else {
-                icon.style.transform = 'rotate(-90deg)';
-                icon.textContent = '▶';
-            }
-        });
-    }
-    
+    // The BCC collapse toggle is handled in 21-ui-toggles.js via #bcc-card-header.
+    // This just sets the default-collapsed state on load.
     document.getElementById('bcc-collapse').classList.add('d-none');
     document.getElementById('bcc-toggle-icon').style.transform = 'rotate(-90deg)';
     document.getElementById('bcc-toggle-icon').textContent = '▶';
@@ -119,8 +106,8 @@ document.getElementById('reset-template-btn').addEventListener('click', function
         
         document.querySelectorAll('.add-stat-btn, .add-graph-btn, .ra-add-btn, .recs-add-btn, .droppedneedle-add-btn, .droppedneedle-server-add-btn, .yearly-wrapped-add-btn, .sonarr-coming-soon-add-btn, .radarr-coming-soon-add-btn').forEach(btn => {
             btn.textContent = 'Add';
-            btn.classList.remove('btn-success');
-            btn.classList.add('button');
+            btn.classList.remove('nl-btn--success');
+            btn.classList.add('nl-btn--primary');
             btn.disabled = false;
         });
         const editor = document.getElementById('custom-html-editor');
@@ -212,8 +199,8 @@ function loadTemplate(template) {
         
         document.querySelectorAll('.add-stat-btn, .add-graph-btn, .ra-add-btn, .recs-add-btn, .droppedneedle-add-btn, .droppedneedle-server-add-btn, .yearly-wrapped-add-btn, .sonarr-coming-soon-add-btn, .radarr-coming-soon-add-btn').forEach(btn => {
             btn.textContent = 'Add';
-            btn.classList.remove('btn-success');
-            btn.classList.add('button');
+            btn.classList.remove('nl-btn--success');
+            btn.classList.add('nl-btn--primary');
             btn.disabled = false;
         });
         
@@ -300,8 +287,8 @@ function loadTemplate(template) {
             const button = document.querySelector(`[data-id="${item.id}"]`);
             if (button) {
                 button.textContent = 'Added';
-                button.classList.remove('button');
-                button.classList.add('btn-success');
+                button.classList.remove('nl-btn--primary');
+                button.classList.add('nl-btn--success');
                 button.disabled = true;
             }
         });

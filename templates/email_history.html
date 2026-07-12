@@ -1,22 +1,23 @@
 {% extends "base.html" %}
 {% block title %}email history{% endblock %}
-
+{% block page_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/history.css') }}">{% endblock %}
+{% block page_header %}
+<header class="page-header">
+    <h1>email history</h1>
+    {% if emails %}
+    <div class="page-actions">
+        <form method="POST" action="/email_history/clear" id="clear-history-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+            <button type="submit" class="btn btn-danger">Clear History</button>
+        </form>
+    </div>
+    {% endif %}
+</header>
+{% endblock %}
 {% block content %}
-    <div class="container-fluid">
-        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
-            <div>
-                <h1 class="mb-1">email history</h1>
-                <p class="text-info mb-0">View all sent emails and their recipients</p>
-            </div>
-            {% if emails %}
-                <form method="POST" action="/email_history/clear" id="clear-history-form">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
-                    <button type="submit" class="btn btn-danger">
-                        🗑️ Clear History
-                    </button>
-                </form>
-            {% endif %}
-        </div>
+    <div class="container-fluid history-page">
+        {% include 'partials/_sends_tabs.html' %}
+        <p class="text-muted mb-3">View all sent emails and their recipients.</p>
 
         {% if emails %}
             <div class="table-responsive">
@@ -96,11 +97,10 @@
                 </nav>
             {% endif %}
         {% else %}
-            <div class="alert alert-info" role="alert">
-                <h4 class="alert-heading">No Email History</h4>
+            <div class="nl-alert nl-alert--info" role="alert">
+                <h4 class="mb-2">No Email History</h4>
                 <p>No emails have been sent yet. Email history will appear here after you send your first newsletter.</p>
-                <hr>
-                <p class="mb-0"><a href="{{ url_for('main.index') }}" class="button">Send Your First Newsletter</a></p>
+                <p class="mb-0 mt-3"><a href="{{ url_for('main.index') }}" class="nl-btn nl-btn--primary">Send Your First Newsletter</a></p>
             </div>
         {% endif %}
     </div>
@@ -169,8 +169,7 @@
                             recipientsList.appendChild(col);
                         });
                         
-                        const modal = new bootstrap.Modal(document.getElementById('recipientsModal'));
-                        modal.show();
+                        window.NLModal.show('recipientsModal');
                         
                     } catch (error) {
                         alert('Error loading recipients: ' + error.message);

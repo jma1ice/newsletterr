@@ -1,34 +1,51 @@
+                        <h3 class="rail-heading">Pull data</h3>
                         <form method="POST" id="stats_form">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
                             <label for="items_to_pull" id="items_to_pull_label">Recently Added Items {% if settings.get('recently_added_mode') == 'days' %}(days){% else %}(items){% endif %}:</label>
-                            <input type="number" id="items_to_pull" name="items_to_pull" value="10" style="width: 8.5rem; margin-bottom: 8px;" /><br>
+                            <input type="number" id="items_to_pull" name="items_to_pull" value="10" /><br>
                             <label for="days_to_pull">Time Range (days):</label>
                             <input type="number" id="days_to_pull" name="days_to_pull" value="30" /><br>
-                            <div class="quick-range-buttons d-flex flex-nowrap overflow-auto gap-2" style="padding-bottom: 5px;">
-                                <button id="time_range_week" type="button" class="button">7</button>
-                                <button id="time_range_month" type="button" class="button">30</button>
-                                <button id="time_range_quarter" type="button" class="button">90</button>
-                                <button id="time_range_two_q" type="button" class="button">180</button>
-                                <button id="time_range_three_q" type="button" class="button">270</button>
-                                <button id="time_range_year" type="button" class="button">365</button>
+                            <div class="quick-range-buttons d-flex flex-nowrap overflow-auto gap-2">
+                                <button id="time_range_week" type="button" class="nl-btn nl-btn--primary">7</button>
+                                <button id="time_range_month" type="button" class="nl-btn nl-btn--primary">30</button>
+                                <button id="time_range_quarter" type="button" class="nl-btn nl-btn--primary">90</button>
+                                <button id="time_range_two_q" type="button" class="nl-btn nl-btn--primary">180</button>
+                                <button id="time_range_three_q" type="button" class="nl-btn nl-btn--primary">270</button>
+                                <button id="time_range_year" type="button" class="nl-btn nl-btn--primary">365</button>
                             </div>
-                            <button type="submit" class="button">Get Stats\Users</button>
-                            <button id="clear_cache_btn" type="button" class="button" 
-                                    style="background-color: #dc3545; margin-top: 5px;"
+                            <button type="submit" class="nl-btn nl-btn--primary">Get Stats\Users</button>
+                            <button id="clear_cache_btn" type="button" class="nl-btn nl-btn--danger"
                                     title="Clear cached data to force fresh fetch">Clear Cache</button>
                         </form>
-                        
+
+                        {% if not user_dict %}
+                            <button id="pullRecsBtn" class="nl-btn nl-btn--ghost" disabled>Get Recommendations</button>
+                        {% else %}
+                            <button id="pullRecsBtn" class="nl-btn nl-btn--ghost">Get Recommendations</button>
+                        {% endif %}
+                        <p class="rail-note">Pulled for users in the BCC list after Get Stats\Users. Takes 20-25 seconds per user.</p>
+
+                        {% if not user_dict %}
+                            <button id="pullDroppedNeedleBtn" class="nl-btn nl-btn--ghost" disabled>Get DroppedNeedle Stats</button>
+                        {% else %}
+                            <button id="pullDroppedNeedleBtn" class="nl-btn nl-btn--ghost">Get DroppedNeedle Stats</button>
+                        {% endif %}
+                        <p class="rail-note">Per-user "year in music" wrapped and server-wide stats for the BCC list.</p>
+
+                        <button id="pullComingSoonBtn" class="nl-btn nl-btn--ghost">Get Coming Soon Calendar</button>
+                        <p class="rail-note">Upcoming episode and movie calendar from Sonarr and Radarr, if configured in settings.</p>
+
+
                         {% if cache_info %}
                             <div class="card mt-3" id="cache-card">
-                                <div id="cache-card-header" class="card-header d-flex justify-content-between align-items-center" 
-                                    style="cursor: pointer; padding: 8px 12px;">
-                                    <h6 class="mb-0" style="font-size: 0.85rem;">Cache Status</h6>
-                                    <span style="font-size: 0.8rem;">▼</span>
+                                <div id="cache-card-header" class="card-header d-flex justify-content-between align-items-center" >
+                                    <h6 class="mb-0">Cache Status</h6>
+                                    <span>▼</span>
                                 </div>
-                                <div id="cache-status-badge" class="card-body d-none" style="padding: 8px 12px; font-size: 0.8rem;">
+                                <div id="cache-status-badge" class="card-body d-none">
                                     {% for key, info in cache_info.items() %}
                                         <div class="d-flex justify-content-between align-items-center mb-1">
-                                            <span class="text-muted" style="text-transform: capitalize;">{{ key.replace('_', ' ') }}:</span>
+                                            <span class="text-muted cache-cap">{{ key.replace('_', ' ') }}:</span>
                                             {% if info.exists %}
                                                 {% if info.is_fresh %}
                                                     <span class="text-success">✓ Fresh ({{ "%.1f"|format(info.age_hours) }}h)</span>
@@ -47,18 +64,17 @@
                             </div>
                         {% endif %}
 
-                        <div class="card mb-3" style="margin-top: 20px;">
-                            <div id="bcc-card-header" class="card-header d-flex justify-content-between align-items-center" 
-                                 style="cursor: pointer;">
+                        <div class="card mb-3 bcc-card">
+                            <div id="bcc-card-header" class="card-header d-flex justify-content-between align-items-center" >
                                 <h5 class="mb-0">Email Recipients</h5>
-                                <span id="bcc-toggle-icon" style="transition: transform 0.3s;">▼</span>
+                                <span id="bcc-toggle-icon">▼</span>
                             </div>
                             <div id="bcc-collapse" class="card-body">
                                 <form method="POST" action="/send_email">
                                     <div class="mb-3">
                                         <label class="form-label">Email Lists:</label>
                                         <div class="d-flex gap-2 align-items-center">
-                                            <select id="email_list_selector" class="form-select" style="flex: 1;">
+                                            <select id="email_list_selector" class="form-select flex-1">
                                                 <option value="(Save new list)">(Save list)</option>
                                                 <option value="ALL">ALL</option>
                                                 <option value="Custom" selected>Custom</option>
@@ -91,21 +107,4 @@
                                 </form>
                             </div>
                         </div>
-
-                        {% if not user_dict %}
-                            <button id="pullRecsBtn" class="button opacity-50 cursor-not-allowed" disabled>Get Recommendations</button>
-                        {% else %}
-                            <button id="pullRecsBtn" class="button">Get Recommendations</button>
-                        {% endif %}
-                        <p>Note, recommendations take 20-25 seconds per user. After getting stats/users with the top button, recommendations will be pulled for users in the BCC list.</p>
-
-                        {% if not user_dict %}
-                            <button id="pullDroppedNeedleBtn" class="button opacity-50 cursor-not-allowed" disabled>Get DroppedNeedle Stats</button>
-                        {% else %}
-                            <button id="pullDroppedNeedleBtn" class="button">Get DroppedNeedle Stats</button>
-                        {% endif %}
-                        <p>Pulls per-user "year in music" wrapped stats and server-wide stats from DroppedNeedle for users in the BCC list.</p>
-
-                        <button id="pullComingSoonBtn" class="button">Get Coming Soon Calendar</button>
-                        <p>Pulls the upcoming episode/movie calendar from Sonarr and Radarr, if configured on the settings page.</p>
 

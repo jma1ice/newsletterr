@@ -1,0 +1,129 @@
+/*
+ * Shared styling for the info-style shell pages (about, logs).
+ * Scoped to .info-page.
+ */
+
+.container-fluid.info-page {
+    background: transparent;
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    border-radius: 0;
+}
+.info-page .foreground {
+    background: transparent;
+}
+.info-intro {
+    color: var(--text-muted);
+}
+.info-hr {
+    border: none;
+    border-top: 1px dashed var(--border);
+    margin: var(--space-6) 0;
+}
+.info-page h2 {
+    font-size: var(--text-xl);
+    font-weight: 700;
+    margin: 0 0 var(--space-4);
+}
+.info-subhead {
+    font-weight: 700;
+    color: var(--text);
+    margin: 0 0 var(--space-2);
+}
+.info-page a {
+    color: var(--accent);
+}
+
+/* contributor tiers */
+.contrib-group {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-2);
+    margin-bottom: var(--space-3);
+    max-width: 800px;
+}
+.contrib-group--gold { border-color: var(--warning); }
+.contrib-group--green { border-color: var(--success); }
+.contrib-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--space-2);
+}
+.contrib-card {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3);
+    background: var(--surface-2);
+    border-radius: var(--radius-md);
+}
+.contrib-badge {
+    flex: none;
+    min-width: 64px;
+    text-align: center;
+    padding: 6px 10px;
+    background: var(--accent);
+    color: var(--on-accent);
+    border-radius: var(--radius-full);
+    font-weight: 700;
+    font-size: var(--text-xs);
+}
+.contrib-name {
+    font-weight: 600;
+    color: var(--text);
+}
+
+/* definition list + bullet lists */
+.info-dl {
+    display: grid;
+    gap: var(--space-4);
+    margin: 0;
+}
+.info-dl dt {
+    font-weight: 600;
+    color: var(--text);
+}
+.info-dl dd {
+    margin: 4px 0 0;
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+}
+.info-list {
+    font-size: var(--text-sm);
+    padding-left: 1.25rem;
+    color: var(--text);
+}
+.info-list li { margin-bottom: 6px; }
+
+/* logs: card + controls */
+.info-card {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-5);
+    max-width: 640px;
+}
+/* buttons: .nl-btn variants (components.css) own these now; the page-scoped
+   .button definition retired. */
+.info-page input[type="text"],
+.info-page .theme-input {
+    background: var(--surface-1);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 8px 10px;
+}
+.info-page input:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: var(--focus-ring);
+}
+.info-page label {
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+}
+
+/* migrated inline styles */
+.info-page #discord_thread_id { max-width: 400px; }
+.info-page .contrib-group--gold { max-width: 500px; }

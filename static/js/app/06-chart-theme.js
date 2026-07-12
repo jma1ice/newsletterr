@@ -1,14 +1,17 @@
-function themeVars(isDark) {
+function themeVars() {
+    // Read live design tokens so charts follow the theme without hard-coded hex.
+    const cs = getComputedStyle(document.documentElement);
+    const v = (name, fallback) => (cs.getPropertyValue(name).trim() || fallback);
     return {
-        text: isDark ? '#8acbd4' : '#333',
-        grid: isDark ? '#e5e7eb' : '#374151',
-        axis: isDark ? '#e5e7eb' : '#374151',
-        bg: isDark ? '#333' : '#8acbd4',
+        text: v('--text', '#142226'),
+        grid: v('--border', '#d0dfe1'),
+        axis: v('--text-faint', '#8aa0a3'),
+        bg: v('--surface-1', '#ffffff'),
     };
 }
 
-function applyChartTheme(isDark) {
-    const t = themeVars(isDark);
+function applyChartTheme() {
+    const t = themeVars();
 
     Highcharts.setOptions({
         chart: { backgroundColor: t.bg, style: { fontFamily: 'IBM Plex Sans' } },
@@ -44,10 +47,9 @@ function applyChartTheme(isDark) {
     });
 }
 
-const isDark = document.documentElement.classList.contains('dark');
-applyChartTheme(isDark);
+applyChartTheme();
 
+// Defer past the toggle handler that flips the .dark class so tokens are current.
 document.getElementById('theme-toggle')?.addEventListener('click', () => {
-    const nowDark = document.documentElement.classList.contains('dark');
-    applyChartTheme(!nowDark);
+    requestAnimationFrame(applyChartTheme);
 });

@@ -200,11 +200,11 @@ function updateSelectedItemsDisplay() {
                             style="height: 60px; font-size: 0.9rem; resize: vertical;"
                             placeholder="${placeholderText}"
                             oninput="updateTextBlockName('${item.id}', ${index})">${currentContent}</textarea>
-                        <button type="button" class="btn button-outline btn-sm mt-1 emoji-toggle-btn" data-target="emoji-picker-${item.id}" title="Insert emoji into text block">
+                        <button type="button" class="nl-btn nl-btn--ghost nl-btn--sm mt-1 emoji-toggle-btn" data-target="emoji-picker-${item.id}" title="Insert emoji into text block">
                             + Emoji
                         </button>
                         <div id="emoji-picker-${item.id}" style="display: none; margin-top: 4px;">
-                            <emoji-picker data-textblock-id="${item.id}" style="width: 100%; --emoji-size: 1.2rem; --num-columns: 10;"></emoji-picker>
+                            <emoji-picker data-textblock-id="${item.id}" data-source="/static/js/vendor/emoji-picker-data.json" style="width: 100%; --emoji-size: 1.2rem; --num-columns: 10;"></emoji-picker>
                         </div>
                     </div>
                 `;
@@ -228,11 +228,11 @@ function updateSelectedItemsDisplay() {
                             style="height: 60px; font-size: 0.9rem; resize: vertical;"
                             placeholder="${placeholderText}"
                             oninput="updateTextBlockName('${item.id}', ${index})">${currentContent}</textarea>
-                        <button type="button" class="btn button-outline btn-sm mt-1 emoji-toggle-btn" data-target="emoji-picker-${item.id}" title="Insert emoji into text block">
+                        <button type="button" class="nl-btn nl-btn--ghost nl-btn--sm mt-1 emoji-toggle-btn" data-target="emoji-picker-${item.id}" title="Insert emoji into text block">
                             + Emoji
                         </button>
                         <div id="emoji-picker-${item.id}" style="display: none; margin-top: 4px;">
-                            <emoji-picker data-textblock-id="${item.id}" style="width: 100%; --emoji-size: 1.2rem; --num-columns: 10;"></emoji-picker>
+                            <emoji-picker data-textblock-id="${item.id}" data-source="/static/js/vendor/emoji-picker-data.json" style="width: 100%; --emoji-size: 1.2rem; --num-columns: 10;"></emoji-picker>
                         </div>
                     </div>
                 `;
@@ -265,10 +265,10 @@ function updateSelectedItemsDisplay() {
                                 placeholder="Image URL or upload a file..."
                                 value="${item.src || ''}"
                                 style="flex: 1;">
-                            <button type="button" class="btn button btn-sm media-upload-btn" data-index="${index}" title="Upload from device">
+                            <button type="button" class="nl-btn nl-btn--primary nl-btn--sm media-upload-btn" data-index="${index}" title="Upload from device">
                                 📁
                             </button>
-                            <button type="button" class="btn button btn-sm media-gif-search-btn" data-index="${index}" title="Search GIFs">
+                            <button type="button" class="nl-btn nl-btn--primary nl-btn--sm media-gif-search-btn" data-index="${index}" title="Search GIFs">
                                 🔍 GIF
                             </button>
                         </div>
@@ -305,7 +305,7 @@ function updateSelectedItemsDisplay() {
                                 <button type="button" class="btn btn-sm btn-outline-danger remove-item-btn" data-index="${index}">x</button>
                             </div>
                         </div>
-                        <div class="collection-group-items text-[#333] dark:text-[#8acbd4]" style="font-size: 0.85rem;">
+                        <div class="collection-group-items" style="font-size: 0.85rem;">
                             ${item.collections && item.collections.length > 0 
                                 ? item.collections.map((col, i) => {
                                     const stableGroupId = item.id || `group-${index}`;
@@ -360,7 +360,7 @@ function updateSelectedItemsDisplay() {
                                         </div>
                                     `;
                                 }).join('')
-                                : '<em class="text-[#333] dark:text-[#8acbd4]">No collections added yet</em>'
+                                : '<em>No collections added yet</em>'
                             }
                         </div>
                     </div>
@@ -757,8 +757,8 @@ function removeItem(index) {
     const button = document.querySelector(`[data-id="${removedItem.id}"]`);
     if (button) {
         button.textContent = `Add`;
-        button.classList.remove('btn-success');
-        button.classList.add('button');
+        button.classList.remove('nl-btn--success');
+        button.classList.add('nl-btn--primary');
         button.disabled = false;
     }
 }
@@ -1027,8 +1027,8 @@ document.addEventListener('click', async (e) => {
 
     if (await addItemWithChartCapture(id, name || id, type, extra)) {
         btn.textContent = 'Added';
-        btn.classList.remove('button');
-        btn.classList.add('btn-success');
+        btn.classList.remove('nl-btn--primary');
+        btn.classList.add('nl-btn--success');
         btn.disabled = true;
 
         console.log('Item added. Current selectedItems:', selectedItems);

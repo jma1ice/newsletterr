@@ -1,0 +1,139 @@
+/*
+ * newsletterr design tokens - the single source of color, space, type, and
+ * elevation for the UI overhaul. Light values live on :root; dark overrides
+ * live in the .dark block. The dark palette is the designed-first one; light
+ * is derived. No .dark .selector descendant rules anywhere else: components
+ * read these semantic tokens and theme switching happens here only.
+ *
+ * Loaded first in base.html. Defining variables has no visual effect on its
+ * own; components opt in as they are migrated per phase.
+ */
+
+:root {
+    color-scheme: light;
+
+    /* teal identity primitives (kept from the original brand) */
+    --teal-100: #a8d8de;
+    --teal-300: #8acbd4;
+    --teal-500: #62a1a4;
+    --teal-700: #3f7477;
+
+    /* teal-cast ink ramp: near-black to near-white, biased toward the accent */
+    --ink-950: #0d1417;
+    --ink-900: #141d21;
+    --ink-850: #1b262b;
+    --ink-800: #223035;
+    --ink-700: #2c3d43;
+    --ink-600: #3c5157;
+    --ink-500: #587074;
+    --ink-400: #7b9296;
+    --ink-300: #a7bcbf;
+    --ink-200: #cfdee0;
+    --ink-100: #e4eeef;
+    --ink-50:  #f2f7f8;
+
+    /* semantic surfaces + text (light): teal canvas, teal-cast near-white
+       surfaces. No pure white anywhere; the canvas is the brand teal. */
+    --bg: #a8d8de;
+    --surface-1: #f2f7f8;
+    --surface-2: #e2eef0;
+    --surface-3: #d3e5e8;
+    --border: #b9d3d7;
+    --border-soft: #d1e3e6;
+
+    --text: #142226;
+    --text-muted: #587074;
+    --text-faint: #8aa0a3;
+
+    /* accent (light) */
+    --accent: #3f7477;
+    --accent-strong: #2f5c5f;
+    --accent-soft: #c9e4e8;
+    --on-accent: #ffffff;
+
+    /* status colors */
+    --success: #198754;
+    --success-soft: #d1e7dd;
+    --warning: #b7791f;
+    --warning-soft: #fff3cd;
+    --danger: #c0392b;
+    --danger-soft: #f8d7da;
+    --info: var(--accent);
+
+    /* elevation */
+    --shadow-1: 0 1px 2px rgba(20, 34, 38, .06);
+    --shadow-2: 0 2px 8px rgba(20, 34, 38, .10);
+    --shadow-3: 0 10px 30px rgba(20, 34, 38, .14);
+
+    /* radius */
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --radius-full: 999px;
+
+    /* spacing scale */
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 24px;
+    --space-6: 32px;
+    --space-7: 48px;
+    --space-8: 64px;
+
+    /* type scale */
+    --font-sans: 'IBM Plex Sans', system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --font-mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+    --text-xs: 12px;
+    --text-sm: 13px;
+    --text-base: 15px;
+    --text-md: 17px;
+    --text-lg: 20px;
+    --text-xl: 26px;
+    --text-2xl: 32px;
+    --text-3xl: 42px;
+    --leading-tight: 1.15;
+    --leading-normal: 1.5;
+
+    /* focus + layout metrics */
+    --focus-ring: 0 0 0 3px color-mix(in srgb, var(--accent) 45%, transparent);
+    --sidebar-w: 248px;
+    --sidebar-w-collapsed: 64px;
+}
+
+.dark {
+    color-scheme: dark;
+
+    /* semantic surfaces + text (dark, designed first) */
+    --bg: #0d1417;
+    --surface-1: #141d21;
+    --surface-2: #1b262b;
+    --surface-3: #223035;
+    --border: #26373d;
+    --border-soft: #1e2c31;
+
+    --text: #e9f1f2;
+    --text-muted: #93a7aa;
+    --text-faint: #647a7e;
+
+    /* accent (dark) */
+    --accent: #8acbd4;
+    --accent-strong: #62a1a4;
+    --accent-soft: #17323a;
+    --on-accent: #08131a;
+
+    /* status colors (dark-tuned softs) */
+    --success: #3fae74;
+    --success-soft: #14312a;
+    --warning: #d6a53a;
+    --warning-soft: #33280f;
+    --danger: #e06156;
+    --danger-soft: #331a1a;
+
+    /* elevation (deeper on dark) */
+    --shadow-1: 0 1px 2px rgba(0, 0, 0, .30);
+    --shadow-2: 0 4px 14px rgba(0, 0, 0, .35);
+    --shadow-3: 0 12px 34px rgba(0, 0, 0, .45);
+
+    --focus-ring: 0 0 0 3px color-mix(in srgb, var(--accent) 40%, transparent);
+}

@@ -1,104 +1,94 @@
 {% extends "base.html" %}
 {% block title %}about{% endblock %}
+{% block page_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/info.css') }}">{% endblock %}
+{% block page_header %}
+<header class="page-header">
+    <h1>about</h1>
+</header>
+{% endblock %}
 {% block content %}
-<div class="container-fluid">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h1>about</h1>
-    </div>
-    <p class="text-info mb-4">Learn more about this application, version information, and licensing details.</p>
+<div class="container-fluid info-page">
+    <p class="info-intro mb-4">Learn more about this application, version information, and licensing details.</p>
 
-    <hr class="my-8 border-dashed border-gray-300 dark:border-gray-600">
+    <hr class="info-hr">
 
-    <h2 class="text-2xl font-bold mb-4">🍪 Contributors 🍪</h2>
-    <p class="text-sm text-gray-600 dark:text-gray-400 mb-2">
+    <h2>🍪 Contributors 🍪</h2>
+    <p class="info-intro mb-2">
         Special thanks to everyone who has supported this project, your support helps keep this project alive and growing!
     </p>
-    <p class="text-sm text-gray-600 dark:text-gray-400 mb-6">
+    <p class="info-intro mb-4">
         Whether monetarily or through pull requests, we appreciate you!
     </p>
 
-    <div class="border-1 border-yellow-400 dark:border-yellow-500 rounded-lg p-2 mb-2 w-100" style="max-width: 500px;">
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 w-100">
-            <div class="flex w-100 items-center space-x-3 p-3 bg-[#8acbd4] dark:bg-[#62a1a4] rounded-lg">
-                <div class="w-20 h-10 bg-[#62a1a4] dark:bg-[#8acbd4] rounded-full flex items-center justify-center text-[#333] font-bold">
-                    Ko-Fi
-                </div>
-                <div class="font-semibold text-[#333]">@baggins</div>
+    <div class="contrib-group contrib-group--gold">
+        <div class="contrib-grid">
+            <div class="contrib-card">
+                <span class="contrib-badge">Ko-Fi</span>
+                <span class="contrib-name">@baggins</span>
             </div>
-            <div class="flex w-100 items-center space-x-3 p-3 bg-[#8acbd4] dark:bg-[#62a1a4] rounded-lg">
-                <div class="w-20 h-10 bg-[#62a1a4] dark:bg-[#8acbd4] rounded-full flex items-center justify-center text-[#333] font-bold">
-                    GitHub
-                </div>
-                <div class="font-semibold text-[#333]">@dreondre</div>
+            <div class="contrib-card">
+                <span class="contrib-badge">GitHub</span>
+                <span class="contrib-name">@dreondre</span>
             </div>
         </div>
     </div>
 
-    <div class="border-1 border-green-400 dark:border-green-500 rounded-lg p-2 mb-2 w-100" style="max-width: 800px;">
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 w-100">
-            <div class="flex w-100 items-center space-x-3 p-3 bg-[#8acbd4] dark:bg-[#62a1a4] rounded-lg">
-                <div class="w-20 h-10 bg-[#62a1a4] dark:bg-[#8acbd4] rounded-full flex items-center justify-center text-[#333] font-bold">
-                    Ko-Fi
-                </div>
-                <div class="font-semibold text-[#333]">@taehatypes</div>
+    <div class="contrib-group contrib-group--green">
+        <div class="contrib-grid">
+            <div class="contrib-card">
+                <span class="contrib-badge">Ko-Fi</span>
+                <span class="contrib-name">@taehatypes</span>
             </div>
-            <div class="flex w-100 items-center space-x-3 p-3 bg-[#8acbd4] dark:bg-[#62a1a4] rounded-lg">
-                <div class="w-20 h-10 bg-[#62a1a4] dark:bg-[#8acbd4] rounded-full flex items-center justify-center text-[#333] font-bold">
-                    GitHub
-                </div>
-                <div class="font-semibold text-[#333]">@quinneydavid</div>
+            <div class="contrib-card">
+                <span class="contrib-badge">GitHub</span>
+                <span class="contrib-name">@quinneydavid</span>
             </div>
-            <div class="flex w-100 items-center space-x-3 p-3 bg-[#8acbd4] dark:bg-[#62a1a4] rounded-lg">
-                <div class="w-20 h-10 bg-[#62a1a4] dark:bg-[#8acbd4] rounded-full flex items-center justify-center text-[#333] font-bold">
-                    Ko-Fi
-                </div>
-                <div class="font-semibold text-[#333]">@bferd</div>
+            <div class="contrib-card">
+                <span class="contrib-badge">Ko-Fi</span>
+                <span class="contrib-name">@bferd</span>
             </div>
         </div>
     </div>
 
-    <hr class="my-8 border-dashed border-gray-300 dark:border-gray-600">
-  
-    <dl class="grid grid-cols-1 sm:grid-cols-1 gap-3 text-lg leading-tight">
-        <div class="sm:col-span-2">
-            <dt class="font-semibold dark:border-gray-300">Version</dt>
-            <dd class="mt-1 text-sm">{{ version }}</dd>
+    <hr class="info-hr">
+
+    <dl class="info-dl">
+        <div>
+            <dt>Version</dt>
+            <dd>{{ version }}</dd>
         </div>
-        <div class="sm:col-span-2">
-            <dt class="font-semibold dark:border-gray-300">Published</dt>
-            <dd class="mt-1 text-sm">{{ publish_date }}</dd>
+        <div>
+            <dt>Published</dt>
+            <dd>{{ publish_date }}</dd>
         </div>
-        <div class="sm:col-span-2">
-            <dt class="font-semibold dark:border-gray-300">License</dt>
-            <dd class="mt-1 text-sm">MIT</dd>
+        <div>
+            <dt>License</dt>
+            <dd>MIT</dd>
         </div>
-        <div class="sm:col-span-2">
-            <dt class="font-semibold dark:border-gray-300">Found a bug?</dt>
-            <dd class="mt-1 text-sm">
+        <div>
+            <dt>Found a bug?</dt>
+            <dd>
                 <a href="{{ url_for('logs.logs_page') }}">Export logs</a> to attach to a
                 <a target="_blank" href="https://discord.gg/7Skcsqs4uT">support post on Discord</a>.
             </dd>
         </div>
         <div>
-            <dt class="font-semibold dark:border-gray-300">Check out our other projects:</dt>
-            <a target="_blank" href="https://github.com/yungsnuzzy/conjurr">conjurr</a>
-            <p>AI Recommendations for your users</p>
-            <a target="_blank" href="https://github.com/yungsnuzzy/autoytdlp">autoytdlp</a>
-            <p>Automated YouTube downloader and processor</p>
-            <a target="_blank" href="https://github.com/jma1ice/scorepad">ScorePad</a>
-            <p>Scorekeeping site for card games</p>
-            <a target="_blank" href="https://github.com/jma1ice/focus">FOCUS</a>
-            <p>Productivity app to help keep your projects on track</p>
-            <a target="_blank" href="https://github.com/jma1ice/onairr">OnAirr</a>
-            <p>Minimal Plex 'Now Streaming' interface</p>
-            <a target="_blank" href="https://ko-fi.com/newsletterr">Tip the developers!</a>
+            <dt>Check out our other projects:</dt>
+            <dd>
+                <a target="_blank" href="https://github.com/yungsnuzzy/conjurr">conjurr</a> - AI Recommendations for your users<br>
+                <a target="_blank" href="https://github.com/yungsnuzzy/autoytdlp">autoytdlp</a> - Automated YouTube downloader and processor<br>
+                <a target="_blank" href="https://github.com/jma1ice/scorepad">ScorePad</a> - Scorekeeping site for card games<br>
+                <a target="_blank" href="https://github.com/jma1ice/focus">FOCUS</a> - Productivity app to help keep your projects on track<br>
+                <a target="_blank" href="https://github.com/jma1ice/onairr">OnAirr</a> - Minimal Plex 'Now Streaming' interface<br>
+                <a target="_blank" href="https://ko-fi.com/newsletterr">Tip the developers!</a>
+            </dd>
         </div>
     </dl>
 
-    <hr class="my-8 border-dashed border-gray-300 dark:border-gray-600">
+    <hr class="info-hr">
 
-    <h2 class="text-2xl font-bold mb-4">Credits & Libraries</h2>
-    <ul class="list-disc list-inside space-y-2 text-sm">
+    <h2>Credits &amp; Libraries</h2>
+    <ul class="info-list">
         <li>DroppedNeedle 'Wrapped' API</li>
         <li>Tautulli API</li>
         <li>Highcharts for interactive graphs</li>
@@ -106,11 +96,11 @@
         <li>Python Flask 3.x</li>
     </ul>
 
-    <hr class="my-8 border-dashed border-gray-300 dark:border-gray-600">
+    <hr class="info-hr">
 
-    <h2 class="text-2xl font-bold mb-2">Recent Changes</h2>
-    <dt class="font-semibold dark:border-gray-300">Fixes:</dt>
-    <ul class="list-disc list-inside space-y-2 text-sm mb-2">
+    <h2>Recent Changes</h2>
+    <p class="info-subhead">Fixes:</p>
+    <ul class="info-list mb-4">
         <li>Fixed issue where fresh setup `migrate_email_templates_for_header_title()` calls for `server_name` failed creating a missing `email_header_title` column</li>
         <li>Patched up some SSRF/secrete containment</li>
         <li>CSRF fixes</li>
@@ -118,14 +108,14 @@
         <li>Bimonthly cadence fix</li>
         <li>Schedule fix for recommendation emails</li>
         <li>API fields in settings are now a password field</li>
-        <li>Fixed ra/recs card differing width issues when >5 columns used</li>
+        <li>Fixed ra/recs card differing width issues when &gt;5 columns used</li>
         <li>Added a 'pop-up blocked' to index for `save_template()` and similar</li>
         <li>Adjusted issue where some email clients show posters as small slivers</li>
         <li>Fixed where contributor area would start clipping out on lower size screens</li>
         <li>Removed plex-api-client as plexapi.plex was no longer supported</li>
     </ul>
-    <dt class="font-semibold dark:border-gray-300">New Features:</dt>
-    <ul class="list-disc list-inside space-y-2 text-sm mb-2">
+    <p class="info-subhead">New Features:</p>
+    <ul class="info-list">
         <li>Added sections to settings page (email server | external services | data settings | email styling | email body defaults | login | security)</li>
         <li>Settings changes are now kept on error so user won't have to re-enter them</li>
         <li>Added test api buttons for conjurr and tautulli</li>
@@ -142,7 +132,7 @@
         <li>Added To: vs BCC: option for email send</li>
         <li>Added option for setting max image heights to reduce email size</li>
         <li>Added API functionality to pull wrapped stats from DroppedNeedle</li>
-        <li>Complete codebase overhaul -> app factory</li>
+        <li>Complete codebase overhaul -&gt; app factory</li>
         <li>SQLite hardened with WAL</li>
         <li>Auth required and extra setup page added for first sign-in</li>
         <li>Visibility for failed sends</li>
@@ -159,6 +149,12 @@
         <li>Plex Wrapped Yearly Review</li>
         <li>Date range for stats (i.e. 1.1.25 - 1.1.26) (instead of 'last X days')</li>
         <li>Made collections clickable</li>
+        <li>Added a hosted 'most recent newsletter' webpage</li>
+        <li>Added opt out support</li>
+        <li>Added hosted images to reduce email size</li>
+        <li>General UI update/modernization</li>
+        <li>More mobile CSS optimizations</li>
+        <li>Removed use of Tailwind Play CDN</li>
     </ul>
 </div>
 {% endblock %}

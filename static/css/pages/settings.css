@@ -1,0 +1,181 @@
+/*
+ * Settings page. Scoped to .settings-page
+ */
+
+/* .container-fluid.settings-page beats .dark .container-fluid so no legacy
+   surface shows behind the cards in either theme. */
+.container-fluid.settings-page {
+    background: transparent;
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    border-radius: 0;
+}
+.settings-page .foreground {
+    background: transparent;
+}
+.settings-page .settings-intro {
+    color: var(--text-muted);
+}
+
+/* two-column layout: vertical tab rail + section content */
+.settings-layout {
+    display: flex;
+    gap: var(--space-5);
+    align-items: flex-start;
+    min-height: 480px;
+}
+
+.settings-page .settings-nav {
+    width: 210px;
+    flex-shrink: 0;
+    border-right: 1px solid var(--border);
+    padding: 0 var(--space-3) 0 0;
+}
+.settings-page .settings-nav nav {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.settings-page .settings-nav-btn {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    text-align: left;
+    padding: 10px 14px;
+    border: none;
+    border-radius: var(--radius-md);
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    font-weight: 500;
+    transition: background .15s ease, color .15s ease;
+}
+.settings-page .settings-nav-btn:hover {
+    background: var(--surface-2);
+    color: var(--text);
+}
+.settings-page .settings-nav-btn.active {
+    background: var(--accent-soft);
+    color: var(--accent-strong);
+    font-weight: 600;
+}
+
+/* section cards */
+.settings-content {
+    flex: 1;
+    min-width: 0;
+}
+.settings-page .settings-section {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-5) var(--space-5) var(--space-6);
+}
+.settings-page .settings-section h4 {
+    margin-top: 0;
+    margin-bottom: var(--space-5);
+}
+.settings-page .settings-section h6 {
+    color: var(--text-faint);
+    margin-top: var(--space-5);
+}
+
+/* form controls */
+.settings-page label {
+    display: inline-block;
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    margin-bottom: var(--space-1);
+}
+.settings-page input[type="text"],
+.settings-page input[type="email"],
+.settings-page input[type="password"],
+.settings-page input[type="number"],
+.settings-page input[type="url"],
+.settings-page input:not([type]),
+.settings-page select,
+.settings-page textarea {
+    width: 100%;
+    max-width: 560px;
+    background: var(--surface-1);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 8px 10px;
+}
+.settings-page input:focus,
+.settings-page select:focus,
+.settings-page textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: var(--focus-ring);
+}
+.settings-page input[type="checkbox"],
+.settings-page input[type="radio"] {
+    width: auto;
+    max-width: none;
+}
+
+/* buttons: .nl-btn variants (components.css) own these now; the page-scoped
+   .button definition retired with the Phase 8d rename. */
+
+/* test-connection result text */
+.settings-page .test-result {
+    font-size: var(--text-sm);
+    margin-top: var(--space-2);
+}
+
+/* mobile: horizontal scrollable tab row */
+@media (max-width: 768px) {
+    .settings-layout {
+        flex-direction: column;
+        gap: var(--space-4);
+    }
+    .settings-page .settings-nav {
+        width: 100%;
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+        padding: 0 0 var(--space-2);
+    }
+    .settings-page .settings-nav nav {
+        flex-direction: row;
+        overflow-x: auto;
+        gap: var(--space-1);
+        padding-bottom: var(--space-1);
+    }
+    .settings-page .settings-nav-btn {
+        width: auto;
+        white-space: nowrap;
+    }
+    .settings-page .settings-section {
+        padding: var(--space-4);
+    }
+    /* Stop the content column (and its width:100% inputs) from overflowing
+       the stacked layout on narrow screens. */
+    .settings-content {
+        width: 100%;
+        max-width: 100%;
+    }
+    .settings-page input,
+    .settings-page select,
+    .settings-page textarea {
+        max-width: 100%;
+    }
+}
+
+/* migrated inline styles (Phase 8d-1): move static-markup inline styles to the
+   sheet. JS-built status messages keep their inline styles (markup in JS). */
+.settings-page h6.text-uppercase { font-size: 0.75rem; letter-spacing: 0.05em; }
+.settings-page .field-hint { font-size: 0.875rem; }
+.settings-page .svc-test { margin: 6px 0 16px; display: flex; align-items: center; gap: 10px; }
+.settings-page .svc-test span { font-size: 0.875rem; }
+.settings-page .login-note { font-size: 0.85rem; color: #888; margin: 2px 0 8px 0; }
+.settings-page .plex-connected { color: #01b301; text-shadow: 1px 0 #000, 0 1px #000, -1px 0 #000, 0 -1px #000; }
+.settings-page .w-num { width: 80px; }
+.settings-page .w-num-lg { width: 120px; }
+.settings-page .w-field { width: 24rem; }
+.settings-page .ta-resize { width: 100%; resize: vertical; }

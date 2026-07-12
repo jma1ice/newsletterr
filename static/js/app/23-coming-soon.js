@@ -17,7 +17,7 @@ function buildSonarrComingSoonRow() {
             <span style="font-size: .9rem;">Coming Soon (TV)</span>
             <div>
                 <button type="button"
-                        class="btn button btn-sm sonarr-coming-soon-add-btn"
+                        class="nl-btn nl-btn--primary nl-btn--sm sonarr-coming-soon-add-btn"
                         data-type="sonarr_coming_soon" data-id="sonarr-coming-soon"
                         data-name="Coming Soon (TV)"
                         style="font-size: .8rem; padding: .25rem .5rem;">Add</button>
@@ -46,7 +46,7 @@ function buildRadarrComingSoonRow() {
             <span style="font-size: .9rem;">Coming Soon (Movies)</span>
             <div>
                 <button type="button"
-                        class="btn button btn-sm radarr-coming-soon-add-btn"
+                        class="nl-btn nl-btn--primary nl-btn--sm radarr-coming-soon-add-btn"
                         data-type="radarr_coming_soon" data-id="radarr-coming-soon"
                         data-name="Coming Soon (Movies)"
                         style="font-size: .8rem; padding: .25rem .5rem;">Add</button>

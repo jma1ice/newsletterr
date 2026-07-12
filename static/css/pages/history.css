@@ -1,0 +1,53 @@
+/*
+ * Email history page. Scoped to .history-page. Retokenizes the
+ * Bootstrap table and recipient cards; the Sends tab bar and detail modal are
+ * styled by shared component rules.
+ */
+
+.container-fluid.history-page {
+    background: transparent;
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    border-radius: 0;
+}
+
+.history-page .table {
+    width: 100%;
+    color: var(--text);
+    border-collapse: collapse;
+    margin: 0;
+}
+.history-page .table thead th {
+    background: var(--surface-2);
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    font-size: var(--text-xs);
+    font-weight: 600;
+    border-bottom: 1px solid var(--border);
+    padding: 10px 14px;
+}
+.history-page .table tbody td {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border-soft);
+    vertical-align: middle;
+}
+/* Neutralize Bootstrap's striped/hover backgrounds in favor of tokens. */
+.history-page .table-striped > tbody > tr:nth-of-type(odd) > * {
+    background: transparent;
+    color: var(--text);
+}
+.history-page .table-hover > tbody > tr:hover > * {
+    background: var(--surface-2);
+    color: var(--text);
+}
+
+/* recipient cards inside the detail modal */
+#recipientsModal .card {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+}
+#recipientsModal .card-body {
+    background: transparent;
+}

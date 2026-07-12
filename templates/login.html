@@ -1,95 +1,37 @@
 <!DOCTYPE html>
 <html lang="en">
     <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>login</title>
-        <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
-        <style>
-            body {
-                background: linear-gradient(160deg, #8acbd4 0%, #62a1a4 100%);
-                min-height: 100vh;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-            }
-            .login-card {
-                background: rgba(255, 255, 255, 0.95);
-                border-radius: 15px;
-                padding: 2rem;
-                box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
-                width: 100%;
-                max-width: 400px;
-            }
-            .logo {
-                text-align: center;
-                margin-bottom: 10px;
-            }
-            .logo h1 {
-                color: #8acbd4;
-                font-weight: bold;
-                margin-bottom: 0.5rem;
-            }
-            .logo p {
-                margin: 0;
-            }
-            .logo-png {
-                height: 75px;
-                margin: 0 0 18px 0;
-            }
-            .form-control {
-                border-radius: 10px;
-                border: 1px solid #ddd;
-                padding: 0.75rem;
-            }
-            .btn-login {
-                background: linear-gradient(160deg, #8acbd4 0%, #62a1a4 100%);
-                border: none;
-                border-radius: 10px;
-                padding: 0.75rem;
-                font-weight: 600;
-                text-transform: uppercase;
-                letter-spacing: 1px;
-            }
-            .alert {
-                border-radius: 10px;
-            }
-        </style>
+        {% include 'partials/_head_min.html' %}
     </head>
-    <body>
-        <div class="login-card">
-            <div class="logo">
-                <img src="/static/img/Asset_94x.png" alt="Logo" class="logo-png" />
-                <p class="text-muted">Please sign in to continue</p>
+    <body class="auth-body">
+        <div class="auth-card">
+            <div class="auth-logo">
+                <img src="/static/img/Asset_94x.png" alt="newsletterr" class="auth-logo-img" />
+                <p class="auth-sub">Please sign in to continue</p>
             </div>
 
             {% if error %}
-                <div class="alert alert-danger" role="alert">
-                    {{ error }}
-                </div>
+                <div class="nl-alert nl-alert--danger mb-3" role="alert">{{ error }}</div>
             {% endif %}
             {% if alert %}
-                <div class="alert alert-success" role="alert">
-                    {{ alert }}
-                </div>
+                <div class="nl-alert nl-alert--success mb-3" role="alert">{{ alert }}</div>
             {% endif %}
 
             <form method="POST">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
-                <div class="mb-3">
-                    <label for="username" class="form-label">Username</label>
-                    <input type="text" class="form-control" id="username" name="username" required>
+                <div class="auth-field">
+                    <label for="username">Username</label>
+                    <input type="text" class="nl-input" id="username" name="username" required>
                 </div>
 
-                <div class="mb-4">
-                    <label for="password" class="form-label">Password</label>
-                    <input type="password" class="form-control" id="password" name="password" required>
+                <div class="auth-field">
+                    <label for="password">Password</label>
+                    <input type="password" class="nl-input" id="password" name="password" required>
                 </div>
 
-                <button type="submit" class="btn btn-primary btn-login w-100">Sign In</button>
+                <button type="submit" class="nl-btn nl-btn--primary auth-submit">Sign In</button>
             </form>
         </div>
-
-        <script src="{{ url_for('static', filename='js/vendor/bootstrap.bundle.min.js') }}" nonce="{{ nonce }}"></script>
     </body>
 </html>

@@ -203,6 +203,7 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 --- Settings ---
 * Option to show or hide description on recently added posters
 * Setting for collection group grid width
+* 'Coming Soon' days ahead and grid width should move to Data Settings
 
 --- Integrations ---
  -- newsletterr GitHub / Discord --
@@ -210,24 +211,18 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Ko-fi -> Discord integration for contributor role
  -- Other --
 * Ombi integration
+* Does this work with Emby/Jellyfin? - jellyfin doesn't use tautulli
 * Servarr PR
 * Clean up looks on DN stats, coming soon, and wrapped
 
---- Hosted ---
-** Add a hosted 'most recent newsletter' webpage
-** Add opt out support
-** Add hosted images to reduce email size
-
 --- UI ---
-* General update/modernization
 * Email preview: desktop/tablet/phone views
+* Swap version and copyright in footer
+* Top right logo should link to site or GH
+* Discord text should be stylized logo to match GitHub
 
 --- Misc. ---
-* More mobile CSS optimizations
-* Discord text should be stylized logo to match GitHub
 * Can Snap-Ins work with custom HTML?
-* Does this work with Emby/Jellyfin?
-* Tailwind Play CDN fix
 * CSP out of Report-Only after trial run
 * 2wheelsdown into gh contrib
 
@@ -285,6 +280,12 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Plex Wrapped Yearly Review
 * Date range for stats (i.e. 1.1.25 - 1.1.26) (instead of 'last X days')
 * Made collections clickable
+* Added a hosted 'most recent newsletter' webpage
+* Added opt out support
+* Added hosted images to reduce email size
+* General UI update/modernization
+* More mobile CSS optimizations
+* Removed use of Tailwind Play CDN
 
 ### v2026.1:
 

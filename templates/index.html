@@ -1,32 +1,100 @@
 {% extends "base.html" %}
 {% block title %}newsletterr{% endblock %}
-{% block content %}
-<div class="container-fluid">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h1 id="welcome-message">{% if username != "" %}welcome, {{ username }}!{% else %}newsletterr dashboard{% endif %}</h1>
-        <div class="d-flex gap-2 align-items-center">
-            <button id="sendTestBtn" class="btn btn-outline-info btn-lg px-4 py-3" style="font-size: 1rem; font-weight: 600;" title="Send this email only to your From address">
-                Send Test
-            </button>
-            <button id="sendEmailBtn" class="btn btn-success btn-lg px-5 py-3" style="font-size: 1.6rem; font-weight: 700; min-width: 220px; box-shadow: 0 4px 8px rgba(0,0,0,0.2);">
-                Send Email
-            </button>
-        </div>
+{% block page_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/builder.css') }}">{% endblock %}
+{% block page_header %}
+<header class="page-header">
+    <h1 id="welcome-message">build newsletter</h1>
+    <div class="page-actions">
+        <button id="sendTestBtn" class="nl-btn nl-btn--ghost" title="Send this email only to your From address">
+            Send Test
+        </button>
+        <button id="sendEmailBtn" class="nl-btn nl-btn--primary nl-btn--lg">
+            Send Email
+        </button>
     </div>
-    <p id="alert_p" style="display: none; color: #01b301; text-shadow: 1px 0 #000, 0 1px #000, -1px 0 #000, 0 -1px #000;">{{ alert or '' }}</p>
-    <p id="error_p" style="display: none; color: #770010; text-shadow: 1px 0 #000, 0 1px #000, -1px 0 #000, 0 -1px #000;">{{ error or '' }}</p>
+</header>
+{% endblock %}
+{% block content %}
+<div class="container-fluid builder-page">
+    <p id="alert_p" class="nl-alert nl-alert--success mb-3" style="display: none;">{{ alert or '' }}</p>
+    <p id="error_p" class="nl-alert nl-alert--danger mb-3" style="display: none;">{{ error or '' }}</p>
     <div class="foreground">
-        <div>
-            <table style="height: 60%; width: 100%;">
-                <tr style="height: 100%; padding: 10px;">
-                    <td id="config-row" style="width: 20%; padding: 10px; vertical-align: top;">
+        <div class="builder-grid">
+            <div class="builder-col mobile-content-panel mobile-section-config active" id="config-row">
 {% include 'partials/_left_panel.html' %}
-{% include 'partials/_email_builder.html' %}
+            </div>
+            <div class="builder-col mobile-content-panel mobile-section-preview" id="preview-row">
+                <form method="POST" action="/send_email" class="msg-bar">
+                    <div class="msg-field">
+                        <label for="subject">Subject</label>
+                        <input type="text" name="subject" id="subject" placeholder="Subject"
+                               value="{{ settings.server_name }} News" required>
+                    </div>
+                    <div class="msg-field">
+                        <label for="email_header_title">Header Title</label>
+                        <input type="text" name="email_header_title" id="email_header_title" placeholder="Leave blank to hide"
+                               value="{{ settings.server_name }} Newsletter">
+                    </div>
+                </form>
+                <div class="d-flex justify-content-between align-items-center mb-2 preview-toolbar">
+                    <span>Preview:</span>
+                    <div class="d-flex gap-2">
+                        <button id="export-html-btn" class="nl-btn nl-btn--ghost nl-btn--sm" title="Export email as HTML file">
+                            &#8681; Export HTML
+                        </button>
+                        <button id="import-html-btn" class="nl-btn nl-btn--ghost nl-btn--sm" title="Import HTML file as template">
+                            &#8679; Import HTML
+                        </button>
+                        <input type="file" id="import-html-input" accept=".html" style="display: none;">
+                        <button id="popout-preview-btn" class="nl-btn nl-btn--ghost nl-btn--sm" title="Open preview in new window">
+                            &#128471; Pop-out
+                        </button>
+                    </div>
+                </div>
+                <div id="popout-status" class="small mb-1" style="display: none;"></div>
+                <iframe class="frame" id="preview"></iframe>
+            </div>
+            <div class="builder-col mobile-content-panel mobile-section-content" id="content-row">
+                <div id="selected-items-pane">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h2>Snap-ins</h2>
+                        <div class="d-flex gap-2 align-items-center">
+                            <button id="reset-template-btn" class="nl-btn nl-btn--ghost nl-btn--sm" title="Clear all items and reset to Custom template">
+                                &#128260; Reset
+                            </button>
+                            <div id="custom-html-toggle-row" class="align-items-center gap-2 border-1 border-secondary rounded p-1">
+                                <div class="form-check form-switch mb-0">
+                                    <input class="form-check-input mt-3" type="checkbox" id="custom-html-toggle" role="switch">
+                                    <label class="form-check-label" for="custom-html-toggle">
+                                        Custom HTML Mode
+                                    </label>
+                                </div>
+                            </div>
+                            <label for="template-selector" class="form-label mb-0">Template:</label>
+                            <select id="template-selector" class="form-select">
+                                <option value="">Custom</option>
+                                <option value="save-template">(Save template)</option>
+                            </select>
+                            <button id="delete-template-btn" class="btn btn-outline-danger btn-sm" style="display: none;">
+                                &#128465;&#65039; Delete
+                            </button>
+                        </div>
+                    </div>
+                    <div id="selected-items-list" class="border rounded p-3 mb-4">
+                        <div id="selected-items-empty" class="text-muted text-center py-3">
+                            No items selected. Use the buttons below to add items to your email.
+                        </div>
+                    </div>
+                    <div id="custom-html-pane" style="display: none;">
+                        <textarea id="custom-html-editor" class="form-control font-monospace text-alert"
+                                placeholder="Paste your complete HTML email here..."></textarea>
+                    </div>
+                </div>
 {% include 'partials/_snapins.html' %}
 {% include 'partials/_previews.html' %}
-                    </td>
-                </tr>
-            </table>
+            </div>
+        </div>
+    </div>
 {% include 'partials/_gif_modal.html' %}
 {% include 'partials/_index_scripts.html' %}
 </div>

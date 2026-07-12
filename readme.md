@@ -220,6 +220,7 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Swap version and copyright in footer
 * Top right logo should link to site or GH
 * Discord text should be stylized logo to match GitHub
+* Footer always visible
 
 --- Misc. ---
 * Can Snap-Ins work with custom HTML?

@@ -92,6 +92,18 @@ def index():
         "coming_soon_grid_columns": s["coming_soon_grid_columns"],
     }
 
+    # Booleans only (no URLs/keys leak to the client): which pull-data services
+    # are configured, so the frontend can grey out buttons that would just fail.
+    service_flags = {
+        "tautulli": bool(s.get("tautulli_url") and s.get("tautulli_api")),
+        "conjurr": bool(s.get("conjurr_url")),
+        "droppedneedle": bool(s.get("droppedneedle_url") and s.get("droppedneedle_api_key")),
+        "calendar": bool(
+            (s.get("sonarr_url") and s.get("sonarr_api_key"))
+            or (s.get("radarr_url") and s.get("radarr_api_key"))
+        ),
+    }
+
     conn = db_connect()
     cursor = conn.cursor()
     if logo_filename == '' or logo_filename is None:
@@ -189,7 +201,7 @@ def index():
                            droppedneedle_wrapped_json=droppedneedle_wrapped_json, droppedneedle_server_json=droppedneedle_server_json,
                            yearly_wrapped_json=yearly_wrapped_json,
                            sonarr_coming_soon_json=sonarr_coming_soon_json, radarr_coming_soon_json=radarr_coming_soon_json,
-                           csrf_token=session["csrf_token"], username=username
+                           csrf_token=session["csrf_token"], username=username, service_flags=service_flags
                         )
 
 @bp.route('/proxy-art/<path:art_path>')

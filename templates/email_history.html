@@ -1,17 +1,10 @@
 {% extends "base.html" %}
+{% from '_icons.html' import icon %}
 {% block title %}email history{% endblock %}
 {% block page_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/history.css') }}">{% endblock %}
 {% block page_header %}
 <header class="page-header">
     <h1>email history</h1>
-    {% if emails %}
-    <div class="page-actions">
-        <form method="POST" action="/email_history/clear" id="clear-history-form">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
-            <button type="submit" class="btn btn-danger">Clear History</button>
-        </form>
-    </div>
-    {% endif %}
 </header>
 {% endblock %}
 {% block content %}
@@ -20,28 +13,45 @@
         <p class="text-muted mb-3">View all sent emails and their recipients.</p>
 
         {% if emails %}
-            <div class="table-responsive">
-                <table class="table table-striped table-hover">
-                    <thead class="table-dark">
+            <div class="history-toolbar">
+                <div class="chips" id="status-filter" role="group" aria-label="Filter by status">
+                    <button type="button" class="chip is-active" data-filter="all">All <span class="n" id="count-all">0</span></button>
+                    <button type="button" class="chip" data-filter="sent">Sent <span class="n" id="count-sent">0</span></button>
+                    <button type="button" class="chip" data-filter="failed">Failed <span class="n" id="count-failed">0</span></button>
+                </div>
+                <div class="history-toolbar-right">
+                    {% if total_pages > 1 %}
+                        <span class="text-muted small">page {{ page }} of {{ total_pages }}</span>
+                    {% endif %}
+                    <form method="POST" action="/email_history/clear" id="clear-history-form">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+                        <button type="submit" class="nl-btn nl-btn--danger nl-btn--sm">{{ icon('trash') }} Clear History</button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="tbl-wrap">
+                <table class="table history-table">
+                    <thead>
                         <tr>
                             <th>Status</th>
                             <th>Subject</th>
-                            <th>Date & Time Sent</th>
+                            <th>Date &amp; Time Sent</th>
                             <th>Template</th>
-                            <th>Size (KB)</th>
+                            <th>Size</th>
                             <th>Recipients</th>
-                            <th>View Recipients</th>
-                            <th>Resend</th>
+                            <th></th>
+                            <th></th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody id="history-rows">
                         {% for email in emails %}
-                            <tr>
+                            <tr data-status="{{ 'failed' if email.status == 'failed' else 'sent' }}">
                                 <td>
                                     {% if email.status == 'failed' %}
-                                        <span class="badge bg-danger" title="{{ email.error or 'Send failed' }}">Failed</span>
+                                        <span class="pill pill--fail" title="{{ email.error or 'Send failed' }}">Failed</span>
                                     {% else %}
-                                        <span class="badge bg-success">Sent</span>
+                                        <span class="pill pill--ok"><span class="dotc" style="background: var(--success);"></span> Sent</span>
                                     {% endif %}
                                 </td>
                                 <td>
@@ -51,27 +61,27 @@
                                     {% endif %}
                                 </td>
                                 <td><span class="text-muted">{{ email.sent_at }}</span></td>
-                                <td><span class="badge bg-secondary">{{ email.template_name }}</span></td>
+                                <td><span class="pill pill--tpl">{{ email.template_name }}</span></td>
                                 <td>
-                                    <span class="badge bg-info">{{ "%.2f"|format(email.content_size_kb or 0) }} KB</span>
+                                    <span class="pill pill--muted">{{ "%.2f"|format(email.content_size_kb or 0) }} KB</span>
                                 </td>
                                 <td>
-                                    <span class="badge bg-primary">{{ email.recipient_count }} recipient{{ 's' if email.recipient_count != 1 else '' }}</span>
+                                    <span class="pill pill--list">{{ email.recipient_count }} recipient{{ 's' if email.recipient_count != 1 else '' }}</span>
                                 </td>
                                 <td>
-                                    <button class="btn btn-secondary btn-sm view-recipients-btn"
+                                    <button class="icon-btn view-recipients-btn" title="View recipients" aria-label="View recipients"
                                             data-email-id="{{ email.id }}"
                                             data-subject="{{ email.subject }}">
-                                        👥 Recipients
+                                        {{ icon('users') }}
                                     </button>
                                 </td>
                                 <td>
                                     {% if email.status != 'failed' %}
-                                        <button class="btn btn-outline-secondary btn-sm resend-btn"
+                                        <button class="icon-btn resend-btn" title="Resend" aria-label="Resend email"
                                                 data-email-id="{{ email.id }}"
                                                 data-subject="{{ email.subject }}"
                                                 data-recipient-count="{{ email.recipient_count }}">
-                                            🔁 Resend
+                                            {{ icon('repeat') }}
                                         </button>
                                     {% else %}
                                         <span class="text-muted small">n/a</span>
@@ -83,15 +93,17 @@
                 </table>
             </div>
 
+            <div id="history-empty-filter" class="text-muted small mt-3 d-none">No emails match this filter.</div>
+
             {% if total_pages > 1 %}
-                <nav class="d-flex justify-content-between align-items-center mt-2">
+                <nav class="history-pager mt-3">
                     <span class="text-muted small">{{ total }} total, page {{ page }} of {{ total_pages }}</span>
-                    <div class="btn-group">
+                    <div class="row-actions">
                         {% if page > 1 %}
-                            <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('emails.email_history', page=page-1) }}">Previous</a>
+                            <a class="nl-btn nl-btn--ghost nl-btn--sm" href="{{ url_for('emails.email_history', page=page-1) }}">Previous</a>
                         {% endif %}
                         {% if page < total_pages %}
-                            <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('emails.email_history', page=page+1) }}">Next</a>
+                            <a class="nl-btn nl-btn--ghost nl-btn--sm" href="{{ url_for('emails.email_history', page=page+1) }}">Next</a>
                         {% endif %}
                     </div>
                 </nav>
@@ -114,10 +126,10 @@
                 </div>
                 <div class="modal-body">
                     <h6 id="modal-subject" class="mb-3"></h6>
-                    <div id="recipients-list" class="row"></div>
+                    <div id="recipients-list" class="recipients-grid"></div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="nl-btn nl-btn--ghost" data-bs-dismiss="modal">Close</button>
                 </div>
             </div>
         </div>
@@ -156,17 +168,13 @@
                         recipientsList.innerHTML = '';
                         
                         data.recipients.forEach(recipient => {
-                            const col = document.createElement('div');
-                            col.className = 'col-md-6 mb-2';
-                            col.innerHTML = `
-                                <div class="card">
-                                    <div class="card-body py-2">
-                                        <small class="text-muted">📧</small>
-                                        <span class="text-info">${recipient}</span>
-                                    </div>
-                                </div>
-                            `;
-                            recipientsList.appendChild(col);
+                            const item = document.createElement('div');
+                            item.className = 'recipient-item';
+                            const email = document.createElement('span');
+                            email.className = 'recipient-email';
+                            email.textContent = recipient;
+                            item.appendChild(email);
+                            recipientsList.appendChild(item);
                         });
                         
                         window.NLModal.show('recipientsModal');
@@ -189,9 +197,8 @@
                         return;
                     }
 
-                    const originalText = this.textContent;
                     this.disabled = true;
-                    this.textContent = 'Sending…';
+                    this.classList.add('sending-flash');
 
                     try {
                         const response = await fetch(`/email_history/${emailId}/resend`, {
@@ -214,8 +221,33 @@
                         alert('Resend failed: ' + error.message);
                     } finally {
                         this.disabled = false;
-                        this.textContent = originalText;
+                        this.classList.remove('sending-flash');
                     }
+                });
+            });
+
+            // Status filter chips: count rows and show/hide by data-status.
+            const rows = Array.from(document.querySelectorAll('#history-rows tr'));
+            const emptyNote = document.getElementById('history-empty-filter');
+            const counts = { all: rows.length, sent: 0, failed: 0 };
+            rows.forEach(r => { counts[r.dataset.status] = (counts[r.dataset.status] || 0) + 1; });
+            const setCount = (id, n) => { const el = document.getElementById(id); if (el) el.textContent = n; };
+            setCount('count-all', counts.all);
+            setCount('count-sent', counts.sent);
+            setCount('count-failed', counts.failed);
+
+            document.querySelectorAll('#status-filter .chip').forEach(chip => {
+                chip.addEventListener('click', function () {
+                    const filter = this.dataset.filter;
+                    document.querySelectorAll('#status-filter .chip').forEach(c => c.classList.remove('is-active'));
+                    this.classList.add('is-active');
+                    let shown = 0;
+                    rows.forEach(r => {
+                        const match = filter === 'all' || r.dataset.status === filter;
+                        r.classList.toggle('d-none', !match);
+                        if (match) shown++;
+                    });
+                    if (emptyNote) emptyNote.classList.toggle('d-none', shown !== 0);
                 });
             });
         });

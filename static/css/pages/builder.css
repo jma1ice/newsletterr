@@ -223,7 +223,8 @@
 }
 .builder-page #selected-items-list {
     background: var(--surface-2);
-    border-color: var(--border);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
 }
 .builder-page #selected-items-empty {
     color: var(--text-faint);
@@ -261,9 +262,30 @@
 
 /* custom-html mode toggle chrome */
 .builder-page #custom-html-toggle-row {
-    border-color: var(--border) !important;
+    border: 1px solid var(--border) !important;
     border-radius: var(--radius-md);
 }
+
+/* Snap-ins heading + tool cluster: one aligned toolbar that wraps as a unit
+   instead of ragged pieces. */
+.builder-page .snapins-toolbar { gap: var(--space-3); }
+.builder-page .snapins-tools {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    justify-content: flex-end;
+}
+.builder-page #delete-template-btn { color: var(--danger); border-color: var(--border); }
+.builder-page #delete-template-btn:hover { border-color: var(--danger); background: var(--danger-soft); }
+
+/* collection headings: inline icon aligned with the label text */
+.builder-page .collection-heading {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+.builder-page .collection-heading .nl-icon { color: var(--text-muted); }
 
 /* recently-added preview cards */
 .ra-card {
@@ -430,7 +452,7 @@
 /* migrated inline styles */
 .builder-page #subject { width: 100%; }
 .builder-page #email_header_title { width: 100%; }
-.builder-page label[for="custom-html-toggle"] { font-size: 0.9rem; max-width: 5rem; }
+.builder-page label[for="custom-html-toggle"] { font-size: 0.9rem; }
 .builder-page #template-selector { width: 200px; }
 .builder-page .send-form { margin-top: 0; }
 #sendEmailBtn { font-weight: 700; min-width: 180px; }
@@ -440,8 +462,15 @@
 .builder-page #cache-card-header { padding: 8px 12px; }
 .builder-page #cache-card-header h6 { font-size: 0.85rem; }
 .builder-page #cache-card-header > span { font-size: 0.8rem; }
-.builder-page .bcc-card { margin-top: 20px; }
-.builder-page #bcc-toggle-icon { transition: transform 0.3s; }
+.builder-page .bcc-card { margin-top: var(--space-3); }
+/* collapsible card headers: chevron rotates to point right when collapsed */
+.builder-page #cache-card-header .nl-icon,
+.builder-page #bcc-card-header .nl-icon { width: 16px; height: 16px; transition: transform 0.3s ease; }
+.builder-page #cache-card-header.is-collapsed .nl-icon,
+.builder-page #bcc-card-header.is-collapsed .nl-icon { transform: rotate(-90deg); }
+/* tighten the top of the collapsible bodies so content sits close to the header */
+.builder-page #cache-status-badge,
+.builder-page #bcc-collapse { padding-top: var(--space-2); }
 .builder-page .cache-cap { text-transform: capitalize; }
 .builder-page .snapin-note { font-size: 0.9rem; padding: 0.75rem; }
 
@@ -540,10 +569,25 @@
     margin: var(--space-2) 0 var(--space-4);
 }
 
-/* composer column: snap-in sections wrap instead of overflowing the narrower
-   column (the add-button groups were a single non-wrapping flex row). */
-.builder-page #content-row .d-flex.justify-content-between { flex-wrap: wrap; row-gap: var(--space-2); }
+/* composer column: the add-button groups wrap their buttons within the
+   narrower column instead of overflowing it. The outer heading/actions rows
+   no longer wrap as a whole, so headings and stat/graph labels stay put. */
 .builder-page #content-row .d-flex.gap-2 { flex-wrap: wrap; }
+
+/* stat/graph snap-in rows: keep the label on one line with an ellipsis (full
+   name in the title attr) and pin the button pair so nothing wraps or drops. */
+.builder-page .snapin-row-label {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+    font-size: 0.9rem;
+}
+.builder-page .snapin-row-actions {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+}
 
 @media (max-width: 768px) {
     /* stack the message fields and let the preview size to content on mobile */

@@ -19,6 +19,8 @@
             .filter(Boolean);
         ta.value = list.join(', ');
         input.placeholder = 'Add BCC emails';
+        const countEl = document.getElementById('bcc-count');
+        if (countEl) countEl.textContent = `(${list.length})`;
     }
 
     function makeChip(email) {

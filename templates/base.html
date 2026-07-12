@@ -42,7 +42,7 @@
                 <img class="brand-mark" src="/static/img/Asset_54x.png" alt="newsletterr logo" />
             </a>
             <ul id="navLinks">
-                <li><a href="{{ url_for('main.index') }}"{% if request.endpoint == 'main.index' %} class="is-active"{% endif %}>{{ icon('home') }}<span class="nav-label">build newsletter</span></a></li>
+                <li><a href="{{ url_for('main.index') }}"{% if request.endpoint == 'main.index' %} class="is-active"{% endif %}>{{ icon('home') }}<span class="nav-label">build</span></a></li>
                 <li><a href="{{ url_for('scheduling.scheduling') }}"{% if request.endpoint in ['scheduling.scheduling', 'emails.email_history'] %} class="is-active"{% endif %}>{{ icon('clock') }}<span class="nav-label">sends</span></a></li>
                 <li class="nav-group-gap"><a href="{{ url_for('settings.settings') }}"{% if request.endpoint == 'settings.settings' %} class="is-active"{% endif %}>{{ icon('settings') }}<span class="nav-label">settings</span></a></li>
                 <li><a href="{{ url_for('main.about') }}"{% if request.endpoint == 'main.about' %} class="is-active"{% endif %}>{{ icon('info') }}<span class="nav-label">about</span></a></li>
@@ -100,13 +100,13 @@
             {% block page_header %}{% endblock %}
             <main>{% block content %}{% endblock %}</main>
             <footer class="site-foot-flow">
-                <span class="foot-left">Newsletterr © 2026. <a target="_blank" href="https://discord.gg/7Skcsqs4uT">Join the discussion on Discord!</a></span>
+                <a class="foot-left" target="_blank" href="https://github.com/jma1ice/newsletterr">
+                    <img src="{{ url_for('static', filename='img/github.png') }}" alt="GitHub"><span>{{ version }}</span>
+                </a>
                 <a class="foot-mid" target="_blank" href="https://ko-fi.com/newsletterr">
                     <img src="{{ url_for('static', filename='img/kofi.png') }}" alt="Ko-fi"><span>Tip the devs</span>
                 </a>
-                <a class="foot-right" target="_blank" href="https://github.com/jma1ice/newsletterr">
-                    <span>{{ version }}</span><img src="{{ url_for('static', filename='img/github.png') }}" alt="GitHub">
-                </a>
+                <span class="foot-right"><a target="_blank" href="https://discord.gg/7Skcsqs4uT">Join the discussion on Discord!</a> Newsletterr © 2026.</span>
             </footer>
         </div>
         <div class="sidebar-scrim"></div>

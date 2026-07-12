@@ -3,7 +3,7 @@ import time
 import requests
 from flask import Blueprint, jsonify, render_template, request, session
 
-from app.settings_store import get_settings
+from app.settings_store import get_service_flags, get_settings
 from app.cache import set_cached_data, get_cache_info
 from app.crypto import decrypt
 from app.security import require_csrf_for_json, requires_auth, safe_get, json_body
@@ -187,6 +187,7 @@ def pull_recommendations():
                                     stats=stats, user_dict=user_dict, graph_data=graph_data,
                                     graph_commands=graph_commands, recent_data=recent_data,
                                     libs=libs, settings=settings, theme_settings=get_theme_settings(),
+                                    service_flags=get_service_flags(_s),
                                     csrf_token=session.get("csrf_token", ""))
         else:
             conjurr_base_url = conjurr_settings['conjurr_url']
@@ -215,7 +216,8 @@ def pull_recommendations():
     return render_template('index.html', stats=stats, user_dict=user_dict, graph_data=graph_data, cache_info=cache_info,
                             graph_commands=graph_commands, recent_data=recent_data, libs=libs, settings=settings,
                             recommendations_json=recommendations_json, filtered_users=filtered_users, alert=alert,
-                            error=error, theme_settings=theme_settings, csrf_token=session.get("csrf_token", ""))
+                            error=error, theme_settings=theme_settings, service_flags=get_service_flags(_s),
+                            csrf_token=session.get("csrf_token", ""))
 
 @bp.route('/pull_droppedneedle_stats', methods=['POST'])
 @requires_auth
@@ -255,6 +257,7 @@ def pull_droppedneedle_stats():
                                 stats=stats, user_dict=user_dict, graph_data=graph_data,
                                 graph_commands=graph_commands, recent_data=recent_data,
                                 libs=libs, settings=settings, theme_settings=get_theme_settings(),
+                                service_flags=get_service_flags(_s),
                                 csrf_token=session.get("csrf_token", ""))
 
     droppedneedle_wrapped_json, error = run_droppedneedle_command(droppedneedle_url, droppedneedle_api_key, filtered_users, error)
@@ -286,7 +289,7 @@ def pull_droppedneedle_stats():
     return render_template('index.html', stats=stats, user_dict=user_dict, graph_data=graph_data, cache_info=cache_info,
                             graph_commands=graph_commands, recent_data=recent_data, libs=libs, settings=settings,
                             droppedneedle_wrapped_json=droppedneedle_wrapped_json, droppedneedle_server_json=droppedneedle_server_json,
-                            alert=alert, error=error, theme_settings=theme_settings,
+                            alert=alert, error=error, theme_settings=theme_settings, service_flags=get_service_flags(_s),
                             csrf_token=session.get("csrf_token", ""))
 
 @bp.route('/pull_coming_soon', methods=['POST'])
@@ -327,6 +330,7 @@ def pull_coming_soon():
                                 stats=stats, user_dict=user_dict, graph_data=graph_data,
                                 graph_commands=graph_commands, recent_data=recent_data,
                                 libs=libs, settings=settings, theme_settings=get_theme_settings(),
+                                service_flags=get_service_flags(_s),
                                 csrf_token=session.get("csrf_token", ""))
 
     start_date = datetime.now().strftime('%Y-%m-%d')
@@ -372,7 +376,7 @@ def pull_coming_soon():
     return render_template('index.html', stats=stats, user_dict=user_dict, graph_data=graph_data, cache_info=cache_info,
                             graph_commands=graph_commands, recent_data=recent_data, libs=libs, settings=settings,
                             sonarr_coming_soon_json=sonarr_coming_soon_json, radarr_coming_soon_json=radarr_coming_soon_json,
-                            alert=alert, error=error, theme_settings=theme_settings,
+                            alert=alert, error=error, theme_settings=theme_settings, service_flags=get_service_flags(_s),
                             csrf_token=session.get("csrf_token", ""))
 
 @bp.route('/fetch_collections/<collection_type>', methods=['GET'])

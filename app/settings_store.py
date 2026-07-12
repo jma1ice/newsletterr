@@ -79,3 +79,17 @@ def get_settings(decrypt_secrets=True):
         except (TypeError, ValueError):
             s[col] = default
     return s
+
+def get_service_flags(s):
+    """Booleans only (no URLs/keys leak to the client): which pull-data
+    services are configured, so the frontend can grey out buttons that
+    would just fail. `s` is a settings dict as returned by get_settings()."""
+    return {
+        "tautulli": bool(s.get("tautulli_url") and s.get("tautulli_api")),
+        "conjurr": bool(s.get("conjurr_url")),
+        "droppedneedle": bool(s.get("droppedneedle_url") and s.get("droppedneedle_api_key")),
+        "calendar": bool(
+            (s.get("sonarr_url") and s.get("sonarr_api_key"))
+            or (s.get("radarr_url") and s.get("radarr_api_key"))
+        ),
+    }

@@ -97,17 +97,17 @@ function renderRAGrid(list, target) {
     list.forEach(it => {
         const imgURL = it.thumb ? `/proxy-art${it.thumb.startsWith('/')?it.thumb:('/'+it.thumb)}` : '';
         const li = document.createElement('li');
-        li.className = "group rounded-2xl overflow-hidden bg-[#8acbd4] dark:bg-[#333] ";
+        li.className = "ra-card";
         li.innerHTML = `
-            <div class="relative aspect-[2/3] bg-gray-200 dark:bg-gray-700">
-            ${imgURL ? `<img loading="lazy" src="${imgURL}" class="h-full w-full object-cover">` : ''}
-            ${it.library ? `<div class="ra-pill absolute top-1 right-1 text-xs px-2 py-1 rounded-full bg-black/70 text-white"><span class="pill_text">${it.library}</span></div>` : ''}
-            ${it.added ? `<div class="ra-pill absolute bottom-1 right-1 text-[11px] text-white/90"><span class="bg-black/60 rounded px-1.5 py-0.5"><span class="pill_text">${it.added}</span></span></div>` : ''}
+            <div class="ra-card-imgwrap">
+            ${imgURL ? `<img loading="lazy" src="${imgURL}">` : ''}
+            ${it.library ? `<div class="ra-pill ra-pill--lib"><span class="pill_text">${it.library}</span></div>` : ''}
+            ${it.added ? `<div class="ra-pill ra-pill--added"><span class="pill_text">${it.added}</span></div>` : ''}
             </div>
-            <div class="p-3">
-            <div class="font-semibold line-clamp-2 text-[#333] dark:text-[#8acbd4]">${it.title}</div>
-            <div class="text-xs text-gray-500 dark:text-gray-400">${it.sub ? it.sub + ' • ' : ''}${it.duration}</div>
-            ${it.summary ? `<div class="mt-2 text-xs text-gray-600 dark:text-gray-300 line-clamp-5">${it.summary}</div>` : ''}
+            <div class="ra-card-body">
+            <div class="ra-card-title">${it.title}</div>
+            <div class="ra-card-sub">${it.sub ? it.sub + ' • ' : ''}${it.duration}</div>
+            ${it.summary ? `<div class="ra-card-summary">${it.summary}</div>` : ''}
             </div>`;
         target.appendChild(li);
     });
@@ -129,11 +129,11 @@ function buildRALibraryRows() {
             <div class="d-flex justify-content-between align-items-center p-2 border rounded">
                 <span style="font-size: .9rem;">${lib}</span>
                 <div>
-                    <button hidden type="button" class="btn button-outline btn-sm me-1 ra-view-btn" 
+                    <button hidden type="button" class="nl-btn nl-btn--ghost nl-btn--sm me-1 ra-view-btn" 
                             data-lib="${lib}" data-target="${id}" style="font-size: .8rem; padding: .25rem .5rem;">
                     View
                     </button>
-                    <button type="button" class="btn button btn-sm ra-add-btn" 
+                    <button type="button" class="nl-btn nl-btn--primary nl-btn--sm ra-add-btn" 
                             data-type="recently added" data-lib="${lib}" data-id="${id}" data-name="Recently Added: ${lib}"
                             style="font-size: .8rem; padding: .25rem .5rem;">
                     Add
@@ -163,11 +163,11 @@ function buildStatsRows() {
             <div class="d-flex justify-content-between align-items-center p-2 border rounded">
                 <span style="font-size: 0.9rem;">${stat.stat_title}</span>
                 <div>
-                    <button hidden type="button" class="btn button-outline btn-sm me-1 view-stat-btn"
+                    <button hidden type="button" class="nl-btn nl-btn--ghost nl-btn--sm me-1 view-stat-btn"
                             data-target="stat-${index}" style="font-size: 0.8rem; padding: 0.25rem 0.5rem;">
                         View
                     </button>
-                    <button type="button" class="btn button btn-sm add-stat-btn"
+                    <button type="button" class="nl-btn nl-btn--primary nl-btn--sm add-stat-btn"
                             data-id="stat-${index}"
                             data-name="${stat.stat_title}"
                             data-type="stat" style="font-size: 0.8rem; padding: 0.25rem 0.5rem;">
@@ -201,11 +201,11 @@ function buildGraphsRows() {
                 <div class="d-flex justify-content-between align-items-center p-2 border rounded">
                     <span style="font-size: 0.9rem;">${name}</span>
                     <div>
-                        <button hidden type="button" class="btn button-outline btn-sm me-1 view-graph-btn"
+                        <button hidden type="button" class="nl-btn nl-btn--ghost nl-btn--sm me-1 view-graph-btn"
                                 data-target="graph-${index}" style="font-size: 0.8rem; padding: 0.25rem 0.5rem;">
                             View
                         </button>
-                        <button type="button" class="btn button btn-sm add-graph-btn"
+                        <button type="button" class="nl-btn nl-btn--primary nl-btn--sm add-graph-btn"
                                 data-id="graph-${index}"
                                 data-name="${name}"
                                 data-type="graph" style="font-size: 0.8rem; padding: 0.25rem 0.5rem;">
@@ -232,25 +232,20 @@ function render(list) {
     list.forEach(it => {
         const imgURL = buildThumb(it.thumb);
         const li = document.createElement('li');
-        li.className = "group rounded-2xl overflow-hidden bg-[#8acbd4] dark:bg-[#333] " + 
-        "!shadow-[0_6px_18px_rgba(0, 0, 0, 0.6)] hover:!shadow-[0_10px_28px_rgba(0, 0, 0, 0.6)] " + 
-        "dark:!shadow-[0_6px_18px_rgba(74, 127, 130, 0.6)] dark:hover:!shadow-[0_10px_28px_rgba(74, 127, 130, 0.6)]";
+        li.className = "ra-card";
         li.dataset.lib = it.library;
         li.innerHTML = `
-            <style>
-                .ra-pill{ display:inline-flex; align-items:center; justify-content:center; line-height:1; }
-            </style>
-            <div class="relative aspect-[2/3] bg-gray-200 dark:bg-gray-700">
-                ${imgURL ? `<img loading="lazy" src="${imgURL}" class="h-full w-full object-cover">` : ''}
-                ${it.library ? `<div class="ra-pill absolute top-1 right-1 text-xs px-2 py-1 rounded-full bg-black/70 text-white"><span class="pill_text">${it.library}</span></div>` : ''}
-                ${it.added ? `<div class="ra-pill absolute bottom-1 right-1 text-[11px] text-white/90 bg-black/60 rounded px-1.5 py-0.5"><span class="pill_text">${it.added}</span></div>` : ''}
+            <div class="ra-card-imgwrap">
+                ${imgURL ? `<img loading="lazy" src="${imgURL}">` : ''}
+                ${it.library ? `<div class="ra-pill ra-pill--lib"><span class="pill_text">${it.library}</span></div>` : ''}
+                ${it.added ? `<div class="ra-pill ra-pill--added"><span class="pill_text">${it.added}</span></div>` : ''}
             </div>
-            <div class="p-3">
-                <div class="font-semibold line-clamp-2">${it.title}</div>
-                <div class="text-xs text-gray-500 dark:text-gray-400">
+            <div class="ra-card-body">
+                <div class="ra-card-title">${it.title}</div>
+                <div class="ra-card-sub">
                     ${it.sub ? it.sub + ' • ' : ''}${it.duration}
                 </div>
-                ${it.summary ? `<div class="mt-2 text-xs text-gray-600 dark:text-gray-300 line-clamp-5">${it.summary}</div>` : ''}
+                ${it.summary ? `<div class="ra-card-summary">${it.summary}</div>` : ''}
             </div>
         `;
         grid.appendChild(li);

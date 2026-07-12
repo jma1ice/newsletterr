@@ -1,44 +1,19 @@
 <!DOCTYPE html>
 <html lang="en">
     <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>newsletter</title>
-        <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
-        <style>
-            body {
-                background: linear-gradient(160deg, #8acbd4 0%, #62a1a4 100%);
-                min-height: 100vh;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                padding: 2rem 1rem;
-            }
-            .login-card {
-                background: rgba(255, 255, 255, 0.95);
-                border-radius: 15px;
-                padding: 2rem;
-                box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
-                width: 100%;
-                max-width: 440px;
-                text-align: center;
-            }
-            .logo-png {
-                height: 75px;
-                margin: 0 0 18px 0;
-            }
-        </style>
+        {% include 'partials/_head_min.html' %}
     </head>
-    <body>
-        <div class="login-card">
-            <img src="/static/img/Asset_94x.png" alt="Logo" class="logo-png" />
+    <body class="auth-body">
+        <div class="auth-card text-center">
+            <img src="/static/img/Asset_94x.png" alt="newsletterr" class="auth-logo-img" />
 
             {% if state == 'disabled' %}
-                <h5>Not available</h5>
-                <p class="text-muted">Hosted newsletters aren't enabled for this instance.</p>
+                <h5 class="auth-title">Not available</h5>
+                <p class="auth-sub">Hosted newsletters aren't enabled for this instance.</p>
             {% elif state == 'empty' %}
-                <h5>No newsletter yet</h5>
-                <p class="text-muted">Nothing has been sent yet.</p>
+                <h5 class="auth-title">No newsletter yet</h5>
+                <p class="auth-sub">Nothing has been sent yet.</p>
             {% endif %}
         </div>
     </body>

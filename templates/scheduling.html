@@ -1,15 +1,20 @@
 {% extends "base.html" %}
 {% block title %}email scheduling{% endblock %}
-
-{% block content %}
-<div class="container-fluid">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h1>email scheduling</h1>
-        <button id="add-schedule-btn" class="btn btn-success btn-lg px-4 py-2" data-bs-toggle="modal" data-bs-target="#scheduleModal" style="font-size: 1.2rem; font-weight: 600; min-width: 180px; box-shadow: 0 4px 8px rgba(0,0,0,0.2);">
+{% block page_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/scheduling.css') }}">{% endblock %}
+{% block page_header %}
+<header class="page-header">
+    <h1>scheduling</h1>
+    <div class="page-actions">
+        <button id="add-schedule-btn" class="nl-btn nl-btn--primary nl-btn--lg" data-bs-toggle="modal" data-bs-target="#scheduleModal">
             Add Schedule
         </button>
     </div>
-    <p class="text-info mb-4">Manage automated email schedules. Emails will be sent automatically based on your configured schedules.</p>
+</header>
+{% endblock %}
+{% block content %}
+<div class="container-fluid scheduling-page">
+    {% include 'partials/_sends_tabs.html' %}
+    <p class="text-muted mb-4">Manage automated email schedules. Emails will be sent automatically based on your configured schedules.</p>
 
     {% if schedules %}
         <div class="table-responsive">
@@ -38,7 +43,7 @@
                                     {% if schedule.template_id %}
                                         <span class="template-color-dot schedule-row-dot" data-template-id="{{ schedule.template_id }}" title="Template color"></span>
                                     {% else %}
-                                        <span class="template-color-dot schedule-row-dot" style="opacity:.35;" title="No template"></span>
+                                        <span class="template-color-dot schedule-row-dot no-tpl" title="No template"></span>
                                     {% endif %}
                                     <strong>{{ schedule.name }}</strong>
                                 </div>
@@ -126,11 +131,10 @@
             </table>
         </div>
     {% else %}
-        <div class="alert alert-info" role="alert">
-            <h4 class="alert-heading">No Schedules Created</h4>
+        <div class="nl-alert nl-alert--info" role="alert">
+            <h4 class="mb-2">No Schedules Created</h4>
             <p>You haven't created any email schedules yet. Email schedules allow you to automatically send newsletters at regular intervals.</p>
-            <hr>
-            <p class="mb-0">
+            <p class="mb-0 mt-3">
                 <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#scheduleModal">
                     Create Your First Schedule
                 </button>
@@ -152,7 +156,7 @@
                 </div>
                 <div class="card-body">
                     <div id="calendar-container"></div>
-                    <div id="calendar-legend" class="mt-3 d-flex flex-wrap gap-2 justify-content-center" style="font-size:.6rem;"></div>
+                    <div id="calendar-legend" class="mt-3 d-flex flex-wrap gap-2 justify-content-center"></div>
                 </div>
             </div>
         </div>
@@ -284,407 +288,6 @@
     </div>
 </div>
 
-<style>
-    .theme-modal {
-        background-color: var(--bs-body-bg);
-        color: var(--bs-body-color);
-    }
-
-    .theme-modal-header, .theme-modal-footer {
-        border-color: var(--bs-border-color);
-    }
-
-    .theme-card {
-        background-color: var(--bs-body-bg);
-        color: var(--bs-body-color);
-        border-color: var(--bs-border-color);
-    }
-
-    .theme-card-header {
-        border-color: var(--bs-border-color);
-    }
-
-    .calendar-card {
-        max-width: 560px;
-        width: 100%;
-        border-radius: 18px;
-        overflow: hidden;
-        box-shadow: 0 5px 14px -4px rgba(0, 0, 0, 0.32);
-    }
-
-    .calendar-card .card-header {
-        border-bottom: none;
-        padding: .65rem .9rem;
-        background: var(--bs-primary);
-        color: #fff;
-        border-radius: 18px 18px 0 0;
-        font-size: .95rem;
-    }
-
-    .dark .calendar-card .card-header {
-        background: #2c2c2c;
-    }
-
-    .calendar-card .card-body {
-        padding: 1rem .85rem .75rem;
-        background: radial-gradient(circle at 85% 12%, rgba(255, 255, 255, 0.04), transparent 55%);
-    }
-
-    .calendar-container {
-        display: grid;
-        grid-template-columns: repeat(7, 1fr);
-        gap: 6px;
-        width: 100%;
-        margin: 0 auto 0;
-        max-width: 530px;
-    }
-
-    .calendar-header {
-        font-size: .7rem;
-        font-weight: 600;
-        letter-spacing: .5px;
-        text-transform: uppercase;
-        padding: .35rem .25rem;
-        text-align: center;
-        color: var(--bs-secondary);
-        opacity: .85;
-    }
-
-    .dark .calendar-header {
-        color: #8acbd4;
-        opacity: .75;
-    }
-
-    .calendar-day {
-        position: relative;
-        background: rgba(var(--bs-primary-rgb), 0.035);
-        border-radius: 14px;
-        padding: 3px 4px 2px;
-        display: flex;
-        flex-direction: column;
-        justify-content: flex-start;
-        align-items: flex-start;
-        min-height: 0;
-        aspect-ratio: 1;
-        box-sizing: border-box;
-        overflow: hidden;
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        backdrop-filter: blur(2px);
-        -webkit-backdrop-filter: blur(2px);
-        transition: background .18s ease, transform .18s ease, box-shadow .18s ease, border-color .18s ease;
-    }
-    
-    body:not(.dark) .calendar-day {
-        background: linear-gradient(145deg, #ffffff, #f1f5ff);
-        border: 1px solid #e3e8ef;
-    }
-    
-    .calendar-day:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 6px 18px -4px rgba(0, 0, 0, 0.35);
-    }
-    
-    .calendar-day.has-schedule {
-        background: linear-gradient(170deg, rgba(13, 110, 253, .18), rgba(13, 110, 253, .07));
-        border-color: rgba(13, 110, 253, .42);
-    }
-    
-    body:not(.dark) .calendar-day.has-schedule {
-        background: linear-gradient(170deg, #e9f3ff, #f5faff);
-        border-color: #bed7fb;
-    }
-    
-    .calendar-day.other-month {
-        opacity: .35;
-        filter: saturate(.6);
-    }
-    
-    .calendar-day.today {
-        outline: 2px solid var(--bs-primary);
-        outline-offset: 2px;
-        box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.35);
-    }
-    
-    .dark .calendar-day.today {
-        box-shadow: 0 0 0 3px rgba(111, 66, 193, 0.45);
-    }
-
-    .calendar-day-number {
-        font-size: .6rem;
-        font-weight: 700;
-        line-height: 1;
-        letter-spacing: .4px;
-        padding: 2px 5px;
-        background: rgba(255, 255, 255, 0.38);
-        border-radius: 12px;
-        backdrop-filter: blur(3px);
-        -webkit-backdrop-filter: blur(3px);
-        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.55), 0 1px 2px rgba(0, 0, 0, 0.28);
-        color: #000;
-    }
-    
-    .dark .calendar-day-number {
-        background: rgba(0,0,0,0.4);
-        color: #fff;
-        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07), 0 1px 2px rgba(0, 0, 0, 0.5);
-    }
-
-    .calendar-dots {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 5px;
-        margin-top: auto;
-        max-height: 48px;
-        overflow: hidden;
-        width: 100%;
-        padding-top: 1px;
-    }
-    
-    .calendar-dot {
-        width: 18px;
-        height: 18px;
-        border-radius: 50%;
-        position: relative;
-        background: #0d6efd;
-        box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.6), 0 3px 6px -1px rgba(0, 0, 0, .5);
-        cursor: pointer;
-        transition: transform .22s ease, box-shadow .22s ease;
-    }
-    
-    .calendar-dot:hover {
-        transform: none;
-        filter: brightness(1.35) saturate(1.3);
-        box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.9), 0 4px 10px -2px rgba(0, 0, 0, .6);
-    }
-    
-    .dark .calendar-dot {
-        box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.55), 0 3px 6px -2px rgba(0, 0, 0, .9);
-    }
-
-    @media (max-width: 1100px) {
-        .calendar-day-number {
-            font-size: .55rem;
-        }
-        .calendar-dot {
-            width: 16px;
-            height: 16px;
-        }
-    }
-    
-    @media (max-width: 900px) {
-        .calendar-container {
-            gap: 8px;
-        }
-    }
-    
-    @media (max-width: 760px) {
-        .calendar-container {
-            gap: 6px;
-        }
-        .calendar-card{
-            border-radius: 20px;
-        }
-    }
-    
-    @media (max-width: 640px) {
-        .calendar-container {
-            gap: 4px;
-        }
-        .calendar-card{
-            border-radius: 16px;
-        }
-    }
-
-    #today-month {
-        font-size: 0.8rem;
-        padding: 0.25rem 0.5rem;
-        white-space: nowrap;
-    }
-
-    #today-month:hover {
-        background-color: var(--bs-secondary);
-        border-color: var(--bs-secondary);
-        color: white;
-    }
-
-    .schedule-tooltip {
-        position: absolute;
-        background-color: #333;
-        color: white;
-        padding: 8px;
-        border-radius: 4px;
-        font-size: 0.75rem;
-        z-index: 1000;
-        white-space: nowrap;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-    }
-
-    body:not(.dark) .theme-modal {
-        background-color: #fff;
-        color: #333;
-        border: 1px solid #62a1a4;
-    }
-
-    body:not(.dark) .theme-card {
-        background-color: #fff;
-        color: #333;
-        border: 1px solid #62a1a4;
-    }
-
-    body:not(.dark) .theme-card-header {
-        background-color: #8acbd4;
-        color: #333;
-        border-color: #62a1a4;
-    }
-
-    body:not(.dark) .theme-modal-header, body:not(.dark) .theme-modal-footer {
-        border-color: #62a1a4;
-    }
-
-    body:not(.dark) .theme-input {
-        background-color: #8acbd4;
-        color: #333;
-        border-color: #62a1a4;
-    }
-
-    body:not(.dark) .theme-input:focus {
-        background-color: #8acbd4;
-        color: #333;
-        border-color: #333;
-        box-shadow: 0 0 0 0.2rem rgba(51, 51, 51, 0.25);
-    }
-
-    body:not(.dark) .theme-input::placeholder {
-        color: rgba(51, 51, 51, 0.7);
-    }
-
-    body:not(.dark) .theme-alert {
-        background-color: #e3f7fa;
-        border-color: #62a1a4;
-        color: #333;
-    }
-
-    body:not(.dark) .calendar-day.other-month {
-        background-color: #f8f9fa;
-        color: #6c757d;
-    }
-
-    body:not(.dark) .theme-alert {
-        background-color: #e3f7fa;
-        border-color: #62a1a4;
-        color: #333;
-    }
-
-    .dark .theme-modal {
-        background-color: #333 !important;
-        color: #8acbd4 !important;
-        border: 1px solid #555;
-    }
-
-    .dark .theme-card {
-        background-color: #333 !important;
-        color: #8acbd4 !important;
-        border: 1px solid #555;
-    }
-
-    .dark .theme-card-header {
-        background-color: #2c2c2c !important;
-        color: #8acbd4 !important;
-        border-color: #555 !important;
-    }
-
-    .dark .theme-modal-header, .dark .theme-modal-footer {
-        border-color: #555 !important;
-    }
-
-    .dark .theme-input {
-        background-color: #333;
-        color: #8acbd4;
-        border-color: #555;
-    }
-
-    .dark .theme-input:focus {
-        background-color: #333;
-        color: #8acbd4;
-        border-color: #8acbd4;
-        box-shadow: 0 0 0 0.2rem rgba(138, 203, 212, 0.25);
-    }
-
-    .dark .theme-input::placeholder {
-        color: rgba(138, 203, 212, 0.7);
-    }
-
-    .dark .theme-btn-close {
-        filter: invert(1) grayscale(100%) brightness(200%);
-    }
-
-    .dark .theme-alert {
-        background-color: rgba(138, 203, 212, 0.1);
-        border-color: #8acbd4;
-        color: #8acbd4;
-    }
-
-    .dark .calendar-day {
-        background-color: #2c2c2c;
-        color: #8acbd4;
-    }
-
-    .dark .calendar-day.other-month {
-        background-color: #1a1a1a;
-        color: #666;
-    }
-
-    .table {
-        background-color: transparent;
-    }
-
-    .badge {
-        font-size: 0.75em;
-    }
-
-    .btn-group-sm > .btn {
-        font-size: 0.75rem;
-        padding: 0.25rem 0.5rem;
-    }
-
-    .btn-outline-warning:hover {
-        background-color: #ffc107;
-        border-color: #ffc107;
-        color: #000;
-    }
-
-    .btn-outline-success:hover {
-        background-color: #198754;
-        border-color: #198754;
-        color: #fff;
-    }
-
-    .btn-outline-danger:hover {
-        background-color: #dc3545;
-        border-color: #dc3545;
-        color: #fff;
-    }
-
-    .template-color-dot {
-        width: 12px;
-        height: 12px;
-        border-radius: 50%;
-        display: inline-block;
-        background: var(--bs-secondary);
-        box-shadow: 0 0 0 2px rgba(255, 255, 255, .6), 0 2px 4px -1px rgba(0, 0, 0, .4);
-        position: relative;
-        transition: filter .2s ease, box-shadow .25s ease;
-    }
-    
-    .template-color-dot:hover {
-        filter: brightness(1.3) saturate(1.25);
-        box-shadow: 0 0 0 2px rgba(255, 255, 255, .9), 0 3px 8px -2px rgba(0, 0, 0, .55);
-    }
-    
-    .dark .template-color-dot {
-        box-shadow: 0 0 0 2px rgba(0, 0, 0, .55), 0 2px 4px -2px rgba(0, 0, 0, .85);
-    }
-</style>
 
 <script nonce="{{ nonce }}">
     document.addEventListener('DOMContentLoaded', function() {

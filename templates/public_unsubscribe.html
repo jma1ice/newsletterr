@@ -1,59 +1,25 @@
 <!DOCTYPE html>
 <html lang="en">
     <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>unsubscribe</title>
-        <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
-        <style>
-            body {
-                background: linear-gradient(160deg, #8acbd4 0%, #62a1a4 100%);
-                min-height: 100vh;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                padding: 2rem 1rem;
-            }
-            .login-card {
-                background: rgba(255, 255, 255, 0.95);
-                border-radius: 15px;
-                padding: 2rem;
-                box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
-                width: 100%;
-                max-width: 440px;
-                text-align: center;
-            }
-            .logo-png {
-                height: 75px;
-                margin: 0 0 18px 0;
-            }
-            .btn-login {
-                background: linear-gradient(160deg, #8acbd4 0%, #62a1a4 100%);
-                border: none;
-                border-radius: 10px;
-                padding: 0.75rem 1.5rem;
-                font-weight: 600;
-                text-transform: uppercase;
-                letter-spacing: 1px;
-            }
-        </style>
+        {% include 'partials/_head_min.html' %}
     </head>
-    <body>
-        <div class="login-card">
-            <img src="/static/img/Asset_94x.png" alt="Logo" class="logo-png" />
+    <body class="auth-body">
+        <div class="auth-card text-center">
+            <img src="/static/img/Asset_94x.png" alt="newsletterr" class="auth-logo-img" />
 
             {% if state == 'invalid' %}
-                <h5>Link not recognized</h5>
-                <p class="text-muted">This unsubscribe link is invalid or has already been used.</p>
+                <h5 class="auth-title">Link not recognized</h5>
+                <p class="auth-sub">This unsubscribe link is invalid or has already been used.</p>
             {% elif state == 'confirm' %}
-                <h5>Unsubscribe {{ email }}?</h5>
-                <p class="text-muted">You'll stop receiving newsletter emails at this address.</p>
+                <h5 class="auth-title">Unsubscribe {{ email }}?</h5>
+                <p class="auth-sub mb-4">You'll stop receiving newsletter emails at this address.</p>
                 <form method="POST">
-                    <button type="submit" class="btn btn-primary btn-login">Unsubscribe</button>
+                    <button type="submit" class="nl-btn nl-btn--primary">Unsubscribe</button>
                 </form>
             {% elif state == 'done' %}
-                <h5>You're unsubscribed</h5>
-                <p class="text-muted">{{ email }} won't receive newsletter emails anymore.</p>
+                <h5 class="auth-title">You're unsubscribed</h5>
+                <p class="auth-sub">{{ email }} won't receive newsletter emails anymore.</p>
             {% endif %}
         </div>
     </body>

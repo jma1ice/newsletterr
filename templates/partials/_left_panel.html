@@ -1,3 +1,4 @@
+                        {% from '_icons.html' import icon %}
                         <h3 class="rail-heading">Pull data</h3>
                         <form method="POST" id="stats_form">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
@@ -13,34 +14,30 @@
                                 <button id="time_range_three_q" type="button" class="nl-btn nl-btn--primary">270</button>
                                 <button id="time_range_year" type="button" class="nl-btn nl-btn--primary">365</button>
                             </div>
-                            <button type="submit" class="nl-btn nl-btn--primary">Get Stats\Users</button>
+                            <button type="submit" class="nl-btn nl-btn--primary"{% if not service_flags.tautulli %} disabled title="Configure Tautulli in settings"{% endif %}>Get Stats\Users</button>
                             <button id="clear_cache_btn" type="button" class="nl-btn nl-btn--danger"
                                     title="Clear cached data to force fresh fetch">Clear Cache</button>
                         </form>
 
-                        {% if not user_dict %}
-                            <button id="pullRecsBtn" class="nl-btn nl-btn--ghost" disabled>Get Recommendations</button>
-                        {% else %}
-                            <button id="pullRecsBtn" class="nl-btn nl-btn--ghost">Get Recommendations</button>
-                        {% endif %}
+                        <button id="pullRecsBtn" class="nl-btn nl-btn--ghost"
+                                {%- if not service_flags.conjurr %} disabled title="Configure Conjurr in settings"
+                                {%- elif not user_dict %} disabled title="Run Get Stats\Users first to load recipients"{% endif %}>Get Recommendations</button>
                         <p class="rail-note">Pulled for users in the BCC list after Get Stats\Users. Takes 20-25 seconds per user.</p>
 
-                        {% if not user_dict %}
-                            <button id="pullDroppedNeedleBtn" class="nl-btn nl-btn--ghost" disabled>Get DroppedNeedle Stats</button>
-                        {% else %}
-                            <button id="pullDroppedNeedleBtn" class="nl-btn nl-btn--ghost">Get DroppedNeedle Stats</button>
-                        {% endif %}
+                        <button id="pullDroppedNeedleBtn" class="nl-btn nl-btn--ghost"
+                                {%- if not service_flags.droppedneedle %} disabled title="Configure DroppedNeedle in settings"
+                                {%- elif not user_dict %} disabled title="Run Get Stats\Users first to load recipients"{% endif %}>Get DroppedNeedle Stats</button>
                         <p class="rail-note">Per-user "year in music" wrapped and server-wide stats for the BCC list.</p>
 
-                        <button id="pullComingSoonBtn" class="nl-btn nl-btn--ghost">Get Coming Soon Calendar</button>
+                        <button id="pullComingSoonBtn" class="nl-btn nl-btn--ghost"{% if not service_flags.calendar %} disabled title="Configure Sonarr or Radarr in settings"{% endif %}>Get Coming Soon Calendar</button>
                         <p class="rail-note">Upcoming episode and movie calendar from Sonarr and Radarr, if configured in settings.</p>
 
 
                         {% if cache_info %}
                             <div class="card mt-3" id="cache-card">
-                                <div id="cache-card-header" class="card-header d-flex justify-content-between align-items-center" >
+                                <div id="cache-card-header" class="card-header d-flex justify-content-between align-items-center is-collapsed" >
                                     <h6 class="mb-0">Cache Status</h6>
-                                    <span>▼</span>
+                                    <span>{{ icon('chevron-down') }}</span>
                                 </div>
                                 <div id="cache-status-badge" class="card-body d-none">
                                     {% for key, info in cache_info.items() %}
@@ -66,8 +63,8 @@
 
                         <div class="card mb-3 bcc-card">
                             <div id="bcc-card-header" class="card-header d-flex justify-content-between align-items-center" >
-                                <h5 class="mb-0">Email Recipients</h5>
-                                <span id="bcc-toggle-icon">▼</span>
+                                <h5 class="mb-0">Email Recipients <span id="bcc-count">(0)</span></h5>
+                                <span id="bcc-toggle-icon">{{ icon('chevron-down') }}</span>
                             </div>
                             <div id="bcc-collapse" class="card-body">
                                 <form method="POST" action="/send_email">

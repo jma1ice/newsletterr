@@ -20,7 +20,7 @@
     position: sticky;
     top: 0;
     align-self: flex-start;
-    height: 100vh;
+    height: calc(100vh - var(--footer-h));
     transition: width .18s ease;
 }
 .sidebar-collapsed #app-sidebar {
@@ -91,7 +91,15 @@
     align-self: flex-start;
     white-space: nowrap;
 }
-.sidebar-collapsed .sidebar-cache { display: none; }
+/* Collapsed: keep the pill so its status dot stays visible; drop the label
+   text and shrink to just the ::before dot, centered in the rail. The title
+   tooltip keeps working. */
+.sidebar-collapsed .sidebar-cache {
+    align-self: center;
+    padding: 6px;
+    gap: 0;
+}
+.sidebar-collapsed .sidebar-cache strong { display: none; }
 .sidebar-collapsed .sidebar-foot-row { flex-direction: column; }
 .sidebar-collapsed .sidebar-brand { justify-content: center; padding: var(--space-5) var(--space-2); }
 .sidebar-collapsed .sidebar-foot { padding: var(--space-3) var(--space-1); }
@@ -120,6 +128,7 @@
     min-height: 100vh;
     display: flex;
     flex-direction: column;
+    padding-bottom: var(--footer-h);
 }
 
 .page-header {
@@ -152,20 +161,33 @@
 }
 
 .site-foot-flow {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    height: var(--footer-h);
     border-top: 1px solid var(--border);
-    padding: var(--space-4) var(--space-6);
+    padding: 0 var(--space-6);
     display: flex;
-    flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
     gap: var(--space-3);
+    background: var(--surface-1);
     color: var(--text-muted);
     font-size: var(--text-sm);
 }
 .site-foot-flow a { color: var(--accent); text-decoration: none; }
 .site-foot-flow a:hover { text-decoration: underline; }
+.site-foot-flow .foot-left,
 .site-foot-flow .foot-mid,
 .site-foot-flow .foot-right { display: inline-flex; align-items: center; gap: 6px; }
+/* Center the tip against the whole footer width, not the flex distribution. */
+.site-foot-flow .foot-mid {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+}
 .mobile-topbar-brand { font-weight: 700; font-size: var(--text-md); }
 
 /* ---- mobile shell */
@@ -191,8 +213,9 @@
     .sidebar-collapsed #app-sidebar { width: var(--sidebar-w); }
     .sidebar-collapsed #app-sidebar #navLinks a { justify-content: flex-start; }
     .sidebar-collapsed #app-sidebar #navLinks a .nav-label,
-    .sidebar-collapsed .sidebar-brand .brand-full,
-    .sidebar-collapsed .sidebar-cache { display: revert; }
+    .sidebar-collapsed .sidebar-brand .brand-full { display: revert; }
+    .sidebar-collapsed .sidebar-cache { align-self: flex-start; padding: 3px 10px; gap: 7px; }
+    .sidebar-collapsed .sidebar-cache strong { display: revert; }
     .sidebar-collapsed .sidebar-brand .brand-mark { display: none; }
     .sidebar-collapsed .sidebar-foot-row { flex-direction: row; }
     .sidebar-collapsed .sidebar-brand { justify-content: flex-start; padding: var(--space-5) var(--space-4); }
@@ -239,6 +262,23 @@
     /* Title + actions stack instead of overflowing on narrow screens. */
     .page-header { flex-wrap: wrap; gap: var(--space-3); }
     .page-actions { flex-wrap: wrap; }
+
+    /* Footer reverts to in-flow on mobile so it does not fight the builder
+       mobile tab bar; the sidebar drawer stays full height (set above). */
+    .app-main { padding-bottom: 0; }
+    .site-foot-flow {
+        position: static;
+        height: auto;
+        padding: var(--space-4);
+        flex-wrap: wrap;
+        justify-content: center;
+        text-align: center;
+    }
+    .site-foot-flow .foot-mid {
+        position: static;
+        left: auto;
+        transform: none;
+    }
 }
 
 /* ======================================================================
@@ -646,10 +686,12 @@
         display: block !important;
     }
     
+    /* Fixed footer is out of flow; app-main padding-bottom reserves its space,
+       so no legacy body bottom padding is needed. */
     body {
-        padding-bottom: 70px;
+        padding-bottom: 0;
     }
-    
+
     .nl-btn:hover, .btn:hover {
         transform: translateY(-1px);
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
@@ -662,5 +704,6 @@
 }
 
 /* footer service icons */
+.site-foot-flow .foot-left img,
 .site-foot-flow .foot-mid img,
-.site-foot-flow .foot-right img { height: 20px; }
+.site-foot-flow .foot-right img { height: 20px; width: auto; }

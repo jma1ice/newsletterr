@@ -1,9 +1,10 @@
 {% extends "base.html" %}
+{% from '_icons.html' import icon %}
 {% block title %}newsletterr{% endblock %}
 {% block page_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/builder.css') }}">{% endblock %}
 {% block page_header %}
 <header class="page-header">
-    <h1 id="welcome-message">build newsletter</h1>
+    <h1 id="welcome-message">build</h1>
     <div class="page-actions">
         <button id="sendTestBtn" class="nl-btn nl-btn--ghost" title="Send this email only to your From address">
             Send Test
@@ -56,15 +57,15 @@
             </div>
             <div class="builder-col mobile-content-panel mobile-section-content" id="content-row">
                 <div id="selected-items-pane">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-3 snapins-toolbar">
                         <h2>Snap-ins</h2>
-                        <div class="d-flex gap-2 align-items-center">
+                        <div class="snapins-tools">
                             <button id="reset-template-btn" class="nl-btn nl-btn--ghost nl-btn--sm" title="Clear all items and reset to Custom template">
-                                &#128260; Reset
+                                {{ icon('refresh') }} Reset
                             </button>
-                            <div id="custom-html-toggle-row" class="align-items-center gap-2 border-1 border-secondary rounded p-1">
+                            <div id="custom-html-toggle-row" class="d-flex align-items-center gap-2 p-1">
                                 <div class="form-check form-switch mb-0">
-                                    <input class="form-check-input mt-3" type="checkbox" id="custom-html-toggle" role="switch">
+                                    <input class="form-check-input" type="checkbox" id="custom-html-toggle" role="switch">
                                     <label class="form-check-label" for="custom-html-toggle">
                                         Custom HTML Mode
                                     </label>
@@ -75,8 +76,8 @@
                                 <option value="">Custom</option>
                                 <option value="save-template">(Save template)</option>
                             </select>
-                            <button id="delete-template-btn" class="btn btn-outline-danger btn-sm" style="display: none;">
-                                &#128465;&#65039; Delete
+                            <button id="delete-template-btn" class="nl-btn nl-btn--ghost nl-btn--sm nl-btn--icon" style="display: none;" title="Delete this template" aria-label="Delete template">
+                                {{ icon('trash') }}
                             </button>
                         </div>
                     </div>

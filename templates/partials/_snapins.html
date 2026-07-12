@@ -1,3 +1,4 @@
+{% from '_icons.html' import icon %}
                         <div class="mb-4">
                             <div class="d-flex justify-content-between align-items-center mb-3">
                                 <h2>Text Blocks</h2>
@@ -95,7 +96,7 @@
                                 </button>
                                 <div class="row">
                                     <div class="col-md-4">
-                                        <h5>📽️ Movie Collections</h5>
+                                        <h5 class="collection-heading">{{ icon('film') }} Movie Collections</h5>
                                         <div class="d-flex align-items-center gap-2 mb-3">
                                             <select id="movie-collections-dropdown" class="form-select flex-1">
                                                 <option value="">Pick collection...</option>
@@ -112,7 +113,7 @@
                                         </div>
                                     </div>
                                     <div class="col-md-4">
-                                        <h5>📺 TV Show Collections</h5>
+                                        <h5 class="collection-heading">{{ icon('tv') }} TV Show Collections</h5>
                                         <div class="d-flex align-items-center gap-2 mb-3">
                                             <select id="show-collections-dropdown" class="form-select flex-1">
                                                 <option value="">Pick collection...</option>
@@ -129,7 +130,7 @@
                                         </div>
                                     </div>
                                     <div class="col-md-4">
-                                        <h5>🎧 Audio Collections</h5>
+                                        <h5 class="collection-heading">{{ icon('music') }} Audio Collections</h5>
                                         <div class="d-flex align-items-center gap-2 mb-3">
                                             <select id="audio-collections-dropdown" class="form-select flex-1">
                                                 <option value="">Pick collection...</option>

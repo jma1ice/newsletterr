@@ -10,7 +10,7 @@ from app.db import db_connect
 from app.cache import is_cache_valid, get_cached_data, get_cache_info, clear_cache
 from app.crypto import decrypt
 from app.net import is_safe_fetch_url, configured_media_hosts
-from app.settings_store import get_settings
+from app.settings_store import get_service_flags, get_settings
 from app.security import require_csrf_for_json, requires_auth, safe_get
 from app.store import get_saved_email_lists
 from app.theme import get_theme_settings
@@ -92,17 +92,7 @@ def index():
         "coming_soon_grid_columns": s["coming_soon_grid_columns"],
     }
 
-    # Booleans only (no URLs/keys leak to the client): which pull-data services
-    # are configured, so the frontend can grey out buttons that would just fail.
-    service_flags = {
-        "tautulli": bool(s.get("tautulli_url") and s.get("tautulli_api")),
-        "conjurr": bool(s.get("conjurr_url")),
-        "droppedneedle": bool(s.get("droppedneedle_url") and s.get("droppedneedle_api_key")),
-        "calendar": bool(
-            (s.get("sonarr_url") and s.get("sonarr_api_key"))
-            or (s.get("radarr_url") and s.get("radarr_api_key"))
-        ),
-    }
+    service_flags = get_service_flags(s)
 
     conn = db_connect()
     cursor = conn.cursor()

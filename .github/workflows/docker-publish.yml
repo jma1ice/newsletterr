@@ -32,9 +32,16 @@ jobs:
         id: tags
         run: |
           REPO="jma1ice/newsletterr"
+
           if [ "${{ github.event_name }}" = "release" ]; then
             TAG="${{ github.event.release.tag_name }}"
-            echo "tags=$REPO:latest,$REPO:nightly,$REPO:pre-release,$REPO:$TAG" >> "$GITHUB_OUTPUT"
+
+            if [ "${{ github.event.release.prerelease }}" = "true" ]; then
+              echo "tags=$REPO:pre-release,$REPO:$TAG" >> "$GITHUB_OUTPUT"
+            else
+              echo "tags=$REPO:latest,$REPO:nightly,$REPO:pre-release,$REPO:$TAG" >> "$GITHUB_OUTPUT"
+            fi
+            
           elif [ "${{ github.ref_name }}" = "main" ]; then
             echo "tags=$REPO:pre-release" >> "$GITHUB_OUTPUT"
           else

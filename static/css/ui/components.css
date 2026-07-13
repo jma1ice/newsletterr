@@ -376,6 +376,11 @@ body.nl-modal-open { overflow: hidden; }
     color: rgba(233, 241, 242, .72);
     min-height: 1.2em;
 }
+/* Contributor shout-outs echo the About page tiers. Fixed colors (the dark
+   status tones) since the scrim is always dark; gold = --warning, green =
+   --success. */
+.spinner-tip--gold { color: #d6a53a; }
+.spinner-tip--green { color: #3fae74; }
 
 /* ---- chips (BCC recipients) - token-driven, owns the .nl-chip name */
 .nl-chips {

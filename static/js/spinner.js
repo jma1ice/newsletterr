@@ -27,12 +27,13 @@
         'Polishing the pixels...',
         'Lining up the newsletters...',
         'Tightening a few bolts...',
-        // contributor shout-outs
-        'Thanks to @baggins for helping keep newsletterr alive!',
-        'Shoutout to @dreondre for contributing on GitHub!',
-        'Thanks to @taehatypes for the support!',
-        'Shoutout to @quinneydavid for contributing on GitHub!',
-        'Thanks to @bferd for the support!',
+        // contributor shout-outs, colored to match the About page tiers
+        // (gold = contrib-group--gold, green = contrib-group--green)
+        { text: 'Thanks to @baggins for helping keep newsletterr alive!', tier: 'gold' },
+        { text: 'Shoutout to @dreondre for contributing on GitHub!', tier: 'gold' },
+        { text: 'Thanks to @taehatypes for the support!', tier: 'green' },
+        { text: 'Shoutout to @quinneydavid for contributing on GitHub!', tier: 'green' },
+        { text: 'Thanks to @bferd for the support!', tier: 'green' },
         // quips
         'Good things come to those who wait...',
         'Herding a few cats...',
@@ -60,7 +61,11 @@
         const el = document.getElementById('loading-tip');
         if (!el) return;
         lastTip = pickIndex(TIPS.length, lastTip);
-        el.textContent = TIPS[lastTip];
+        const tip = TIPS[lastTip];
+        const tier = typeof tip === 'string' ? null : tip.tier;
+        el.textContent = typeof tip === 'string' ? tip : tip.text;
+        el.classList.toggle('spinner-tip--gold', tier === 'gold');
+        el.classList.toggle('spinner-tip--green', tier === 'green');
     }
 
     window.showSpinner = function (passedText) {

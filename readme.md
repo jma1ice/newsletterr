@@ -218,6 +218,9 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Email preview: desktop/tablet/phone views
 * Top right logo should link to site
 
+--- Email ---
+* Possible default email layout/UI overhaul with pride theme
+
 --- Misc. ---
 * Can Snap-Ins work with custom HTML?
 * CSP out of Report-Only after trial run

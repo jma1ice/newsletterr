@@ -3,7 +3,9 @@
  * elevation for the UI overhaul. Light values live on :root; dark overrides
  * live in the .dark block. The dark palette is the designed-first one; light
  * is derived. No .dark .selector descendant rules anywhere else: components
- * read these semantic tokens and theme switching happens here only.
+ * read these semantic tokens and theme switching happens here and in pride.css
+ * only (pride.css layers per-flag palettes on top and is the one other file
+ * allowed to use .dark in selectors).
  *
  * Loaded first in base.html. Defining variables has no visual effect on its
  * own; components opt in as they are migrated per phase.
@@ -99,7 +101,7 @@
     --focus-ring: 0 0 0 3px color-mix(in srgb, var(--accent) 45%, transparent);
     --sidebar-w: 248px;
     --sidebar-w-collapsed: 64px;
-    --footer-h: 48px;
+    --footer-h: 40px;
 }
 
 .dark {

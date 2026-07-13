@@ -56,6 +56,8 @@ document.getElementById('stats_form').addEventListener('submit', async (e) => {
                 host.innerHTML = '';
                 buildRALibraryRows();
             }
+            const raCard = document.getElementById('ra-card');
+            if (raCard) raCard.style.display = '';
             const raHeader = document.getElementById('ra-header');
             if (raHeader) raHeader.style.display = '';
             if (host) host.style.display = '';

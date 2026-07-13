@@ -10,3 +10,14 @@ if (cacheCardHeader) {
         e.currentTarget.classList.toggle('is-collapsed', collapsed);
     });
 }
+
+// Recipients toggle: chevron collapses the nested list selector + BCC chips so
+// the message bar stays compact. Default-collapsed state is set in the markup.
+const bccCardHeader = document.getElementById('bcc-card-header');
+if (bccCardHeader) {
+    bccCardHeader.addEventListener('click', (e) => {
+        const collapsed = document.getElementById('bcc-collapse').classList.toggle('d-none');
+        e.currentTarget.classList.toggle('is-collapsed', collapsed);
+        e.currentTarget.setAttribute('aria-expanded', String(!collapsed));
+    });
+}

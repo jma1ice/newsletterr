@@ -37,32 +37,38 @@
                                value="{{ settings.server_name }} Newsletter">
                     </div>
                     <div class="msg-field msg-field--recipients">
-                        <label for="email_list_selector">Recipients <span id="bcc-count">(0)</span></label>
-                        <div class="d-flex gap-2 align-items-center">
-                            <select id="email_list_selector" class="form-select flex-1">
-                                <option value="(Save new list)">(Save list)</option>
-                                <option value="ALL">ALL</option>
-                                <option value="Custom" selected>Custom</option>
-                                {% for list in email_lists|sort(attribute='name') %}
-                                    <option value="{{ list.id }}" data-emails="{{ list.emails }}">{{ list.name }}</option>
-                                {% endfor %}
-                            </select>
-                            <button id="delete_list_btn" type="button" class="btn btn-sm btn-danger d-none">Delete</button>
-                        </div>
-                        <div id="save_list_container" class="d-none">
-                            <div class="d-flex gap-2">
-                                <input type="text" id="new_list_name" class="form-control" placeholder="Enter list name" />
-                                <button id="save_list_btn" type="button" class="btn btn-sm btn-success">Save</button>
-                                <button id="cancel_save_btn" type="button" class="btn btn-sm btn-secondary">Cancel</button>
+                        <label>Recipients</label>
+                        <button type="button" id="bcc-card-header" class="msg-recipients-toggle is-collapsed" aria-expanded="false" aria-controls="bcc-collapse">
+                            <span class="msg-recipients-count"><span id="bcc-count">(0)</span> recipients</span>
+                            <span id="bcc-toggle-icon">{{ icon('chevron-down') }}</span>
+                        </button>
+                        <div id="bcc-collapse" class="msg-recipients-body d-none">
+                            <div class="d-flex gap-2 align-items-center">
+                                <select id="email_list_selector" class="form-select flex-1">
+                                    <option value="(Save new list)">(Save list)</option>
+                                    <option value="ALL">ALL</option>
+                                    <option value="Custom" selected>Custom</option>
+                                    {% for list in email_lists|sort(attribute='name') %}
+                                        <option value="{{ list.id }}" data-emails="{{ list.emails }}">{{ list.name }}</option>
+                                    {% endfor %}
+                                </select>
+                                <button id="delete_list_btn" type="button" class="btn btn-sm btn-danger d-none">Delete</button>
                             </div>
+                            <div id="save_list_container" class="d-none mt-2">
+                                <div class="d-flex gap-2">
+                                    <input type="text" id="new_list_name" class="form-control" placeholder="Enter list name" />
+                                    <button id="save_list_btn" type="button" class="btn btn-sm btn-success">Save</button>
+                                    <button id="cancel_save_btn" type="button" class="btn btn-sm btn-secondary">Cancel</button>
+                                </div>
+                            </div>
+                            <div id="bcc_chips" class="nl-chips mt-2" role="listbox" aria-label="BCC recipients">
+                                <input id="email_chip_input"
+                                        type="text"
+                                        placeholder="Add BCC emails"
+                                        aria-label="Add recipient" />
+                            </div>
+                            <textarea name="to_emails" id="to_emails" class="d-none">{{ user_dict.values() | join(', ') }}</textarea>
                         </div>
-                        <div id="bcc_chips" class="nl-chips" role="listbox" aria-label="BCC recipients">
-                            <input id="email_chip_input"
-                                    type="text"
-                                    placeholder="Add BCC emails"
-                                    aria-label="Add recipient" />
-                        </div>
-                        <textarea name="to_emails" id="to_emails" class="d-none">{{ user_dict.values() | join(', ') }}</textarea>
                     </div>
                 </form>
                 <div class="d-flex justify-content-between align-items-center mb-2 preview-toolbar">

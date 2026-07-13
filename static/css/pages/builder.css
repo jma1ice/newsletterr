@@ -182,10 +182,27 @@
     box-shadow: var(--shadow-1);
     margin-bottom: var(--space-4);
 }
-.builder-page .builder-card:last-child { margin-bottom: 0; }
-/* section headings sit flush with the card top */
-.builder-page .builder-card > h2:first-child,
-.builder-page .builder-card > .d-flex:first-child h2 { margin-top: 0; }
+/* Uniform bottom margin on every card (no :last-child reset): dynamic sections
+   nest their card inside a wrapper div, so a :last-child reset would strip the
+   gap under Recommendations / DroppedNeedle / Coming Soon and let the next
+   section collide with them. */
+/* section headings sit flush with the card top and never wrap; the add-button
+   clusters in the toolbar wrap instead so the heading is free to fully extend. */
+.builder-page .builder-card h2 { margin-top: 0; }
+.builder-page .snapins-toolbar > h2,
+.builder-page .builder-card > .d-flex > h2 {
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+/* sub-section headings inside a consolidated card (e.g. Stats / Graphs) */
+.builder-page .card-subhead {
+    font-size: var(--text-sm);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--text-muted);
+    margin: 0 0 var(--space-2);
+}
 
 /* buttons: .nl-btn variants (components.css) own these now; the page-scoped
    .button definitions retired with the Phase 8d rename. */
@@ -522,7 +539,37 @@
    selector and BCC chips, which stack under the label. */
 .builder-page .msg-field--recipients { flex: 1.4; }
 .builder-page .msg-field--recipients #bcc_chips { width: 100%; }
-.builder-page .msg-field--recipients #bcc-count { color: var(--text-faint); font-weight: 600; }
+.builder-page .msg-field--recipients #bcc-count { color: var(--text); font-weight: 700; }
+/* Recipients collapses to a chevron toggle so the list can be hidden; the
+   list selector + BCC chips nest in the body that drops open below it. */
+.builder-page .msg-recipients-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    width: 100%;
+    background: var(--surface-1);
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 8px 10px;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+.builder-page .msg-recipients-toggle:hover { border-color: var(--accent); }
+.builder-page .msg-recipients-toggle:focus-visible {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: var(--focus-ring);
+}
+.builder-page #bcc-toggle-icon .nl-icon {
+    width: 16px;
+    height: 16px;
+    transition: transform 0.3s ease;
+}
+.builder-page .msg-recipients-toggle.is-collapsed #bcc-toggle-icon .nl-icon { transform: rotate(-90deg); }
+.builder-page .msg-recipients-body { padding-top: var(--space-2); }
 .builder-page .msg-field {
     flex: 1;
     min-width: 0;

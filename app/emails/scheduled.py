@@ -20,7 +20,7 @@ from datetime import datetime, timedelta
 from app.tokens import make_unsubscribe_placeholder
 from app.emails.assemble import convert_html_to_plain_text, build_email_html_with_all_cids
 from app.emails.fetchers import fetch_tautulli_data_for_email
-from app.emails.send import group_recipients_by_user, send_personalized_per_recipient
+from app.emails.send import group_recipients_by_user, send_personalized_per_recipient, filter_inactive
 
 import logging
 
@@ -100,6 +100,11 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
         to_emails_list, _suppressed = filter_suppressed(to_emails_list)
         if not to_emails_list:
             logger.info("All recipients have unsubscribed; skipping scheduled send")
+            return False
+
+        to_emails_list, _inactive = filter_inactive(to_emails_list, s)
+        if not to_emails_list:
+            logger.info("All recipients filtered out for inactivity; skipping scheduled send")
             return False
 
         templates_conn = db_connect()
@@ -379,6 +384,9 @@ def send_scheduled_user_email_with_cids(ctx, settings, recipients, user_key):
         tautulli_data["settings"]["stat_cover_art"] = stat_cover_art
         tautulli_data["settings"]["poster_max_height"] = poster_max_height
         tautulli_data["settings"]["coming_soon_grid_columns"] = coming_soon_grid_columns
+        tautulli_data["settings"]["collections_grid_columns"] = settings.get("collections_grid_columns", 5)
+        tautulli_data["settings"]["ra_show_description"] = settings.get("ra_show_description", "enabled")
+        tautulli_data["settings"]["include_user_info"] = settings.get("include_user_info", "enabled")
 
         template_data = {
             'selected_items': json.dumps(selected_items),
@@ -594,6 +602,9 @@ def send_scheduled_single_email_with_cids(ctx, settings, to_emails_list):
         tautulli_data["settings"]["stat_cover_art"] = stat_cover_art
         tautulli_data["settings"]["poster_max_height"] = poster_max_height
         tautulli_data["settings"]["coming_soon_grid_columns"] = coming_soon_grid_columns
+        tautulli_data["settings"]["collections_grid_columns"] = settings.get("collections_grid_columns", 5)
+        tautulli_data["settings"]["ra_show_description"] = settings.get("ra_show_description", "enabled")
+        tautulli_data["settings"]["include_user_info"] = settings.get("include_user_info", "enabled")
 
         template_data = {
             'selected_items': json.dumps(selected_items),

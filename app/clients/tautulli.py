@@ -21,6 +21,9 @@ def run_tautulli_command(base_url, api_key, command, section_id, error, time_ran
 
     if command == 'get_users' or command == 'get_library_names' or command == 'get_libraries':
         api_url = f"{base_url}/api/v2?apikey={decrypt(api_key)}&cmd={command}"
+    elif command == 'get_users_table':
+        # returns rows with user_id + last_seen (epoch); length caps the page size
+        api_url = f"{base_url}/api/v2?apikey={decrypt(api_key)}&cmd={command}&length=1000"
     elif command == 'get_recently_added':
         api_url = f"{base_url}/api/v2?apikey={decrypt(api_key)}&cmd={command}&count={time_range}&section_id={section_id}&start={start}"
         logger.info(f"Tautulli API call: get_recently_added with count={time_range}, start={start}")

@@ -6,12 +6,14 @@
     </head>
     <body class="auth-body">
         <div id="spinner" class="spinner" style="display: none;">
-            <img src="/static/img/load.gif" alt="Loading..." />
+            <img src="/static/img/Asset_45752.gif" alt="Loading..." />
             <p id="loading-text"></p>
+            <p id="loading-tip" class="spinner-tip"></p>
         </div>
         <div class="auth-card">
             <div class="auth-logo">
-                <img src="/static/img/Asset_94x.png" alt="newsletterr" class="auth-logo-img" />
+                <img src="/static/img/Asset_94x.png" alt="newsletterr" class="auth-logo-img brand-normal" />
+                <img src="/static/img/Asset_51.png" alt="newsletterr" class="auth-logo-img brand-pride" />
             </div>
 
             {% if error %}
@@ -218,16 +220,8 @@
             </div>
         </div>
 
+        <script src="{{ url_for('static', filename='js/spinner.js') }}" nonce="{{ nonce }}"></script>
         <script nonce="{{ nonce }}">
-            function showSpinner(passedText) {
-                document.getElementById('spinner').style.display = 'flex';
-                document.getElementById('loading-text').innerText = passedText;
-            }
-
-            function hideSpinner() {
-                document.getElementById('spinner').style.display = 'none';
-            }
-
             function openCenteredPopup(url, w = 520, h = 680, name = 'plex-auth', offsetX = 0, offsetY = 0) {
                 const dualLeft = window.screenLeft ?? window.screenX;
                 const dualTop  = window.screenTop  ?? window.screenY;

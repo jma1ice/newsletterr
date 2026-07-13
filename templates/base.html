@@ -11,11 +11,14 @@
             if (localStorage.getItem('sidebar') === 'collapsed') {
                 document.documentElement.classList.add('sidebar-collapsed');
             }
+            const pride = localStorage.getItem('pride');
+            if (pride) document.documentElement.classList.add('pride', 'pride-' + pride);
         } catch (_) {}
     </script>
     <meta charset="UTF-8" name="viewport" content="width=device-width, initial-scale=1">
     <link rel="icon" type="image/x-icon" href="/static/img/favicon.ico">
     <link href="{{ url_for('static', filename='css/ui/tokens.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/ui/pride.css') }}" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/ui/compat.css') }}" rel="stylesheet">
     <script src="{{ url_for('static', filename='js/vendor/html2canvas.min.js') }}" nonce="{{ nonce }}"></script>
     <script src="{{ url_for('static', filename='js/vendor/highcharts.js') }}" nonce="{{ nonce }}"></script>
@@ -32,14 +35,17 @@
 </head>
 <body>
     <div id="spinner" class="spinner" style="display: none;">
-        <img src="/static/img/load.gif" alt="Loading..." />
+        <img src="/static/img/Asset_45752.gif" alt="Loading..." />
         <p id="loading-text"></p>
+        <p id="loading-tip" class="spinner-tip"></p>
     </div>
     <div class="app-shell">
         <aside id="app-sidebar">
             <a class="sidebar-brand" href="{{ url_for('main.index') }}">
-                <img class="brand-full" src="/static/img/Asset_94x.png" alt="newsletterr logo" />
-                <img class="brand-mark" src="/static/img/Asset_54x.png" alt="newsletterr logo" />
+                <img class="brand-full brand-normal" src="/static/img/Asset_94x.png" alt="newsletterr logo" />
+                <img class="brand-mark brand-normal" src="/static/img/Asset_54x.png" alt="newsletterr logo" />
+                <img class="brand-full brand-pride" src="/static/img/Asset_51.png" alt="newsletterr logo" />
+                <img class="brand-mark brand-pride" src="/static/img/Asset_50.png" alt="newsletterr logo" />
             </a>
             <ul id="navLinks">
                 <li><a href="{{ url_for('main.index') }}"{% if request.endpoint == 'main.index' %} class="is-active"{% endif %}>{{ icon('home') }}<span class="nav-label">build</span></a></li>
@@ -101,26 +107,25 @@
             <main>{% block content %}{% endblock %}</main>
             <footer class="site-foot-flow">
                 <a class="foot-left" target="_blank" href="https://github.com/jma1ice/newsletterr">
-                    <img src="{{ url_for('static', filename='img/github.png') }}" alt="GitHub"><span>{{ version }}</span>
+                    <img class="swap-normal" src="{{ url_for('static', filename='img/github.png') }}" alt="GitHub">
+                    <img class="swap-pride-light" src="{{ url_for('static', filename='img/Asset_59.png') }}" alt="GitHub">
+                    <img class="swap-pride-dark" src="{{ url_for('static', filename='img/Asset_69.png') }}" alt="GitHub">
+                    <span>{{ version }}</span>
                 </a>
                 <a class="foot-mid" target="_blank" href="https://ko-fi.com/newsletterr">
                     <img src="{{ url_for('static', filename='img/kofi.png') }}" alt="Ko-fi"><span>Tip the devs</span>
                 </a>
-                <span class="foot-right"><a target="_blank" href="https://discord.gg/7Skcsqs4uT">Join the discussion on Discord!</a> Newsletterr © 2026.</span>
+                <a class="foot-right" target="_blank" href="https://discord.gg/7Skcsqs4uT">
+                    <img class="swap-light" src="{{ url_for('static', filename='img/Asset_56.png') }}" alt="Discord">
+                    <img class="swap-dark" src="{{ url_for('static', filename='img/Asset_55.png') }}" alt="Discord">
+                    <img class="swap-pride" src="{{ url_for('static', filename='img/Asset_57.png') }}" alt="Discord">
+                    <span>Newsletterr © 2026.</span>
+                </a>
             </footer>
         </div>
         <div class="sidebar-scrim"></div>
     </div>
-    <script nonce="{{ nonce }}">
-        function showSpinner(passedText) {
-            document.getElementById('spinner').style.display = 'flex';
-            document.getElementById('loading-text').innerText = passedText;
-        }
-
-        function hideSpinner() {
-            document.getElementById('spinner').style.display = 'none';
-        }
-    </script>
+    <script src="{{ url_for('static', filename='js/spinner.js') }}" nonce="{{ nonce }}"></script>
     <script nonce="{{ nonce }}">
         const btn = document.getElementById('theme-toggle');
         function syncAria() {

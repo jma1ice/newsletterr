@@ -58,6 +58,9 @@
                     <button type="button" class="settings-nav-btn" data-section="hosted-features">
                         Hosted Features
                     </button>
+                    <button type="button" class="settings-nav-btn" data-section="appearance">
+                        Appearance
+                    </button>
                 </nav>
             </div>
 
@@ -478,6 +481,28 @@
 
                         <button id="apply_settings_hosted" class="nl-btn nl-btn--primary">Apply Settings</button>
                     </div>
+
+                    <div class="settings-section d-none" id="section-appearance">
+                        <h4 class="mb-4">Appearance</h4>
+
+                        <label for="pride_flag">Pride Theme:</label><br>
+                        <select id="pride_flag">
+                            <option value="off">Off</option>
+                            <option value="rainbow">Rainbow</option>
+                            <option value="trans">Transgender</option>
+                            <option value="bi">Bisexual</option>
+                            <option value="pan">Pansexual</option>
+                            <option value="nonbinary">Nonbinary</option>
+                            <option value="lesbian">Lesbian</option>
+                            <option value="ace">Asexual</option>
+                            <option value="progress">Progress</option>
+                        </select><br>
+                        <div class="pride-preview" aria-hidden="true"></div>
+                        <p class="text-info mt-2 field-hint">
+                            Recolors the whole interface with your chosen pride flag palette, in both
+                            light and dark mode. Saved in this browser only, like the dark mode toggle.
+                        </p>
+                    </div>
                 </form>
             </div>
         </div>
@@ -527,6 +552,41 @@
         }
         showSpinner('Applying settings...');
     });
+</script>
+
+<script nonce="{{ nonce }}">
+    (function () {
+        const FLAGS = ['rainbow', 'trans', 'bi', 'pan', 'nonbinary', 'lesbian', 'ace', 'progress'];
+        const sel = document.getElementById('pride_flag');
+        if (!sel) return;
+        const root = document.documentElement;
+
+        function stripPride() {
+            root.classList.remove('pride');
+            [...root.classList].forEach(c => { if (c.indexOf('pride-') === 0) root.classList.remove(c); });
+        }
+
+        const stored = localStorage.getItem('pride');
+        const current = FLAGS.indexOf(stored) !== -1 ? stored : 'off';
+        sel.value = current;
+        if (stored && current === 'off') {
+            // Invalid stored slug: clean up localStorage and the stray classes
+            // the boot script added.
+            localStorage.removeItem('pride');
+            stripPride();
+        }
+
+        sel.addEventListener('change', () => {
+            const val = sel.value;
+            stripPride();
+            if (val === 'off') {
+                localStorage.removeItem('pride');
+            } else {
+                root.classList.add('pride', 'pride-' + val);
+                localStorage.setItem('pride', val);
+            }
+        });
+    })();
 </script>
 
 <script nonce="{{ nonce }}">

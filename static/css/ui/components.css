@@ -359,10 +359,23 @@ body.nl-modal-open { overflow: hidden; }
     justify-content: center;
     align-items: center;
     background-color: rgba(3, 8, 10, .75);
-    color: var(--text);
+    /* The scrim is always dark regardless of theme, so spinner text is a fixed
+       light color (not the theme --text, which is dark in light mode). */
+    color: #eaf3f7;
 }
 .spinner img { max-width: 120px; height: auto; }
 .spinner p { margin-top: var(--space-3); }
+/* Rotating flavor line under the pinned action text. The scrim is always dark
+   (theme-independent), so this uses a fixed light-muted color, not a token. */
+.spinner-tip {
+    margin-top: var(--space-2);
+    max-width: 420px;
+    padding: 0 var(--space-4);
+    text-align: center;
+    font-size: var(--text-sm);
+    color: rgba(233, 241, 242, .72);
+    min-height: 1.2em;
+}
 
 /* ---- chips (BCC recipients) - token-driven, owns the .nl-chip name */
 .nl-chips {

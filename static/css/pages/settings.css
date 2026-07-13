@@ -179,3 +179,13 @@
 .settings-page .w-num-lg { width: 120px; }
 .settings-page .w-field { width: 24rem; }
 .settings-page .ta-resize { width: 100%; resize: vertical; }
+
+/* Appearance section: pride flag gradient preview swatch. Shows the active
+   flag's --pride-gradient (transparent when pride mode is off). */
+.settings-page .pride-preview {
+    height: 10px;
+    border-radius: var(--radius-full);
+    background: var(--pride-gradient, transparent);
+    max-width: 320px;
+    margin-top: var(--space-3);
+}

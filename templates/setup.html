@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
     <head>
-        <title>setup</title>
+        <title>Welcome to newsletterr</title>
         {% include 'partials/_head_min.html' %}
     </head>
     <body class="auth-body">
@@ -55,6 +55,21 @@
                     <div class="mb-3">
                         <label for="from_name" class="form-label">From Name (optional)</label>
                         <input type="text" class="form-control" id="from_name" name="from_name" value="{{ settings.from_name or '' }}">
+                    </div>
+                    <div class="mb-3">
+                        <label for="email_provider" class="form-label">Email Provider (autofills the SMTP settings below)</label>
+                        <select class="form-control" id="email_provider">
+                            <option value="">Choose a provider...</option>
+                            <option value="gmail">Gmail</option>
+                            <option value="outlook">Outlook / Microsoft 365</option>
+                            <option value="yahoo">Yahoo Mail</option>
+                            <option value="icloud">iCloud Mail</option>
+                            <option value="custom">Custom / Other</option>
+                        </select>
+                        <div id="email_provider_notes" class="alert alert-info mt-2 d-none"></div>
+                        <p id="email_provider_link_line" class="d-none mt-2">
+                            <a id="email_provider_link" href="#" target="_blank" rel="noopener">Open the app password page</a>
+                        </p>
                     </div>
                     <div class="mb-3">
                         <label for="smtp_server" class="form-label">SMTP Server</label>
@@ -176,6 +191,7 @@
                     <div class="mb-3">
                         <label for="sonarr_url" class="form-label">Sonarr URL</label>
                         <input type="text" class="form-control" id="sonarr_url" name="sonarr_url" value="{{ settings.sonarr_url or '' }}" placeholder="http://localhost:8989">
+                        <small class="form-text text-muted">Leave blank to use http://localhost:8989. Clear the API key to disable.</small>
                     </div>
                     <div class="mb-3">
                         <label for="sonarr_api_key" class="form-label">Sonarr API Key</label>
@@ -198,6 +214,7 @@
                     <div class="mb-3">
                         <label for="radarr_url" class="form-label">Radarr URL</label>
                         <input type="text" class="form-control" id="radarr_url" name="radarr_url" value="{{ settings.radarr_url or '' }}" placeholder="http://localhost:7878">
+                        <small class="form-text text-muted">Leave blank to use http://localhost:7878. Clear the API key to disable.</small>
                     </div>
                     <div class="mb-3">
                         <label for="radarr_api_key" class="form-label">Radarr API Key</label>
@@ -221,6 +238,7 @@
         </div>
 
         <script src="{{ url_for('static', filename='js/spinner.js') }}" nonce="{{ nonce }}"></script>
+        <script src="{{ url_for('static', filename='js/email-providers.js') }}" nonce="{{ nonce }}"></script>
         <script nonce="{{ nonce }}">
             function openCenteredPopup(url, w = 520, h = 680, name = 'plex-auth', offsetX = 0, offsetY = 0) {
                 const dualLeft = window.screenLeft ?? window.screenX;
@@ -414,7 +432,19 @@
                 }, 'droppedneedle_test_result', 'test_droppedneedle');
             });
 
+            // When an API key is present but the URL is left blank, fill in the
+            // default so the user sees exactly what will be tested and saved.
+            function fillDefaultUrlIfKeyed(urlId, keyId, defaultUrl) {
+                const urlEl = document.getElementById(urlId);
+                const keyEl = document.getElementById(keyId);
+                if (!urlEl || !keyEl) return;
+                if (!urlEl.value.trim() && keyEl.value.trim()) {
+                    urlEl.value = defaultUrl;
+                }
+            }
+
             document.getElementById('test_sonarr')?.addEventListener('click', () => {
+                fillDefaultUrlIfKeyed('sonarr_url', 'sonarr_api_key', 'http://localhost:8989');
                 runConnectionTest('/api/test/sonarr', {
                     url: document.getElementById('sonarr_url').value.trim(),
                     api_key: document.getElementById('sonarr_api_key').value.trim()
@@ -422,10 +452,54 @@
             });
 
             document.getElementById('test_radarr')?.addEventListener('click', () => {
+                fillDefaultUrlIfKeyed('radarr_url', 'radarr_api_key', 'http://localhost:7878');
                 runConnectionTest('/api/test/radarr', {
                     url: document.getElementById('radarr_url').value.trim(),
                     api_key: document.getElementById('radarr_api_key').value.trim()
                 }, 'radarr_test_result', 'test_radarr');
+            });
+
+            // First-run email step: provider dropdown autofills SMTP fields and
+            // shows app-password guidance. Non-modal counterpart of the settings wizard.
+            document.getElementById('email_provider')?.addEventListener('change', (e) => {
+                const preset = (window.EMAIL_PROVIDERS || {})[e.target.value];
+                const notes = document.getElementById('email_provider_notes');
+                const linkLine = document.getElementById('email_provider_link_line');
+                const link = document.getElementById('email_provider_link');
+                if (!preset) {
+                    notes.classList.add('d-none');
+                    linkLine.classList.add('d-none');
+                    return;
+                }
+                const server = document.getElementById('smtp_server');
+                const port = document.getElementById('smtp_port');
+                const proto = document.getElementById('smtp_protocol');
+                if (preset.smtpServer) server.value = preset.smtpServer;
+                if (preset.smtpPort) port.value = preset.smtpPort;
+                if (preset.smtpProtocol) proto.value = preset.smtpProtocol;
+
+                notes.innerHTML = '';
+                (preset.notes || []).forEach(text => {
+                    const div = document.createElement('div');
+                    div.textContent = text;
+                    notes.appendChild(div);
+                });
+                notes.classList.toggle('d-none', !(preset.notes && preset.notes.length));
+
+                if (preset.appPasswordUrl) {
+                    link.href = preset.appPasswordUrl;
+                    linkLine.classList.remove('d-none');
+                } else {
+                    linkLine.classList.add('d-none');
+                }
+            });
+
+            document.getElementById('sonarr-form')?.addEventListener('submit', () => {
+                fillDefaultUrlIfKeyed('sonarr_url', 'sonarr_api_key', 'http://localhost:8989');
+            });
+
+            document.getElementById('radarr-form')?.addEventListener('submit', () => {
+                fillDefaultUrlIfKeyed('radarr_url', 'radarr_api_key', 'http://localhost:7878');
             });
         </script>
     </body>

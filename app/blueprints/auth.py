@@ -4,6 +4,7 @@ import time
 
 from flask import Blueprint, abort, redirect, render_template, request, session, url_for
 
+from app.config import DEFAULT_RADARR_URL, DEFAULT_SONARR_URL
 from app.crypto import encrypt
 from app.db import db_connect
 from app.settings_store import get_settings
@@ -239,9 +240,9 @@ def setup_sonarr():
         if not token or token != session.get("csrf_token"):
             abort(400)
 
-        sonarr_url = request.form.get('sonarr_url', '').strip()
+        sonarr_url = request.form.get('sonarr_url', '').strip() or DEFAULT_SONARR_URL
         sonarr_api_key = request.form.get('sonarr_api_key', '').strip()
-        if sonarr_url and sonarr_api_key:
+        if sonarr_api_key:
             conn = db_connect()
             conn.execute("INSERT OR IGNORE INTO settings (id) VALUES (1)")
             conn.execute("UPDATE settings SET sonarr_url = ?, sonarr_api_key = ? WHERE id = 1", (sonarr_url, encrypt(sonarr_api_key)))
@@ -263,9 +264,9 @@ def setup_radarr():
         if not token or token != session.get("csrf_token"):
             abort(400)
 
-        radarr_url = request.form.get('radarr_url', '').strip()
+        radarr_url = request.form.get('radarr_url', '').strip() or DEFAULT_RADARR_URL
         radarr_api_key = request.form.get('radarr_api_key', '').strip()
-        if radarr_url and radarr_api_key:
+        if radarr_api_key:
             conn = db_connect()
             conn.execute("INSERT OR IGNORE INTO settings (id) VALUES (1)")
             conn.execute("UPDATE settings SET radarr_url = ?, radarr_api_key = ? WHERE id = 1", (radarr_url, encrypt(radarr_api_key)))

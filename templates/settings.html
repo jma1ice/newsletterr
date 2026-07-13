@@ -71,6 +71,11 @@
                     <div class="settings-section" id="section-email-server">
                         <h4 class="mb-4">Email Server</h4>
 
+                        <p>
+                            <button type="button" class="nl-btn nl-btn--primary nl-btn--sm" data-bs-toggle="modal" data-bs-target="#emailWizardModal">Email Setup Wizard</button>
+                            <span class="field-hint">Guided presets for Gmail, Outlook, Yahoo, and iCloud.</span>
+                        </p>
+
                         <label for="from_email">From:</label><br>
                         <input type="email" id="from_email" name="from_email"
                             {% if settings.from_email != "" %}value="{{ settings.from_email }}"{% endif %}
@@ -124,6 +129,9 @@
                         <p class="text-info mt-2 field-hint">In <strong>To:</strong> mode each recipient gets an individual send with their own address in the To: header. No automatic sender copy.</p><br>
 
                         <button id="apply_settings" class="nl-btn nl-btn--primary">Apply Settings</button>
+                        <button type="button" id="send_test_email_btn" class="nl-btn nl-btn--primary">Send Test Email</button>
+                        <span id="send_test_email_result" class="test-result"></span>
+                        <p class="field-hint mt-2">Send Test Email uses your <em>saved</em> settings and delivers to your From address. Apply Settings first if you just changed anything.</p>
                     </div>
 
                     <div class="settings-section d-none" id="section-external-services">
@@ -189,7 +197,8 @@
                         <label for="sonarr_url">Sonarr Base URL (Optional - for the coming soon calendar):</label><br>
                         <input type="text" id="sonarr_url" name="sonarr_url"
                             {% if settings.sonarr_url != "" %}value="{{ settings.sonarr_url }}"{% endif %}
-                            placeholder="http://localhost:8989"><br><br>
+                            placeholder="http://localhost:8989"><br>
+                        <small class="form-text text-muted">Leave blank to use http://localhost:8989. Clear the API key to disable.</small><br><br>
 
                         <label for="sonarr_api_key">Sonarr API Key:</label><br>
                         <input type="password" id="sonarr_api_key" name="sonarr_api_key" autocomplete="new-password"
@@ -204,7 +213,8 @@
                         <label for="radarr_url">Radarr Base URL (Optional - for the coming soon calendar):</label><br>
                         <input type="text" id="radarr_url" name="radarr_url"
                             {% if settings.radarr_url != "" %}value="{{ settings.radarr_url }}"{% endif %}
-                            placeholder="http://localhost:7878"><br><br>
+                            placeholder="http://localhost:7878"><br>
+                        <small class="form-text text-muted">Leave blank to use http://localhost:7878. Clear the API key to disable.</small><br><br>
 
                         <label for="radarr_api_key">Radarr API Key:</label><br>
                         <input type="password" id="radarr_api_key" name="radarr_api_key" autocomplete="new-password"
@@ -537,6 +547,8 @@
     });
 
     document.getElementById('settings_form').addEventListener('submit', (e) => {
+        window.fillDefaultUrlIfKeyed('sonarr_url', 'sonarr_api_key', HAS_SONARR_API_KEY, 'http://localhost:8989');
+        window.fillDefaultUrlIfKeyed('radarr_url', 'radarr_api_key', HAS_RADARR_API_KEY, 'http://localhost:7878');
         const requiredFields = e.target.querySelectorAll('[required]');
         for (const field of requiredFields) {
             if (!field.validity.valid) {
@@ -983,6 +995,20 @@
 </script>
 
 <script nonce="{{ nonce }}">
+    const HAS_SONARR_API_KEY = {{ 'true' if settings.has_sonarr_api_key else 'false' }};
+    const HAS_RADARR_API_KEY = {{ 'true' if settings.has_radarr_api_key else 'false' }};
+
+    // When an API key is present (typed now or already saved) but the URL is
+    // blank, fill in the default so the user sees what will be tested and saved.
+    window.fillDefaultUrlIfKeyed = function (urlId, keyId, hasSavedKey, defaultUrl) {
+        const urlEl = document.getElementById(urlId);
+        const keyEl = document.getElementById(keyId);
+        if (!urlEl || !keyEl) return;
+        if (!urlEl.value.trim() && (keyEl.value.trim() || hasSavedKey)) {
+            urlEl.value = defaultUrl;
+        }
+    };
+
     async function runConnectionTest(endpoint, payload, resultSpanId, btnId) {
         const btn = document.getElementById(btnId);
         const span = document.getElementById(resultSpanId);
@@ -1027,6 +1053,7 @@
     });
 
     document.getElementById('test_sonarr')?.addEventListener('click', () => {
+        window.fillDefaultUrlIfKeyed('sonarr_url', 'sonarr_api_key', HAS_SONARR_API_KEY, 'http://localhost:8989');
         runConnectionTest('/api/test/sonarr', {
             url: document.getElementById('sonarr_url').value.trim(),
             api_key: document.getElementById('sonarr_api_key').value.trim()
@@ -1034,10 +1061,152 @@
     });
 
     document.getElementById('test_radarr')?.addEventListener('click', () => {
+        window.fillDefaultUrlIfKeyed('radarr_url', 'radarr_api_key', HAS_RADARR_API_KEY, 'http://localhost:7878');
         runConnectionTest('/api/test/radarr', {
             url: document.getElementById('radarr_url').value.trim(),
             api_key: document.getElementById('radarr_api_key').value.trim()
         }, 'radarr_test_result', 'test_radarr');
+    });
+</script>
+
+{% include 'partials/_email_wizard_modal.html' %}
+
+<script src="{{ url_for('static', filename='js/email-providers.js') }}" nonce="{{ nonce }}"></script>
+<script nonce="{{ nonce }}">
+    (function () {
+        const modal = document.getElementById('emailWizardModal');
+        if (!modal) return;
+
+        const panes = {
+            provider: document.getElementById('wizard_pane_provider'),
+            credentials: document.getElementById('wizard_pane_credentials'),
+            review: document.getElementById('wizard_pane_review'),
+        };
+        const order = ['provider', 'credentials', 'review'];
+        let step = 0;
+
+        const providerSel = document.getElementById('wizard_provider');
+        const notesEl = document.getElementById('wizard_notes');
+        const appPwLine = document.getElementById('wizard_app_password_line');
+        const appPwLink = document.getElementById('wizard_app_password_link');
+        const customFields = document.getElementById('wizard_custom_fields');
+        const backBtn = document.getElementById('wizard_back_btn');
+        const nextBtn = document.getElementById('wizard_next_btn');
+        const applyBtn = document.getElementById('wizard_apply_btn');
+
+        function currentPreset() {
+            return (window.EMAIL_PROVIDERS || {})[providerSel.value] || {};
+        }
+
+        function computedValues() {
+            const preset = currentPreset();
+            if (providerSel.value === 'custom') {
+                return {
+                    server: document.getElementById('wizard_smtp_server').value.trim(),
+                    port: document.getElementById('wizard_smtp_port').value.trim() || '587',
+                    protocol: document.getElementById('wizard_smtp_protocol').value,
+                };
+            }
+            return {server: preset.smtpServer, port: String(preset.smtpPort), protocol: preset.smtpProtocol};
+        }
+
+        function renderPreset() {
+            const preset = currentPreset();
+            notesEl.innerHTML = '';
+            (preset.notes || []).forEach(text => {
+                const li = document.createElement('div');
+                li.textContent = text;
+                notesEl.appendChild(li);
+            });
+            if (preset.appPasswordUrl) {
+                appPwLink.href = preset.appPasswordUrl;
+                appPwLine.classList.remove('d-none');
+            } else {
+                appPwLine.classList.add('d-none');
+            }
+            customFields.classList.toggle('d-none', providerSel.value !== 'custom');
+        }
+
+        function renderReview() {
+            const v = computedValues();
+            document.getElementById('wizard_review_email').textContent = document.getElementById('wizard_email').value.trim() || '(not set)';
+            document.getElementById('wizard_review_from_name').textContent = document.getElementById('wizard_from_name').value.trim() || '(none)';
+            document.getElementById('wizard_review_server').textContent = v.server || '(not set)';
+            document.getElementById('wizard_review_port').textContent = v.port || '(not set)';
+            document.getElementById('wizard_review_protocol').textContent = v.protocol || '(not set)';
+        }
+
+        function showStep() {
+            order.forEach((key, i) => panes[key].classList.toggle('d-none', i !== step));
+            backBtn.classList.toggle('d-none', step === 0);
+            nextBtn.classList.toggle('d-none', step === order.length - 1);
+            applyBtn.classList.toggle('d-none', step !== order.length - 1);
+            if (order[step] === 'credentials') renderPreset();
+            if (order[step] === 'review') renderReview();
+        }
+
+        providerSel.addEventListener('change', renderPreset);
+
+        nextBtn.addEventListener('click', () => {
+            if (step < order.length - 1) { step += 1; showStep(); }
+        });
+        backBtn.addEventListener('click', () => {
+            if (step > 0) { step -= 1; showStep(); }
+        });
+
+        applyBtn.addEventListener('click', () => {
+            const preset = currentPreset();
+            const v = computedValues();
+            const setVal = (id, val) => { const el = document.getElementById(id); if (el != null) el.value = val; };
+            setVal('from_email', document.getElementById('wizard_email').value.trim());
+            setVal('from_name', document.getElementById('wizard_from_name').value.trim());
+            setVal('smtp_server', v.server);
+            setVal('smtp_port', v.port);
+            const protoSel = document.getElementById('smtp_protocol');
+            if (protoSel) protoSel.value = v.protocol;
+            setVal('password', document.getElementById('wizard_password').value);
+            // usernameIsEmail providers authenticate with the From address, so
+            // leave SMTP Username blank (the backend defaults to from_email).
+            if (preset.usernameIsEmail) setVal('smtp_username', '');
+            window.NLModal.hide('emailWizardModal');
+            step = 0;
+            showStep();
+            const result = document.getElementById('send_test_email_result');
+            if (result) {
+                result.style.color = '';
+                result.textContent = 'Values filled in. Click Apply Settings, then Send Test Email.';
+            }
+        });
+
+        showStep();
+    })();
+
+    document.getElementById('send_test_email_btn')?.addEventListener('click', async () => {
+        const span = document.getElementById('send_test_email_result');
+        const btn = document.getElementById('send_test_email_btn');
+        btn.disabled = true;
+        span.style.color = '';
+        span.textContent = 'Sending test email...';
+        try {
+            const resp = await fetch('/send_test_email', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', 'X-CSRF-Token': '{{ csrf_token }}'},
+                body: JSON.stringify({
+                    subject: 'newsletterr SMTP test',
+                    selected_items: [{type: 'textblock', content: 'This is a test email from newsletterr. If you can read this, your SMTP settings work.'}],
+                    custom_html: '',
+                    user_dict: {},
+                    expanded_collections: {},
+                }),
+            });
+            const data = await resp.json();
+            span.style.color = resp.ok ? '#01b301' : '#770010';
+            span.textContent = resp.ok ? (data.message || 'Test email sent.') : (data.error || 'Failed to send test email.');
+        } catch (e) {
+            span.style.color = '#770010';
+            span.textContent = 'Request failed';
+        }
+        btn.disabled = false;
     });
 </script>
 

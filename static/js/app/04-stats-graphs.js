@@ -559,20 +559,28 @@ function buildYearlyWrappedPreviewHTML() {
         }
     });
 
+    // Mirrors _thumb_src in build_yearly_wrapped_html_with_cids: proxy the row's
+    // thumb (or grandparent_thumb) through /proxy-art. The user row has no proxyable thumb.
+    const thumbSrc = (row) => {
+        const path = row.thumb || row.grandparent_thumb;
+        if (!path) return null;
+        return path.startsWith('/proxy-art') ? path : `/proxy-art${path}`;
+    };
+
     const highlights = [];
-    if (topMovie) highlights.push(['🎬 Top Movie', topMovie.title || '']);
-    if (topShow) highlights.push(['📺 Top Show', topShow.title || '']);
-    if (topArtist) highlights.push(['🎵 Top Artist', topArtist.title || '']);
-    if (topUser) highlights.push(['👤 Most Active', topUser.user || '']);
+    if (topMovie) highlights.push(['🎬 Top Movie', topMovie.title || '', thumbSrc(topMovie)]);
+    if (topShow) highlights.push(['📺 Top Show', topShow.title || '', thumbSrc(topShow)]);
+    if (topArtist) highlights.push(['🎵 Top Artist', topArtist.title || '', thumbSrc(topArtist)]);
+    if (topUser) highlights.push(['👤 Most Active', topUser.user || '', null]);
 
     if (!highlights.length && !totalPlays) {
         return '';
     }
 
-    const highlightCells = highlights.map(([label, value]) => `
+    const highlightCells = highlights.map(([label, value, thumb]) => `
         <td style="text-align: center; padding: 12px; vertical-align: top; width: ${100 / Math.max(highlights.length, 1)}%;">
             <div style="font-size: 12px; color: rgba(255,255,255,0.85); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">${label}</div>
-            <div style="font-size: 15px; font-weight: bold; color: white; line-height: 1.3;">${value}</div>
+            ${thumb ? `<img src="${thumb}" alt="${value}" style="height:60px;width:auto;border-radius:4px;display:block;margin:0 auto 6px;">` : ''}<div style="font-size: 15px; font-weight: bold; color: white; line-height: 1.3;">${value}</div>
         </td>
     `).join('');
 
@@ -602,6 +610,26 @@ function _comingSoonRelativeDate(dateStr) {
     if (diffDays > 1) return `in ${diffDays} days`;
     if (diffDays === -1) return 'yesterday';
     return `${Math.abs(diffDays)} days ago`;
+}
+
+// Mirrors upcoming_release_date in app/emails/builders/coming_soon.py. NOTE:
+// Python parses in UTC; this uses browser-local time, so a UTC-midnight release
+// can differ by a day between this preview and the emailed version.
+function _comingSoonUpcomingReleaseDate(movie) {
+    const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    const today = startOfDay(new Date());
+    let earliest = null;
+    for (const field of ['inCinemas', 'digitalRelease', 'physicalRelease']) {
+        const raw = movie[field];
+        if (!raw) continue;
+        const dt = new Date(raw);
+        if (isNaN(dt.getTime())) continue;
+        const d = startOfDay(dt);
+        if (d >= today && (earliest === null || d < earliest)) {
+            earliest = d;
+        }
+    }
+    return earliest;
 }
 
 function _comingSoonPosterUrl(images) {
@@ -657,6 +685,31 @@ function _comingSoonGridHTML(cardsHTML, title, gridColumns) {
     `;
 }
 
+// Mirrors group_sonarr_episodes in app/emails/builders/coming_soon.py. Collapses
+// full-season drops (2+ episodes, same series/season, same local air day) into
+// one group entry; seasonNumber null never groups.
+function _groupSonarrEpisodes(episodes) {
+    const airDay = (ep) => ep.airDate || (ep.airDateUtc || '').slice(0, 10);
+    const groups = [];
+    const indexByKey = new Map();
+    episodes.forEach(ep => {
+        const series = ep.series || {};
+        const season = ep.seasonNumber;
+        let key = null;
+        if (season != null) {
+            key = `${series.id || series.title || ep.title}|${season}|${airDay(ep)}`;
+        }
+        if (key !== null && indexByKey.has(key)) {
+            groups[indexByKey.get(key)].episodes.push(ep);
+            return;
+        }
+        const entry = {series, season, episodes: [ep], airDate: airDay(ep)};
+        if (key !== null) indexByKey.set(key, groups.length);
+        groups.push(entry);
+    });
+    return groups;
+}
+
 // Kept in sync by hand with app/emails/builders/coming_soon.py:build_sonarr_coming_soon_html_with_cids
 function buildSonarrComingSoonPreviewHTML() {
     const episodes = sonarrComingSoonPayload;
@@ -666,17 +719,30 @@ function buildSonarrComingSoonPreviewHTML() {
 
     const gridColumns = parseInt(APP.comingSoonGridColumns) || 5;
 
-    const cardsHTML = episodes.map(ep => {
-        const series = ep.series || {};
-        const seriesTitle = series.title || ep.title || 'Unknown';
-        const seLabel = (ep.seasonNumber != null && ep.episodeNumber != null)
-            ? `S${String(ep.seasonNumber).padStart(2, '0')}E${String(ep.episodeNumber).padStart(2, '0')}`
-            : '';
-        const subtitle = [seLabel, ep.title || ''].filter(Boolean).join(' - ');
-        const relative = _comingSoonRelativeDate(ep.airDateUtc || ep.airDate);
+    const cardsHTML = _groupSonarrEpisodes(episodes).map(group => {
+        const series = group.series || {};
+        const eps = group.episodes;
+        const firstEp = eps[0];
+        const seriesTitle = series.title || firstEp.title || 'Unknown';
+        const season = group.season;
+        const year = series.year || firstEp.year || '';
+        const yearPrefix = year ? String(year) : '';
+        const relative = _comingSoonRelativeDate(firstEp.airDateUtc || firstEp.airDate);
         const metaText = relative ? `Airs ${relative}` : '';
 
-        const posterPath = _comingSoonPosterUrl(series.images) || _comingSoonPosterUrl(ep.images);
+        let subtitle;
+        if (eps.length >= 2) {
+            const seasonLabel = season != null ? `Season ${season}` : 'New episodes';
+            subtitle = [yearPrefix, `${seasonLabel} (${eps.length} episodes)`].filter(Boolean).join(' • ');
+        } else {
+            const seLabel = (season != null && firstEp.episodeNumber != null)
+                ? `S${String(season).padStart(2, '0')}E${String(firstEp.episodeNumber).padStart(2, '0')}`
+                : '';
+            const seText = [seLabel, firstEp.title || ''].filter(Boolean).join(' - ');
+            subtitle = [yearPrefix, seText].filter(Boolean).join(' • ');
+        }
+
+        const posterPath = _comingSoonPosterUrl(series.images) || _comingSoonPosterUrl(firstEp.images);
         const posterSrc = posterPath ? `/proxy-sonarr-art${posterPath.startsWith('/') ? posterPath : '/' + posterPath}` : '';
 
         return _comingSoonCardHTML(seriesTitle, subtitle, metaText, posterSrc);
@@ -694,10 +760,17 @@ function buildRadarrComingSoonPreviewHTML() {
 
     const gridColumns = parseInt(APP.comingSoonGridColumns) || 5;
 
-    const cardsHTML = movies.map(movie => {
+    // Drop already-downloaded (hasFile) or already-released movies to match
+    // filter_radarr_upcoming in coming_soon.py.
+    const upcoming = movies.filter(m => !m.hasFile && _comingSoonUpcomingReleaseDate(m));
+    if (!upcoming.length) {
+        return `<div><p style="text-align: center; color: var(--email-muted); padding: 20px;">No upcoming movies found.</p></div>`;
+    }
+
+    const cardsHTML = upcoming.map(movie => {
         const title = movie.title || 'Unknown';
         const subtitle = movie.year ? String(movie.year) : '';
-        const releaseDate = movie.digitalRelease || movie.physicalRelease || movie.inCinemas;
+        const releaseDate = _comingSoonUpcomingReleaseDate(movie);
         const relative = _comingSoonRelativeDate(releaseDate);
         const metaText = relative ? `Releases ${relative}` : '';
 

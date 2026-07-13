@@ -197,13 +197,8 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 
 ### For the v2026.3 sprint, these items are to be addressed:
 * Email click for recently added/available recommendations is going to browser on mobile instead of Plex app - this is an issue with the new Plex client, have not seen a fix yet and no info released by Plex at this time
-* Changing ra/recs grid width does not maintain the correct poster ratio and the description gets pushed out (<=5) or has too much bottom space (>5)
 
 ### And these items are feature requests:
---- Settings ---
-* Option to show or hide description on recently added posters
-* Setting for collection group grid width
-
 --- Integrations ---
  -- newsletterr GitHub / Discord --
 * GitHub webhook to pull submitted issues to Discord channel
@@ -220,6 +215,7 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 
 --- Email ---
 * Possible default email layout/UI overhaul with pride theme
+* SVG over emoji if possible
 
 --- Misc. ---
 * Can Snap-Ins work with custom HTML?
@@ -245,6 +241,7 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Adjusted issue where some email clients show posters as small slivers
 * Fixed where contributor area would start clipping out on lower size screens
 * Removed plex-api-client as plexapi.plex was no longer supported
+* Fixed changing ra/recs grid width to maintain the correct poster ratio
 
 #### New Features:
 * Added sections to settings page (email server | external services | data settings | email styling | email body defaults | security)
@@ -287,6 +284,8 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * More mobile CSS optimizations
 * Removed use of Tailwind Play CDN
 * Pride UI themes
+* Option to show or hide description on recently added posters
+* Setting for collection group grid width
 
 ### v2026.1:
 

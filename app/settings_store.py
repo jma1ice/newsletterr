@@ -44,6 +44,8 @@ DEFAULTS = {
     "hosted_enabled": "disabled",
     "hosted_base_url": "",
     "hosted_images_enabled": "disabled",
+    "ra_show_description": "enabled",
+    "include_user_info": "enabled",
 }
 
 INT_COLUMNS = {
@@ -51,6 +53,8 @@ INT_COLUMNS = {
     "recs_grid_columns": 5,
     "poster_max_height": 0,
     "coming_soon_grid_columns": 5,
+    "collections_grid_columns": 5,
+    "exclude_inactive_days": 0,
 }
 
 def get_settings(decrypt_secrets=True):

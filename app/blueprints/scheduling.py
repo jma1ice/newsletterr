@@ -241,7 +241,7 @@ def preview_schedule(schedule_id):
         to_emails_list = [email.strip() for email in to_emails.split(",")]
         
         _s = get_settings(decrypt_secrets=False)
-        settings_row = (_s.get("server_name"), _s.get("tautulli_url"), _s.get("tautulli_api"), _s.get("logo_filename"), _s.get("logo_width"), _s.get("custom_logo_filename"), _s.get("logo_position"), _s.get("default_intro_text"), _s.get("default_outro_text"), _s.get("hide_stat_play_counts"), _s.get("hide_graph_play_counts"), _s.get("stats_type"), _s.get("recently_added_mode"), _s.get("recently_added_sort"), _s.get("ra_grid_columns"), _s.get("recs_grid_columns"), _s.get("stat_cover_art"), _s.get("poster_max_height")) if "id" in _s else None
+        settings_row = (_s.get("server_name"), _s.get("tautulli_url"), _s.get("tautulli_api"), _s.get("logo_filename"), _s.get("logo_width"), _s.get("custom_logo_filename"), _s.get("logo_position"), _s.get("default_intro_text"), _s.get("default_outro_text"), _s.get("hide_stat_play_counts"), _s.get("hide_graph_play_counts"), _s.get("stats_type"), _s.get("recently_added_mode"), _s.get("recently_added_sort"), _s.get("ra_grid_columns"), _s.get("recs_grid_columns"), _s.get("stat_cover_art"), _s.get("poster_max_height"), _s.get("collections_grid_columns"), _s.get("ra_show_description"), _s.get("include_user_info")) if "id" in _s else None
 
         if settings_row:
             settings = {
@@ -263,6 +263,9 @@ def preview_schedule(schedule_id):
                 "recs_grid_columns": settings_row[15] or '5',
                 "stat_cover_art": settings_row[16] or 'disabled',
                 "poster_max_height": int(settings_row[17] or 0) if settings_row[17] else 0,
+                "collections_grid_columns": settings_row[18] or '5',
+                "ra_show_description": settings_row[19] or 'enabled',
+                "include_user_info": settings_row[20] or 'enabled',
             }
         else:
             settings = {"server_name": ""}
@@ -312,6 +315,9 @@ def preview_schedule(schedule_id):
         tautulli_data["settings"]["recs_grid_columns"] = int(settings.get("recs_grid_columns") or 5)
         tautulli_data["settings"]["stat_cover_art"] = settings.get("stat_cover_art", "disabled")
         tautulli_data["settings"]["poster_max_height"] = settings.get("poster_max_height", 0)
+        tautulli_data["settings"]["collections_grid_columns"] = int(settings.get("collections_grid_columns") or 5)
+        tautulli_data["settings"]["ra_show_description"] = settings.get("ra_show_description", "enabled")
+        tautulli_data["settings"]["include_user_info"] = settings.get("include_user_info", "enabled")
 
         recommendations_data = None
         has_recs = any(item.get('type') == 'recommendations' for item in selected_items)
@@ -329,7 +335,15 @@ def preview_schedule(schedule_id):
             except Exception as e:
                 logger.warning(f"preview_schedule: recommendations unavailable: {e}")
                 recommendations_data = {}
-        
+
+        # Cache-only reads (no live fetch in the preview) for the remaining
+        # block types, mirroring how stats/recommendations are sourced above.
+        yearly_wrapped_data = get_cached_data('yearly_wrapped_json', strict=False) or []
+        droppedneedle_wrapped_data = get_cached_data('droppedneedle_wrapped_json', strict=False) or {}
+        droppedneedle_server_data = get_cached_data('droppedneedle_server_json', strict=False) or None
+        sonarr_coming_soon_data = get_cached_data('sonarr_coming_soon_json', strict=False) or []
+        radarr_coming_soon_data = get_cached_data('radarr_coming_soon_json', strict=False) or []
+
         return jsonify({
             "status": "success",
             "message": "ok",
@@ -346,6 +360,11 @@ def preview_schedule(schedule_id):
             "graph_commands": tautulli_data.get('graph_commands', []),
             "recent_commands": [{'command': 'movie'}, {'command': 'show'}],
             "recommendations": recommendations_data or {},
+            "yearly_wrapped": yearly_wrapped_data,
+            "droppedneedle_wrapped": droppedneedle_wrapped_data,
+            "droppedneedle_server": droppedneedle_server_data,
+            "sonarr_coming_soon": sonarr_coming_soon_data,
+            "radarr_coming_soon": radarr_coming_soon_data,
             "user_dict": user_dict,
             "users_full_data": users_full_data,
             "expanded_collections": expanded_collections,
@@ -372,7 +391,7 @@ def preview_schedule_page(schedule_id):
         date_range = 7
 
     _s = get_settings(decrypt_secrets=False)
-    settings_row = (_s.get("logo_filename"), _s.get("logo_width"), _s.get("tautulli_url"), _s.get("tautulli_api"), _s.get("custom_logo_filename"), _s.get("recipient_display_name"), _s.get("hide_graph_play_counts"), _s.get("stats_type"), _s.get("recently_added_mode"), _s.get("recently_added_sort"), _s.get("ra_grid_columns"), _s.get("recs_grid_columns"), _s.get("stat_cover_art"), _s.get("poster_max_height"), _s.get("logo_position")) if "id" in _s else None
+    settings_row = (_s.get("logo_filename"), _s.get("logo_width"), _s.get("tautulli_url"), _s.get("tautulli_api"), _s.get("custom_logo_filename"), _s.get("recipient_display_name"), _s.get("hide_graph_play_counts"), _s.get("stats_type"), _s.get("recently_added_mode"), _s.get("recently_added_sort"), _s.get("ra_grid_columns"), _s.get("recs_grid_columns"), _s.get("stat_cover_art"), _s.get("poster_max_height"), _s.get("logo_position"), _s.get("collections_grid_columns"), _s.get("ra_show_description"), _s.get("include_user_info")) if "id" in _s else None
     logo_filename = settings_row[0] if settings_row else 'Asset_94x.png'
     logo_width = settings_row[1] if settings_row else 80
     tautulli_url = settings_row[2] if settings_row else ''
@@ -388,6 +407,9 @@ def preview_schedule_page(schedule_id):
     stat_cover_art = settings_row[12] if settings_row else 'disabled'
     poster_max_height = int(settings_row[13] or 0) if settings_row and settings_row[13] else 0
     logo_position = settings_row[14] if settings_row else 'center'
+    collections_grid_columns = settings_row[15] if settings_row else '5'
+    ra_show_description = settings_row[16] if settings_row else 'enabled'
+    include_user_info = settings_row[17] if settings_row else 'enabled'
 
     settings = {
         "logo_filename": logo_filename,
@@ -403,6 +425,9 @@ def preview_schedule_page(schedule_id):
         "stat_cover_art": stat_cover_art or 'disabled',
         "poster_max_height": poster_max_height,
         "logo_position": logo_position or 'center',
+        "collections_grid_columns": collections_grid_columns or '5',
+        "ra_show_description": ra_show_description or 'enabled',
+        "include_user_info": include_user_info or 'enabled',
     }
     conn.close()
 

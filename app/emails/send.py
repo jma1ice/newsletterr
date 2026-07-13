@@ -18,6 +18,83 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+def filter_inactive(emails, settings):
+    """Drop recipients who have not streamed on Tautulli within
+    `exclude_inactive_days` days. Returns (kept, excluded).
+
+    Fails open: if filtering is off, Tautulli is unconfigured, or the API call
+    fails, the full list is returned unchanged. Recipients not found among
+    Tautulli users are kept (cannot judge manually-added addresses). Matching
+    is case-insensitive."""
+    emails = emails or []
+    try:
+        days = int(settings.get("exclude_inactive_days") or 0)
+    except (TypeError, ValueError):
+        days = 0
+    if days <= 0:
+        return emails, []
+
+    tautulli_url = (settings.get("tautulli_url") or "").rstrip('/')
+    tautulli_api = settings.get("tautulli_api")
+    if not (tautulli_url and tautulli_api):
+        return emails, []
+
+    try:
+        users_data, err = run_tautulli_command(tautulli_url, tautulli_api, 'get_users', 'Users', None)
+        table_data, err2 = run_tautulli_command(tautulli_url, tautulli_api, 'get_users_table', 'Users', None)
+        if err or err2 or not users_data:
+            logger.warning("filter_inactive: Tautulli lookup failed; not filtering")
+            return emails, []
+    except Exception:
+        logger.warning("filter_inactive: Tautulli lookup raised; not filtering", exc_info=True)
+        return emails, []
+
+    # user_id -> last_seen epoch (from get_users_table)
+    table_rows = table_data.get('data', []) if isinstance(table_data, dict) else (table_data or [])
+    last_seen_by_id = {}
+    email_last_seen = {}
+    for row in table_rows:
+        if not isinstance(row, dict):
+            continue
+        uid = row.get('user_id')
+        if uid is not None:
+            last_seen_by_id[str(uid)] = row.get('last_seen')
+        # some Tautulli versions include email directly on the table rows
+        row_email = (row.get('email') or '').strip().lower()
+        if row_email:
+            email_last_seen[row_email] = row.get('last_seen')
+
+    # join get_users (email per user_id) against the table's last_seen
+    for u in users_data:
+        if not isinstance(u, dict):
+            continue
+        u_email = (u.get('email') or '').strip().lower()
+        if not u_email:
+            continue
+        if u_email not in email_last_seen:
+            email_last_seen[u_email] = last_seen_by_id.get(str(u.get('user_id')))
+
+    import time as _time
+    cutoff = _time.time() - days * 86400
+
+    kept, excluded = [], []
+    for email in emails:
+        key = (email or '').strip().lower()
+        if key not in email_last_seen:
+            kept.append(email)  # unknown recipient: cannot judge, keep
+            continue
+        last_seen = email_last_seen.get(key)
+        try:
+            last_seen_val = float(last_seen) if last_seen not in (None, '') else None
+        except (TypeError, ValueError):
+            last_seen_val = None
+        if last_seen_val is None or last_seen_val < cutoff:
+            excluded.append(email)
+            logger.info(f"filter_inactive: excluding inactive recipient {email}")
+        else:
+            kept.append(email)
+    return kept, excluded
+
 def group_recipients_by_user(to_emails_list, user_dict):
     email_to_user = { (v or '').strip().lower(): k for k, v in (user_dict or {}).items() if v }
     groups = defaultdict(list)
@@ -73,6 +150,9 @@ def send_standard_email_with_cids(req, settings, to_emails):
         to_emails, _suppressed = filter_suppressed(to_emails)
         if not to_emails:
             return {"error": "All recipients have unsubscribed"}, 400
+        to_emails, _inactive = filter_inactive(to_emails, settings)
+        if not to_emails:
+            return {"error": "All recipients were filtered out for inactivity"}, 400
 
         from_email = settings.get("from_email") or ""
         alias_email = settings.get("alias_email") or ""
@@ -248,6 +328,9 @@ def send_recommendations_email_with_cids(req, settings, to_emails):
         to_emails, _suppressed = filter_suppressed(to_emails)
         if not to_emails:
             return {"error": "All recipients have unsubscribed"}, 400
+        to_emails, _inactive = filter_inactive(to_emails, settings)
+        if not to_emails:
+            return {"error": "All recipients were filtered out for inactivity"}, 400
 
         selected_items = req.selected_items
         user_dict = req.user_dict
@@ -509,6 +592,14 @@ def resend_email_from_history(email_id, settings):
     recipients = [r.strip() for r in (recipients_str or "").split(',') if r.strip()]
     if not recipients:
         return False, "No recipients stored for this send"
+
+    # an unsubscribed or inactivity-filtered address should not receive a resend either
+    recipients, _suppressed = filter_suppressed(recipients)
+    if not recipients:
+        return False, "All stored recipients have unsubscribed"
+    recipients, _inactive = filter_inactive(recipients, settings)
+    if not recipients:
+        return False, "All stored recipients were filtered out for inactivity"
 
     from_email = settings.get("from_email") or ""
     alias_email = settings.get("alias_email") or ""

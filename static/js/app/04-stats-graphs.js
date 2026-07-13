@@ -34,7 +34,12 @@ function buildStatPreviewHTML(statId) {
     
     const title = stat.stat_title || 'Statistics';
     const rows = stat.rows;
-    
+
+    // user-info toggle: mirror the server-side skip of the Most Active Users stat
+    if (title === "Most Active Users" && window.APP?.includeUserInfo === 'disabled') {
+        return '';
+    }
+
     let backgroundElements = '';
     if (rows.length > 0) {
         const artwork = rows[0].art || rows[0].grandparent_thumb;
@@ -126,8 +131,12 @@ function buildStatPreviewHTML(statId) {
     const headers = getStatHeaders(title);
     const headerHTML = headers.map(h => `<th>${h}</th>`).join('');
     
+    const showUserAvatars = title === "Most Active Users" && window.APP?.includeUserInfo !== 'disabled';
     const rowsHTML = rows.map(row => {
         const cells = getStatCells(title, row);
+        if (showUserAvatars && row.user_thumb) {
+            cells[0] = `<img src="${row.user_thumb}" style="height:32px;width:32px;border-radius:50%;object-fit:cover;margin-right:7px;vertical-align:middle;" alt="">${cells[0]}`;
+        }
         const cellsHTML = cells.map(cell => `<td>${cell}</td>`).join('');
         return `<tr>${cellsHTML}</tr>`;
     }).join('');
@@ -164,7 +173,13 @@ function buildGraphPreviewHTML(graphId) {
     
     const commandInfo = graphCommands[graphIndex];
     const graphData = graphDataList[graphIndex];
-    
+
+    // user-info toggle: mirror the server-side skip of the top-users graphs
+    if (window.APP?.includeUserInfo === 'disabled' &&
+        (commandInfo?.name === 'Plays by Top Users' || commandInfo?.name === 'Stream Type by Top Users')) {
+        return '';
+    }
+
     if (!graphData || (!graphData.categories && !graphData.series)) {
         return `
             <div style="margin: 20px 0; padding: 30px; background: #f8f9fa; border: 2px dashed #dee2e6; border-radius: 8px; text-align: center;">
@@ -379,7 +394,7 @@ function buildRecentlyAddedPreviewHTML(libraryFilter) {
                     <div style="font-size: 10px; color: var(--email-muted); margin-bottom: 8px; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
                         ${[item.sub, item.duration, item.contentRating, item.added ? 'Added ' + item.added : ''].filter(Boolean).join(' • ')}
                     </div>
-                    ${item.summary ? `
+                    ${(item.summary && (window.APP?.raShowDescription !== 'disabled')) ? `
                         <div style="font-size: 11px; color: var(--email-text); opacity: 0.8; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden;">
                             ${item.summary}
                         </div>
@@ -568,19 +583,23 @@ function buildYearlyWrappedPreviewHTML() {
     };
 
     const highlights = [];
-    if (topMovie) highlights.push(['🎬 Top Movie', topMovie.title || '', thumbSrc(topMovie)]);
-    if (topShow) highlights.push(['📺 Top Show', topShow.title || '', thumbSrc(topShow)]);
-    if (topArtist) highlights.push(['🎵 Top Artist', topArtist.title || '', thumbSrc(topArtist)]);
-    if (topUser) highlights.push(['👤 Most Active', topUser.user || '', null]);
+    const includeUserInfo = window.APP?.includeUserInfo !== 'disabled';
+    if (topMovie) highlights.push(['🎬 Top Movie', topMovie.title || '', thumbSrc(topMovie), false]);
+    if (topShow) highlights.push(['📺 Top Show', topShow.title || '', thumbSrc(topShow), false]);
+    if (topArtist) highlights.push(['🎵 Top Artist', topArtist.title || '', thumbSrc(topArtist), false]);
+    if (topUser && includeUserInfo) {
+        const userThumb = topUser.user_thumb || null;
+        highlights.push(['👤 Most Active', topUser.user || '', userThumb, true]);
+    }
 
     if (!highlights.length && !totalPlays) {
         return '';
     }
 
-    const highlightCells = highlights.map(([label, value, thumb]) => `
+    const highlightCells = highlights.map(([label, value, thumb, isRound]) => `
         <td style="text-align: center; padding: 12px; vertical-align: top; width: ${100 / Math.max(highlights.length, 1)}%;">
             <div style="font-size: 12px; color: rgba(255,255,255,0.85); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">${label}</div>
-            ${thumb ? `<img src="${thumb}" alt="${value}" style="height:60px;width:auto;border-radius:4px;display:block;margin:0 auto 6px;">` : ''}<div style="font-size: 15px; font-weight: bold; color: white; line-height: 1.3;">${value}</div>
+            ${thumb ? `<img src="${thumb}" alt="${value}" style="height:60px;${isRound ? 'width:60px;border-radius:50%;object-fit:cover;' : 'width:auto;border-radius:4px;'}display:block;margin:0 auto 6px;">` : ''}<div style="font-size: 15px; font-weight: bold; color: white; line-height: 1.3;">${value}</div>
         </td>
     `).join('');
 
@@ -1197,7 +1216,8 @@ function buildCollectionPreviewHTMLForEmail(title, collections, stableGroupId = 
         }
     });
 
-    const itemsPerRow = 5;
+    const itemsPerRow = parseInt(window.APP?.collectionsGridColumns) || 5;
+    const fullRowCellWidth = `${(100 / itemsPerRow).toFixed(4)}%`;
     let itemsHTML = "";
     
     for (let i = 0; i < allItemsToDisplay.length; i += itemsPerRow) {
@@ -1236,7 +1256,7 @@ function buildCollectionPreviewHTMLForEmail(title, collections, stableGroupId = 
             
             rowItems.forEach((item) => {
                 const cellStyle = `
-                    width: 20%;
+                    width: ${fullRowCellWidth};
                     padding: 6px;
                     vertical-align: top;
                     font-family: 'IBM Plex Sans';

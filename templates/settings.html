@@ -255,6 +255,13 @@
                                class="w-num"><br>
                         <p class="text-info mt-2 field-hint">Number of columns in the Recently Added grid (default: 5).</p><br>
 
+                        <label for="ra_show_description">Recently Added Descriptions:</label><br>
+                        <select id="ra_show_description" name="ra_show_description">
+                            <option value="enabled"  {% if settings.get('ra_show_description', 'enabled') != 'disabled' %}selected{% endif %}>Show</option>
+                            <option value="disabled" {% if settings.get('ra_show_description', 'enabled') == 'disabled' %}selected{% endif %}>Hide</option>
+                        </select><br>
+                        <p class="text-info mt-2 field-hint">Show or hide the summary/description text under each Recently Added item in emails.</p><br>
+
                         <label for="recs_grid_columns">Recommendations Grid Columns:</label><br>
                         <input type="number" id="recs_grid_columns" name="recs_grid_columns" min="1" max="10"
                                value="{{ settings.get('recs_grid_columns', '5') }}"
@@ -299,6 +306,23 @@
                         <label for="coming_soon_grid_columns">Coming Soon Grid Columns:</label><br>
                         <input type="number" id="coming_soon_grid_columns" name="coming_soon_grid_columns" min="1" max="10"
                             value="{{ settings.get('coming_soon_grid_columns', '5') }}"><br><br>
+
+                        <label for="collections_grid_columns">Collections Grid Columns:</label><br>
+                        <input type="number" id="collections_grid_columns" name="collections_grid_columns" min="1" max="10"
+                            value="{{ settings.get('collections_grid_columns', '5') }}"><br>
+                        <p class="text-info mt-2 field-hint">Number of collection/item cards per row in Collections email blocks (default: 5).</p><br>
+
+                        <label for="include_user_info">Include Other Users' Info:</label><br>
+                        <select id="include_user_info" name="include_user_info">
+                            <option value="enabled"  {% if settings.get('include_user_info', 'enabled') != 'disabled' %}selected{% endif %}>Include</option>
+                            <option value="disabled" {% if settings.get('include_user_info', 'enabled') == 'disabled' %}selected{% endif %}>Exclude</option>
+                        </select><br>
+                        <p class="text-info mt-2 field-hint">When set to Include, usernames and profile pictures of other users appear in the "Most Active Users" stat, the Wrapped "Most Active" highlight, and the top-users graphs. When set to Exclude, that content is removed from emails regardless of what a template selected. A recipient's own DroppedNeedle Wrapped is not affected.</p><br>
+
+                        <label for="exclude_inactive_days">Skip Recipients Inactive For (days):</label><br>
+                        <input type="number" id="exclude_inactive_days" name="exclude_inactive_days" min="0" max="3650"
+                            value="{{ settings.get('exclude_inactive_days', '0') }}" class="w-num-lg"><br>
+                        <p class="text-info mt-2 field-hint">Skip sending to recipients who have not streamed on Tautulli within this many days (0 = send to everyone). Recipients not found among Tautulli users are always kept. Requires Tautulli to be configured.</p><br>
 
                         <label for="recipient_display_name">Recipient Display Name (used in recommendation emails):</label><br>
                         <select id="recipient_display_name" name="recipient_display_name">

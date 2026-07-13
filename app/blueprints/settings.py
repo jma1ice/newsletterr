@@ -114,6 +114,10 @@ def settings():
                 radarr_url = DEFAULT_RADARR_URL
             coming_soon_days_ahead = request.form.get("coming_soon_days_ahead", "14")
             coming_soon_grid_columns = request.form.get("coming_soon_grid_columns", "5")
+            collections_grid_columns = request.form.get("collections_grid_columns", "5")
+            ra_show_description = request.form.get("ra_show_description", "enabled")
+            exclude_inactive_days = request.form.get("exclude_inactive_days", "0")
+            include_user_info = request.form.get("include_user_info", "enabled")
             hosted_enabled = request.form.get("hosted_enabled", "disabled")
             hosted_base_url = (request.form.get("hosted_base_url") or "").strip().rstrip('/')
             hosted_images_enabled = request.form.get("hosted_images_enabled", "disabled")
@@ -178,8 +182,8 @@ def settings():
                 INSERT INTO settings
                 (id, from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, plex_url, tautulli_url,
                     tautulli_api, conjurr_url, droppedneedle_url, droppedneedle_api_key, recipient_display_name, logo_filename, logo_width, email_theme, primary_color, secondary_color, accent_color, background_color,
-                    text_color, from_name, custom_logo_filename, login_toggle, nl_username, nl_password, default_intro_text, default_outro_text, hsts_enabled, scheduled_subject_prefix, logo_position, hide_stat_play_counts, hide_graph_play_counts, stats_type, recently_added_mode, recently_added_sort, ra_grid_columns, recs_grid_columns, stat_cover_art, send_mode, poster_max_height, discord_webhook_url, sonarr_url, sonarr_api_key, radarr_url, radarr_api_key, coming_soon_days_ahead, coming_soon_grid_columns, hosted_enabled, hosted_base_url, hosted_images_enabled)
-                VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    text_color, from_name, custom_logo_filename, login_toggle, nl_username, nl_password, default_intro_text, default_outro_text, hsts_enabled, scheduled_subject_prefix, logo_position, hide_stat_play_counts, hide_graph_play_counts, stats_type, recently_added_mode, recently_added_sort, ra_grid_columns, recs_grid_columns, stat_cover_art, send_mode, poster_max_height, discord_webhook_url, sonarr_url, sonarr_api_key, radarr_url, radarr_api_key, coming_soon_days_ahead, coming_soon_grid_columns, hosted_enabled, hosted_base_url, hosted_images_enabled, collections_grid_columns, ra_show_description, exclude_inactive_days, include_user_info)
+                VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT (id) DO UPDATE
                 SET from_email = excluded.from_email, alias_email = excluded.alias_email, reply_to_email = excluded.reply_to_email, password = excluded.password,
                     smtp_username = excluded.smtp_username, smtp_server = excluded.smtp_server, smtp_port = excluded.smtp_port, smtp_protocol = excluded.smtp_protocol,
@@ -205,12 +209,17 @@ def settings():
                     coming_soon_grid_columns = excluded.coming_soon_grid_columns,
                     hosted_enabled = excluded.hosted_enabled,
                     hosted_base_url = excluded.hosted_base_url,
-                    hosted_images_enabled = excluded.hosted_images_enabled
+                    hosted_images_enabled = excluded.hosted_images_enabled,
+                    collections_grid_columns = excluded.collections_grid_columns,
+                    ra_show_description = excluded.ra_show_description,
+                    exclude_inactive_days = excluded.exclude_inactive_days,
+                    include_user_info = excluded.include_user_info
             """, (from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, plex_url, tautulli_url, tautulli_api,
                   conjurr_url, droppedneedle_url, droppedneedle_api_key, recipient_display_name, logo_filename, logo_width, email_theme, primary_color, secondary_color, accent_color, background_color, text_color, from_name,
                   custom_logo_filename, login_toggle, nl_username, nl_password, default_intro_text, default_outro_text, hsts_enabled, scheduled_subject_prefix, logo_position,
                   hide_stat_play_counts, hide_graph_play_counts, stats_type, recently_added_mode, recently_added_sort, ra_grid_columns, recs_grid_columns, stat_cover_art, send_mode, poster_max_height, discord_webhook_url,
-                  sonarr_url, sonarr_api_key, radarr_url, radarr_api_key, coming_soon_days_ahead, coming_soon_grid_columns, hosted_enabled, hosted_base_url, hosted_images_enabled))
+                  sonarr_url, sonarr_api_key, radarr_url, radarr_api_key, coming_soon_days_ahead, coming_soon_grid_columns, hosted_enabled, hosted_base_url, hosted_images_enabled,
+                  collections_grid_columns, ra_show_description, exclude_inactive_days, include_user_info))
             conn.commit()
             cursor.execute("SELECT plex_token FROM settings WHERE id = 1")
             plex_token = cursor.fetchone()[0]
@@ -269,6 +278,10 @@ def settings():
                 "radarr_api_key": decrypt(radarr_api_key),
                 "coming_soon_days_ahead": coming_soon_days_ahead,
                 "coming_soon_grid_columns": coming_soon_grid_columns,
+                "collections_grid_columns": collections_grid_columns,
+                "ra_show_description": ra_show_description,
+                "exclude_inactive_days": exclude_inactive_days,
+                "include_user_info": include_user_info,
                 "hosted_enabled": hosted_enabled,
                 "hosted_base_url": hosted_base_url,
                 "hosted_images_enabled": hosted_images_enabled,
@@ -341,6 +354,10 @@ def settings():
                 "radarr_api_key": request.form.get("radarr_api_key", ""),
                 "coming_soon_days_ahead": request.form.get("coming_soon_days_ahead", "14"),
                 "coming_soon_grid_columns": request.form.get("coming_soon_grid_columns", "5"),
+                "collections_grid_columns": request.form.get("collections_grid_columns", "5"),
+                "ra_show_description": request.form.get("ra_show_description", "enabled"),
+                "exclude_inactive_days": request.form.get("exclude_inactive_days", "0"),
+                "include_user_info": request.form.get("include_user_info", "enabled"),
                 "recipient_display_name": request.form.get("recipient_display_name", "email"),
                 "logo_filename": request.form.get("logo_filename", ""),
                 "logo_width": request.form.get("logo_width", ""),
@@ -431,6 +448,10 @@ def settings():
     radarr_api_key = s.get("radarr_api_key")
     coming_soon_days_ahead = s.get("coming_soon_days_ahead")
     coming_soon_grid_columns = s.get("coming_soon_grid_columns")
+    collections_grid_columns = s.get("collections_grid_columns")
+    ra_show_description = s.get("ra_show_description")
+    exclude_inactive_days = s.get("exclude_inactive_days")
+    include_user_info = s.get("include_user_info")
     hosted_enabled = s.get("hosted_enabled")
     hosted_base_url = s.get("hosted_base_url")
     hosted_images_enabled = s.get("hosted_images_enabled")
@@ -488,6 +509,10 @@ def settings():
         "radarr_url": radarr_url or "",
         "coming_soon_days_ahead": coming_soon_days_ahead or "14",
         "coming_soon_grid_columns": coming_soon_grid_columns or "5",
+        "collections_grid_columns": collections_grid_columns or "5",
+        "ra_show_description": ra_show_description or "enabled",
+        "exclude_inactive_days": exclude_inactive_days if exclude_inactive_days is not None else "0",
+        "include_user_info": include_user_info or "enabled",
         "hosted_enabled": hosted_enabled or "disabled",
         "hosted_base_url": hosted_base_url or "",
         "hosted_images_enabled": hosted_images_enabled or "disabled",

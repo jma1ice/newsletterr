@@ -6,7 +6,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, library_filter=None, base_url="", max_items=None, recently_added_mode="items", ra_grid_columns=5, poster_max_height=0, hosted_images_enabled=False, hosted_base_url=""):
+def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, library_filter=None, base_url="", max_items=None, recently_added_mode="items", ra_grid_columns=5, poster_max_height=0, hosted_images_enabled=False, hosted_base_url="", show_description=True):
     if not recent_data:
         return f"""
         <div style="background-color: {theme_colors['card_bg']}; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid {theme_colors['border']}; font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;">
@@ -38,6 +38,17 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
     items_html = ""
     items_per_row = max(1, int(ra_grid_columns) if ra_grid_columns else 5)
     cell_width_pct = f"{100 / items_per_row:.4f}%"
+
+    # Email-safe uniform poster box: the delivered bytes are cropped to a 2:3
+    # box (see poster_target below), so `width:100%; height:auto` renders a
+    # consistent aspect ratio at any column count without object-fit. The card
+    # is capped to poster_px so it centers in a wider cell instead of stretching.
+    _base_width = 760
+    poster_px = max(60, int(_base_width / items_per_row) - 16)
+    if poster_max_height:
+        poster_px = min(poster_px, max(40, int(int(poster_max_height) * 2 // 3)))
+    poster_target = (poster_px, int(round(poster_px * 1.5)))
+    summary_len = max(40, int(420 / items_per_row))
 
     for i in range(0, len(items), items_per_row):
         row_items = items[i:i + items_per_row]
@@ -90,7 +101,7 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
                         msg_root,
                         f"recent-{i}-{j}",
                         base_url,
-                        max_height=poster_max_height if poster_max_height else None,
+                        target=poster_target,
                         hosted_images_enabled=hosted_images_enabled,
                         hosted_base_url=hosted_base_url
                     )
@@ -183,14 +194,11 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
             if poster_src_result:
                 poster_src = poster_src_result
 
-                img_attrs = 'width="100%"'
-                img_style = "width: 100%; height: auto; display: block; object-fit: cover; border-radius: 10px 10px 0 0; background-color: #f8f9fa;"
-                if poster_max_height:
-                    img_attrs = f'width="100%" height="{poster_max_height}"'
-                    img_style = (
-                        f"width: 100%; height: {poster_max_height}px; display: block; object-fit: cover; "
-                        "border-radius: 10px 10px 0 0; background-color: #f8f9fa;"
-                    )
+                img_attrs = f'width="{poster_px}"'
+                img_style = (
+                    "width: 100%; height: auto; display: block; "
+                    "border-radius: 10px 10px 0 0; background-color: #f8f9fa;"
+                )
 
                 meta_text = truncate_text(' • '.join(filter(None, [
                     str(year) if year else '',
@@ -206,6 +214,7 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
                         overflow: hidden;
                         border: 1px solid {theme_colors['border']};
                         width: 100%;
+                        max-width: {poster_px}px;
                         margin: 0 auto;
                         box-shadow: 0 6px 18px rgba(0, 0, 0, 0.6);
                     ">
@@ -215,7 +224,6 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
                             padding: 6px;
                             background-color: {theme_colors['card_bg']};
                             color: {theme_colors['text']};
-                            min-height: 135px;
                         ">
                             <div style="
                                 font-weight: bold;
@@ -244,8 +252,8 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
                                 font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
                                 word-wrap: break-word;
                                 overflow-wrap: break-word;
-                            ">{summary[:84]}{'...' if len(summary) > 84 else ''}</div>
-                            ''' if summary else ''}
+                            ">{summary[:summary_len]}{'...' if len(summary) > summary_len else ''}</div>
+                            ''' if (summary and show_description) else ''}
                         </div>
                     </div>
                 """
@@ -269,9 +277,9 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
                         border: 1px solid {theme_colors['border']};
                         padding: 12px;
                         text-align: center;
-                        max-width: 200px;
+                        max-width: {poster_px}px;
                         margin: 0 auto;
-                        height: 320px;
+                        min-height: {poster_target[1]}px;
                     ">
                         <div style="display: table-cell; vertical-align: middle;">
                             <div style="
@@ -294,7 +302,7 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
                                 opacity: 0.8;
                                 font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
                             ">{summary[:100]}{'...' if len(summary) > 100 else ''}</div>
-                            ''' if summary else ''}
+                            ''' if (summary and show_description) else ''}
                         </div>
                     </div>
                 """
@@ -314,7 +322,7 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
             row_html += f'<td class="recently-added-cell" style="{cell_style}">{card_html}</td>'
         
         while len(row_items) < items_per_row:
-            row_html += f'<td class="recently-added-cell" style="width: 20%; padding: 8px;"></td>'
+            row_html += f'<td class="recently-added-cell" style="width: {cell_width_pct}; padding: 8px;"></td>'
             row_items.append(None)
         
         row_html += "</tr>"

@@ -66,6 +66,10 @@
     const recentlyAddedMode = "{{ settings.get('recently_added_mode', 'items') }}";
     const raGridColumns = parseInt("{{ settings.get('ra_grid_columns', '5') }}") || 5;
     const recsGridColumns = parseInt("{{ settings.get('recs_grid_columns', '5') }}") || 5;
+    const collectionsGridColumns = parseInt("{{ settings.get('collections_grid_columns', '5') }}") || 5;
+    const raShowDescription = "{{ settings.get('ra_show_description', 'enabled') }}" !== "disabled";
+    const includeUserInfo = "{{ settings.get('include_user_info', 'enabled') }}" !== "disabled";
+    const comingSoonGridColumns = parseInt("{{ settings.get('coming_soon_grid_columns', '5') }}") || 5;
     const showStatCoverArt = "{{ settings.get('stat_cover_art', 'disabled') }}" === "enabled";
 
     let templateData = {};
@@ -73,6 +77,11 @@
     let graphData = [];
     let recentData = [];
     let recsPayload = {};
+    let yearlyWrappedPayload = [];
+    let droppedneedleWrappedPayload = {};
+    let droppedneedleServerPayload = null;
+    let sonarrComingSoonPayload = [];
+    let radarrComingSoonPayload = [];
     let selectedItems = [];
     let graphCommands = [];
     let recentCommands = [];
@@ -524,6 +533,11 @@
             graphData = data.graph_data || [];
             recentData = data.recent_data || [];
             recsPayload = data.recommendations || {};
+            yearlyWrappedPayload = data.yearly_wrapped || [];
+            droppedneedleWrappedPayload = data.droppedneedle_wrapped || {};
+            droppedneedleServerPayload = data.droppedneedle_server || null;
+            sonarrComingSoonPayload = data.sonarr_coming_soon || [];
+            radarrComingSoonPayload = data.radarr_coming_soon || [];
             graphCommands = data.graph_commands || [];
             recentCommands = data.recent_commands || [];
             userDict = data.user_dict || {};
@@ -727,7 +741,13 @@
                 contentHTML += buildStatHTML(item.id, dateRange);
             } else if (item.type === 'graph') {
                 console.log('Processing graph item:', item.id);
-                
+
+                // user-info toggle: mirror the server-side skip of the top-users graphs
+                const _gName = (graphCommands[parseInt(item.id.split('-')[1])] || {}).name;
+                if (!includeUserInfo && (_gName === 'Plays by Top Users' || _gName === 'Stream Type by Top Users')) {
+                    continue;
+                }
+
                 await new Promise(resolve => setTimeout(resolve, 100));
                 
                 const availableCharts = Highcharts.charts.filter(Boolean);
@@ -786,6 +806,16 @@
                 contentHTML += buildRecentlyAddedHTML(item.raLibrary);
             } else if (item.type === 'recommendations') {
                 contentHTML += buildRecommendationsHTML(item.userKey);
+            } else if (item.type === 'droppedneedle_wrapped') {
+                contentHTML += buildDroppedNeedleWrappedPreviewHTML(item.userKey);
+            } else if (item.type === 'droppedneedle_server_stats') {
+                contentHTML += buildDroppedNeedleServerStatsPreviewHTML();
+            } else if (item.type === 'yearly_wrapped') {
+                contentHTML += buildYearlyWrappedPreviewHTML();
+            } else if (item.type === 'sonarr_coming_soon') {
+                contentHTML += buildSonarrComingSoonPreviewHTML();
+            } else if (item.type === 'radarr_coming_soon') {
+                contentHTML += buildRadarrComingSoonPreviewHTML();
             } else if (item.type === 'collection_group') {
                 const groupTitle = item.title || 'Collections';
                 const groupCollections = item.collections || [];
@@ -831,10 +861,13 @@
         
         const stat = stats[statIndex];
         if (!stat || !stat.rows) return '';
-        
+
         const title = stat.stat_title || 'Statistics';
         const rows = stat.rows;
-        
+
+        // user-info toggle: mirror the server-side skip of the Most Active Users stat
+        if (title === "Most Active Users" && !includeUserInfo) return '';
+
         let backgroundElements = '';
         let hasBackground = false;
         if (rows.length > 0) {
@@ -943,9 +976,13 @@
             `<th style="padding: 12px; background: rgba(52, 58, 64, 0.9); color: white; font-weight: bold;">${h}</th>`
         ).join('');
         
+        const showUserAvatars = title === "Most Active Users" && includeUserInfo;
         const rowsHTML = rows.map(row => {
             const cells = getStatCells(title, row);
-            const cellsHTML = cells.map(cell => 
+            if (showUserAvatars && row.user_thumb) {
+                cells[0] = `<img src="${row.user_thumb}" style="height:32px;width:32px;border-radius:50%;object-fit:cover;margin-right:7px;vertical-align:middle;" alt="">${cells[0]}`;
+            }
+            const cellsHTML = cells.map(cell =>
                 `<td style="color: black; padding: 12px; background: rgba(255, 255, 255, 0.5); border-bottom: 1px solid rgba(222, 226, 230, 0.8);">${cell}</td>`
             ).join('');
             return `<tr>${cellsHTML}</tr>`;
@@ -1106,7 +1143,7 @@
                         <div style="font-size: 10px; color: var(--email-muted); margin-bottom: 8px; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
                             ${[item.sub, item.duration, item.contentRating, item.added ? 'Added ' + item.added : ''].filter(Boolean).join(' • ')}
                         </div>
-                        ${item.summary ? `
+                        ${(item.summary && raShowDescription) ? `
                             <div style="font-size: 11px; color: var(--email-text); opacity: 0.8; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden;">
                                 ${item.summary}
                             </div>
@@ -1271,6 +1308,288 @@
                 </div>
             </div>
         `;
+    }
+
+    // --- Wrapped / DroppedNeedle / Coming Soon blocks
+    // Mirrored by hand from static/js/app/04-stats-graphs.js so the schedule
+    // preview renders the same block types the index builder preview does.
+
+    function buildWrappedRankedListHTML(title, items, labelFn) {
+        if (!items || !items.length) return '';
+        const rows = items.map((item, i) => `
+            <li style="margin: 4px 0; color: var(--email-text);">
+                <strong>#${i + 1}</strong> ${labelFn(item)}
+                <span style="color: var(--email-muted); font-size: 0.85em;"> - ${item.listen_count} plays</span>
+            </li>`).join('');
+        return `
+            <div style="margin-bottom: 16px;">
+                <h3 style="margin-bottom: 6px; color: var(--email-text);">${title}</h3>
+                <ol style="padding-left: 20px; margin: 0;">${rows}</ol>
+            </div>`;
+    }
+
+    function buildDroppedNeedleWrappedPreviewHTML(userKey) {
+        const data = droppedneedleWrappedPayload && userKey ? droppedneedleWrappedPayload[userKey] : null;
+        if (!data || !data.has_data) {
+            return `<div class="droppedneedle-wrapped-block"><p style="text-align: center; color: var(--email-muted); padding: 20px;">No DroppedNeedle wrapped stats available for this user</p></div>`;
+        }
+        const userDisplay = getUserDisplayName(userKey);
+        const sections = [
+            buildWrappedRankedListHTML('Top Artists', data.top_artists, a => a.name),
+            buildWrappedRankedListHTML('Top Tracks', data.top_tracks, t => `${t.name} - ${t.artist_name}`),
+            buildWrappedRankedListHTML('Top Albums', data.top_albums, al => `${al.name} - ${al.artist_name}`),
+            buildWrappedRankedListHTML('Top Genres', data.top_genres, g => g.genre),
+        ].join('');
+        return `
+            <div class="droppedneedle-wrapped-block" style="padding: 0;" data-wrapped-user="${userKey}">
+                <h2 style="text-align: center; margin-top: 0; margin-bottom: 10px; color: var(--email-text);">
+                    ${userDisplay}'s ${data.year} Wrapped
+                </h2>
+                <p style="text-align: center; color: var(--email-muted); margin-bottom: 16px;">
+                    ~${data.total_listens_estimated} plays tracked &bull; ${data.loved_tracks_count} loved tracks
+                </p>
+                ${sections}
+            </div>`;
+    }
+
+    function buildDroppedNeedleServerStatsPreviewHTML() {
+        const data = droppedneedleServerPayload;
+        if (!data) {
+            return `<div class="droppedneedle-server-block"><p style="text-align: center; color: var(--email-muted); padding: 20px;">No DroppedNeedle server stats available</p></div>`;
+        }
+        const leaderboardHTML = buildWrappedRankedListHTML('Top Listeners', data.leaderboard, entry => entry.display_name);
+        const topArtist = data.top_artist_sitewide
+            ? `<p style="color: var(--email-text);"><strong>Top Artist:</strong> ${data.top_artist_sitewide.name} (${data.top_artist_sitewide.listen_count} plays)</p>` : '';
+        const topAlbum = data.top_album_sitewide
+            ? `<p style="color: var(--email-text);"><strong>Top Album:</strong> ${data.top_album_sitewide.name} - ${data.top_album_sitewide.artist_name} (${data.top_album_sitewide.listen_count} plays)</p>` : '';
+        return `
+            <div class="droppedneedle-server-block" style="padding: 0;">
+                <h2 style="text-align: center; margin-top: 0; margin-bottom: 10px; color: var(--email-text);">
+                    Server Stats - ${data.year}
+                </h2>
+                <p style="text-align: center; color: var(--email-muted); margin-bottom: 16px;">
+                    ~${data.total_listens_estimated} plays across ${data.total_users_tracked} listeners
+                </p>
+                ${topArtist}
+                ${topAlbum}
+                ${leaderboardHTML}
+            </div>`;
+    }
+
+    function buildYearlyWrappedPreviewHTML() {
+        const statsData = yearlyWrappedPayload;
+        if (!statsData || !statsData.length) {
+            return `<div><p style="text-align: center; color: var(--email-muted); padding: 20px;">No yearly wrapped data available</p></div>`;
+        }
+        const firstRow = (title) => {
+            const stat = statsData.find(s => s.stat_title === title && s.rows && s.rows.length);
+            return stat ? stat.rows[0] : null;
+        };
+        const topMovie = firstRow('Most Watched Movies');
+        const topShow = firstRow('Most Watched TV Shows');
+        const topArtist = firstRow('Most Played Artists');
+        const topUser = firstRow('Most Active Users');
+        let totalPlays = 0;
+        statsData.forEach(stat => {
+            if (['Most Watched Movies', 'Most Watched TV Shows', 'Most Played Artists'].includes(stat.stat_title)) {
+                (stat.rows || []).forEach(row => { totalPlays += parseInt(row.total_plays || 0, 10); });
+            }
+        });
+        const thumbSrc = (row) => {
+            const path = row.thumb || row.grandparent_thumb;
+            if (!path) return null;
+            return path.startsWith('/proxy-art') ? path : `/proxy-art${path}`;
+        };
+        const highlights = [];
+        if (topMovie) highlights.push(['🎬 Top Movie', topMovie.title || '', thumbSrc(topMovie), false]);
+        if (topShow) highlights.push(['📺 Top Show', topShow.title || '', thumbSrc(topShow), false]);
+        if (topArtist) highlights.push(['🎵 Top Artist', topArtist.title || '', thumbSrc(topArtist), false]);
+        if (topUser && includeUserInfo) {
+            highlights.push(['👤 Most Active', topUser.user || '', topUser.user_thumb || null, true]);
+        }
+        if (!highlights.length && !totalPlays) return '';
+        const highlightCells = highlights.map(([label, value, thumb, isRound]) => `
+            <td style="text-align: center; padding: 12px; vertical-align: top; width: ${100 / Math.max(highlights.length, 1)}%;">
+                <div style="font-size: 12px; color: rgba(255,255,255,0.85); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">${label}</div>
+                ${thumb ? `<img src="${thumb}" alt="${value}" style="height:60px;${isRound ? 'width:60px;border-radius:50%;object-fit:cover;' : 'width:auto;border-radius:4px;'}display:block;margin:0 auto 6px;">` : ''}<div style="font-size: 15px; font-weight: bold; color: white; line-height: 1.3;">${value}</div>
+            </td>
+        `).join('');
+        const displayYear = new Date().getFullYear();
+        return `
+            <div style="margin: 20px 0; border-radius: 12px; overflow: hidden; background: linear-gradient(135deg, var(--email-primary) 0%, var(--email-accent) 100%); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);">
+                <div style="padding: 20px 20px 4px 20px; text-align: center;">
+                    <div style="font-size: 13px; color: rgba(255,255,255,0.85); text-transform: uppercase; letter-spacing: 0.1em;">Year in Review</div>
+                    <div style="font-size: 26px; font-weight: bold; color: white; margin: 4px 0 4px 0;">${displayYear} Wrapped</div>
+                    ${totalPlays ? `<div style="font-size: 14px; color: rgba(255,255,255,0.9); margin-bottom: 8px;">~${totalPlays} plays this year</div>` : ''}
+                </div>
+                <table cellpadding="0" cellspacing="0" border="0" width="100%">
+                    <tr>${highlightCells}</tr>
+                </table>
+            </div>`;
+    }
+
+    function _comingSoonRelativeDate(dateStr) {
+        if (!dateStr) return '';
+        const dt = new Date(dateStr);
+        if (isNaN(dt.getTime())) return '';
+        const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+        const diffDays = Math.round((startOfDay(dt) - startOfDay(new Date())) / 864e5);
+        if (diffDays === 0) return 'today';
+        if (diffDays === 1) return 'tomorrow';
+        if (diffDays > 1) return `in ${diffDays} days`;
+        if (diffDays === -1) return 'yesterday';
+        return `${Math.abs(diffDays)} days ago`;
+    }
+
+    function _comingSoonUpcomingReleaseDate(movie) {
+        const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+        const today = startOfDay(new Date());
+        let earliest = null;
+        for (const field of ['inCinemas', 'digitalRelease', 'physicalRelease']) {
+            const raw = movie[field];
+            if (!raw) continue;
+            const dt = new Date(raw);
+            if (isNaN(dt.getTime())) continue;
+            const d = startOfDay(dt);
+            if (d >= today && (earliest === null || d < earliest)) earliest = d;
+        }
+        return earliest;
+    }
+
+    function _comingSoonPosterUrl(images) {
+        if (!Array.isArray(images)) return null;
+        const poster = images.find(img => img.coverType === 'poster' && (img.url || img.remoteUrl));
+        if (poster) return poster.url || poster.remoteUrl;
+        const any = images.find(img => img.url || img.remoteUrl);
+        return any ? (any.url || any.remoteUrl) : null;
+    }
+
+    function _comingSoonPosterSrc(posterPath, arrPrefix) {
+        if (!posterPath) return '';
+        if (posterPath.startsWith('http')) return `/proxy-img?u=${encodeURIComponent(posterPath)}`;
+        return `${arrPrefix}${posterPath.startsWith('/') ? posterPath : '/' + posterPath}`;
+    }
+
+    function _comingSoonCardHTML(title, subtitle, metaText, posterSrc) {
+        const posterHTML = posterSrc
+            ? `<div style="position: relative; aspect-ratio: 2/3; background: #f8f9fa;"><img src="${posterSrc}" style="width: 100%; height: 100%; object-fit: cover; display: block;" alt="${title}"></div>`
+            : '';
+        return `
+            <div style="
+                background: var(--email-card-bg);
+                border-radius: 12px;
+                overflow: hidden;
+                border: 1px solid var(--email-border);
+                width: 100%;
+                margin: 0 auto;
+                box-shadow: 0 6px 18px rgba(0, 0, 0, 0.6);
+            ">
+                ${posterHTML}
+                <div style="padding: 6px; color: var(--email-text); min-height: 60px;">
+                    <div style="font-weight: bold; font-size: 14px; color: var(--email-text); margin-bottom: 1px; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${title}</div>
+                    ${subtitle ? `<div style="font-size: 11px; color: var(--email-text); opacity: 0.85; margin-bottom: 2px;">${subtitle}</div>` : ''}
+                    <div style="font-size: 10px; color: var(--email-muted);">${metaText}</div>
+                </div>
+            </div>
+        `;
+    }
+
+    function _comingSoonGridHTML(cardsHTML, title, gridColumns) {
+        if (!cardsHTML.length) {
+            return `<div><p style="text-align: center; color: var(--email-muted); padding: 20px;">No upcoming items found.</p></div>`;
+        }
+        return `
+            <div>
+                <h2 style="text-align: center; margin: 0 0 10px 0; color: var(--email-text);">${title}</h2>
+                <div style="
+                    display: grid;
+                    grid-template-columns: repeat(${gridColumns}, minmax(0, 1fr));
+                    gap: 12px;
+                    margin: 15px auto 0 auto;
+                    padding: 0;
+                    width: 80%;
+                ">
+                    ${cardsHTML.join('')}
+                </div>
+            </div>
+        `;
+    }
+
+    function _groupSonarrEpisodes(episodes) {
+        const airDay = (ep) => ep.airDate || (ep.airDateUtc || '').slice(0, 10);
+        const groups = [];
+        const indexByKey = new Map();
+        episodes.forEach(ep => {
+            const series = ep.series || {};
+            const season = ep.seasonNumber;
+            let key = null;
+            if (season != null) {
+                key = `${series.id || series.title || ep.title}|${season}|${airDay(ep)}`;
+            }
+            if (key !== null && indexByKey.has(key)) {
+                groups[indexByKey.get(key)].episodes.push(ep);
+                return;
+            }
+            const entry = {series, season, episodes: [ep], airDate: airDay(ep)};
+            if (key !== null) indexByKey.set(key, groups.length);
+            groups.push(entry);
+        });
+        return groups;
+    }
+
+    function buildSonarrComingSoonPreviewHTML() {
+        const episodes = sonarrComingSoonPayload;
+        if (!episodes || !episodes.length) {
+            return `<div><p style="text-align: center; color: var(--email-muted); padding: 20px;">No upcoming episodes found.</p></div>`;
+        }
+        const cardsHTML = _groupSonarrEpisodes(episodes).map(group => {
+            const series = group.series || {};
+            const eps = group.episodes;
+            const firstEp = eps[0];
+            const seriesTitle = series.title || firstEp.title || 'Unknown';
+            const season = group.season;
+            const year = series.year || firstEp.year || '';
+            const yearPrefix = year ? String(year) : '';
+            const relative = _comingSoonRelativeDate(firstEp.airDateUtc || firstEp.airDate);
+            const metaText = relative ? `Airs ${relative}` : '';
+            let subtitle;
+            if (eps.length >= 2) {
+                const seasonLabel = season != null ? `Season ${season}` : 'New episodes';
+                subtitle = [yearPrefix, `${seasonLabel} (${eps.length} episodes)`].filter(Boolean).join(' • ');
+            } else {
+                const seLabel = (season != null && firstEp.episodeNumber != null)
+                    ? `S${String(season).padStart(2, '0')}E${String(firstEp.episodeNumber).padStart(2, '0')}`
+                    : '';
+                const seText = [seLabel, firstEp.title || ''].filter(Boolean).join(' - ');
+                subtitle = [yearPrefix, seText].filter(Boolean).join(' • ');
+            }
+            const posterPath = _comingSoonPosterUrl(series.images) || _comingSoonPosterUrl(firstEp.images);
+            const posterSrc = _comingSoonPosterSrc(posterPath, '/proxy-sonarr-art');
+            return _comingSoonCardHTML(seriesTitle, subtitle, metaText, posterSrc);
+        });
+        return _comingSoonGridHTML(cardsHTML, 'Coming Soon (TV)', comingSoonGridColumns);
+    }
+
+    function buildRadarrComingSoonPreviewHTML() {
+        const movies = radarrComingSoonPayload;
+        if (!movies || !movies.length) {
+            return `<div><p style="text-align: center; color: var(--email-muted); padding: 20px;">No upcoming movies found.</p></div>`;
+        }
+        const upcoming = movies.filter(m => !m.hasFile && _comingSoonUpcomingReleaseDate(m));
+        if (!upcoming.length) {
+            return `<div><p style="text-align: center; color: var(--email-muted); padding: 20px;">No upcoming movies found.</p></div>`;
+        }
+        const cardsHTML = upcoming.map(movie => {
+            const title = movie.title || 'Unknown';
+            const subtitle = movie.year ? String(movie.year) : '';
+            const releaseDate = _comingSoonUpcomingReleaseDate(movie);
+            const relative = _comingSoonRelativeDate(releaseDate);
+            const metaText = relative ? `Releases ${relative}` : '';
+            const posterPath = _comingSoonPosterUrl(movie.images);
+            const posterSrc = _comingSoonPosterSrc(posterPath, '/proxy-radarr-art');
+            return _comingSoonCardHTML(title, subtitle, metaText, posterSrc);
+        });
+        return _comingSoonGridHTML(cardsHTML, 'Coming Soon (Movies)', comingSoonGridColumns);
     }
 
     function buildCollectionCard(collection, themeColors) {
@@ -1580,9 +1899,10 @@
             }
         });
 
-        const itemsPerRow = 5;
+        const itemsPerRow = collectionsGridColumns;
+        const fullRowCellWidth = `${(100 / itemsPerRow).toFixed(4)}%`;
         let itemsHTML = "";
-        
+
         for (let i = 0; i < allItemsToDisplay.length; i += itemsPerRow) {
             const rowItems = allItemsToDisplay.slice(i, i + itemsPerRow);
             const isPartialRow = rowItems.length < itemsPerRow;
@@ -1619,12 +1939,12 @@
                 
                 rowItems.forEach((item) => {
                     const cellStyle = `
-                        width: 20%;
+                        width: ${fullRowCellWidth};
                         padding: 6px;
                         vertical-align: top;
                         font-family: 'IBM Plex Sans';
                     `;
-                    
+
                     const cardHTML = item.isIndividualItem
                         ? buildIndividualItemCardForSchedule(item, themeColors)
                         : buildCollectionCard(item, themeColors);

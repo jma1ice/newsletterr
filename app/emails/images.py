@@ -14,7 +14,26 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-def fetch_and_attach_image(image_url, msg_root, cid_name, base_url="", max_height=None, hosted_images_enabled=False, hosted_base_url=""):
+def _center_crop_resize(img, target_w, target_h):
+    """Center-crop `img` to the target_w:target_h aspect ratio then resize to
+    exactly (target_w, target_h), so the delivered bytes match the display box
+    without relying on CSS object-fit (which most email clients ignore)."""
+    orig_w, orig_h = img.size
+    if orig_w <= 0 or orig_h <= 0:
+        return img
+    target_ratio = target_w / target_h
+    orig_ratio = orig_w / orig_h
+    if orig_ratio > target_ratio:
+        new_w = max(1, int(round(orig_h * target_ratio)))
+        left = (orig_w - new_w) // 2
+        img = img.crop((left, 0, left + new_w, orig_h))
+    elif orig_ratio < target_ratio:
+        new_h = max(1, int(round(orig_w / target_ratio)))
+        top = (orig_h - new_h) // 2
+        img = img.crop((0, top, orig_w, top + new_h))
+    return img.resize((target_w, target_h), Image.LANCZOS)
+
+def fetch_and_attach_image(image_url, msg_root, cid_name, base_url="", max_height=None, hosted_images_enabled=False, hosted_base_url="", target=None):
     try:
         logger.debug(f"fetch_and_attach_image called with: {image_url}")
         
@@ -86,7 +105,28 @@ def fetch_and_attach_image(image_url, msg_root, cid_name, base_url="", max_heigh
             subtype = 'jpeg'
 
         image_bytes = response.content
-        if max_height and isinstance(max_height, int) and max_height > 0:
+        # An explicit (width, height) target wins over max_height: crop the
+        # delivered bytes to exactly that box so grid posters share one aspect
+        # ratio regardless of column count.
+        _tw = _th = 0
+        if target and isinstance(target, (tuple, list)) and len(target) == 2:
+            try:
+                _tw, _th = int(target[0]), int(target[1])
+            except (TypeError, ValueError):
+                _tw = _th = 0
+        if _tw > 0 and _th > 0:
+            try:
+                img = Image.open(io.BytesIO(image_bytes))
+                img = _center_crop_resize(img, _tw, _th)
+                out = io.BytesIO()
+                save_fmt = 'JPEG' if subtype == 'jpeg' else 'PNG'
+                if save_fmt == 'JPEG' and img.mode in ('RGBA', 'P', 'LA'):
+                    img = img.convert('RGB')
+                img.save(out, format=save_fmt, quality=85)
+                image_bytes = out.getvalue()
+            except Exception as _e:
+                logger.error(f"PIL target crop failed, using original: {_e}")
+        elif max_height and isinstance(max_height, int) and max_height > 0:
             try:
                 img = Image.open(io.BytesIO(image_bytes))
                 orig_w, orig_h = img.size

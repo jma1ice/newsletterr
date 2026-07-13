@@ -128,6 +128,9 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, displ
     recs_grid_columns = int(tautulli_data.get('settings', {}).get('recs_grid_columns', 5) or 5)
     poster_max_height = int(tautulli_data.get('settings', {}).get('poster_max_height') or 0)
     coming_soon_grid_columns = int(tautulli_data.get('settings', {}).get('coming_soon_grid_columns', 5) or 5)
+    collections_grid_columns = int(tautulli_data.get('settings', {}).get('collections_grid_columns', 5) or 5)
+    ra_show_description = tautulli_data.get('settings', {}).get('ra_show_description', 'enabled') != 'disabled'
+    include_user_info = tautulli_data.get('settings', {}).get('include_user_info', 'enabled') != 'disabled'
     _default_intro = tautulli_data.get('settings', {}).get('default_intro_text') or ''
     _default_outro = tautulli_data.get('settings', {}).get('default_outro_text') or ''
     _resolved_intro = _default_intro or f"You are receiving this email because you are a member of {server_name}."
@@ -188,9 +191,13 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, displ
             stat_index = int(item['id'].split('-')[1])
             if stat_index < len(tautulli_data.get('stats', [])):
                 stat_data = tautulli_data['stats'][stat_index]
-                content_html += build_stats_html_with_cid_background(stat_data, msg_root, theme_colors, base_url, date_range, hide_play_counts=hide_stat_play_counts, show_cover_art=show_cover_art, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
-        
+                content_html += build_stats_html_with_cid_background(stat_data, msg_root, theme_colors, base_url, date_range, hide_play_counts=hide_stat_play_counts, show_cover_art=show_cover_art, include_user_info=include_user_info, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
+
         elif item_type == 'graph':
+            # user-info toggle: the top-users graphs name other users, so drop
+            # them server-side regardless of what the template selected
+            if not include_user_info and item.get('name') in ('Plays by Top Users', 'Stream Type by Top Users'):
+                continue
             content_html += build_graph_html_with_frontend_image(item, msg_root)
         
         elif item_type == 'recently added':
@@ -206,7 +213,7 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, displ
                     except (TypeError, ValueError):
                         max_items = 10
 
-            content_html += build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, library_filter, base_url, max_items, recently_added_mode=recently_added_mode, ra_grid_columns=ra_grid_columns, poster_max_height=poster_max_height, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
+            content_html += build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, library_filter, base_url, max_items, recently_added_mode=recently_added_mode, ra_grid_columns=ra_grid_columns, poster_max_height=poster_max_height, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url, show_description=ra_show_description)
         
         elif item_type == 'recommendations':
             if recommendations_data:
@@ -234,7 +241,7 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, displ
 
         elif item_type == 'yearly_wrapped':
             if yearly_wrapped_data:
-                content_html += build_yearly_wrapped_html_with_cids(yearly_wrapped_data, msg_root, theme_colors, base_url=base_url, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
+                content_html += build_yearly_wrapped_html_with_cids(yearly_wrapped_data, msg_root, theme_colors, base_url=base_url, include_user_info=include_user_info, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
 
         elif item_type == 'sonarr_coming_soon':
             if sonarr_coming_soon_data:
@@ -248,7 +255,7 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, displ
             group_title = item.get('title', 'Collections')
             group_collections = item.get('collections', [])
             if group_collections:
-                content_html += build_collections_html_with_cids(group_collections, msg_root, theme_colors, base_url, group_title, expanded_collections, group_index, poster_max_height=poster_max_height, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
+                content_html += build_collections_html_with_cids(group_collections, msg_root, theme_colors, base_url, group_title, expanded_collections, group_index, poster_max_height=poster_max_height, grid_columns=collections_grid_columns, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
 
     email_html = build_complete_email_html_with_cid_logo(content_html, server_name, subject, email_header_title, logo_src, logo_width, is_scheduled, logo_position=logo_position, unsubscribe_placeholder=unsubscribe_placeholder, hosted_base_url=hosted_base_url)
 

@@ -211,7 +211,14 @@ def build_recommendations_section_with_cids(available_items, unavailable_items, 
     all_items = available_items + unavailable_items
     items_per_row = max(1, int(recs_grid_columns) if recs_grid_columns else 5)
     cell_width_pct = f"{100 / items_per_row:.4f}%"
-    
+
+    # Uniform 2:3 poster box regardless of column count (see recently_added.py).
+    _base_width = 760
+    poster_px = max(60, int(_base_width / items_per_row) - 16)
+    if poster_max_height:
+        poster_px = min(poster_px, max(40, int(int(poster_max_height) * 2 // 3)))
+    poster_target = (poster_px, int(round(poster_px * 1.5)))
+
     rows_html = ""
     for i in range(0, len(all_items), items_per_row):
         row_items = all_items[i:i + items_per_row]
@@ -227,7 +234,7 @@ def build_recommendations_section_with_cids(available_items, unavailable_items, 
                     msg_root,
                     f"{section_prefix}-{i}-{j}",
                     base_url,
-                    max_height=poster_max_height if poster_max_height else None,
+                    target=poster_target,
                     hosted_images_enabled=hosted_images_enabled,
                     hosted_base_url=hosted_base_url
                 )
@@ -266,17 +273,11 @@ def build_recommendations_section_with_cids(available_items, unavailable_items, 
             if poster_src_result:
                 poster_src = poster_src_result
 
-                img_attrs = 'width="100%"'
+                img_attrs = f'width="{poster_px}"'
                 img_style = (
-                    "width: 100%; height: auto; display: block; object-fit: cover; "
+                    "width: 100%; height: auto; display: block; "
                     "border-radius: 12px 12px 0 0; background-color: #f8f9fa;"
                 )
-                if poster_max_height:
-                    img_attrs = f'width="100%" height="{poster_max_height}"'
-                    img_style = (
-                        f"width: 100%; height: {poster_max_height}px; display: block; object-fit: cover; "
-                        "border-radius: 12px 12px 0 0; background-color: #f8f9fa;"
-                    )
 
                 meta_line = " • ".join(filter(None, [
                     str(year) if year else '',
@@ -292,6 +293,7 @@ def build_recommendations_section_with_cids(available_items, unavailable_items, 
                         overflow: hidden;
                         border: 1px solid {theme_colors['border']};
                         width: 100%;
+                        max-width: {poster_px}px;
                         margin: 0 auto;
                         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
                     ">
@@ -373,7 +375,7 @@ def build_recommendations_section_with_cids(available_items, unavailable_items, 
             row_html += f'<td style="{cell_style}">{card_html}</td>'
         
         while len(row_items) < items_per_row:
-            row_html += f'<td style="width: 20%; padding: 6px;"></td>'
+            row_html += f'<td style="width: {cell_width_pct}; padding: 6px;"></td>'
             row_items.append(None)
         
         row_html += "</tr>"

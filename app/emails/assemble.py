@@ -234,7 +234,7 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, displ
 
         elif item_type == 'yearly_wrapped':
             if yearly_wrapped_data:
-                content_html += build_yearly_wrapped_html_with_cids(yearly_wrapped_data, msg_root, theme_colors)
+                content_html += build_yearly_wrapped_html_with_cids(yearly_wrapped_data, msg_root, theme_colors, base_url=base_url, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
 
         elif item_type == 'sonarr_coming_soon':
             if sonarr_coming_soon_data:

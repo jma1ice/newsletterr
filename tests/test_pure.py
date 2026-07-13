@@ -170,3 +170,76 @@ def test_recently_added_days_mode_title_shows_date_range():
     end_date = datetime.now().strftime("%-m/%-d/%y")
     assert f"{since_date} - {end_date}" in html
     assert "since" not in html.split("Recently Added")[1].split("</h2>")[0].lower()
+
+def test_radarr_upcoming_release_date_picks_earliest_today_or_later():
+    from datetime import date
+    from app.emails.builders.coming_soon import upcoming_release_date
+
+    today = date(2026, 7, 9)
+    # inCinemas is past, physicalRelease is future -> physical wins
+    movie = {'inCinemas': '2026-06-01', 'physicalRelease': '2026-08-01'}
+    assert upcoming_release_date(movie, today) == date(2026, 8, 1)
+
+    # earliest of two future dates wins
+    movie2 = {'digitalRelease': '2026-09-01', 'physicalRelease': '2026-08-15'}
+    assert upcoming_release_date(movie2, today) == date(2026, 8, 15)
+
+    # all past -> None
+    movie3 = {'inCinemas': '2026-01-01', 'digitalRelease': '2026-02-01'}
+    assert upcoming_release_date(movie3, today) is None
+
+    # today counts as upcoming
+    movie4 = {'digitalRelease': '2026-07-09'}
+    assert upcoming_release_date(movie4, today) == today
+
+def test_filter_radarr_upcoming_drops_owned_and_released():
+    from datetime import date
+    from app.emails.builders.coming_soon import filter_radarr_upcoming
+
+    today = date(2026, 7, 9)
+    upcoming = {'title': 'Upcoming', 'digitalRelease': '2026-08-01'}
+    owned = {'title': 'Owned', 'digitalRelease': '2026-08-01', 'hasFile': True}
+    past = {'title': 'Past', 'digitalRelease': '2026-06-01'}
+    no_date = {'title': 'NoDate'}
+
+    result = filter_radarr_upcoming([upcoming, owned, past, no_date], today)
+    titles = [m['title'] for m in result]
+    assert titles == ['Upcoming']
+
+def test_group_sonarr_episodes_collapses_same_day_season():
+    from app.emails.builders.coming_soon import group_sonarr_episodes
+
+    series = {"id": 1, "title": "Show A"}
+    eps = [
+        {"series": series, "seasonNumber": 1, "episodeNumber": 1, "airDate": "2026-07-15"},
+        {"series": series, "seasonNumber": 1, "episodeNumber": 2, "airDate": "2026-07-15"},
+        {"series": series, "seasonNumber": 1, "episodeNumber": 3, "airDate": "2026-07-15"},
+    ]
+    groups = group_sonarr_episodes(eps)
+    assert len(groups) == 1
+    assert len(groups[0]["episodes"]) == 3
+    assert groups[0]["season"] == 1
+
+def test_group_sonarr_episodes_different_day_or_season_stay_separate():
+    from app.emails.builders.coming_soon import group_sonarr_episodes
+
+    series = {"id": 1, "title": "Show A"}
+    eps = [
+        {"series": series, "seasonNumber": 1, "episodeNumber": 1, "airDate": "2026-07-15"},
+        {"series": series, "seasonNumber": 1, "episodeNumber": 2, "airDate": "2026-07-16"},
+        {"series": series, "seasonNumber": 2, "episodeNumber": 1, "airDate": "2026-07-15"},
+    ]
+    groups = group_sonarr_episodes(eps)
+    assert len(groups) == 3
+    assert all(len(g["episodes"]) == 1 for g in groups)
+
+def test_group_sonarr_episodes_none_season_never_groups():
+    from app.emails.builders.coming_soon import group_sonarr_episodes
+
+    series = {"id": 1, "title": "Show A"}
+    eps = [
+        {"series": series, "seasonNumber": None, "episodeNumber": 1, "airDate": "2026-07-15"},
+        {"series": series, "seasonNumber": None, "episodeNumber": 2, "airDate": "2026-07-15"},
+    ]
+    groups = group_sonarr_episodes(eps)
+    assert len(groups) == 2

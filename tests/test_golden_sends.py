@@ -446,9 +446,34 @@ def test_manual_yearly_wrapped_email_golden(manual_send_env, monkeypatch):
 
 SONARR_EPISODES_FIXTURE = [
     {
-        "series": {"title": "Test Show", "images": [{"coverType": "poster", "url": "/mediacover/1/poster.jpg"}]},
+        "series": {"title": "Test Show", "year": 2026, "images": [{"coverType": "poster", "url": "/mediacover/1/poster.jpg"}]},
         "seasonNumber": 1, "episodeNumber": 2, "title": "Pilot Returns",
         "airDateUtc": "2026-07-15T00:00:00Z",
+    },
+]
+
+SONARR_GROUPED_FIXTURE = [
+    # A full-season drop: three episodes of the same series/season on one day.
+    {
+        "series": {"id": 10, "title": "Binge Show", "year": 2026, "images": [{"coverType": "poster", "url": "/mediacover/10/poster.jpg"}]},
+        "seasonNumber": 1, "episodeNumber": 1, "title": "Chapter One",
+        "airDate": "2026-07-15", "airDateUtc": "2026-07-15T00:00:00Z",
+    },
+    {
+        "series": {"id": 10, "title": "Binge Show", "year": 2026, "images": [{"coverType": "poster", "url": "/mediacover/10/poster.jpg"}]},
+        "seasonNumber": 1, "episodeNumber": 2, "title": "Chapter Two",
+        "airDate": "2026-07-15", "airDateUtc": "2026-07-15T00:00:00Z",
+    },
+    {
+        "series": {"id": 10, "title": "Binge Show", "year": 2026, "images": [{"coverType": "poster", "url": "/mediacover/10/poster.jpg"}]},
+        "seasonNumber": 1, "episodeNumber": 3, "title": "Chapter Three",
+        "airDate": "2026-07-15", "airDateUtc": "2026-07-15T00:00:00Z",
+    },
+    # A standalone episode of a different show that must not be grouped.
+    {
+        "series": {"id": 20, "title": "Solo Show", "year": 2025, "images": [{"coverType": "poster", "url": "/mediacover/20/poster.jpg"}]},
+        "seasonNumber": 2, "episodeNumber": 5, "title": "On Its Own",
+        "airDate": "2026-07-16", "airDateUtc": "2026-07-16T00:00:00Z",
     },
 ]
 
@@ -456,6 +481,15 @@ RADARR_MOVIES_FIXTURE = [
     {
         "title": "Test Movie", "year": 2026, "digitalRelease": "2026-07-20",
         "images": [{"coverType": "poster", "url": "/mediacover/2/poster.jpg"}],
+    },
+    # Already released (all dates before the frozen 2026-07-09) -> filtered out.
+    {
+        "title": "Released Movie", "year": 2025, "digitalRelease": "2025-01-01",
+        "inCinemas": "2024-06-01", "physicalRelease": "2025-03-01",
+    },
+    # Already downloaded (hasFile) even though the date is upcoming -> filtered out.
+    {
+        "title": "Owned Movie", "year": 2026, "digitalRelease": "2026-08-01", "hasFile": True,
     },
 ]
 
@@ -500,6 +534,41 @@ def test_manual_sonarr_coming_soon_email_golden(manual_send_env, monkeypatch):
     assert "S01E02" in normalized["html"]
     _assert_golden("manual_sonarr_coming_soon", normalized)
 
+def test_manual_sonarr_coming_soon_grouped_email_golden(manual_send_env, monkeypatch):
+    from app.emails import send as send_mod
+    from app.emails.builders import coming_soon as coming_soon_mod
+
+    monkeypatch.setattr(send_mod, "get_sonarr_coming_soon_cached", lambda *a, **k: SONARR_GROUPED_FIXTURE)
+    monkeypatch.setattr(coming_soon_mod, "fetch_and_attach_image", lambda *a, **k: None)
+    _freeze_coming_soon_clock(monkeypatch, coming_soon_mod)
+
+    client = manual_send_env
+    resp = _post_send(client, {
+        "to_emails": "a@b.c, d@e.f", "subject": "Grouped Coming Soon TV", "email_header_title": "The Header",
+        "selected_items": [
+            {"type": "sonarr_coming_soon", "id": "sonarr-coming-soon"},
+        ],
+        "custom_html": "", "user_dict": {}, "expanded_collections": {},
+    })
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body.get("success") is True
+
+    sends = [s for inst in RecorderSMTP.instances for s in inst.sent]
+    assert len(sends) == 1
+    from_addr, to_addrs, content = sends[0]
+    normalized = _normalize(content)
+    normalized["envelope"] = {"from": from_addr, "to": to_addrs}
+    normalized["response"] = body
+    # The three same-day season-1 episodes collapse into one grouped card.
+    assert "Season 1 (3 episodes)" in normalized["html"]
+    assert "S01E0" not in normalized["html"]  # individual grouped episodes are hidden
+    assert "Binge Show" in normalized["html"]
+    # The standalone episode of another show keeps its single-card form.
+    assert "Solo Show" in normalized["html"]
+    assert "S02E05" in normalized["html"]
+    _assert_golden("manual_sonarr_coming_soon_grouped", normalized)
+
 def test_manual_radarr_coming_soon_email_golden(manual_send_env, monkeypatch):
     from app.emails import send as send_mod
     from app.emails.builders import coming_soon as coming_soon_mod
@@ -529,6 +598,9 @@ def test_manual_radarr_coming_soon_email_golden(manual_send_env, monkeypatch):
     normalized["response"] = body
     assert "Test Movie" in normalized["html"]
     assert "2026" in normalized["html"]
+    # Released and already-owned movies are filtered out before rendering.
+    assert "Released Movie" not in normalized["html"]
+    assert "Owned Movie" not in normalized["html"]
     _assert_golden("manual_radarr_coming_soon", normalized)
 
 def test_manual_coming_soon_degrades_when_only_one_service_configured(manual_send_env, monkeypatch):

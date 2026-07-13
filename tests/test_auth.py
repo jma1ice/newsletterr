@@ -101,6 +101,72 @@ def test_setup_email_step_saves_and_advances_to_plex(anon_client, seeded_setting
         conn.commit()
         conn.close()
 
+def test_setup_sonarr_blank_url_falls_back_to_default(anon_client, seeded_settings):
+    client = anon_client
+    with client.session_transaction() as sess:
+        sess["authenticated"] = True
+        sess["username"] = "admin"
+        sess["csrf_token"] = "wizard-token"
+    try:
+        resp = client.post("/setup/sonarr", data={
+            "csrf_token": "wizard-token",
+            "sonarr_url": "",
+            "sonarr_api_key": "sonarr-key-1",
+        })
+        assert resp.status_code == 302 and "/setup/radarr" in resp.headers["Location"]
+
+        conn = sqlite3.connect(config.DB_PATH)
+        sonarr_url = conn.execute("SELECT sonarr_url FROM settings WHERE id = 1").fetchone()[0]
+        conn.close()
+        assert sonarr_url == config.DEFAULT_SONARR_URL
+    finally:
+        conn = sqlite3.connect(config.DB_PATH)
+        conn.execute("UPDATE settings SET sonarr_url = '', sonarr_api_key = '' WHERE id = 1")
+        conn.commit()
+        conn.close()
+
+def test_setup_radarr_blank_url_falls_back_to_default(anon_client, seeded_settings):
+    client = anon_client
+    with client.session_transaction() as sess:
+        sess["authenticated"] = True
+        sess["username"] = "admin"
+        sess["csrf_token"] = "wizard-token"
+    try:
+        resp = client.post("/setup/radarr", data={
+            "csrf_token": "wizard-token",
+            "radarr_url": "",
+            "radarr_api_key": "radarr-key-1",
+        })
+        assert resp.status_code == 302
+
+        conn = sqlite3.connect(config.DB_PATH)
+        radarr_url = conn.execute("SELECT radarr_url FROM settings WHERE id = 1").fetchone()[0]
+        conn.close()
+        assert radarr_url == config.DEFAULT_RADARR_URL
+    finally:
+        conn = sqlite3.connect(config.DB_PATH)
+        conn.execute("UPDATE settings SET radarr_url = '', radarr_api_key = '' WHERE id = 1")
+        conn.commit()
+        conn.close()
+
+def test_setup_sonarr_no_key_does_not_persist(anon_client, seeded_settings):
+    client = anon_client
+    with client.session_transaction() as sess:
+        sess["authenticated"] = True
+        sess["username"] = "admin"
+        sess["csrf_token"] = "wizard-token"
+    resp = client.post("/setup/sonarr", data={
+        "csrf_token": "wizard-token",
+        "sonarr_url": "",
+        "sonarr_api_key": "",
+    })
+    assert resp.status_code == 302
+
+    conn = sqlite3.connect(config.DB_PATH)
+    sonarr_url = conn.execute("SELECT sonarr_url FROM settings WHERE id = 1").fetchone()[0]
+    conn.close()
+    assert not sonarr_url
+
 def test_setup_optional_step_skip_does_not_require_data(anon_client, seeded_settings):
     client = anon_client
     with client.session_transaction() as sess:

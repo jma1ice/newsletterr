@@ -632,12 +632,22 @@ function _comingSoonUpcomingReleaseDate(movie) {
     return earliest;
 }
 
+// Mirrors _poster_url in coming_soon.py. Calendar images often carry only
+// remoteUrl (an absolute CDN link) with no local url, so fall back to it.
 function _comingSoonPosterUrl(images) {
     if (!Array.isArray(images)) return null;
-    const poster = images.find(img => img.coverType === 'poster' && img.url);
-    if (poster) return poster.url;
-    const any = images.find(img => img.url);
-    return any ? any.url : null;
+    const poster = images.find(img => img.coverType === 'poster' && (img.url || img.remoteUrl));
+    if (poster) return poster.url || poster.remoteUrl;
+    const any = images.find(img => img.url || img.remoteUrl);
+    return any ? (any.url || any.remoteUrl) : null;
+}
+
+// Mirrors _arr_poster_src in coming_soon.py. Absolute remoteUrls go through the
+// generic /proxy-img route; local paths through the *arr art proxy.
+function _comingSoonPosterSrc(posterPath, arrPrefix) {
+    if (!posterPath) return '';
+    if (posterPath.startsWith('http')) return `/proxy-img?u=${encodeURIComponent(posterPath)}`;
+    return `${arrPrefix}${posterPath.startsWith('/') ? posterPath : '/' + posterPath}`;
 }
 
 function _comingSoonCardHTML(title, subtitle, metaText, posterSrc) {
@@ -743,7 +753,7 @@ function buildSonarrComingSoonPreviewHTML() {
         }
 
         const posterPath = _comingSoonPosterUrl(series.images) || _comingSoonPosterUrl(firstEp.images);
-        const posterSrc = posterPath ? `/proxy-sonarr-art${posterPath.startsWith('/') ? posterPath : '/' + posterPath}` : '';
+        const posterSrc = _comingSoonPosterSrc(posterPath, '/proxy-sonarr-art');
 
         return _comingSoonCardHTML(seriesTitle, subtitle, metaText, posterSrc);
     });
@@ -775,7 +785,7 @@ function buildRadarrComingSoonPreviewHTML() {
         const metaText = relative ? `Releases ${relative}` : '';
 
         const posterPath = _comingSoonPosterUrl(movie.images);
-        const posterSrc = posterPath ? `/proxy-radarr-art${posterPath.startsWith('/') ? posterPath : '/' + posterPath}` : '';
+        const posterSrc = _comingSoonPosterSrc(posterPath, '/proxy-radarr-art');
 
         return _comingSoonCardHTML(title, subtitle, metaText, posterSrc);
     });

@@ -685,6 +685,11 @@
     flex-shrink: 0;
 }
 
+.builder-page .snapin-row-actions .nl-btn {
+    padding: 0px 6px 0px 0px;
+    
+}
+
 @media (max-width: 768px) {
     /* stack the message fields and let the preview size to content on mobile */
     .builder-page .msg-bar { flex-direction: column; gap: var(--space-3); }

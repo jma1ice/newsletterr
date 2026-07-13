@@ -194,6 +194,41 @@
     white-space: nowrap;
     flex-shrink: 0;
 }
+/* keep a clear gap between the card heading and its add-button cluster; when
+   the buttons run out of room the whole cluster wraps to the next line. */
+.builder-page .snapins-toolbar,
+.builder-page .builder-card > .d-flex.justify-content-between {
+    gap: var(--space-3);
+    row-gap: var(--space-2);
+    flex-wrap: wrap;
+}
+
+/* keep the Snap-ins card (selected items) in view while the add-content cards
+   below it scroll past, mirroring the sticky preview column. Cap it to the
+   viewport so a long selected-items list scrolls inside the card instead of
+   pushing the card taller than the screen. */
+#selected-items-pane {
+    position: sticky;
+    top: var(--space-5);
+    z-index: 3;
+    max-height: calc(100vh - var(--space-5) * 2);
+    overflow-y: auto;
+}
+@media (max-width: 768px) {
+    #selected-items-pane {
+        position: static;
+        max-height: none;
+        overflow-y: visible;
+    }
+}
+
+/* collection expand/collapse toggle: size the inline chevron to sit in the
+   small bootstrap button that replaced the folder emoji. */
+.builder-page .expand-collection-btn .nl-icon {
+    width: 14px;
+    height: 14px;
+    vertical-align: middle;
+}
 /* sub-section headings inside a consolidated card (e.g. Stats / Graphs) */
 .builder-page .card-subhead {
     font-size: var(--text-sm);

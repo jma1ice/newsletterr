@@ -63,15 +63,14 @@ document.getElementById('pullRecsBtn').addEventListener('click', async () => {
         const oldAlertP = document.getElementById('alert_p');
         const newAlertP = doc.getElementById('alert_p');
         if (oldAlertP && newAlertP) {
-            newAlertP.style.display = '';
+            newAlertP.style.display = newAlertP.textContent.trim() ? '' : 'none';
             oldAlertP.replaceWith(newAlertP);
-
         }
 
         const oldErrorP = document.getElementById('error_p');
         const newErrorP = doc.getElementById('error_p');
         if (oldErrorP && newErrorP) {
-            newErrorP.style.display = '';
+            newErrorP.style.display = newErrorP.textContent.trim() ? '' : 'none';
             oldErrorP.replaceWith(newErrorP);
         }
 

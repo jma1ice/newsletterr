@@ -164,16 +164,28 @@
     background: transparent;
 }
 
-/* Config and composer columns read as cards; the preview column floats its
-   own message-bar and email-card so it does not need an outer card. */
+/* All three columns are transparent containers that float their own cards:
+   the left rail (Pull Data / Get / Cache), the composer sections, and the
+   preview column's message-bar + email-card all read as .builder-card. */
 #config-row,
 #content-row {
+    align-self: start;
+}
+
+/* One card treatment shared by every builder section so the columns read as
+   a single system instead of ragged headings. */
+.builder-page .builder-card {
     background: var(--surface-1);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
-    padding: var(--space-5);
-    align-self: start;
+    padding: var(--space-4);
+    box-shadow: var(--shadow-1);
+    margin-bottom: var(--space-4);
 }
+.builder-page .builder-card:last-child { margin-bottom: 0; }
+/* section headings sit flush with the card top */
+.builder-page .builder-card > h2:first-child,
+.builder-page .builder-card > .d-flex:first-child h2 { margin-top: 0; }
 
 /* buttons: .nl-btn variants (components.css) own these now; the page-scoped
    .button definitions retired with the Phase 8d rename. */
@@ -457,20 +469,14 @@
 .builder-page .send-form { margin-top: 0; }
 #sendEmailBtn { font-weight: 700; min-width: 180px; }
 .builder-page #items_to_pull { width: 8.5rem; margin-bottom: 8px; }
-.builder-page #cache-card-header,
-.builder-page #bcc-card-header { cursor: pointer; }
-.builder-page #cache-card-header { padding: 8px 12px; }
+.builder-page #cache-card-header { cursor: pointer; padding: 8px 12px; }
 .builder-page #cache-card-header h6 { font-size: 0.85rem; }
 .builder-page #cache-card-header > span { font-size: 0.8rem; }
-.builder-page .bcc-card { margin-top: var(--space-3); }
-/* collapsible card headers: chevron rotates to point right when collapsed */
-.builder-page #cache-card-header .nl-icon,
-.builder-page #bcc-card-header .nl-icon { width: 16px; height: 16px; transition: transform 0.3s ease; }
-.builder-page #cache-card-header.is-collapsed .nl-icon,
-.builder-page #bcc-card-header.is-collapsed .nl-icon { transform: rotate(-90deg); }
-/* tighten the top of the collapsible bodies so content sits close to the header */
-.builder-page #cache-status-badge,
-.builder-page #bcc-collapse { padding-top: var(--space-2); }
+/* collapsible cache header: chevron rotates to point right when collapsed */
+.builder-page #cache-card-header .nl-icon { width: 16px; height: 16px; transition: transform 0.3s ease; }
+.builder-page #cache-card-header.is-collapsed .nl-icon { transform: rotate(-90deg); }
+/* tighten the top of the collapsible body so content sits close to the header */
+.builder-page #cache-status-badge { padding-top: var(--space-2); }
 .builder-page .cache-cap { text-transform: capitalize; }
 .builder-page .snapin-note { font-size: 0.9rem; padding: 0.75rem; }
 
@@ -503,6 +509,7 @@
 /* message bar: Subject + Header Title, docked above the preview */
 .builder-page .msg-bar {
     display: flex;
+    align-items: flex-start;
     gap: var(--space-4);
     margin-bottom: var(--space-4);
     padding: var(--space-4);
@@ -511,6 +518,11 @@
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-1);
 }
+/* Recipients sits alongside Subject + Header; give it extra room for the list
+   selector and BCC chips, which stack under the label. */
+.builder-page .msg-field--recipients { flex: 1.4; }
+.builder-page .msg-field--recipients #bcc_chips { width: 100%; }
+.builder-page .msg-field--recipients #bcc-count { color: var(--text-faint); font-weight: 600; }
 .builder-page .msg-field {
     flex: 1;
     min-width: 0;

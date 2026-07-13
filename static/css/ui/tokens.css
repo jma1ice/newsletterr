@@ -101,7 +101,7 @@
     --focus-ring: 0 0 0 3px color-mix(in srgb, var(--accent) 45%, transparent);
     --sidebar-w: 248px;
     --sidebar-w-collapsed: 64px;
-    --footer-h: 48px;
+    --footer-h: 40px;
 }
 
 .dark {

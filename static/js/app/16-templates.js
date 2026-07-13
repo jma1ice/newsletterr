@@ -1,9 +1,4 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // The BCC collapse toggle is handled in 21-ui-toggles.js via #bcc-card-header.
-    // This just sets the default-collapsed state on load.
-    document.getElementById('bcc-collapse').classList.add('d-none');
-    document.getElementById('bcc-card-header').classList.add('is-collapsed');
-    
     const clearCacheBtn = document.getElementById('clear_cache_btn');
     if (clearCacheBtn) {
         clearCacheBtn.addEventListener('click', async () => {

@@ -1,0 +1,80 @@
+<div class="modal fade" id="emailWizardModal" tabindex="-1" aria-labelledby="emailWizardModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content theme-modal">
+            <div class="modal-header theme-modal-header">
+                <h5 class="modal-title" id="emailWizardModalLabel">Email Setup Wizard</h5>
+                <button type="button" class="btn-close theme-btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+
+                <div id="wizard_pane_provider" class="wizard-pane">
+                    <p>Pick your email provider. We will fill in the SMTP server, port, and protocol for you.</p>
+                    <label for="wizard_provider" class="form-label">Provider</label>
+                    <select id="wizard_provider" class="form-select theme-input">
+                        <option value="gmail">Gmail</option>
+                        <option value="outlook">Outlook / Microsoft 365</option>
+                        <option value="yahoo">Yahoo Mail</option>
+                        <option value="icloud">iCloud Mail</option>
+                        <option value="custom">Custom / Other</option>
+                    </select>
+                </div>
+
+                <div id="wizard_pane_credentials" class="wizard-pane d-none">
+                    <div id="wizard_notes" class="alert alert-info"></div>
+                    <p id="wizard_app_password_line" class="d-none">
+                        <a id="wizard_app_password_link" href="#" target="_blank" rel="noopener">Open the app password page</a>
+                    </p>
+                    <div class="mb-3">
+                        <label for="wizard_email" class="form-label">Email address (From)</label>
+                        <input type="email" id="wizard_email" class="form-control theme-input" placeholder="you@example.com">
+                    </div>
+                    <div class="mb-3">
+                        <label for="wizard_from_name" class="form-label">From Name (optional)</label>
+                        <input type="text" id="wizard_from_name" class="form-control theme-input" placeholder="Your name">
+                    </div>
+                    <div class="mb-3">
+                        <label for="wizard_password" class="form-label">App password / email password</label>
+                        <input type="password" id="wizard_password" class="form-control theme-input" autocomplete="new-password">
+                    </div>
+                    <div id="wizard_custom_fields" class="d-none">
+                        <div class="mb-3">
+                            <label for="wizard_smtp_server" class="form-label">SMTP Server</label>
+                            <input type="text" id="wizard_smtp_server" class="form-control theme-input" placeholder="smtp.example.com">
+                        </div>
+                        <div class="d-flex gap-2">
+                            <div class="mb-3 flex-1">
+                                <label for="wizard_smtp_port" class="form-label">Port</label>
+                                <input type="number" id="wizard_smtp_port" class="form-control theme-input" placeholder="587">
+                            </div>
+                            <div class="mb-3 flex-1">
+                                <label for="wizard_smtp_protocol" class="form-label">Protocol</label>
+                                <select id="wizard_smtp_protocol" class="form-select theme-input">
+                                    <option value="TLS">TLS</option>
+                                    <option value="SSL">SSL</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="wizard_pane_review" class="wizard-pane d-none">
+                    <p>Review the values that will be applied to the Email Server form:</p>
+                    <ul class="wizard-review-list">
+                        <li>From: <strong id="wizard_review_email"></strong></li>
+                        <li>From Name: <strong id="wizard_review_from_name"></strong></li>
+                        <li>SMTP Server: <strong id="wizard_review_server"></strong></li>
+                        <li>Port: <strong id="wizard_review_port"></strong></li>
+                        <li>Protocol: <strong id="wizard_review_protocol"></strong></li>
+                    </ul>
+                    <p class="text-info field-hint">After applying, click <strong>Apply Settings</strong> to save, then <strong>Send Test Email</strong> to confirm delivery.</p>
+                </div>
+
+            </div>
+            <div class="modal-footer theme-modal-footer">
+                <button type="button" id="wizard_back_btn" class="nl-btn nl-btn--ghost d-none">Back</button>
+                <button type="button" id="wizard_next_btn" class="nl-btn nl-btn--primary">Next</button>
+                <button type="button" id="wizard_apply_btn" class="nl-btn nl-btn--primary d-none">Apply to form</button>
+            </div>
+        </div>
+    </div>
+</div>

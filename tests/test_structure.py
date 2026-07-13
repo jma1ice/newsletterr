@@ -84,6 +84,12 @@ def test_pages_render(client, seeded_settings, path):
     resp = client.get(path)
     assert resp.status_code == 200
 
+def test_settings_includes_email_wizard(client, seeded_settings):
+    resp = client.get("/settings")
+    assert resp.status_code == 200
+    assert b"emailWizardModal" in resp.data
+    assert b"email-providers.js" in resp.data
+
 def test_index_unconfigured_redirects_to_settings(client, seeded_settings):
     # index redirects to settings until from_email is configured; force that
     # state explicitly so this test is independent of execution order

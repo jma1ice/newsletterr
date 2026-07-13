@@ -197,7 +197,7 @@ def build_stats_html_with_cid_background(stat_data, msg_root, theme_colors, base
         </div>
     """
 
-def build_yearly_wrapped_html_with_cids(stats_data, msg_root, theme_colors, year=None):
+def build_yearly_wrapped_html_with_cids(stats_data, msg_root, theme_colors, year=None, base_url="", hosted_images_enabled=False, hosted_base_url=""):
     if not stats_data:
         return ""
 
@@ -218,27 +218,37 @@ def build_yearly_wrapped_html_with_cids(stats_data, msg_root, theme_colors, year
             for row in stat.get('rows', []):
                 total_plays += int(row.get('total_plays', 0) or 0)
 
+    def _thumb_src(row, cid_name):
+        thumb_path = row.get('thumb') or row.get('grandparent_thumb')
+        if not thumb_path:
+            return None
+        proxy_path = f"/proxy-art{thumb_path}" if not thumb_path.startswith('/proxy-art') else thumb_path
+        return fetch_and_attach_small_thumbnail(proxy_path, msg_root, cid_name, base_url, height=60, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
+
     highlights = []
     if top_movie:
-        highlights.append(('🎬 Top Movie', top_movie.get('title', '')))
+        highlights.append(('🎬 Top Movie', top_movie.get('title', ''), _thumb_src(top_movie, 'wrapped-movie')))
     if top_show:
-        highlights.append(('📺 Top Show', top_show.get('title', '')))
+        highlights.append(('📺 Top Show', top_show.get('title', ''), _thumb_src(top_show, 'wrapped-show')))
     if top_artist:
-        highlights.append(('🎵 Top Artist', top_artist.get('title', '')))
+        highlights.append(('🎵 Top Artist', top_artist.get('title', ''), _thumb_src(top_artist, 'wrapped-artist')))
     if top_user:
-        highlights.append(('👤 Most Active', top_user.get('user', '')))
+        # The user thumbnail is a plex.tv URL the /proxy-art route does not serve.
+        highlights.append(('👤 Most Active', top_user.get('user', ''), None))
 
     if not highlights and not total_plays:
         return ""
 
+    # The img is placed immediately before the value div so a missing thumbnail
+    # leaves no stray whitespace (keeps the thumb-less golden byte-for-byte stable).
     highlight_cells = "".join([
         f"""
         <td style="text-align: center; padding: 12px; vertical-align: top; width: {100 // max(len(highlights), 1)}%;">
             <div style="font-size: 12px; color: {theme_colors['muted_text']}; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">{label}</div>
-            <div style="font-size: 15px; font-weight: bold; color: white; line-height: 1.3;">{value}</div>
+            {f'<img src="{thumb_src}" alt="{value}" style="height:60px;width:auto;border-radius:4px;display:block;margin:0 auto 6px;">' if thumb_src else ''}<div style="font-size: 15px; font-weight: bold; color: white; line-height: 1.3;">{value}</div>
         </td>
         """
-        for label, value in highlights
+        for label, value, thumb_src in highlights
     ])
 
     display_year = year or datetime.now().year

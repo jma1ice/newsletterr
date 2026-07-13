@@ -5,6 +5,7 @@ import os, time
 from flask import Blueprint, abort, current_app, jsonify, redirect, render_template, request, session, url_for
 from PIL import Image
 
+from app.config import DEFAULT_RADARR_URL, DEFAULT_SONARR_URL
 from app.db import db_connect
 from app.settings_store import get_settings
 from app.crypto import encrypt, decrypt
@@ -105,6 +106,12 @@ def settings():
             sonarr_api_key = _secret("sonarr_api_key", existing_sonarr_api_key)
             radarr_url = request.form.get("radarr_url")
             radarr_api_key = _secret("radarr_api_key", existing_radarr_api_key)
+            # A blank URL with an API key present (submitted or saved) falls back
+            # to the default; clearing the API key is how you disable the integration.
+            if not (sonarr_url or "").strip() and sonarr_api_key:
+                sonarr_url = DEFAULT_SONARR_URL
+            if not (radarr_url or "").strip() and radarr_api_key:
+                radarr_url = DEFAULT_RADARR_URL
             coming_soon_days_ahead = request.form.get("coming_soon_days_ahead", "14")
             coming_soon_grid_columns = request.form.get("coming_soon_grid_columns", "5")
             hosted_enabled = request.form.get("hosted_enabled", "disabled")

@@ -1,7 +1,8 @@
 /*
- * Email history page. Scoped to .history-page. Retokenizes the
- * Bootstrap table and recipient cards; the Sends tab bar and detail modal are
- * styled by shared component rules.
+ * Email history page. Scoped to .history-page. Header toolbar (status filter
+ * chips + clear + pagination), a token-styled table wrapped in a rounded
+ * frame, and the recipients detail modal. Pills and icon buttons come from
+ * the shared component layer.
  */
 
 .container-fluid.history-page {
@@ -12,42 +13,99 @@
     border-radius: 0;
 }
 
-.history-page .table {
+/* ---- header toolbar */
+.history-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+    margin-bottom: var(--space-3);
+}
+.history-toolbar-right {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+}
+.history-toolbar-right form { margin: 0; }
+
+/* status filter chips */
+.history-page .chips { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+.history-page .chip {
+    font-family: inherit;
+    font-size: var(--text-sm);
+    font-weight: 600;
+    padding: 5px 13px;
+    border-radius: var(--radius-full);
+    border: 1px solid var(--border);
+    background: var(--surface-1);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: background .12s ease, color .12s ease, border-color .12s ease;
+}
+.history-page .chip:hover { border-color: var(--accent-strong); color: var(--text); }
+.history-page .chip.is-active {
+    background: var(--accent);
+    color: var(--on-accent);
+    border-color: var(--accent);
+}
+.history-page .chip .n { opacity: .7; margin-left: 4px; font-variant-numeric: tabular-nums; }
+
+/* ---- table */
+.tbl-wrap {
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+}
+.history-page .history-table {
     width: 100%;
     color: var(--text);
     border-collapse: collapse;
     margin: 0;
 }
-.history-page .table thead th {
+.history-page .history-table thead th {
     background: var(--surface-2);
     color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: .04em;
     font-size: var(--text-xs);
-    font-weight: 600;
+    font-weight: 700;
+    text-align: left;
     border-bottom: 1px solid var(--border);
     padding: 10px 14px;
+    white-space: nowrap;
 }
-.history-page .table tbody td {
+.history-page .history-table tbody td {
     padding: 12px 14px;
     border-bottom: 1px solid var(--border-soft);
     vertical-align: middle;
+    white-space: nowrap;
 }
-/* Neutralize Bootstrap's striped/hover backgrounds in favor of tokens. */
-.history-page .table-striped > tbody > tr:nth-of-type(odd) > * {
-    background: transparent;
-    color: var(--text);
-}
-.history-page .table-hover > tbody > tr:hover > * {
-    background: var(--surface-2);
-    color: var(--text);
+.history-page .history-table tbody tr:last-child td { border-bottom: none; }
+.history-page .history-table tbody tr:hover td { background: var(--surface-2); }
+
+/* ---- pager */
+.history-pager {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    flex-wrap: wrap;
 }
 
-/* recipient cards inside the detail modal */
-#recipientsModal .card {
+/* ---- recipients detail modal */
+.recipients-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: var(--space-2);
+}
+.recipient-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
     background: var(--surface-2);
     border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 8px 12px;
 }
-#recipientsModal .card-body {
-    background: transparent;
-}
+.recipient-email { color: var(--text); font-size: var(--text-sm); word-break: break-all; }

@@ -10,7 +10,7 @@ from app.db import db_connect
 from app.cache import is_cache_valid, get_cached_data, get_cache_info, clear_cache
 from app.crypto import decrypt
 from app.net import is_safe_fetch_url, configured_media_hosts
-from app.settings_store import get_settings
+from app.settings_store import get_service_flags, get_settings
 from app.security import require_csrf_for_json, requires_auth, safe_get
 from app.store import get_saved_email_lists
 from app.theme import get_theme_settings
@@ -91,6 +91,8 @@ def index():
         "coming_soon_days_ahead": s["coming_soon_days_ahead"],
         "coming_soon_grid_columns": s["coming_soon_grid_columns"],
     }
+
+    service_flags = get_service_flags(s)
 
     conn = db_connect()
     cursor = conn.cursor()
@@ -189,7 +191,7 @@ def index():
                            droppedneedle_wrapped_json=droppedneedle_wrapped_json, droppedneedle_server_json=droppedneedle_server_json,
                            yearly_wrapped_json=yearly_wrapped_json,
                            sonarr_coming_soon_json=sonarr_coming_soon_json, radarr_coming_soon_json=radarr_coming_soon_json,
-                           csrf_token=session["csrf_token"], username=username
+                           csrf_token=session["csrf_token"], username=username, service_flags=service_flags
                         )
 
 @bp.route('/proxy-art/<path:art_path>')

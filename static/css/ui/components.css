@@ -48,6 +48,54 @@
 .nl-btn--lg { padding: 13px 22px; font-size: var(--text-md); }
 .nl-btn--icon { padding: 9px; }
 
+/* Default inline-icon size. Contexts with their own svg sizing (sidebar nav,
+   collapse button) win on specificity; buttons get a slightly smaller glyph. */
+.nl-icon { width: 18px; height: 18px; flex: none; }
+.nl-btn .nl-icon { width: 16px; height: 16px; }
+.nl-btn--sm .nl-icon { width: 15px; height: 15px; }
+
+/* ---- icon action button (compact square, replaces emoji btn-groups) */
+.icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    flex: none;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: color .12s ease, border-color .12s ease, background .12s ease;
+}
+.icon-btn:hover { color: var(--text); border-color: var(--accent-strong); background: var(--surface-2); }
+.icon-btn:disabled { opacity: .55; cursor: not-allowed; }
+.icon-btn .nl-icon { width: 16px; height: 16px; }
+.icon-btn.icon-btn--danger:hover { color: var(--danger); border-color: var(--danger); background: var(--danger-soft); }
+.row-actions { display: inline-flex; align-items: center; gap: 6px; }
+
+/* ---- token pills (replace Bootstrap badge bg-*) */
+.pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: var(--text-xs);
+    font-weight: 600;
+    line-height: 1.4;
+    padding: 3px 9px;
+    border-radius: var(--radius-full);
+    border: 1px solid transparent;
+    white-space: nowrap;
+}
+.pill--list { background: var(--accent-soft); color: var(--accent-strong); }
+.pill--tpl { background: var(--surface-2); color: var(--text); border-color: var(--border); }
+.pill--muted { background: var(--surface-2); color: var(--text-muted); border-color: var(--border-soft); }
+.pill--ok { background: var(--success-soft); color: var(--success); }
+.pill--off { background: var(--surface-2); color: var(--text-faint); border-color: var(--border-soft); }
+.pill--fail { background: var(--danger-soft); color: var(--danger); }
+.pill .dotc { width: 9px; height: 9px; border-radius: 50%; flex: none; display: inline-block; background: var(--accent-strong); }
+
 /* ---- cards */
 .nl-card {
     background: var(--surface-1);
@@ -311,10 +359,28 @@ body.nl-modal-open { overflow: hidden; }
     justify-content: center;
     align-items: center;
     background-color: rgba(3, 8, 10, .75);
-    color: var(--text);
+    /* The scrim is always dark regardless of theme, so spinner text is a fixed
+       light color (not the theme --text, which is dark in light mode). */
+    color: #eaf3f7;
 }
 .spinner img { max-width: 120px; height: auto; }
 .spinner p { margin-top: var(--space-3); }
+/* Rotating flavor line under the pinned action text. The scrim is always dark
+   (theme-independent), so this uses a fixed light-muted color, not a token. */
+.spinner-tip {
+    margin-top: var(--space-2);
+    max-width: 420px;
+    padding: 0 var(--space-4);
+    text-align: center;
+    font-size: var(--text-sm);
+    color: rgba(233, 241, 242, .72);
+    min-height: 1.2em;
+}
+/* Contributor shout-outs echo the About page tiers. Fixed colors (the dark
+   status tones) since the scrim is always dark; gold = --warning, green =
+   --success. */
+.spinner-tip--gold { color: #d6a53a; }
+.spinner-tip--green { color: #3fae74; }
 
 /* ---- chips (BCC recipients) - token-driven, owns the .nl-chip name */
 .nl-chips {

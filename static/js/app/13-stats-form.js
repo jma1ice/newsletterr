@@ -56,6 +56,8 @@ document.getElementById('stats_form').addEventListener('submit', async (e) => {
                 host.innerHTML = '';
                 buildRALibraryRows();
             }
+            const raCard = document.getElementById('ra-card');
+            if (raCard) raCard.style.display = '';
             const raHeader = document.getElementById('ra-header');
             if (raHeader) raHeader.style.display = '';
             if (host) host.style.display = '';
@@ -102,7 +104,9 @@ document.getElementById('stats_form').addEventListener('submit', async (e) => {
 
         if (data.user_dict && Object.keys(data.user_dict).length > 0) {
             const recsBtn = document.getElementById('pullRecsBtn');
-            if (recsBtn) {
+            // Only re-enable if Conjurr is actually configured; otherwise the
+            // button stays greyed with its explanatory tooltip.
+            if (recsBtn && window.APP?.serviceFlags?.conjurr) {
                 recsBtn.disabled = false;
                 recsBtn.classList.remove('opacity-50', 'cursor-not-allowed');
             }

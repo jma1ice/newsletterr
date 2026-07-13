@@ -1,0 +1,389 @@
+/*
+ * newsletterr pride themes - selectable pride flag palettes layered on top of
+ * the light/dark system. Activated by class on <html>: "pride pride-<slug>",
+ * combined freely with "dark". The slug lives in localStorage key "pride"
+ * (absent = off). Loaded immediately after tokens.css so these blocks override
+ * the semantic tokens defined there.
+ *
+ * Rules for this file (the ONLY file besides tokens.css allowed to use .dark in
+ * selectors):
+ *
+ * 1. Symmetric block invariant: every ".pride-<flag>.dark" block must set every
+ *    token its ".pride-<flag>" light block sets. The dark block's specificity
+ *    (0,2,0) always beats the light block's (0,1,0), so a symmetric list makes
+ *    the result independent of source order. Keep the two blocks token-for-token
+ *    identical in which tokens they define. The mandatory 13-token set is:
+ *      --bg, --surface-1, --surface-2, --surface-3, --border, --border-soft,
+ *      --text, --text-muted, --text-faint, --accent, --accent-strong,
+ *      --accent-soft, --on-accent
+ *    --focus-ring and --info derive from --accent automatically (see tokens.css);
+ *    status colors, shadows, radius, spacing, and type stay global.
+ *
+ * 2. Per-flag stripe primitives --pride-1..N and --pride-gradient are defined
+ *    once in the light block (mode-independent) and reused by both modes.
+ *
+ * 3. Components MUST NOT read --pride-* directly. They read the semantic tokens
+ *    above. --pride-* only exists to derive those tokens and paint the shared
+ *    brand flourish / gradient accents in this file.
+ */
+
+/* Shared brand flourish: a pride gradient underline under the sidebar brand.
+   Inset tuned against .sidebar-brand padding (layout.css). */
+.pride .sidebar-brand {
+    position: relative;
+}
+.pride .sidebar-brand::after {
+    content: "";
+    position: absolute;
+    left: var(--space-4);
+    right: var(--space-4);
+    bottom: calc(var(--space-4) - 6px);
+    height: 3px;
+    border-radius: var(--radius-full);
+    background: var(--pride-gradient);
+    opacity: .9;
+}
+.sidebar-collapsed .pride .sidebar-brand::after,
+.pride.sidebar-collapsed .sidebar-brand::after {
+    left: var(--space-2);
+    right: var(--space-2);
+}
+
+/* ============================ transgender ============================ */
+.pride-trans {
+    --pride-1: #5bcefa; --pride-2: #f5a9b8; --pride-3: #ffffff;
+    --pride-gradient: linear-gradient(90deg,
+        var(--pride-1) 0 20%, var(--pride-2) 20% 40%, var(--pride-3) 40% 60%,
+        var(--pride-2) 60% 80%, var(--pride-1) 80% 100%);
+
+    --bg: color-mix(in srgb, var(--pride-1) 55%, #eef6f9);
+    --surface-1: color-mix(in srgb, var(--pride-1) 8%, #fbfdfe);
+    --surface-2: color-mix(in srgb, var(--pride-2) 16%, #f3f8fa);
+    --surface-3: color-mix(in srgb, var(--pride-1) 18%, #e9f2f5);
+    --border: color-mix(in srgb, var(--pride-1) 45%, #b9cdd4);
+    --border-soft: color-mix(in srgb, var(--pride-2) 40%, #dde8ec);
+    --text: #132430;
+    --text-muted: color-mix(in srgb, var(--pride-1) 22%, #4d6470);
+    --text-faint: color-mix(in srgb, var(--pride-1) 30%, #7e939d);
+    --accent: color-mix(in srgb, var(--pride-1) 45%, #14506e);
+    --accent-strong: color-mix(in srgb, var(--pride-1) 30%, #103e56);
+    --accent-soft: color-mix(in srgb, var(--pride-2) 45%, #f3f8fa);
+    --on-accent: #ffffff;
+}
+.pride-trans.dark {
+    --bg: color-mix(in srgb, var(--pride-1) 10%, #0b1216);
+    --surface-1: color-mix(in srgb, var(--pride-1) 8%, #121c22);
+    --surface-2: color-mix(in srgb, var(--pride-2) 8%, #19252c);
+    --surface-3: color-mix(in srgb, var(--pride-1) 12%, #203039);
+    --border: color-mix(in srgb, var(--pride-1) 25%, #22343d);
+    --border-soft: color-mix(in srgb, var(--pride-2) 18%, #1c2a31);
+    --text: #eaf3f7;
+    --text-muted: color-mix(in srgb, var(--pride-2) 25%, #93a7aa);
+    --text-faint: color-mix(in srgb, var(--pride-1) 20%, #647a7e);
+    --accent: var(--pride-1);
+    --accent-strong: color-mix(in srgb, var(--pride-1) 65%, #2a5a74);
+    --accent-soft: color-mix(in srgb, var(--pride-1) 20%, #12222c);
+    --on-accent: #0a1a22;
+}
+
+/* ============================== rainbow ============================== */
+.pride-rainbow {
+    --pride-1: #e40303; --pride-2: #ff8c00; --pride-3: #ffed00;
+    --pride-4: #008026; --pride-5: #24408e; --pride-6: #732982;
+    --pride-gradient: linear-gradient(90deg,
+        var(--pride-1) 0 16.66%, var(--pride-2) 16.66% 33.33%,
+        var(--pride-3) 33.33% 50%, var(--pride-4) 50% 66.66%,
+        var(--pride-5) 66.66% 83.33%, var(--pride-6) 83.33% 100%);
+
+    --bg: color-mix(in srgb, var(--pride-6) 22%, #f4eef7);
+    --surface-1: color-mix(in srgb, var(--pride-6) 5%, #fdfbfe);
+    --surface-2: color-mix(in srgb, var(--pride-6) 9%, #f6f1f8);
+    --surface-3: color-mix(in srgb, var(--pride-6) 13%, #ece3f0);
+    --border: color-mix(in srgb, var(--pride-6) 32%, #cbb9d4);
+    --border-soft: color-mix(in srgb, var(--pride-6) 18%, #e2d6e8);
+    --text: #241430;
+    --text-muted: color-mix(in srgb, var(--pride-6) 20%, #5a4d64);
+    --text-faint: color-mix(in srgb, var(--pride-6) 24%, #8a7e94);
+    --accent: color-mix(in srgb, var(--pride-6) 60%, #3d1a54);
+    --accent-strong: color-mix(in srgb, var(--pride-6) 45%, #2a1038);
+    --accent-soft: color-mix(in srgb, var(--pride-6) 18%, #f0e8f5);
+    --on-accent: #ffffff;
+}
+.pride-rainbow.dark {
+    --bg: color-mix(in srgb, var(--pride-6) 12%, #100b14);
+    --surface-1: color-mix(in srgb, var(--pride-6) 8%, #191320);
+    --surface-2: color-mix(in srgb, var(--pride-6) 9%, #221a2b);
+    --surface-3: color-mix(in srgb, var(--pride-6) 13%, #2b2135);
+    --border: color-mix(in srgb, var(--pride-6) 25%, #342740);
+    --border-soft: color-mix(in srgb, var(--pride-6) 18%, #241c2e);
+    --text: #f1eaf7;
+    --text-muted: color-mix(in srgb, var(--pride-6) 20%, #a396ad);
+    --text-faint: color-mix(in srgb, var(--pride-6) 18%, #746881);
+    --accent: #b98ccb;
+    --accent-strong: color-mix(in srgb, #b98ccb 60%, #7a5a8c);
+    --accent-soft: color-mix(in srgb, var(--pride-6) 22%, #1d1526);
+    --on-accent: #180f20;
+}
+
+/* ============================ bisexual =============================== */
+.pride-bi {
+    --pride-1: #d60270; --pride-2: #9b4f96; --pride-3: #0038a8;
+    --pride-gradient: linear-gradient(90deg,
+        var(--pride-1) 0 40%, var(--pride-2) 40% 60%, var(--pride-3) 60% 100%);
+
+    --bg: color-mix(in srgb, var(--pride-1) 24%, #f7eef3);
+    --surface-1: color-mix(in srgb, var(--pride-1) 5%, #fefbfd);
+    --surface-2: color-mix(in srgb, var(--pride-2) 12%, #f9f0f5);
+    --surface-3: color-mix(in srgb, var(--pride-1) 12%, #f2e3ec);
+    --border: color-mix(in srgb, var(--pride-1) 30%, #d8b9cc);
+    --border-soft: color-mix(in srgb, var(--pride-2) 26%, #ecd9e4);
+    --text: #2e1020;
+    --text-muted: color-mix(in srgb, var(--pride-1) 18%, #6b4d5c);
+    --text-faint: color-mix(in srgb, var(--pride-1) 22%, #9a7e8c);
+    --accent: color-mix(in srgb, var(--pride-1) 72%, #4a0d2b);
+    --accent-strong: color-mix(in srgb, var(--pride-1) 55%, #380a20);
+    --accent-soft: color-mix(in srgb, var(--pride-1) 16%, #f6ecf1);
+    --on-accent: #ffffff;
+}
+.pride-bi.dark {
+    --bg: color-mix(in srgb, var(--pride-1) 12%, #140b10);
+    --surface-1: color-mix(in srgb, var(--pride-1) 7%, #1e1319);
+    --surface-2: color-mix(in srgb, var(--pride-2) 9%, #281a22);
+    --surface-3: color-mix(in srgb, var(--pride-1) 11%, #33212b);
+    --border: color-mix(in srgb, var(--pride-1) 24%, #402734);
+    --border-soft: color-mix(in srgb, var(--pride-2) 18%, #2e1c26);
+    --text: #f7eaf1;
+    --text-muted: color-mix(in srgb, var(--pride-1) 18%, #ad96a3);
+    --text-faint: color-mix(in srgb, var(--pride-1) 16%, #816872);
+    --accent: color-mix(in srgb, var(--pride-1) 50%, #f5a0c8);
+    --accent-strong: color-mix(in srgb, var(--pride-1) 70%, #f5a0c8);
+    --accent-soft: color-mix(in srgb, var(--pride-1) 22%, #22111a);
+    --on-accent: #1a0b12;
+}
+
+/* ============================ pansexual ============================== */
+.pride-pan {
+    --pride-1: #ff218c; --pride-2: #ffd800; --pride-3: #21b1ff;
+    --pride-gradient: linear-gradient(90deg,
+        var(--pride-1) 0 33.33%, var(--pride-2) 33.33% 66.66%,
+        var(--pride-3) 66.66% 100%);
+
+    --bg: color-mix(in srgb, var(--pride-3) 28%, #eef6fb);
+    --surface-1: color-mix(in srgb, var(--pride-3) 5%, #fbfdfe);
+    --surface-2: color-mix(in srgb, var(--pride-1) 8%, #f0f6fb);
+    --surface-3: color-mix(in srgb, var(--pride-3) 14%, #e3eef7);
+    --border: color-mix(in srgb, var(--pride-3) 30%, #b9cbd8);
+    --border-soft: color-mix(in srgb, var(--pride-1) 18%, #d6e4ee);
+    --text: #101f2e;
+    --text-muted: color-mix(in srgb, var(--pride-3) 20%, #4d5c6b);
+    --text-faint: color-mix(in srgb, var(--pride-3) 24%, #7e8c9a);
+    --accent: color-mix(in srgb, var(--pride-3) 58%, #0a3a5c);
+    --accent-strong: color-mix(in srgb, var(--pride-3) 42%, #082c46);
+    --accent-soft: color-mix(in srgb, var(--pride-1) 22%, #eef6fb);
+    --on-accent: #ffffff;
+}
+.pride-pan.dark {
+    --bg: color-mix(in srgb, var(--pride-3) 12%, #0b1016);
+    --surface-1: color-mix(in srgb, var(--pride-3) 7%, #121820);
+    --surface-2: color-mix(in srgb, var(--pride-1) 8%, #1a222c);
+    --surface-3: color-mix(in srgb, var(--pride-3) 12%, #212c39);
+    --border: color-mix(in srgb, var(--pride-3) 24%, #273440);
+    --border-soft: color-mix(in srgb, var(--pride-1) 16%, #1c242e);
+    --text: #eaf1f7;
+    --text-muted: color-mix(in srgb, var(--pride-3) 20%, #96a3ad);
+    --text-faint: color-mix(in srgb, var(--pride-3) 18%, #687281);
+    --accent: var(--pride-3);
+    --accent-strong: color-mix(in srgb, var(--pride-3) 65%, #1a6a9c);
+    --accent-soft: color-mix(in srgb, var(--pride-3) 20%, #10202c);
+    --on-accent: #06141d;
+}
+
+/* ============================ nonbinary ============================== */
+.pride-nonbinary {
+    --pride-1: #fcf434; --pride-2: #ffffff; --pride-3: #9c59d1; --pride-4: #2c2c2c;
+    --pride-gradient: linear-gradient(90deg,
+        var(--pride-1) 0 25%, var(--pride-2) 25% 50%,
+        var(--pride-3) 50% 75%, var(--pride-4) 75% 100%);
+
+    --bg: color-mix(in srgb, var(--pride-3) 20%, #f5f2f8);
+    --surface-1: color-mix(in srgb, var(--pride-3) 4%, #fdfbfe);
+    --surface-2: color-mix(in srgb, var(--pride-1) 12%, #f6f4f0);
+    --surface-3: color-mix(in srgb, var(--pride-3) 12%, #ece3f0);
+    --border: color-mix(in srgb, var(--pride-3) 28%, #cbb9d4);
+    --border-soft: color-mix(in srgb, var(--pride-1) 22%, #e2d6e8);
+    --text: #201430;
+    --text-muted: color-mix(in srgb, var(--pride-3) 18%, #5a4d64);
+    --text-faint: color-mix(in srgb, var(--pride-3) 22%, #8a7e94);
+    --accent: color-mix(in srgb, var(--pride-3) 65%, #4a2570);
+    --accent-strong: color-mix(in srgb, var(--pride-3) 48%, #371a54);
+    --accent-soft: color-mix(in srgb, var(--pride-1) 20%, #f2ecf8);
+    --on-accent: #ffffff;
+}
+.pride-nonbinary.dark {
+    --bg: color-mix(in srgb, var(--pride-3) 10%, #100b16);
+    --surface-1: color-mix(in srgb, var(--pride-3) 7%, #191320);
+    --surface-2: color-mix(in srgb, var(--pride-1) 6%, #221a2b);
+    --surface-3: color-mix(in srgb, var(--pride-3) 12%, #2b2135);
+    --border: color-mix(in srgb, var(--pride-3) 24%, #342740);
+    --border-soft: color-mix(in srgb, var(--pride-1) 12%, #241c2e);
+    --text: #f0eaf7;
+    --text-muted: color-mix(in srgb, var(--pride-3) 20%, #a396ad);
+    --text-faint: color-mix(in srgb, var(--pride-3) 18%, #746881);
+    --accent: color-mix(in srgb, var(--pride-3) 55%, #d9b8f0);
+    --accent-strong: color-mix(in srgb, var(--pride-3) 75%, #d9b8f0);
+    --accent-soft: color-mix(in srgb, var(--pride-3) 22%, #1e1528);
+    --on-accent: #170f22;
+}
+
+/* ============================= lesbian ============================== */
+.pride-lesbian {
+    --pride-1: #d52d00; --pride-2: #ff9a56; --pride-3: #ffffff;
+    --pride-4: #d362a4; --pride-5: #a30262;
+    --pride-gradient: linear-gradient(90deg,
+        var(--pride-1) 0 20%, var(--pride-2) 20% 40%, var(--pride-3) 40% 60%,
+        var(--pride-4) 60% 80%, var(--pride-5) 80% 100%);
+
+    --bg: color-mix(in srgb, var(--pride-2) 30%, #fdf3ec);
+    --surface-1: color-mix(in srgb, var(--pride-2) 6%, #fefcfa);
+    --surface-2: color-mix(in srgb, var(--pride-4) 10%, #fbf2ec);
+    --surface-3: color-mix(in srgb, var(--pride-2) 16%, #f5e6da);
+    --border: color-mix(in srgb, var(--pride-4) 26%, #dcc3b0);
+    --border-soft: color-mix(in srgb, var(--pride-2) 26%, #efe0d3);
+    --text: #2e1408;
+    --text-muted: color-mix(in srgb, var(--pride-5) 16%, #6b544d);
+    --text-faint: color-mix(in srgb, var(--pride-5) 20%, #9a867e);
+    --accent: color-mix(in srgb, var(--pride-5) 82%, #5e0138);
+    --accent-strong: color-mix(in srgb, var(--pride-5) 62%, #46012a);
+    --accent-soft: color-mix(in srgb, var(--pride-2) 24%, #fbf2ec);
+    --on-accent: #ffffff;
+}
+.pride-lesbian.dark {
+    --bg: color-mix(in srgb, var(--pride-5) 14%, #140d0b);
+    --surface-1: color-mix(in srgb, var(--pride-5) 7%, #1e1613);
+    --surface-2: color-mix(in srgb, var(--pride-4) 9%, #28201a);
+    --surface-3: color-mix(in srgb, var(--pride-5) 11%, #332921);
+    --border: color-mix(in srgb, var(--pride-4) 22%, #403227);
+    --border-soft: color-mix(in srgb, var(--pride-5) 18%, #2e241c);
+    --text: #f7efea;
+    --text-muted: color-mix(in srgb, var(--pride-4) 20%, #ada396);
+    --text-faint: color-mix(in srgb, var(--pride-5) 16%, #817268);
+    --accent: color-mix(in srgb, var(--pride-4) 65%, #ffcbe0);
+    --accent-strong: color-mix(in srgb, var(--pride-4) 82%, #ffcbe0);
+    --accent-soft: color-mix(in srgb, var(--pride-5) 30%, #241019);
+    --on-accent: #1c0a12;
+}
+
+/* ============================== asexual ============================= */
+.pride-ace {
+    --pride-1: #000000; --pride-2: #a3a3a3; --pride-3: #ffffff; --pride-4: #800080;
+    --pride-gradient: linear-gradient(90deg,
+        var(--pride-1) 0 25%, var(--pride-2) 25% 50%,
+        var(--pride-3) 50% 75%, var(--pride-4) 75% 100%);
+
+    --bg: color-mix(in srgb, var(--pride-4) 12%, #f0f0f3);
+    --surface-1: color-mix(in srgb, var(--pride-4) 2%, #fcfcfd);
+    --surface-2: color-mix(in srgb, var(--pride-4) 4%, #f2f2f4);
+    --surface-3: color-mix(in srgb, var(--pride-4) 7%, #e6e6ea);
+    --border: color-mix(in srgb, var(--pride-4) 16%, #c8c8d0);
+    --border-soft: color-mix(in srgb, var(--pride-4) 9%, #dedee4);
+    --text: #1a1a20;
+    --text-muted: color-mix(in srgb, var(--pride-4) 12%, #56565e);
+    --text-faint: color-mix(in srgb, var(--pride-4) 16%, #86868e);
+    --accent: color-mix(in srgb, var(--pride-4) 78%, #4a004a);
+    --accent-strong: color-mix(in srgb, var(--pride-4) 60%, #380038);
+    --accent-soft: color-mix(in srgb, var(--pride-4) 14%, #f0eef2);
+    --on-accent: #ffffff;
+}
+.pride-ace.dark {
+    --bg: color-mix(in srgb, var(--pride-4) 8%, #0d0d10);
+    --surface-1: color-mix(in srgb, var(--pride-4) 6%, #16161a);
+    --surface-2: color-mix(in srgb, var(--pride-4) 7%, #1f1f24);
+    --surface-3: color-mix(in srgb, var(--pride-4) 10%, #28282e);
+    --border: color-mix(in srgb, var(--pride-4) 18%, #333339);
+    --border-soft: color-mix(in srgb, var(--pride-4) 10%, #232329);
+    --text: #ececf0;
+    --text-muted: color-mix(in srgb, var(--pride-4) 14%, #9a9aa2);
+    --text-faint: color-mix(in srgb, var(--pride-4) 12%, #6a6a72);
+    --accent: #b57edc;
+    --accent-strong: color-mix(in srgb, #b57edc 62%, #7a5296);
+    --accent-soft: color-mix(in srgb, var(--pride-4) 22%, #1c141f);
+    --on-accent: #160f1c;
+}
+
+/* ============================= progress ============================= */
+.pride-progress {
+    --pride-1: #e40303; --pride-2: #ff8c00; --pride-3: #ffed00;
+    --pride-4: #008026; --pride-5: #24408e; --pride-6: #732982;
+    --pride-c1: #ffffff; --pride-c2: #f5a9b8; --pride-c3: #5bcefa;
+    --pride-c4: #613915; --pride-c5: #000000;
+    --pride-gradient: linear-gradient(90deg,
+        var(--pride-c5) 0 6%, var(--pride-c4) 6% 12%, var(--pride-c3) 12% 18%,
+        var(--pride-c2) 18% 24%, var(--pride-c1) 24% 30%,
+        var(--pride-1) 30% 41.66%, var(--pride-2) 41.66% 53.33%,
+        var(--pride-3) 53.33% 65%, var(--pride-4) 65% 76.66%,
+        var(--pride-5) 76.66% 88.33%, var(--pride-6) 88.33% 100%);
+
+    --bg: color-mix(in srgb, var(--pride-6) 22%, #f4eef7);
+    --surface-1: color-mix(in srgb, var(--pride-6) 5%, #fdfbfe);
+    --surface-2: color-mix(in srgb, var(--pride-6) 9%, #f6f1f8);
+    --surface-3: color-mix(in srgb, var(--pride-6) 13%, #ece3f0);
+    --border: color-mix(in srgb, var(--pride-6) 32%, #cbb9d4);
+    --border-soft: color-mix(in srgb, var(--pride-6) 18%, #e2d6e8);
+    --text: #241430;
+    --text-muted: color-mix(in srgb, var(--pride-6) 20%, #5a4d64);
+    --text-faint: color-mix(in srgb, var(--pride-6) 24%, #8a7e94);
+    --accent: color-mix(in srgb, var(--pride-6) 60%, #3d1a54);
+    --accent-strong: color-mix(in srgb, var(--pride-6) 45%, #2a1038);
+    --accent-soft: color-mix(in srgb, var(--pride-6) 18%, #f0e8f5);
+    --on-accent: #ffffff;
+}
+.pride-progress.dark {
+    --bg: color-mix(in srgb, var(--pride-6) 12%, #100b14);
+    --surface-1: color-mix(in srgb, var(--pride-6) 8%, #191320);
+    --surface-2: color-mix(in srgb, var(--pride-6) 9%, #221a2b);
+    --surface-3: color-mix(in srgb, var(--pride-6) 13%, #2b2135);
+    --border: color-mix(in srgb, var(--pride-6) 25%, #342740);
+    --border-soft: color-mix(in srgb, var(--pride-6) 18%, #241c2e);
+    --text: #f1eaf7;
+    --text-muted: color-mix(in srgb, var(--pride-6) 20%, #a396ad);
+    --text-faint: color-mix(in srgb, var(--pride-6) 18%, #746881);
+    --accent: #b98ccb;
+    --accent-strong: color-mix(in srgb, #b98ccb 60%, #7a5a8c);
+    --accent-soft: color-mix(in srgb, var(--pride-6) 22%, #1d1526);
+    --on-accent: #180f20;
+}
+/* Progress uses gradient accents on primary buttons. Kept within the accent
+   family (with a blue lean from --pride-5) so --on-accent stays legible. */
+.pride-progress .nl-btn--primary {
+    background-image: linear-gradient(135deg,
+        var(--accent-strong) 0%, var(--accent) 55%,
+        color-mix(in srgb, var(--accent) 55%, var(--pride-5)) 100%);
+    border-color: transparent;
+}
+/* The base :hover sets the background shorthand, which would drop the gradient;
+   restore a slightly deepened gradient so hover stays consistent. */
+.pride-progress .nl-btn--primary:hover {
+    background-image: linear-gradient(135deg,
+        color-mix(in srgb, var(--accent-strong) 85%, #000) 0%,
+        var(--accent-strong) 55%,
+        color-mix(in srgb, var(--accent-strong) 60%, var(--pride-5)) 100%);
+}
+
+/* =================== image swaps + brand gating ===================== */
+/* Theme-aware footer icons. A link carries several <img> variants and CSS
+   shows exactly one for the current (dark x pride) state. swap-normal is the
+   default-visible variant (hidden only under pride); the rest opt in. */
+.swap-light, .swap-dark, .swap-pride, .swap-pride-light, .swap-pride-dark { display: none; }
+html:not(.dark):not(.pride) .swap-light { display: inline; }
+html.dark:not(.pride) .swap-dark { display: inline; }
+html.pride .swap-pride { display: inline; }
+html.pride:not(.dark) .swap-pride-light { display: inline; }
+html.pride.dark .swap-pride-dark { display: inline; }
+html.pride .swap-normal { display: none; }
+
+/* Brand logo gating. The pride axis is kept orthogonal to the collapse axis
+   (layout.css brand-full/brand-mark rules, including the mobile display:revert
+   overrides) with !important so a single toggle picks normal vs pride while
+   collapse still chooses full vs mark. */
+html:not(.pride) .brand-pride { display: none !important; }
+html.pride .brand-normal { display: none !important; }

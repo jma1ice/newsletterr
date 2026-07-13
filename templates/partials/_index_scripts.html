@@ -27,7 +27,8 @@
                 userDict: {{ user_dict | tojson }},
                 usersFullData: {{ (users_full_data if users_full_data else []) | tojson }},
                 displayPreference: {{ settings.recipient_display_name | string | tojson }},
-                allUserEmails: {{ (user_dict.values() | list) | tojson }}
+                allUserEmails: {{ (user_dict.values() | list) | tojson }},
+                serviceFlags: {{ service_flags | tojson }}
             };
         </script>
         <script src="{{ url_for('static', filename='js/app/00-alerts.js') }}" nonce="{{ nonce }}"></script>

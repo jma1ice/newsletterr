@@ -203,7 +203,6 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 --- Settings ---
 * Option to show or hide description on recently added posters
 * Setting for collection group grid width
-* 'Coming Soon' days ahead and grid width should move to Data Settings
 
 --- Integrations ---
  -- newsletterr GitHub / Discord --
@@ -217,10 +216,10 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 
 --- UI ---
 * Email preview: desktop/tablet/phone views
-* Swap version and copyright in footer
-* Top right logo should link to site or GH
-* Discord text should be stylized logo to match GitHub
-* Footer always visible
+* Top right logo should link to site
+
+--- Email ---
+* Possible default email layout/UI overhaul with pride theme
 
 --- Misc. ---
 * Can Snap-Ins work with custom HTML?
@@ -287,6 +286,7 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * General UI update/modernization
 * More mobile CSS optimizations
 * Removed use of Tailwind Play CDN
+* Pride UI themes
 
 ### v2026.1:
 

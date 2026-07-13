@@ -160,9 +160,9 @@ function buildStatsRows() {
 
     host.innerHTML = statsList.map((stat, index) => `
         <div class="col-12 mb-2">
-            <div class="d-flex justify-content-between align-items-center p-2 border rounded">
-                <span style="font-size: 0.9rem;">${stat.stat_title}</span>
-                <div>
+            <div class="d-flex justify-content-between align-items-center p-2 border rounded snapin-row">
+                <span class="snapin-row-label" title="${stat.stat_title}">${stat.stat_title}</span>
+                <div class="snapin-row-actions">
                     <button hidden type="button" class="nl-btn nl-btn--ghost nl-btn--sm me-1 view-stat-btn"
                             data-target="stat-${index}" style="font-size: 0.8rem; padding: 0.25rem 0.5rem;">
                         View
@@ -198,9 +198,9 @@ function buildGraphsRows() {
         const name = graphCommands[index]?.name || `Graph ${index}`;
         return `
             <div class="col-12 mb-2">
-                <div class="d-flex justify-content-between align-items-center p-2 border rounded">
-                    <span style="font-size: 0.9rem;">${name}</span>
-                    <div>
+                <div class="d-flex justify-content-between align-items-center p-2 border rounded snapin-row">
+                    <span class="snapin-row-label" title="${name}">${name}</span>
+                    <div class="snapin-row-actions">
                         <button hidden type="button" class="nl-btn nl-btn--ghost nl-btn--sm me-1 view-graph-btn"
                                 data-target="graph-${index}" style="font-size: 0.8rem; padding: 0.25rem 0.5rem;">
                             View

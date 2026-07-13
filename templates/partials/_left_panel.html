@@ -1,110 +1,70 @@
-                        <h3 class="rail-heading">Pull data</h3>
-                        <form method="POST" id="stats_form">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
-                            <label for="items_to_pull" id="items_to_pull_label">Recently Added Items {% if settings.get('recently_added_mode') == 'days' %}(days){% else %}(items){% endif %}:</label>
-                            <input type="number" id="items_to_pull" name="items_to_pull" value="10" /><br>
-                            <label for="days_to_pull">Time Range (days):</label>
-                            <input type="number" id="days_to_pull" name="days_to_pull" value="30" /><br>
-                            <div class="quick-range-buttons d-flex flex-nowrap overflow-auto gap-2">
-                                <button id="time_range_week" type="button" class="nl-btn nl-btn--primary">7</button>
-                                <button id="time_range_month" type="button" class="nl-btn nl-btn--primary">30</button>
-                                <button id="time_range_quarter" type="button" class="nl-btn nl-btn--primary">90</button>
-                                <button id="time_range_two_q" type="button" class="nl-btn nl-btn--primary">180</button>
-                                <button id="time_range_three_q" type="button" class="nl-btn nl-btn--primary">270</button>
-                                <button id="time_range_year" type="button" class="nl-btn nl-btn--primary">365</button>
-                            </div>
-                            <button type="submit" class="nl-btn nl-btn--primary">Get Stats\Users</button>
+                        {% from '_icons.html' import icon %}
+                        <div class="builder-card rail-card">
+                            <h3 class="rail-heading">Pull Data</h3>
+                            <form method="POST" id="stats_form">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+                                <label for="items_to_pull" id="items_to_pull_label">Recently Added Items {% if settings.get('recently_added_mode') == 'days' %}(days){% else %}(items){% endif %}:</label>
+                                <input type="number" id="items_to_pull" name="items_to_pull" value="10" /><br>
+                                <label for="days_to_pull">Time Range (days):</label>
+                                <input type="number" id="days_to_pull" name="days_to_pull" value="30" /><br>
+                                <div class="quick-range-buttons d-flex flex-nowrap overflow-auto gap-2">
+                                    <button id="time_range_week" type="button" class="nl-btn nl-btn--primary">7</button>
+                                    <button id="time_range_month" type="button" class="nl-btn nl-btn--primary">30</button>
+                                    <button id="time_range_quarter" type="button" class="nl-btn nl-btn--primary">90</button>
+                                    <button id="time_range_two_q" type="button" class="nl-btn nl-btn--primary">180</button>
+                                    <button id="time_range_three_q" type="button" class="nl-btn nl-btn--primary">270</button>
+                                    <button id="time_range_year" type="button" class="nl-btn nl-btn--primary">365</button>
+                                </div>
+                                <button type="submit" class="nl-btn nl-btn--primary"{% if not service_flags.tautulli %} disabled title="Configure Tautulli in settings"{% endif %}>Get Stats\Users</button>
+                            </form>
+                        </div>
+
+                        <div class="builder-card rail-card">
+                            <h3 class="rail-heading">Get</h3>
+                            <button id="pullRecsBtn" class="nl-btn nl-btn--ghost"
+                                    {%- if not service_flags.conjurr %} disabled title="Configure Conjurr in settings"
+                                    {%- elif not user_dict %} disabled title="Run Get Stats\Users first to load recipients"{% endif %}>Get Recommendations</button>
+                            <p class="rail-note">Pulled for users in the BCC list after Get Stats\Users. Takes 20-25 seconds per user.</p>
+
+                            <button id="pullDroppedNeedleBtn" class="nl-btn nl-btn--ghost"
+                                    {%- if not service_flags.droppedneedle %} disabled title="Configure DroppedNeedle in settings"
+                                    {%- elif not user_dict %} disabled title="Run Get Stats\Users first to load recipients"{% endif %}>Get DroppedNeedle Stats</button>
+                            <p class="rail-note">Per-user "year in music" wrapped and server-wide stats for the BCC list.</p>
+
+                            <button id="pullComingSoonBtn" class="nl-btn nl-btn--ghost"{% if not service_flags.calendar %} disabled title="Configure Sonarr or Radarr in settings"{% endif %}>Get Coming Soon Calendar</button>
+                            <p class="rail-note">Upcoming episode and movie calendar from Sonarr and Radarr, if configured in settings.</p>
+                        </div>
+
+                        <div class="builder-card rail-card">
+                            <h3 class="rail-heading">Cache</h3>
+                            {% if cache_info %}
+                                <div class="card" id="cache-card">
+                                    <div id="cache-card-header" class="card-header d-flex justify-content-between align-items-center is-collapsed" >
+                                        <h6 class="mb-0 mt-0">Cache Status</h6>
+                                        <span>{{ icon('chevron-down') }}</span>
+                                    </div>
+                                    <div id="cache-status-badge" class="card-body d-none">
+                                        {% for key, info in cache_info.items() %}
+                                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                                <span class="text-muted cache-cap">{{ key.replace('_', ' ') }}:</span>
+                                                {% if info.exists %}
+                                                    {% if info.is_fresh %}
+                                                        <span class="text-success">✓ Fresh ({{ "%.1f"|format(info.age_hours) }}h)</span>
+                                                    {% elif info.is_usable %}
+                                                        <span class="text-warning">⚠ Old ({{ "%.1f"|format(info.age_hours) }}h)</span>
+                                                    {% else %}
+                                                        <span class="text-danger">✗ Expired</span>
+                                                    {% endif %}
+                                                {% else %}
+                                                    <span class="text-muted">○ None</span>
+                                                {% endif %}
+                                            </div>
+                                        {% endfor %}
+                                        <small class="text-muted d-block mt-2">Cache refreshes daily automatically. Use "Get Stats\Users" to refresh manually.</small>
+                                    </div>
+                                </div>
+                            {% endif %}
                             <button id="clear_cache_btn" type="button" class="nl-btn nl-btn--danger"
                                     title="Clear cached data to force fresh fetch">Clear Cache</button>
-                        </form>
-
-                        {% if not user_dict %}
-                            <button id="pullRecsBtn" class="nl-btn nl-btn--ghost" disabled>Get Recommendations</button>
-                        {% else %}
-                            <button id="pullRecsBtn" class="nl-btn nl-btn--ghost">Get Recommendations</button>
-                        {% endif %}
-                        <p class="rail-note">Pulled for users in the BCC list after Get Stats\Users. Takes 20-25 seconds per user.</p>
-
-                        {% if not user_dict %}
-                            <button id="pullDroppedNeedleBtn" class="nl-btn nl-btn--ghost" disabled>Get DroppedNeedle Stats</button>
-                        {% else %}
-                            <button id="pullDroppedNeedleBtn" class="nl-btn nl-btn--ghost">Get DroppedNeedle Stats</button>
-                        {% endif %}
-                        <p class="rail-note">Per-user "year in music" wrapped and server-wide stats for the BCC list.</p>
-
-                        <button id="pullComingSoonBtn" class="nl-btn nl-btn--ghost">Get Coming Soon Calendar</button>
-                        <p class="rail-note">Upcoming episode and movie calendar from Sonarr and Radarr, if configured in settings.</p>
-
-
-                        {% if cache_info %}
-                            <div class="card mt-3" id="cache-card">
-                                <div id="cache-card-header" class="card-header d-flex justify-content-between align-items-center" >
-                                    <h6 class="mb-0">Cache Status</h6>
-                                    <span>▼</span>
-                                </div>
-                                <div id="cache-status-badge" class="card-body d-none">
-                                    {% for key, info in cache_info.items() %}
-                                        <div class="d-flex justify-content-between align-items-center mb-1">
-                                            <span class="text-muted cache-cap">{{ key.replace('_', ' ') }}:</span>
-                                            {% if info.exists %}
-                                                {% if info.is_fresh %}
-                                                    <span class="text-success">✓ Fresh ({{ "%.1f"|format(info.age_hours) }}h)</span>
-                                                {% elif info.is_usable %}
-                                                    <span class="text-warning">⚠ Old ({{ "%.1f"|format(info.age_hours) }}h)</span>
-                                                {% else %}
-                                                    <span class="text-danger">✗ Expired</span>
-                                                {% endif %}
-                                            {% else %}
-                                                <span class="text-muted">○ None</span>
-                                            {% endif %}
-                                        </div>
-                                    {% endfor %}
-                                    <small class="text-muted d-block mt-2">Cache refreshes daily automatically. Use "Get Stats\Users" to refresh manually.</small>
-                                </div>
-                            </div>
-                        {% endif %}
-
-                        <div class="card mb-3 bcc-card">
-                            <div id="bcc-card-header" class="card-header d-flex justify-content-between align-items-center" >
-                                <h5 class="mb-0">Email Recipients</h5>
-                                <span id="bcc-toggle-icon">▼</span>
-                            </div>
-                            <div id="bcc-collapse" class="card-body">
-                                <form method="POST" action="/send_email">
-                                    <div class="mb-3">
-                                        <label class="form-label">Email Lists:</label>
-                                        <div class="d-flex gap-2 align-items-center">
-                                            <select id="email_list_selector" class="form-select flex-1">
-                                                <option value="(Save new list)">(Save list)</option>
-                                                <option value="ALL">ALL</option>
-                                                <option value="Custom" selected>Custom</option>
-                                                {% for list in email_lists|sort(attribute='name') %}
-                                                    <option value="{{ list.id }}" data-emails="{{ list.emails }}">{{ list.name }}</option>
-                                                {% endfor %}
-                                            </select>
-                                            <button id="delete_list_btn" type="button" class="btn btn-sm btn-danger d-none">Delete</button>
-                                        </div>
-                                        
-                                        <div id="save_list_container" class="mt-2 d-none">
-                                            <div class="d-flex gap-2">
-                                                <input type="text" id="new_list_name" class="form-control" placeholder="Enter list name" />
-                                                <button id="save_list_btn" type="button" class="btn btn-sm btn-success">Save</button>
-                                                <button id="cancel_save_btn" type="button" class="btn btn-sm btn-secondary">Cancel</button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    
-                                    <label class="form-label">BCC:</label>
-                                    <div id="bcc_chips" class="nl-chips" role="listbox" aria-label="BCC recipients">
-                                        <input id="email_chip_input"
-                                                type="text"
-                                                placeholder="Add BCC emails"
-                                                aria-label="Add recipient" />
-                                    </div>
-                                    <textarea name="to_emails" id="to_emails" class="d-none">
-                                        {{ user_dict.values() | join(', ') }}
-                                    </textarea>
-                                </form>
-                            </div>
                         </div>
 

@@ -1,6 +1,13 @@
 window.expandedCollections = {};
 window.collapsedCollectionsUI = {};
 
+// Chevron for the collection expand/collapse toggle: points down when the
+// collection is expanded, right when collapsed (matches the cache/BCC cards).
+function collectionToggleIcon(expanded) {
+    const points = expanded ? '6 9 12 15 18 9' : '9 6 15 12 9 18';
+    return `<svg class="nl-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><polyline points="${points}"/></svg>`;
+}
+
 function convertExpandedCollectionsForBackend() {
     const convertedCollections = {};
     
@@ -153,7 +160,7 @@ async function expandCollection(expandedDiv, collectionKey, collectionType, butt
             
             expandedDiv.innerHTML = buildCollectionItemsDisplay(window.expandedCollections[collectionId]);
             
-            buttonElement.textContent = '📂';
+            buttonElement.innerHTML = collectionToggleIcon(true);
             buttonElement.title = 'Hide collection items';
             
             updateSelectedItemsDisplay();
@@ -265,11 +272,11 @@ function updateSelectedItemsDisplay() {
                                 placeholder="Image URL or upload a file..."
                                 value="${item.src || ''}"
                                 style="flex: 1;">
-                            <button type="button" class="nl-btn nl-btn--primary nl-btn--sm media-upload-btn" data-index="${index}" title="Upload from device">
-                                📁
+                            <button type="button" class="nl-btn nl-btn--primary nl-btn--sm media-upload-btn" data-index="${index}" title="Upload from device" aria-label="Upload from device">
+                                <svg class="nl-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                             </button>
                             <button type="button" class="nl-btn nl-btn--primary nl-btn--sm media-gif-search-btn" data-index="${index}" title="Search GIFs">
-                                🔍 GIF
+                                <svg class="nl-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> GIF
                             </button>
                         </div>
                         <div class="d-flex gap-2 align-items-center">
@@ -332,8 +339,8 @@ function updateSelectedItemsDisplay() {
                                                         data-collection-type="${col.type}"
                                                         data-collection-id="${collectionId}"
                                                         title="${isExpanded ? 'Hide collection items' : 'Show collection items'}"
-                                                        style="font-size: 0.7rem; padding: 0.1rem 0.4rem;">
-                                                        ${isExpanded ? '📂' : '📁'}
+                                                        style="padding: 0.1rem 0.4rem;">
+                                                        ${collectionToggleIcon(isExpanded)}
                                                     </button>
                                                     ${isExpanded ? `
                                                     <button type="button" 
@@ -428,7 +435,7 @@ function updateSelectedItemsDisplay() {
                     delete window.expandedCollections[collectionId];
                     delete window.collapsedCollectionsUI[collectionId];
                     expandedDiv.style.display = 'none';
-                    btn.textContent = '📁';
+                    btn.innerHTML = collectionToggleIcon(false);
                     btn.title = 'Show collection items';
                     
                     updateSelectedItemsDisplay();

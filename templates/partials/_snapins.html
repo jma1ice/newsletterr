@@ -1,5 +1,6 @@
-                        <div class="mb-4">
-                            <div class="d-flex justify-content-between align-items-center mb-3">
+{% from '_icons.html' import icon %}
+                        <div class="builder-card">
+                            <div class="d-flex justify-content-between align-items-center">
                                 <h2>Text Blocks</h2>
                                 <div class="d-flex gap-2">
                                     <button type="button" class="nl-btn nl-btn--ghost nl-btn--sm" id="add-title-btn" title="Add a title block with large heading text">
@@ -27,8 +28,8 @@
                             </div>
                         </div>
 
-                        <div class="mb-4">
-                            <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div class="builder-card">
+                            <div class="d-flex justify-content-between align-items-center">
                                 <h2>Media</h2>
                                 <div class="d-flex gap-2">
                                     <button type="button" class="nl-btn nl-btn--ghost nl-btn--sm" id="add-image-btn" title="Add an image or GIF from file or URL">
@@ -39,133 +40,144 @@
                         </div>
                         <input type="file" id="media-upload-input" accept=".png,.jpg,.jpeg,.webp,.gif" style="display: none;">
 
-                        <div class="row">
-                            <div class="col-md-6">
-                                <h2 id="ra-header" style="{{ '' if recent_data else 'display:none;' }}">Recently Added</h2>
-                                <div id="ra-lib-list" class="row" style="{{ '' if recent_data else 'display:none;' }}"></div>
-                            </div>
-                            <div class="col-md-6" id="recs-col">
-                                {% if recommendations_json %}
-                                    <h2>Recommendations</h2>
-                                    <div id="recs-user-list" class="row"></div>
-                                {% endif %}
-                            </div>
+                        <div class="builder-card" id="ra-card" style="{{ '' if recent_data else 'display:none;' }}">
+                            <h2 id="ra-header" style="{{ '' if recent_data else 'display:none;' }}">Recently Added</h2>
+                            <div id="ra-lib-list" class="row" style="{{ '' if recent_data else 'display:none;' }}"></div>
                         </div>
 
-                        <div class="row mt-3" id="droppedneedle-col">
-                            {% if droppedneedle_wrapped_json or droppedneedle_server_json %}
-                                <div class="col-md-6">
-                                    <h2>DroppedNeedle Wrapped</h2>
-                                    <div id="droppedneedle-user-list" class="row"></div>
-                                </div>
-                                <div class="col-md-6">
-                                    <h2>DroppedNeedle Server Stats</h2>
-                                    <div id="droppedneedle-server-list" class="row"></div>
+                        <div id="recs-col">
+                            {% if recommendations_json %}
+                                <div class="builder-card">
+                                    <h2>Recommendations</h2>
+                                    <div id="recs-user-list" class="row"></div>
                                 </div>
                             {% endif %}
                         </div>
 
-                        <div class="row mt-3" id="yearly-wrapped-col">
+                        <div id="droppedneedle-col">
+                            {% if droppedneedle_wrapped_json or droppedneedle_server_json %}
+                                <div class="builder-card">
+                                    <h2>DroppedNeedle Stats</h2>
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <h3 class="card-subhead">Wrapped</h3>
+                                            <div id="droppedneedle-user-list" class="row"></div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <h3 class="card-subhead">Server Stats</h3>
+                                            <div id="droppedneedle-server-list" class="row"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <div id="yearly-wrapped-col">
                             {% if yearly_wrapped_json %}
-                                <div class="col-md-6">
+                                <div class="builder-card">
                                     <h2>Year in Review</h2>
                                     <div id="yearly-wrapped-list" class="row"></div>
                                 </div>
                             {% endif %}
                         </div>
 
-                        <div class="row mt-3" id="coming-soon-col">
+                        <div id="coming-soon-col">
                             {% if sonarr_coming_soon_json or radarr_coming_soon_json %}
-                                <div class="col-md-6" id="sonarr-coming-soon-block" style="{{ '' if sonarr_coming_soon_json else 'display:none;' }}">
-                                    <h2>Coming Soon (TV)</h2>
-                                    <div id="sonarr-coming-soon-list" class="row"></div>
-                                </div>
-                                <div class="col-md-6" id="radarr-coming-soon-block" style="{{ '' if radarr_coming_soon_json else 'display:none;' }}">
-                                    <h2>Coming Soon (Movies)</h2>
-                                    <div id="radarr-coming-soon-list" class="row"></div>
+                                <div class="builder-card">
+                                    <h2>Coming Soon</h2>
+                                    <div class="row">
+                                        <div class="col-md-6" id="sonarr-coming-soon-block" style="{{ '' if sonarr_coming_soon_json else 'display:none;' }}">
+                                            <h3 class="card-subhead">TV</h3>
+                                            <div id="sonarr-coming-soon-list" class="row"></div>
+                                        </div>
+                                        <div class="col-md-6" id="radarr-coming-soon-block" style="{{ '' if radarr_coming_soon_json else 'display:none;' }}">
+                                            <h3 class="card-subhead">Movies</h3>
+                                            <div id="radarr-coming-soon-list" class="row"></div>
+                                        </div>
+                                    </div>
                                 </div>
                             {% endif %}
                         </div>
 
-                        <div class="row mt-4">
-                            <div class="col-12">
-                                <h2>Plex Collections</h2>
-                                <button type="button" class="nl-btn nl-btn--ghost nl-btn--sm mb-2" id="add-collection-group-btn">
-                                    + Collection Group
-                                </button>
-                                <div class="row">
-                                    <div class="col-md-4">
-                                        <h5>📽️ Movie Collections</h5>
-                                        <div class="d-flex align-items-center gap-2 mb-3">
-                                            <select id="movie-collections-dropdown" class="form-select flex-1">
-                                                <option value="">Pick collection...</option>
-                                            </select>
-                                            <button id="add-movie-collection-btn" class="nl-btn nl-btn--primary nl-btn--sm" disabled>
-                                                Add
-                                            </button>
-                                        </div>
-                                        <div id="movie-collections-loading" class="text-center d-none">
-                                            <div class="spinner-border spinner-border-sm" role="status">
-                                                <span class="visually-hidden">Loading...</span>
-                                            </div>
-                                            <span class="ms-2">Loading movie collections...</span>
-                                        </div>
+                        <div class="builder-card">
+                            <h2>Plex Collections</h2>
+                            <button type="button" class="nl-btn nl-btn--ghost nl-btn--sm mb-2" id="add-collection-group-btn">
+                                + Collection Group
+                            </button>
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <h5 class="collection-heading">{{ icon('film') }} Movie Collections</h5>
+                                    <div class="d-flex align-items-center gap-2 mb-3">
+                                        <select id="movie-collections-dropdown" class="form-select flex-1">
+                                            <option value="">Pick collection...</option>
+                                        </select>
+                                        <button id="add-movie-collection-btn" class="nl-btn nl-btn--primary nl-btn--sm" disabled>
+                                            Add
+                                        </button>
                                     </div>
-                                    <div class="col-md-4">
-                                        <h5>📺 TV Show Collections</h5>
-                                        <div class="d-flex align-items-center gap-2 mb-3">
-                                            <select id="show-collections-dropdown" class="form-select flex-1">
-                                                <option value="">Pick collection...</option>
-                                            </select>
-                                            <button id="add-show-collection-btn" class="nl-btn nl-btn--primary nl-btn--sm" disabled>
-                                                Add
-                                            </button>
+                                    <div id="movie-collections-loading" class="text-center d-none">
+                                        <div class="spinner-border spinner-border-sm" role="status">
+                                            <span class="visually-hidden">Loading...</span>
                                         </div>
-                                        <div id="show-collections-loading" class="text-center d-none">
-                                            <div class="spinner-border spinner-border-sm" role="status">
-                                                <span class="visually-hidden">Loading...</span>
-                                            </div>
-                                            <span class="ms-2">Loading TV collections...</span>
-                                        </div>
+                                        <span class="ms-2">Loading movie collections...</span>
                                     </div>
-                                    <div class="col-md-4">
-                                        <h5>🎧 Audio Collections</h5>
-                                        <div class="d-flex align-items-center gap-2 mb-3">
-                                            <select id="audio-collections-dropdown" class="form-select flex-1">
-                                                <option value="">Pick collection...</option>
-                                            </select>
-                                            <button id="add-audio-collection-btn" class="nl-btn nl-btn--primary nl-btn--sm" disabled>
-                                                Add
-                                            </button>
+                                </div>
+                                <div class="col-md-4">
+                                    <h5 class="collection-heading">{{ icon('tv') }} TV Show Collections</h5>
+                                    <div class="d-flex align-items-center gap-2 mb-3">
+                                        <select id="show-collections-dropdown" class="form-select flex-1">
+                                            <option value="">Pick collection...</option>
+                                        </select>
+                                        <button id="add-show-collection-btn" class="nl-btn nl-btn--primary nl-btn--sm" disabled>
+                                            Add
+                                        </button>
+                                    </div>
+                                    <div id="show-collections-loading" class="text-center d-none">
+                                        <div class="spinner-border spinner-border-sm" role="status">
+                                            <span class="visually-hidden">Loading...</span>
                                         </div>
-                                        <div id="audio-collections-loading" class="text-center d-none">
-                                            <div class="spinner-border spinner-border-sm" role="status">
-                                                <span class="visually-hidden">Loading...</span>
-                                            </div>
-                                            <span class="ms-2">Loading audio collections...</span>
+                                        <span class="ms-2">Loading TV collections...</span>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <h5 class="collection-heading">{{ icon('music') }} Audio Collections</h5>
+                                    <div class="d-flex align-items-center gap-2 mb-3">
+                                        <select id="audio-collections-dropdown" class="form-select flex-1">
+                                            <option value="">Pick collection...</option>
+                                        </select>
+                                        <button id="add-audio-collection-btn" class="nl-btn nl-btn--primary nl-btn--sm" disabled>
+                                            Add
+                                        </button>
+                                    </div>
+                                    <div id="audio-collections-loading" class="text-center d-none">
+                                        <div class="spinner-border spinner-border-sm" role="status">
+                                            <span class="visually-hidden">Loading...</span>
                                         </div>
+                                        <span class="ms-2">Loading audio collections...</span>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        <div class="row">
-                            <div class="col-md-6">
-                                <h2>Available Stats</h2>
-                                <div id="stats-list" class="row">
-                                    <div class="alert alert-info snapin-note">
-                                        <i class="fas fa-info-circle me-2"></i>
-                                        No stats data available. Click <strong>"Get Stats\Users"</strong> to load data.
+                        <div class="builder-card">
+                            <h2>Stats and Graphs</h2>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h3 class="card-subhead">Stats</h3>
+                                    <div id="stats-list" class="row">
+                                        <div class="alert alert-info snapin-note">
+                                            <i class="fas fa-info-circle me-2"></i>
+                                            No stats data available. Click <strong>"Get Stats\Users"</strong> to load data.
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                            
-                            <div class="col-md-6">
-                                <h2>Available Graphs</h2>
-                                <div id="graphs-list" class="row">
-                                    <div class="alert alert-info snapin-note">
-                                        <i class="fas fa-info-circle me-2"></i>
-                                        No graph data available. Click <strong>"Get Stats\Users"</strong> to load data.
+                                <div class="col-md-6">
+                                    <h3 class="card-subhead">Graphs</h3>
+                                    <div id="graphs-list" class="row">
+                                        <div class="alert alert-info snapin-note">
+                                            <i class="fas fa-info-circle me-2"></i>
+                                            No graph data available. Click <strong>"Get Stats\Users"</strong> to load data.
+                                        </div>
                                     </div>
                                 </div>
                             </div>

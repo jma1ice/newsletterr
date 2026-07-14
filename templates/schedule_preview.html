@@ -84,7 +84,6 @@
     let radarrComingSoonPayload = [];
     let selectedItems = [];
     let graphCommands = [];
-    let recentCommands = [];
     let userDict = {};
     let usersFullData = {};
     let expandedCollections = {};
@@ -539,7 +538,6 @@
             sonarrComingSoonPayload = data.sonarr_coming_soon || [];
             radarrComingSoonPayload = data.radarr_coming_soon || [];
             graphCommands = data.graph_commands || [];
-            recentCommands = data.recent_commands || [];
             userDict = data.user_dict || {};
             usersFullData = data.users_full_data || {};
             dateRange = data.date_range || '';

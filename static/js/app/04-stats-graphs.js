@@ -1164,19 +1164,6 @@ function getTypeIcon(type) {
     }
 }
 
-function getCollectionGroupIndex(collection) {
-    for (let i = 0; i < selectedItems.length; i++) {
-        if (selectedItems[i].type === 'collection_group' && selectedItems[i].collections) {
-            for (let j = 0; j < selectedItems[i].collections.length; j++) {
-                if (selectedItems[i].collections[j].key === collection.key) {
-                    return i;
-                }
-            }
-        }
-    }
-    return 0;
-}
-
 function buildCollectionPreviewHTMLForEmail(title, collections, stableGroupId = 'group-0') {
     const themeColors = {
         card_bg: 'var(--email-card-bg)',

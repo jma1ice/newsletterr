@@ -19,7 +19,7 @@ def build_graph_html_with_frontend_image(item, msg_root):
     
     if chart_image_data and chart_image_data.startswith('data:image/png'):
         try:
-            header, encoded = chart_image_data.split(',', 1)
+            _, encoded = chart_image_data.split(',', 1)
             image_data = base64.b64decode(encoded)
             
             cid = make_msgid(domain="newsletterr.local")[1:-1]

@@ -240,7 +240,6 @@ Released under the **MIT License** - see [LICENSE](LICENSE.txt) for details.
 --- Misc. ---
 * Can Snap-Ins work with custom HTML?
 * CSP out of Report-Only after trial run
-* June 5 Bleach announced it is no longer maintained
 
 ---
 

@@ -1,6 +1,7 @@
 import hmac, html, re, time
 
 import bleach, requests
+from bleach.css_sanitizer import CSSSanitizer
 from flask import abort, jsonify, redirect, request, session, url_for
 from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -37,6 +38,18 @@ def json_body(required=()):
         return None, (jsonify({"error": f"Missing required field(s): {', '.join(missing)}"}), 400)
     return data, None
 
+# Allowlist of CSS properties kept inside style attributes. Everything else
+# (position, behavior, url() values via background, etc.) is dropped. Without
+# a css_sanitizer, bleach empties style attributes entirely.
+_CSS_SANITIZER = CSSSanitizer(allowed_css_properties=[
+    'color', 'background-color',
+    'font-size', 'font-family', 'font-weight', 'font-style',
+    'text-align', 'text-decoration', 'line-height',
+    'margin', 'margin-top', 'margin-right', 'margin-bottom', 'margin-left',
+    'padding', 'padding-top', 'padding-right', 'padding-bottom', 'padding-left',
+    'border', 'border-radius', 'width', 'max-width', 'height',
+])
+
 def sanitize_html_input(text):
     if not text:
         return ""
@@ -60,6 +73,7 @@ def sanitize_html_input(text):
         tags=allowed_tags,
         attributes=allowed_attributes,
         protocols=allowed_protocols,
+        css_sanitizer=_CSS_SANITIZER,
         strip=True
     )
 
@@ -158,5 +172,6 @@ def sanitize_html(html: str) -> str:
         'span': ['style'],
         '*': ['style']
     }
-    cleaned = bleach.clean(html, tags=allowed_tags, attributes=allowed_attrs, strip=True)
+    cleaned = bleach.clean(html, tags=allowed_tags, attributes=allowed_attrs,
+                           css_sanitizer=_CSS_SANITIZER, strip=True)
     return cleaned

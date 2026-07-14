@@ -74,6 +74,12 @@ def test_sanitize_html_strips_event_handlers():
     out = sanitize_html('<img src="x" onerror="alert(1)">')
     assert "onerror" not in out
 
+def test_sanitize_html_filters_css_properties():
+    out = sanitize_html('<span style="color: red; position: fixed; background: url(http://evil)">x</span>')
+    assert "color: red" in out
+    assert "position" not in out
+    assert "url(" not in out
+
 def test_plain_text_decodes_entities():
     from app.emails.assemble import convert_html_to_plain_text
     out = convert_html_to_plain_text("<p>Hi &amp; welcome to <b>Marvel&#39;s</b> show</p>")

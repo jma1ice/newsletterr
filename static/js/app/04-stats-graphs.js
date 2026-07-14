@@ -243,7 +243,6 @@ function buildGraphPreviewHTML(graphId) {
                 <div style="margin: 20px 0; padding: 30px; background: #f8f9fa; border: 2px dashed #dee2e6; border-radius: 8px; text-align: center;">
                     <h3 style="color: #6c757d; margin-bottom: 10px;">${commandInfo.name}</h3>
                     <p style="color: #6c757d; margin: 0; font-size: 14px;">Error creating chart</p>
-                    <p style="color: #6c757d; margin: 5px 0 0; font-size: 12px; font-style: italic;">Try clicking "View" first to render the chart</p>
                 </div>
             `;
         }
@@ -281,7 +280,6 @@ function buildGraphPreviewHTML(graphId) {
         <div style="margin: 20px 0; padding: 30px; background: #f8f9fa; border: 2px dashed #dee2e6; border-radius: 8px; text-align: center;">
             <h3 style="color: #6c757d; margin-bottom: 10px;">${commandInfo.name}</h3>
             <p style="color: #6c757d; margin: 0; font-size: 14px;">Chart rendering failed</p>
-            <p style="color: #6c757d; margin: 5px 0 0; font-size: 12px; font-style: italic;">Try clicking "View" in the dashboard to render the chart first</p>
         </div>
     `;
 }

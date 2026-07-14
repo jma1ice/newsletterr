@@ -84,6 +84,7 @@ def index():
         "logo_position": s["logo_position"],
         "coming_soon_days_ahead": s["coming_soon_days_ahead"],
         "coming_soon_grid_columns": s["coming_soon_grid_columns"],
+        "email_size_warn_mb": s["email_size_warn_mb"],
     }
 
     service_flags = get_service_flags(s)

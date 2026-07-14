@@ -193,7 +193,24 @@
 }
 .nl-alert--success { background: var(--success-soft); border-color: var(--success); color: var(--success); }
 .nl-alert--danger { background: var(--danger-soft); border-color: var(--danger); color: var(--danger); }
+.nl-alert--warning { background: var(--warning-soft); border-color: var(--warning); color: var(--warning); }
 .nl-alert--info { background: var(--accent-soft); border-color: var(--accent-strong); color: var(--accent-strong); }
+.nl-alert--dismissible {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-3);
+}
+.nl-alert__close {
+    flex: 0 0 auto;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+    padding: 0;
+}
 
 .nl-banner {
     display: flex;
@@ -390,6 +407,8 @@ body.nl-modal-open { overflow: hidden; }
     align-items: stretch;
     padding: 8px;
     min-height: 44px;
+    max-height: 240px;
+    overflow-y: auto;
     border-radius: var(--radius-md);
     background: var(--surface-2);
     border: 1px solid var(--border);
@@ -404,6 +423,7 @@ body.nl-modal-open { overflow: hidden; }
     align-items: center;
     justify-content: space-between;
     width: 100%;
+    min-width: 0;
     gap: 6px;
     border-radius: var(--radius-full);
     padding: 4px 10px;
@@ -411,7 +431,15 @@ body.nl-modal-open { overflow: hidden; }
     color: var(--accent-strong);
     font-size: var(--text-xs);
 }
+/* long emails/usernames truncate rather than overhang the chip */
+.nl-chip > span:first-child {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
 .nl-chip .remove {
+    flex: 0 0 auto;
     border: 0;
     background: transparent;
     cursor: pointer;

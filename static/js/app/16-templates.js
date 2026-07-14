@@ -342,7 +342,16 @@ document.getElementById('delete-template-btn').addEventListener('click', async f
     }
 });
 
-document.getElementById('export-html-btn').addEventListener('click', () => {
+async function blobToDataUri(blob) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+    });
+}
+
+document.getElementById('export-html-btn').addEventListener('click', async () => {
     const frame = document.getElementById('preview');
     const html = frame?.srcdoc || '';
 
@@ -354,13 +363,40 @@ document.getElementById('export-html-btn').addEventListener('click', () => {
     const subject = document.getElementById('subject')?.value.trim() || 'newsletterr-email';
     const filename = subject.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') + '.html';
 
-    const blob = new Blob([html], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
+    showSpinner('Embedding images...');
+    try {
+        // Inline every fetchable image as a base64 data URI so the exported
+        // file renders offline. Same-origin assets (proxy-art, uploads, static)
+        // fetch with the session cookie; cross-origin or dead links throw and
+        // are left as their original URLs.
+        const doc = new DOMParser().parseFromString(html, 'text/html');
+        await Promise.all(Array.from(doc.querySelectorAll('img')).map(async (img) => {
+            const src = img.getAttribute('src') || '';
+            if (!src || src.startsWith('data:')) return;
+            try {
+                const abs = new URL(src, window.location.href).href;
+                const resp = await fetch(abs, { credentials: 'same-origin' });
+                if (!resp.ok) return;
+                img.setAttribute('src', await blobToDataUri(await resp.blob()));
+            } catch (_) {
+                // cross-origin or unreachable: keep the original URL
+            }
+        }));
+
+        const finalHtml = '<!DOCTYPE html>\n' + doc.documentElement.outerHTML;
+        const blob = new Blob([finalHtml], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(url);
+    } catch (err) {
+        console.error('Export failed:', err);
+        alert('Something went wrong exporting the email.');
+    } finally {
+        hideSpinner();
+    }
 });
 
 document.getElementById('import-html-btn').addEventListener('click', () => {

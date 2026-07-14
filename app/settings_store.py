@@ -55,6 +55,7 @@ INT_COLUMNS = {
     "coming_soon_grid_columns": 5,
     "collections_grid_columns": 5,
     "exclude_inactive_days": 0,
+    "email_size_warn_mb": 10,
 }
 
 def get_settings(decrypt_secrets=True):

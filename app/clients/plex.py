@@ -1,3 +1,4 @@
+import threading
 import uuid
 
 from datetime import datetime, timedelta
@@ -13,6 +14,20 @@ from app.clients.tautulli import run_tautulli_command
 import logging
 
 logger = logging.getLogger(__name__)
+
+# Per-thread health flag: a Plex SDK call raised while Plex was configured, so
+# the pipeline silently degraded to Tautulli/cached data. Thread-local keeps
+# the request thread's pull separate from the scheduler thread's sends.
+_plex_health = threading.local()
+
+def reset_plex_health():
+    _plex_health.failed = False
+
+def mark_plex_failed():
+    _plex_health.failed = True
+
+def plex_call_failed():
+    return getattr(_plex_health, 'failed', False)
 
 def get_plex_client_identifier():
     try:
@@ -61,6 +76,7 @@ def get_plex_machine_id():
         return data.get('MediaContainer', {}).get('machineIdentifier')
     except Exception as e:
         logger.error(f"Error getting Plex machine ID: {e}")
+        mark_plex_failed()
         return None
 
 def build_plex_web_link(rating_key, machine_id):
@@ -239,6 +255,7 @@ def fetch_tv_shows_from_plex_sdk(section_id, limit=10, machine_id=None, days=Non
             
     except Exception as e:
         logger.exception(f"Error fetching TV shows from Plex API: {e}")
+        mark_plex_failed()
         return []
 
 def fetch_movies_from_plex_sdk(section_id, limit=10, machine_id=None, days=None):
@@ -317,6 +334,7 @@ def fetch_movies_from_plex_sdk(section_id, limit=10, machine_id=None, days=None)
             
     except Exception as e:
         logger.exception(f"Error fetching movies from Plex API: {e}")
+        mark_plex_failed()
         return []
 
 def fetch_albums_from_plex_sdk(section_id, limit=10, machine_id=None, days=None):
@@ -392,6 +410,7 @@ def fetch_albums_from_plex_sdk(section_id, limit=10, machine_id=None, days=None)
             
     except Exception as e:
         logger.exception(f"Error fetching albums from Plex API: {e}")
+        mark_plex_failed()
         return []
 
 def fetch_recently_added_using_plex_sdk(tautulli_base_url, tautulli_api_key, items_count=10, recently_added_mode="items", recently_added_sort="date"):

@@ -1,6 +1,7 @@
 
 import requests
 
+from app import state
 from app.settings_store import get_settings
 from app.security import safe_get
 from app.clients.plex import search_plex_for_rating_key, build_plex_web_link, get_plex_machine_id
@@ -10,6 +11,11 @@ import logging
 logger = logging.getLogger(__name__)
 
 def run_conjurr_command(base_url, user_dict, error):
+    # A fresh run starts uncancelled; the cancel route sets this event while we
+    # loop, and we bail out between users with whatever we have so far. The
+    # caller reads state.recommendations_cancel.is_set() afterwards to tell a
+    # cancelled run from a completed one.
+    state.recommendations_cancel.clear()
     if base_url == None:
         if error == None:
             error = "Conjurr Error: No Base URL provided"
@@ -35,6 +41,9 @@ def run_conjurr_command(base_url, user_dict, error):
     recommendations_dict = {}
 
     for user in user_dict.keys():
+        if state.recommendations_cancel.is_set():
+            logger.info("Recommendations pull cancelled; returning partial results")
+            break
         try:
             api_url = f"{api_base_url}{user}&mode=history"
             response = safe_get(api_url)

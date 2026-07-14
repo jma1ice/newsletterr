@@ -207,8 +207,8 @@ function updateSelectedItemsDisplay() {
                             style="height: 60px; font-size: 0.9rem; resize: vertical;"
                             placeholder="${placeholderText}"
                             oninput="updateTextBlockName('${item.id}', ${index})">${escapeHtml(currentContent)}</textarea>
-                        <button type="button" class="nl-btn nl-btn--ghost nl-btn--sm mt-1 emoji-toggle-btn" data-target="emoji-picker-${item.id}" title="Insert emoji into text block">
-                            + Emoji
+                        <button type="button" class="nl-btn nl-btn--ghost nl-btn--sm mt-1 emoji-toggle-btn emoji-icon-btn" data-target="emoji-picker-${item.id}" title="Insert emoji into text block" aria-label="Insert emoji into text block">
+                            <svg class="nl-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
                         </button>
                         <div id="emoji-picker-${item.id}" style="display: none; margin-top: 4px;">
                             <emoji-picker data-textblock-id="${item.id}" data-source="/static/js/vendor/emoji-picker-data.json" style="width: 100%; --emoji-size: 1.2rem; --num-columns: 10;"></emoji-picker>
@@ -235,8 +235,8 @@ function updateSelectedItemsDisplay() {
                             style="height: 60px; font-size: 0.9rem; resize: vertical;"
                             placeholder="${placeholderText}"
                             oninput="updateTextBlockName('${item.id}', ${index})">${escapeHtml(currentContent)}</textarea>
-                        <button type="button" class="nl-btn nl-btn--ghost nl-btn--sm mt-1 emoji-toggle-btn" data-target="emoji-picker-${item.id}" title="Insert emoji into text block">
-                            + Emoji
+                        <button type="button" class="nl-btn nl-btn--ghost nl-btn--sm mt-1 emoji-toggle-btn emoji-icon-btn" data-target="emoji-picker-${item.id}" title="Insert emoji into text block" aria-label="Insert emoji into text block">
+                            <svg class="nl-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
                         </button>
                         <div id="emoji-picker-${item.id}" style="display: none; margin-top: 4px;">
                             <emoji-picker data-textblock-id="${item.id}" data-source="/static/js/vendor/emoji-picker-data.json" style="width: 100%; --emoji-size: 1.2rem; --num-columns: 10;"></emoji-picker>
@@ -374,8 +374,8 @@ function updateSelectedItemsDisplay() {
                 `;
             } else {
                 htmlContent += `
-                    <div class="selected-item d-flex justify-content-between align-items-center p-2 mb-2 border rounded bg-light" 
-                         data-index="${index}" draggable="true" style="padding-left: 32px !important;">
+                    <div class="selected-item d-flex justify-content-between align-items-center p-2 mb-2 border rounded bg-light"
+                         data-index="${index}" draggable="true">
                         <span class="item-name">${escapeHtml(item.name)}</span>
                         <div>
                             <span class="badge badge-secondary me-2">${item.type}</span>

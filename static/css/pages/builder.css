@@ -53,6 +53,7 @@
     cursor: grab;
     transition: all 0.2s ease;
     position: relative;
+    padding-left: 30px !important;
 }
 
 .selected-item:hover {
@@ -68,9 +69,8 @@
 .selected-item::before {
     content: "⋮⋮";
     position: absolute;
-    left: 8px;
-    top: 50%;
-    transform: translateY(-50%);
+    left: 10px;
+    top: 14px;
     color: var(--text-faint);
     font-size: 14px;
     line-height: 0.8;
@@ -94,6 +94,16 @@
     max-height: 400px;
     min-height: 100px;
     overflow-y: auto;
+}
+
+.emoji-icon-btn {
+    align-self: flex-start;
+    padding: 4px 6px;
+    line-height: 0;
+}
+.emoji-icon-btn .nl-icon {
+    width: 18px;
+    height: 18px;
 }
 
 #cache-status-badge {
@@ -148,6 +158,19 @@
     }
     #preview-row {
         position: static;
+    }
+}
+
+@media (min-width: 769px) and (max-width: 1200px) {
+    .builder-grid {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr);
+    }
+    #config-row  { grid-column: 1; grid-row: 1; }
+    #content-row { grid-column: 1; grid-row: 2; }
+    #preview-row { grid-column: 2; grid-row: 1 / span 2; }
+    /* don't let the sticky snap-ins pane swallow the whole viewport */
+    #selected-items-pane {
+        max-height: calc(100vh - var(--space-5) * 5);
     }
 }
 

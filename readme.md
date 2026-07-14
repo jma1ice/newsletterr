@@ -211,16 +211,14 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 
 --- UI ---
 * Email preview: desktop/tablet/phone views
-* Top right logo should link to site
 
 --- Email ---
 * Possible default email layout/UI overhaul with pride theme
-* SVG over emoji if possible
+* SVG over emoji if possible in emails
 
 --- Misc. ---
 * Can Snap-Ins work with custom HTML?
 * CSP out of Report-Only after trial run
-* 2wheelsdown into gh contrib
 
 ---
 
@@ -244,6 +242,7 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Fixed changing ra/recs grid width to maintain the correct poster ratio
 
 #### New Features:
+* Thanks @2wheelsdown for the blank emails fix
 * Added sections to settings page (email server | external services | data settings | email styling | email body defaults | security)
 * Settings changes are now kept on error so user won't have to re-enter them
 * Added test api buttons for conjurr and tautulli

@@ -227,6 +227,7 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 ### v2026.2:
 
 #### Fixed:
+* Thanks @2wheelsdown for the blank emails fix
 * Fixed issue where fresh setup `migrate_email_templates_for_header_title()` calls for `server_name` failed creating a missing `email_header_title` column
 * Patched up some SSRF/secrete containment
 * CSRF fixes
@@ -242,7 +243,6 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Fixed changing ra/recs grid width to maintain the correct poster ratio
 
 #### New Features:
-* Thanks @2wheelsdown for the blank emails fix
 * Added sections to settings page (email server | external services | data settings | email styling | email body defaults | security)
 * Settings changes are now kept on error so user won't have to re-enter them
 * Added test api buttons for conjurr and tautulli

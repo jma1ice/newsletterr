@@ -161,16 +161,13 @@
     }
 }
 
+/* Mid-range widths keep the original three-column flow but rebalance the
+   columns: the preview column gives up width (it can pop out anyway) so the
+   controls rail and the content/snap-ins column get more breathing room. The
+   snap-ins un-stick lives with the base rule below so source order wins. */
 @media (min-width: 769px) and (max-width: 1200px) {
     .builder-grid {
-        grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr);
-    }
-    #config-row  { grid-column: 1; grid-row: 1; }
-    #content-row { grid-column: 1; grid-row: 2; }
-    #preview-row { grid-column: 2; grid-row: 1 / span 2; }
-    /* don't let the sticky snap-ins pane swallow the whole viewport */
-    #selected-items-pane {
-        max-height: calc(100vh - var(--space-5) * 5);
+        grid-template-columns: minmax(210px, 1fr) minmax(0, 1.25fr) minmax(0, 1.8fr);
     }
 }
 
@@ -237,7 +234,9 @@
     max-height: calc(100vh - var(--space-5) * 2);
     overflow-y: auto;
 }
-@media (max-width: 768px) {
+/* Snap-ins only sticks at full width; at mid and mobile widths it flows inline
+   so it doesn't float over and cover too much of the narrower column. */
+@media (max-width: 1200px) {
     #selected-items-pane {
         position: static;
         max-height: none;
@@ -649,6 +648,10 @@
 
 /* preview toolbar (Export / Import / Pop-out) reads as a caption row */
 .builder-page .preview-toolbar span { color: var(--text-muted); font-weight: 600; }
+/* let the toolbar and its export/import/pop-out group wrap instead of
+   overflowing the (narrower at mid widths) preview column */
+.builder-page .preview-toolbar { flex-wrap: wrap; gap: var(--space-2); }
+.builder-page .preview-toolbar > .d-flex { flex-wrap: wrap; }
 
 /* hero preview: fills the wide center column and floats as an email card */
 .builder-page .frame {
@@ -711,5 +714,11 @@
 
 @media (max-width: 768px) {
     /* stack the message fields and let the preview size to content on mobile */
+    .builder-page .msg-bar { flex-direction: column; gap: var(--space-3); }
+}
+
+/* At mid widths the preview column is intentionally narrow, so stack the
+   Subject / Header / Recipients fields instead of squeezing them three-across. */
+@media (min-width: 769px) and (max-width: 1200px) {
     .builder-page .msg-bar { flex-direction: column; gap: var(--space-3); }
 }

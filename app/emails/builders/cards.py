@@ -1,5 +1,6 @@
 
 from app.emails.images import fetch_and_attach_image
+from app.security import escape_html_output as esc
 
 import logging
 
@@ -9,7 +10,7 @@ def build_individual_item_card_html(item, theme_colors, msg_root, base_url="", p
     card_width = max(60, int(card_width) if card_width else 120)
     card_height = int(round(card_width * 1.5))
     _target = (card_width, card_height)
-    item_title = item.get('title', 'Unknown Title')
+    item_title = esc(item.get('title', 'Unknown Title'))
     year = item.get('year')
     item_type = item.get('type', 'unknown')
     
@@ -28,9 +29,9 @@ def build_individual_item_card_html(item, theme_colors, msg_root, base_url="", p
     
     subtitle = ""
     if item.get('parentTitle') and item_type in ['album', 'track']:
-        subtitle = item['parentTitle']
+        subtitle = esc(item['parentTitle'])
     elif item.get('grandparentTitle') and item_type == 'track':
-        subtitle = item['grandparentTitle']
+        subtitle = esc(item['grandparentTitle'])
     elif item_type == 'show':
         season_count = item.get('childCount', 0)
         episode_count = item.get('leafCount', 0)
@@ -144,7 +145,7 @@ def build_individual_item_card_html(item, theme_colors, msg_root, base_url="", p
         """
 
     if item.get('plex_url'):
-        return f'<a href="{item["plex_url"]}" style="text-decoration: none; color: inherit; display: block;" target="_blank">{card_html}</a>'
+        return f'<a href="{esc(item["plex_url"])}" style="text-decoration: none; color: inherit; display: block;" target="_blank">{card_html}</a>'
     return card_html
 
 def build_collection_card_html(collection, theme_colors, msg_root, base_url="", poster_max_height=0, card_width=120, hosted_images_enabled=False, hosted_base_url=""):
@@ -175,7 +176,7 @@ def build_collection_card_html(collection, theme_colors, msg_root, base_url="", 
                 poster_src = fetch_and_attach_image(full_art_url, msg_root, f"collection_{collection.get('key', 'unknown')}_art", base_url, max_height=_pmh, target=_target, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
             logger.debug(f"Art src result: {poster_src}")
 
-    collection_title = collection.get('title', 'Unknown Collection')
+    collection_title = esc(collection.get('title', 'Unknown Collection'))
     count = collection.get('childCount', 0)
     subtype = collection.get('subtype', 'unknown')
     summary = collection.get('summary', '')
@@ -259,5 +260,5 @@ def build_collection_card_html(collection, theme_colors, msg_root, base_url="", 
         """
 
     if collection.get('plex_url'):
-        return f'<a href="{collection["plex_url"]}" style="text-decoration: none; color: inherit; display: block;" target="_blank">{card_html}</a>'
+        return f'<a href="{esc(collection["plex_url"])}" style="text-decoration: none; color: inherit; display: block;" target="_blank">{card_html}</a>'
     return card_html

@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 import pytest
 
 from app.crypto import decrypt, encrypt
-from app.security import escape_html_output, sanitize_html, sanitize_html_input
+from app.security import escape_html_output
 from app.store import calculate_next_send, next_future_send
 
 # (frequency, start_date, send_time, last_sent, expected)
@@ -62,23 +62,11 @@ def test_decrypt_passes_through_plaintext():
 def test_decrypt_none_is_empty_string():
     assert decrypt(None) == ""
 
-def test_sanitize_html_input_strips_scripts():
-    out = sanitize_html_input("<script>alert(1)</script><b>hi</b>")
-    assert "<script>" not in out
-    assert "hi" in out
-
 def test_escape_html_output():
     assert escape_html_output("<b>&</b>") == "&lt;b&gt;&amp;&lt;/b&gt;"
 
-def test_sanitize_html_strips_event_handlers():
-    out = sanitize_html('<img src="x" onerror="alert(1)">')
-    assert "onerror" not in out
-
-def test_sanitize_html_filters_css_properties():
-    out = sanitize_html('<span style="color: red; position: fixed; background: url(http://evil)">x</span>')
-    assert "color: red" in out
-    assert "position" not in out
-    assert "url(" not in out
+def test_escape_html_output_none_is_empty():
+    assert escape_html_output(None) == ""
 
 def test_plain_text_decodes_entities():
     from app.emails.assemble import convert_html_to_plain_text

@@ -3,6 +3,7 @@
 from datetime import datetime, timezone
 
 from app.emails.images import fetch_and_attach_image, truncate_text
+from app.security import escape_html_output as esc
 
 import logging
 
@@ -152,6 +153,7 @@ def _build_calendar_grid_html(cards, msg_root, theme_colors, title, base_url, gr
     """
 
 def _build_card_html(theme_colors, title, subtitle, meta_text, poster_src):
+    title, subtitle, meta_text = esc(title), esc(subtitle), esc(meta_text)
     if poster_src:
         poster_html = f'<img class="card-poster-img" src="{poster_src}" alt="{title}" width="100%" style="width: 100%; height: auto; display: block; object-fit: cover; border-radius: 10px 10px 0 0; background-color: #f8f9fa;">'
     else:

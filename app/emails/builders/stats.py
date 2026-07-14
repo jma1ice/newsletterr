@@ -2,6 +2,7 @@ from datetime import datetime
 
 from app.cache import get_cache_info
 from app.emails.images import fetch_and_attach_blurred_image, fetch_and_attach_small_thumbnail
+from app.security import escape_html_output as esc
 
 import logging
 
@@ -38,17 +39,17 @@ def get_stat_cells(title, row, hide_play_counts=False):
     cells = []
 
     if title == "Most Active Libraries" or title == "Library Item Counts":
-        cells.append(row.get('section_name', ''))
+        cells.append(esc(row.get('section_name', '')))
     elif title == "Most Active Users":
-        cells.append(row.get('user', ''))
+        cells.append(esc(row.get('user', '')))
     elif title == "Most Active Platforms":
-        cells.append(row.get('platform', ''))
+        cells.append(esc(row.get('platform', '')))
     else:
-        cells.append(row.get('title', ''))
+        cells.append(esc(row.get('title', '')))
 
     skip_year_stats = ["Most Active Libraries", "Library Item Counts", "Most Active Users", "Most Active Platforms", "Most Concurrent Streams"]
     if title not in skip_year_stats:
-        cells.append(row.get('year', ''))
+        cells.append(esc(str(row.get('year', ''))))
 
     skip_plays_stats = ["Library Item Counts"]
     if "Recently" not in title and "Concurrent" not in title and title not in skip_plays_stats and not hide_play_counts:
@@ -65,9 +66,9 @@ def get_stat_cells(title, row, hide_play_counts=False):
 
     skip_rating_stats = ["Most Active Libraries", "Library Item Counts", "Most Played Artists", "Most Popular Artists", "Most Active Users", "Most Active Platforms", "Most Concurrent Streams"]
     if title not in skip_rating_stats:
-        cells.append(row.get('content_rating', ''))
+        cells.append(esc(str(row.get('content_rating', ''))))
         rating = row.get('rating')
-        cells.append(f"{rating}" if rating else 'NA')
+        cells.append(esc(f"{rating}") if rating else 'NA')
 
     if title == "Most Concurrent Streams":
         cells.append(row.get('count', 0))
@@ -195,7 +196,7 @@ def build_stats_html_with_cid_background(stat_data, msg_root, theme_colors, base
         <div style="{container_style}">
             {overlay}
             <div style="position: relative; z-index: 1;">
-                <div style="{header_style}">{title}{date_suffix}</div>
+                <div style="{header_style}">{esc(title)}{date_suffix}</div>
                 <table style="{table_style}">
                     <thead>
                         <tr>{header_cells}</tr>
@@ -259,7 +260,7 @@ def build_yearly_wrapped_html_with_cids(stats_data, msg_root, theme_colors, year
         f"""
         <td style="text-align: center; padding: 12px; vertical-align: top; width: {100 // max(len(highlights), 1)}%;">
             <div style="font-size: 12px; color: {theme_colors['muted_text']}; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">{label}</div>
-            {f'<img src="{thumb_src}" alt="{value}" style="height:60px;{"width:60px;border-radius:50%;object-fit:cover;" if is_round else "width:auto;border-radius:4px;"}display:block;margin:0 auto 6px;">' if thumb_src else ''}<div style="font-size: 15px; font-weight: bold; color: white; line-height: 1.3;">{value}</div>
+            {f'<img src="{thumb_src}" alt="{esc(value)}" style="height:60px;{"width:60px;border-radius:50%;object-fit:cover;" if is_round else "width:auto;border-radius:4px;"}display:block;margin:0 auto 6px;">' if thumb_src else ''}<div style="font-size: 15px; font-weight: bold; color: white; line-height: 1.3;">{esc(value)}</div>
         </td>
         """
         for label, value, thumb_src, is_round in highlights

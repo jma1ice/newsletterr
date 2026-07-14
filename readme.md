@@ -105,6 +105,26 @@ docker run -d --name newsletterr \
   jma1ice/newsletterr:latest
 ```
 
+Or with docker compose, save this as `docker-compose.yml` and run `docker compose up -d`:
+```yaml
+services:
+  newsletterr:
+    image: jma1ice/newsletterr:latest
+    container_name: newsletterr
+    ports:
+      - "6397:6397"
+    volumes:
+      - newsletterr-db:/app/database
+      - newsletterr-env:/app/env
+      - newsletterr-uploads:/app/static/uploads
+    restart: unless-stopped
+
+volumes:
+  newsletterr-db:
+  newsletterr-env:
+  newsletterr-uploads:
+```
+
 ### 3. Run
 
 For development:

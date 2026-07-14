@@ -1,6 +1,7 @@
 
 from app.settings_store import get_settings
 from app.clients.plex import get_collection_items_for_email
+from app.security import escape_html_output as esc
 
 import logging
 
@@ -142,7 +143,7 @@ def build_collections_html_with_cids(all_collections, msg_root, theme_colors, ba
     
     return f"""
         <div style="{container_style}">
-            <h2 style="{title_style}">{display_title}</h2>
+            <h2 style="{title_style}">{esc(display_title)}</h2>
             <table cellpadding="0" cellspacing="0" border="0" style="{table_style}">
                 {items_html}
             </table>

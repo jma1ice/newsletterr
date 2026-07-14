@@ -82,23 +82,23 @@ function buildStatPreviewHTML(statId) {
         const coverArtTypes = ["Most Watched Movies", "Most Watched TV Shows", "Most Popular Movies", "Most Popular TV Shows", "Most Played Artists", "Most Popular Artists", "Recently Watched"];
 
         if (title === "Most Active Libraries" || title === "Library Item Counts") {
-            cells.push(row.section_name || '');
+            cells.push(escapeHtml(row.section_name || ''));
         } else if (title === "Most Active Users") {
-            cells.push(row.user || '');
+            cells.push(escapeHtml(row.user || ''));
         } else if (title === "Most Active Platforms") {
-            cells.push(row.platform || '');
+            cells.push(escapeHtml(row.platform || ''));
         } else {
-            let titleCell = row.title || '';
+            let titleCell = escapeHtml(row.title || '');
             if (showStatCoverArt && coverArtTypes.includes(title) && (row.thumb || row.grandparent_thumb)) {
                 const thumbPath = row.thumb || row.grandparent_thumb;
-                titleCell = `<img src="/proxy-art${thumbPath}" style="height:38px;width:auto;border-radius:3px;margin-right:7px;vertical-align:middle;">${titleCell}`;
+                titleCell = `<img src="/proxy-art${escapeHtml(thumbPath)}" style="height:38px;width:auto;border-radius:3px;margin-right:7px;vertical-align:middle;">${titleCell}`;
             }
             cells.push(titleCell);
         }
 
         const skipYearStats = ["Most Active Libraries", "Library Item Counts", "Most Active Users", "Most Active Platforms", "Most Concurrent Streams"];
         if (!skipYearStats.includes(title)) {
-            cells.push(row.year || '');
+            cells.push(escapeHtml(row.year || ''));
         }
 
         if (!title.includes("Recently") && !title.includes("Concurrent") && title !== "Library Item Counts") {
@@ -117,8 +117,8 @@ function buildStatPreviewHTML(statId) {
 
         const skipRatingStats = ["Most Active Libraries", "Library Item Counts", "Most Played Artists", "Most Popular Artists", "Most Active Users", "Most Active Platforms", "Most Concurrent Streams"];
         if (!skipRatingStats.includes(title)) {
-            cells.push(row.content_rating || '');
-            cells.push(row.rating ? `${row.rating}` : 'NA');
+            cells.push(escapeHtml(row.content_rating || ''));
+            cells.push(row.rating ? escapeHtml(`${row.rating}`) : 'NA');
         }
 
         if (title === "Most Concurrent Streams" || title === "Library Item Counts") {
@@ -135,7 +135,7 @@ function buildStatPreviewHTML(statId) {
     const rowsHTML = rows.map(row => {
         const cells = getStatCells(title, row);
         if (showUserAvatars && row.user_thumb) {
-            cells[0] = `<img src="${row.user_thumb}" style="height:32px;width:32px;border-radius:50%;object-fit:cover;margin-right:7px;vertical-align:middle;" alt="">${cells[0]}`;
+            cells[0] = `<img src="${escapeHtml(row.user_thumb)}" style="height:32px;width:32px;border-radius:50%;object-fit:cover;margin-right:7px;vertical-align:middle;" alt="">${cells[0]}`;
         }
         const cellsHTML = cells.map(cell => `<td>${cell}</td>`).join('');
         return `<tr>${cellsHTML}</tr>`;
@@ -328,7 +328,7 @@ function buildRecentlyAddedPreviewHTML(libraryFilter) {
     allItems = deduplicated;
     
     if (allItems.length === 0) {
-        return `<div class="recently-added"><p style="text-align: center; color: var(--email-muted); padding: 20px;">No recently added items found${libraryFilter ? ` for ${libraryFilter}` : ''}</p></div>`;
+        return `<div class="recently-added"><p style="text-align: center; color: var(--email-muted); padding: 20px;">No recently added items found${libraryFilter ? ` for ${escapeHtml(libraryFilter)}` : ''}</p></div>`;
     }
     
     const gridItems = allItems.map(item => {
@@ -385,18 +385,18 @@ function buildRecentlyAddedPreviewHTML(libraryFilter) {
                 flex-direction: column;
             ">
                 <div style="position: relative; aspect-ratio: 2/3; background: #f8f9fa;">
-                    <img src="${imgURL}" style="width: 100%; height: 100%; object-fit: cover; display: block;" alt="${item.title}">
+                    <img src="${escapeHtml(imgURL)}" style="width: 100%; height: 100%; object-fit: cover; display: block;" alt="${escapeHtml(item.title)}">
                 </div>
                 <div style="padding: 6px;">
                     <div style="font-weight: bold; font-size: 14px; color: var(--email-text); margin-bottom: 4px; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
-                        ${item.title}
+                        ${escapeHtml(item.title)}
                     </div>
                     <div style="font-size: 10px; color: var(--email-muted); margin-bottom: 8px; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
-                        ${[item.sub, item.duration, item.contentRating, item.added ? 'Added ' + item.added : ''].filter(Boolean).join(' • ')}
+                        ${escapeHtml([item.sub, item.duration, item.contentRating, item.added ? 'Added ' + item.added : ''].filter(Boolean).join(' • '))}
                     </div>
                     ${(item.summary && (window.APP?.raShowDescription !== 'disabled')) ? `
                         <div style="font-size: 11px; color: var(--email-text); opacity: 0.8; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden;">
-                            ${item.summary}
+                            ${escapeHtml(item.summary)}
                         </div>
                     ` : ''}
                 </div>
@@ -405,7 +405,7 @@ function buildRecentlyAddedPreviewHTML(libraryFilter) {
 
         if (item.plex_url) {
             return `
-                <a href="${item.plex_url}" 
+                <a href="${escapeHtml(item.plex_url)}"
                 class="plex-link"
                 style="text-decoration: none; color: inherit; display: block;" 
                 target="_blank"
@@ -429,7 +429,7 @@ function buildRecentlyAddedPreviewHTML(libraryFilter) {
     }
     return `
         <div class="recently-added">
-            <h2>${raTitle}</h2>
+            <h2>${escapeHtml(raTitle)}</h2>
             <div style="
                 display: grid;
                 grid-template-columns: repeat(${raGridColumns}, minmax(0, 1fr));
@@ -471,12 +471,12 @@ function buildRecommendationsPreviewHTML(userKey) {
     }
     
     if (!sectionsHTML) {
-        return `<div class="recommendations-block"><p style="text-align: center; color: var(--email-muted); padding: 0;">No recommendations for ${userEmail}</p></div>`;
+        return `<div class="recommendations-block"><p style="text-align: center; color: var(--email-muted); padding: 0;">No recommendations for ${escapeHtml(userEmail)}</p></div>`;
     }
-    
+
     return `
-        <div class="recommendations-block" style="padding: 0;" data-recs-user="${userKey}">
-            <h2 style="text-align: center; margin-top: 0; margin-bottom: 10px;">Recommendations for ${userEmail}</h2>
+        <div class="recommendations-block" style="padding: 0;" data-recs-user="${escapeHtml(userKey)}">
+            <h2 style="text-align: center; margin-top: 0; margin-bottom: 10px;">Recommendations for ${escapeHtml(userEmail)}</h2>
             ${sectionsHTML}
         </div>
     `;
@@ -486,7 +486,7 @@ function buildWrappedRankedListHTML(title, items, labelFn) {
     if (!items || !items.length) return '';
     const rows = items.map((item, i) => `
         <li style="margin: 4px 0; color: var(--email-text);">
-            <strong>#${i + 1}</strong> ${labelFn(item)}
+            <strong>#${i + 1}</strong> ${escapeHtml(labelFn(item))}
             <span style="color: var(--email-muted); font-size: 0.85em;"> - ${item.listen_count} plays</span>
         </li>`).join('');
     return `
@@ -511,9 +511,9 @@ function buildDroppedNeedleWrappedPreviewHTML(userKey) {
     ].join('');
 
     return `
-        <div class="droppedneedle-wrapped-block" style="padding: 0;" data-wrapped-user="${userKey}">
+        <div class="droppedneedle-wrapped-block" style="padding: 0;" data-wrapped-user="${escapeHtml(userKey)}">
             <h2 style="text-align: center; margin-top: 0; margin-bottom: 10px; color: var(--email-text);">
-                ${userDisplay}'s ${data.year} Wrapped
+                ${escapeHtml(userDisplay)}'s ${data.year} Wrapped
             </h2>
             <p style="text-align: center; color: var(--email-muted); margin-bottom: 16px;">
                 ~${data.total_listens_estimated} plays tracked &bull; ${data.loved_tracks_count} loved tracks
@@ -532,9 +532,9 @@ function buildDroppedNeedleServerStatsPreviewHTML() {
         'Top Listeners', data.leaderboard, entry => entry.display_name
     );
     const topArtist = data.top_artist_sitewide
-        ? `<p style="color: var(--email-text);"><strong>Top Artist:</strong> ${data.top_artist_sitewide.name} (${data.top_artist_sitewide.listen_count} plays)</p>` : '';
+        ? `<p style="color: var(--email-text);"><strong>Top Artist:</strong> ${escapeHtml(data.top_artist_sitewide.name)} (${data.top_artist_sitewide.listen_count} plays)</p>` : '';
     const topAlbum = data.top_album_sitewide
-        ? `<p style="color: var(--email-text);"><strong>Top Album:</strong> ${data.top_album_sitewide.name} - ${data.top_album_sitewide.artist_name} (${data.top_album_sitewide.listen_count} plays)</p>` : '';
+        ? `<p style="color: var(--email-text);"><strong>Top Album:</strong> ${escapeHtml(data.top_album_sitewide.name)} - ${escapeHtml(data.top_album_sitewide.artist_name)} (${data.top_album_sitewide.listen_count} plays)</p>` : '';
 
     return `
         <div class="droppedneedle-server-block" style="padding: 0;">
@@ -599,7 +599,7 @@ function buildYearlyWrappedPreviewHTML() {
     const highlightCells = highlights.map(([label, value, thumb, isRound]) => `
         <td style="text-align: center; padding: 12px; vertical-align: top; width: ${100 / Math.max(highlights.length, 1)}%;">
             <div style="font-size: 12px; color: rgba(255,255,255,0.85); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">${label}</div>
-            ${thumb ? `<img src="${thumb}" alt="${value}" style="height:60px;${isRound ? 'width:60px;border-radius:50%;object-fit:cover;' : 'width:auto;border-radius:4px;'}display:block;margin:0 auto 6px;">` : ''}<div style="font-size: 15px; font-weight: bold; color: white; line-height: 1.3;">${value}</div>
+            ${thumb ? `<img src="${escapeHtml(thumb)}" alt="${escapeHtml(value)}" style="height:60px;${isRound ? 'width:60px;border-radius:50%;object-fit:cover;' : 'width:auto;border-radius:4px;'}display:block;margin:0 auto 6px;">` : ''}<div style="font-size: 15px; font-weight: bold; color: white; line-height: 1.3;">${escapeHtml(value)}</div>
         </td>
     `).join('');
 
@@ -670,8 +670,9 @@ function _comingSoonPosterSrc(posterPath, arrPrefix) {
 }
 
 function _comingSoonCardHTML(title, subtitle, metaText, posterSrc) {
+    title = escapeHtml(title); subtitle = escapeHtml(subtitle); metaText = escapeHtml(metaText);
     const posterHTML = posterSrc
-        ? `<div style="position: relative; aspect-ratio: 2/3; background: #f8f9fa;"><img src="${posterSrc}" style="width: 100%; height: 100%; object-fit: cover; display: block;" alt="${title}"></div>`
+        ? `<div style="position: relative; aspect-ratio: 2/3; background: #f8f9fa;"><img src="${escapeHtml(posterSrc)}" style="width: 100%; height: 100%; object-fit: cover; display: block;" alt="${title}"></div>`
         : '';
     return `
         <div style="
@@ -860,15 +861,15 @@ function buildRecommendationsSectionHTML(availableItems, unavailableItems, title
                 max-width: 200px;
                 margin: 0 auto;
             ">
-                <a href="${href}" style="text-decoration: none; color: inherit; display: block;" target="_blank" title="${linkTitle}">
+                <a href="${escapeHtml(href)}" style="text-decoration: none; color: inherit; display: block;" target="_blank" title="${linkTitle}">
                     <div style="position: relative; aspect-ratio: 2/3; background: #f8f9fa;">
-                        <img src="${posterURL}" style="width: 100%; height: 100%; object-fit: cover; display: block;" alt="${titleText}">
+                        <img src="${escapeHtml(posterURL)}" style="width: 100%; height: 100%; object-fit: cover; display: block;" alt="${escapeHtml(titleText)}">
                     </div>
                     <div style="padding: 8px;">
                         <div style="font-weight: bold; font-size: 12px; color: var(--email-text); line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
-                            ${titleText}
+                            ${escapeHtml(titleText)}
                         </div>
-                        ${metaLine ? `<div style="font-size: 10px; color: var(--email-muted); margin-top: 2px;">${metaLine}</div>` : ''}
+                        ${metaLine ? `<div style="font-size: 10px; color: var(--email-muted); margin-top: 2px;">${escapeHtml(metaLine)}</div>` : ''}
                         ${overview ? `
                             <div style="
                                 font-size: 10px;
@@ -882,7 +883,7 @@ function buildRecommendationsSectionHTML(availableItems, unavailableItems, title
                                 -webkit-line-clamp: 3;
                                 -webkit-box-orient: vertical;
                                 overflow: hidden;
-                            ">${overview}</div>
+                            ">${escapeHtml(overview)}</div>
                         ` : ''}
                     </div>
                 </a>
@@ -918,7 +919,7 @@ function getItemPosterURL(item) {
 }
 
 function buildCollectionCard(collection, themeColors) {
-    const collectionTitle = collection.title || 'Unknown Collection';
+    const collectionTitle = escapeHtml(collection.title || 'Unknown Collection');
     const count = collection.childCount || 0;
     const subtype = collection.subtype || 'unknown';
     const typeIcon = subtype === 'movie' ? '📽️' : subtype === 'show' ? '📺' : '🎧';
@@ -1028,24 +1029,24 @@ function buildCollectionCard(collection, themeColors) {
     }
 
     if (collection.plex_url) {
-        return `<a href="${collection.plex_url}" style="text-decoration: none; color: inherit; display: block;" target="_blank">${cardHtml}</a>`;
+        return `<a href="${escapeHtml(collection.plex_url)}" style="text-decoration: none; color: inherit; display: block;" target="_blank">${cardHtml}</a>`;
     }
     return cardHtml;
 }
 
 function buildIndividualItemCard(item, themeColors) {
-    const itemTitle = item.title || item.name || 'Unknown Title';
+    const itemTitle = escapeHtml(item.title || item.name || 'Unknown Title');
     const year = item.year ? ` (${item.year})` : '';
     const type = item.type || 'unknown';
     const typeIcon = getTypeIcon(type);
     
     let subtitle = '';
     if (item.artist && type !== 'show') {
-        subtitle = item.artist;
+        subtitle = escapeHtml(item.artist);
     } else if (type === 'show' && item.season_count) {
         subtitle = `${item.season_count} seasons`;
     } else if (item.album && type === 'track') {
-        subtitle = item.album;
+        subtitle = escapeHtml(item.album);
     }
     
     let posterURL = null;
@@ -1147,7 +1148,7 @@ function buildIndividualItemCard(item, themeColors) {
     }
 
     if (item.plex_url) {
-        return `<a href="${item.plex_url}" style="text-decoration: none; color: inherit; display: block;" target="_blank">${cardHtml}</a>`;
+        return `<a href="${escapeHtml(item.plex_url)}" style="text-decoration: none; color: inherit; display: block;" target="_blank">${cardHtml}</a>`;
     }
     return cardHtml;
 }
@@ -1299,7 +1300,7 @@ function buildCollectionPreviewHTMLForEmail(title, collections, stableGroupId = 
     
     return `
         <div style="${containerStyle}">
-            <h2 style="${titleStyle}">${title}</h2>
+            <h2 style="${titleStyle}">${escapeHtml(title)}</h2>
             <table cellpadding="0" cellspacing="0" border="0" style="${tableStyle}">
                 ${itemsHTML}
             </table>
@@ -1318,7 +1319,7 @@ function buildPreviewEmailHTML(contentHTML, serverName, subject, emailHeaderTitl
         }
         const _ml = logoPosition === 'left' ? '0' : 'auto';
         const _mr = logoPosition === 'right' ? '0' : 'auto';
-        logoHTML = `<img src="${logoSrc}" alt="${serverName}" class="email-logo" style="max-width: ${logoWidth}px; width: auto; height: auto; display: block; margin-left: ${_ml}; margin-right: ${_mr};">`;
+        logoHTML = `<img src="${logoSrc}" alt="${escapeHtml(serverName)}" class="email-logo" style="max-width: ${logoWidth}px; width: auto; height: auto; display: block; margin-left: ${_ml}; margin-right: ${_mr};">`;
     }
 
     return `<!DOCTYPE html>
@@ -1326,7 +1327,7 @@ function buildPreviewEmailHTML(contentHTML, serverName, subject, emailHeaderTitl
             <head>
                 <meta charset="UTF-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>${subject}</title>
+                <title>${escapeHtml(subject)}</title>
                 ${themedCSS}
             </head>
             <body>

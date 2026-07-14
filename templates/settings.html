@@ -224,12 +224,22 @@
                             <span id="radarr_test_result"></span>
                         </div>
 
+                        <hr>
+                        <h6 class="text-uppercase">Discord</h6>
+                        <label for="discord_webhook_url">Discord Webhook URL (optional):</label><br>
+                        <input type="password" id="discord_webhook_url" name="discord_webhook_url" autocomplete="off" class="w-field"
+                            placeholder="{% if settings.has_discord_webhook_url %}Saved - leave blank to keep{% else %}https://discord.com/api/webhooks/...{% endif %}"><br>
+                        <p class="text-info mt-2 field-hint">
+                            Used by the "Send to Discord" button on the Export Logs page to attach a redacted log file to a channel or forum thread of your choosing.
+                        </p><br>
+
                         <button id="apply_settings_ext" class="nl-btn nl-btn--primary">Apply Settings</button>
                     </div>
 
                     <div class="settings-section d-none" id="section-data-settings">
                         <h4 class="mb-4">Data and Stats</h4>
 
+                        <h6 class="text-uppercase">Recently Added</h6>
                         <label for="recently_added_mode">Recently Added Mode:</label><br>
                         <select id="recently_added_mode" name="recently_added_mode">
                             <option value="items" {% if settings.recently_added_mode != 'days' %}selected{% endif %}>Items: pull a fixed number of recently added items</option>
@@ -262,18 +272,16 @@
                         </select><br>
                         <p class="text-info mt-2 field-hint">Show or hide the summary/description text under each Recently Added item in emails.</p><br>
 
+                        <hr>
+                        <h6 class="text-uppercase">Recommendations</h6>
                         <label for="recs_grid_columns">Recommendations Grid Columns:</label><br>
                         <input type="number" id="recs_grid_columns" name="recs_grid_columns" min="1" max="10"
                                value="{{ settings.get('recs_grid_columns', '5') }}"
                                class="w-num"><br>
                         <p class="text-info mt-2 field-hint">Number of columns in the Recommendations grid (default: 5).</p><br>
 
-                        <label for="poster_max_height">Poster Max Height (px):</label><br>
-                        <input type="number" id="poster_max_height" name="poster_max_height" min="50" max="2000"
-                               value="{{ settings.get('poster_max_height', '') }}"
-                               placeholder="Original" class="w-num-lg"><br>
-                        <p class="text-info mt-2 field-hint">Caps the pixel height of posters embedded in emails (Recently Added, Recommendations, Collections). Width scales automatically to preserve aspect ratio. Leave blank to use original resolution.</p><br>
-
+                        <hr>
+                        <h6 class="text-uppercase">Stats and Graphs</h6>
                         <label for="stats_type">Stats &amp; Graph Metric:</label><br>
                         <select id="stats_type" name="stats_type">
                             <option value="plays"    {% if settings.stats_type != 'duration' %}selected{% endif %}>Plays</option>
@@ -299,6 +307,15 @@
                             <option value="enabled"  {% if settings.hide_graph_play_counts == 'enabled' %}selected{% endif %}>Hide</option>
                         </select><br><br>
 
+                        <label for="include_user_info">Include Other Users' Info:</label><br>
+                        <select id="include_user_info" name="include_user_info">
+                            <option value="enabled"  {% if settings.get('include_user_info', 'enabled') != 'disabled' %}selected{% endif %}>Include</option>
+                            <option value="disabled" {% if settings.get('include_user_info', 'enabled') == 'disabled' %}selected{% endif %}>Exclude</option>
+                        </select><br>
+                        <p class="text-info mt-2 field-hint">When set to Include, usernames and profile pictures of other users appear in the "Most Active Users" stat, the Wrapped "Most Active" highlight, and the top-users graphs. When set to Exclude, that content is removed from emails regardless of what a template selected. A recipient's own DroppedNeedle Wrapped is not affected.</p><br>
+
+                        <hr>
+                        <h6 class="text-uppercase">Coming Soon</h6>
                         <label for="coming_soon_days_ahead">Coming Soon Calendar Window (days ahead):</label><br>
                         <input type="number" id="coming_soon_days_ahead" name="coming_soon_days_ahead" min="1" max="90"
                             value="{{ settings.get('coming_soon_days_ahead', '14') }}"><br><br>
@@ -307,18 +324,23 @@
                         <input type="number" id="coming_soon_grid_columns" name="coming_soon_grid_columns" min="1" max="10"
                             value="{{ settings.get('coming_soon_grid_columns', '5') }}"><br><br>
 
+                        <hr>
+                        <h6 class="text-uppercase">Collections</h6>
                         <label for="collections_grid_columns">Collections Grid Columns:</label><br>
                         <input type="number" id="collections_grid_columns" name="collections_grid_columns" min="1" max="10"
                             value="{{ settings.get('collections_grid_columns', '5') }}"><br>
                         <p class="text-info mt-2 field-hint">Number of collection/item cards per row in Collections email blocks (default: 5).</p><br>
 
-                        <label for="include_user_info">Include Other Users' Info:</label><br>
-                        <select id="include_user_info" name="include_user_info">
-                            <option value="enabled"  {% if settings.get('include_user_info', 'enabled') != 'disabled' %}selected{% endif %}>Include</option>
-                            <option value="disabled" {% if settings.get('include_user_info', 'enabled') == 'disabled' %}selected{% endif %}>Exclude</option>
-                        </select><br>
-                        <p class="text-info mt-2 field-hint">When set to Include, usernames and profile pictures of other users appear in the "Most Active Users" stat, the Wrapped "Most Active" highlight, and the top-users graphs. When set to Exclude, that content is removed from emails regardless of what a template selected. A recipient's own DroppedNeedle Wrapped is not affected.</p><br>
+                        <hr>
+                        <h6 class="text-uppercase">Posters</h6>
+                        <label for="poster_max_height">Poster Max Height (px):</label><br>
+                        <input type="number" id="poster_max_height" name="poster_max_height" min="50" max="2000"
+                               value="{{ settings.get('poster_max_height', '') }}"
+                               placeholder="Original" class="w-num-lg"><br>
+                        <p class="text-info mt-2 field-hint">Caps the pixel height of posters embedded in emails (Recently Added, Recommendations, Collections). Width scales automatically to preserve aspect ratio. Leave blank to use original resolution.</p><br>
 
+                        <hr>
+                        <h6 class="text-uppercase">Recipients</h6>
                         <label for="exclude_inactive_days">Skip Recipients Inactive For (days):</label><br>
                         <input type="number" id="exclude_inactive_days" name="exclude_inactive_days" min="0" max="3650"
                             value="{{ settings.get('exclude_inactive_days', '0') }}" class="w-num-lg"><br>
@@ -467,13 +489,6 @@
                         <p class="text-info mt-2 field-hint">
                             Only enable HSTS if this app is running behind HTTPS (e.g. a reverse proxy with a valid certificate).
                             Enabling it on plain HTTP will cause browsers to block access to the site until the max-age expires (2 years).
-                        </p><br>
-
-                        <label for="discord_webhook_url">Discord Webhook URL (optional):</label><br>
-                        <input type="password" id="discord_webhook_url" name="discord_webhook_url" autocomplete="off" class="w-field"
-                            placeholder="{% if settings.has_discord_webhook_url %}Saved - leave blank to keep{% else %}https://discord.com/api/webhooks/...{% endif %}"><br>
-                        <p class="text-info mt-2 field-hint">
-                            Used by the "Send to Discord" button on the Export Logs page to attach a redacted log file to a channel or forum thread of your choosing.
                         </p><br>
 
                         <button id="apply_settings_security" class="nl-btn nl-btn--primary">Apply Settings</button>

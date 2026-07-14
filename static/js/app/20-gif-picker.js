@@ -46,21 +46,21 @@
             const data = await resp.json();
 
             if (data.error) {
-                grid.innerHTML = `<div style="grid-column: 1/-1; text-align: center; padding: 40px; color: #c00;">${data.error}</div>`;
+                grid.innerHTML = `<div style="grid-column: 1/-1; text-align: center; padding: 40px; color: #c00;">${escapeHtml(data.error)}</div>`;
                 return;
             }
 
             const results = data.results || [];
             if (results.length === 0) {
-                grid.innerHTML = `<div style="grid-column: 1/-1; text-align: center; padding: 40px; color: #888;">No results for "${query}"</div>`;
+                grid.innerHTML = `<div style="grid-column: 1/-1; text-align: center; padding: 40px; color: #888;">No results for "${escapeHtml(query)}"</div>`;
                 return;
             }
 
             grid.innerHTML = results.map(gif => `
-                <div class="gif-result-item" data-url="${gif.url}" data-title="${gif.title || ''}"
+                <div class="gif-result-item" data-url="${escapeHtml(gif.url)}" data-title="${escapeHtml(gif.title || '')}"
                     style="cursor: pointer; border-radius: 6px; overflow: hidden; aspect-ratio: 1; background: #111; position: relative;">
-                    <img src="${gif.preview_url || gif.url}"
-                        alt="${gif.title || ''}"
+                    <img src="${escapeHtml(gif.preview_url || gif.url)}"
+                        alt="${escapeHtml(gif.title || '')}"
                         loading="lazy"
                         style="width: 100%; height: 100%; object-fit: cover; display: block; transition: opacity 0.2s;"
                         onmouseover="this.style.opacity='0.8'"

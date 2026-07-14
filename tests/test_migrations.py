@@ -2,7 +2,7 @@ import json
 import sqlite3
 
 from app import config
-from app.db import migrate_musicseerr_to_droppedneedle
+from app.db import migrate_email_templates_for_header_title, migrate_musicseerr_to_droppedneedle
 
 def _make_pre_rebrand_db(path):
     conn = sqlite3.connect(path)
@@ -47,6 +47,28 @@ def test_musicseerr_rename_migration(tmp_path, monkeypatch):
 
     plain = json.loads(conn.execute("SELECT selected_items FROM email_templates WHERE name = 'plain tpl'").fetchone()[0])
     assert plain == [{"type": "recently added"}]
+    conn.close()
+
+def test_header_title_migration_survives_quoted_server_name(tmp_path, monkeypatch):
+    # a server name containing a quote must not break or inject into the
+    # backfill SQL (regression: the UPDATE used to interpolate it directly)
+    db = str(tmp_path / "quoted.db")
+    conn = sqlite3.connect(db)
+    conn.executescript("""
+        CREATE TABLE settings (id INTEGER PRIMARY KEY, server_name TEXT DEFAULT '');
+        CREATE TABLE email_templates (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE NOT NULL, selected_items TEXT NOT NULL);
+    """)
+    conn.execute("INSERT INTO settings (id, server_name) VALUES (1, ?)", ("Jamie's Plex",))
+    conn.execute("INSERT INTO email_templates (name, selected_items) VALUES (?, ?)", ("tpl", "[]"))
+    conn.commit()
+    conn.close()
+    monkeypatch.setattr(config, "DB_PATH", db)
+
+    migrate_email_templates_for_header_title()
+
+    conn = sqlite3.connect(db)
+    val = conn.execute("SELECT email_header_title FROM email_templates WHERE name = 'tpl'").fetchone()[0]
+    assert val == "Jamie's Plex Newsletter"
     conn.close()
 
 def test_migration_noop_on_fresh_schema(tmp_path, monkeypatch):

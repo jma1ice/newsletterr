@@ -28,8 +28,8 @@
         chip.className = 'nl-chip';
         chip.dataset.email = email;
         chip.innerHTML = `
-            <span>${email}</span>
-            <button type="button" class="remove" aria-label="Remove ${email}">x</button>
+            <span>${escapeHtml(email)}</span>
+            <button type="button" class="remove" aria-label="Remove ${escapeHtml(email)}">x</button>
         `;
         return chip;
     }

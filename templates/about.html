@@ -47,6 +47,10 @@
                 <span class="contrib-badge">Ko-Fi</span>
                 <span class="contrib-name">@bferd</span>
             </div>
+            <div class="contrib-card">
+                <span class="contrib-badge">GitHub</span>
+                <span class="contrib-name">@2wheelsdown</span>
+            </div>
         </div>
     </div>
 
@@ -101,6 +105,7 @@
     <h2>Recent Changes</h2>
     <p class="info-subhead">Fixes:</p>
     <ul class="info-list mb-4">
+        <li>Thanks @2wheelsdown for the blank emails fix</li>
         <li>Fixed issue where fresh setup `migrate_email_templates_for_header_title()` calls for `server_name` failed creating a missing `email_header_title` column</li>
         <li>Patched up some SSRF/secrete containment</li>
         <li>CSRF fixes</li>
@@ -113,10 +118,11 @@
         <li>Adjusted issue where some email clients show posters as small slivers</li>
         <li>Fixed where contributor area would start clipping out on lower size screens</li>
         <li>Removed plex-api-client as plexapi.plex was no longer supported</li>
+        <li>Fixed changing ra/recs grid width to maintain the correct poster ratio</li>
     </ul>
     <p class="info-subhead">New Features:</p>
     <ul class="info-list">
-        <li>Added sections to settings page (email server | external services | data settings | email styling | email body defaults | login | security)</li>
+        <li>Added sections to settings page (email server | connections | data and stats | email content | security | hosted features | appearance)</li>
         <li>Settings changes are now kept on error so user won't have to re-enter them</li>
         <li>Added test api buttons for conjurr and tautulli</li>
         <li>Added setting for custom intro/outro text</li>
@@ -156,6 +162,8 @@
         <li>More mobile CSS optimizations</li>
         <li>Removed use of Tailwind Play CDN</li>
         <li>Pride UI themes</li>
+        <li>Option to show or hide description on recently added posters</li>
+        <li>Setting for collection group grid width</li>
     </ul>
 </div>
 {% endblock %}

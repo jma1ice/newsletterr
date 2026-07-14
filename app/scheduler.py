@@ -147,13 +147,6 @@ def refresh_daily_cache():
             {'command': 'get_stream_type_by_top_10_users', 'name': 'Stream Type by Top Users'}
         ]
         
-        recent_commands = [
-            { 'command': 'movie' },
-            { 'command': 'show' },
-            { 'command' : 'artist' },
-            { 'command' : 'live' },
-        ]
-        
         cache_params = {
             'time_range': time_range,
             'count': count,

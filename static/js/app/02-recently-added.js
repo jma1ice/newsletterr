@@ -100,14 +100,14 @@ function renderRAGrid(list, target) {
         li.className = "ra-card";
         li.innerHTML = `
             <div class="ra-card-imgwrap">
-            ${imgURL ? `<img loading="lazy" src="${imgURL}">` : ''}
-            ${it.library ? `<div class="ra-pill ra-pill--lib"><span class="pill_text">${it.library}</span></div>` : ''}
-            ${it.added ? `<div class="ra-pill ra-pill--added"><span class="pill_text">${it.added}</span></div>` : ''}
+            ${imgURL ? `<img loading="lazy" src="${escapeHtml(imgURL)}">` : ''}
+            ${it.library ? `<div class="ra-pill ra-pill--lib"><span class="pill_text">${escapeHtml(it.library)}</span></div>` : ''}
+            ${it.added ? `<div class="ra-pill ra-pill--added"><span class="pill_text">${escapeHtml(it.added)}</span></div>` : ''}
             </div>
             <div class="ra-card-body">
-            <div class="ra-card-title">${it.title}</div>
-            <div class="ra-card-sub">${it.sub ? it.sub + ' • ' : ''}${it.duration}</div>
-            ${it.summary ? `<div class="ra-card-summary">${it.summary}</div>` : ''}
+            <div class="ra-card-title">${escapeHtml(it.title)}</div>
+            <div class="ra-card-sub">${it.sub ? escapeHtml(it.sub) + ' • ' : ''}${escapeHtml(it.duration)}</div>
+            ${it.summary ? `<div class="ra-card-summary">${escapeHtml(it.summary)}</div>` : ''}
             </div>`;
         target.appendChild(li);
     });
@@ -127,14 +127,14 @@ function buildRALibraryRows() {
 
         row.innerHTML = `
             <div class="d-flex justify-content-between align-items-center p-2 border rounded">
-                <span style="font-size: .9rem;">${lib}</span>
+                <span style="font-size: .9rem;">${escapeHtml(lib)}</span>
                 <div>
-                    <button hidden type="button" class="nl-btn nl-btn--ghost nl-btn--sm me-1 ra-view-btn" 
-                            data-lib="${lib}" data-target="${id}" style="font-size: .8rem; padding: .25rem .5rem;">
+                    <button hidden type="button" class="nl-btn nl-btn--ghost nl-btn--sm me-1 ra-view-btn"
+                            data-lib="${escapeHtml(lib)}" data-target="${id}" style="font-size: .8rem; padding: .25rem .5rem;">
                     View
                     </button>
-                    <button type="button" class="nl-btn nl-btn--primary nl-btn--sm ra-add-btn" 
-                            data-type="recently added" data-lib="${lib}" data-id="${id}" data-name="Recently Added: ${lib}"
+                    <button type="button" class="nl-btn nl-btn--primary nl-btn--sm ra-add-btn"
+                            data-type="recently added" data-lib="${escapeHtml(lib)}" data-id="${id}" data-name="Recently Added: ${escapeHtml(lib)}"
                             style="font-size: .8rem; padding: .25rem .5rem;">
                     Add
                     </button>
@@ -158,10 +158,14 @@ function buildStatsRows() {
         return;
     }
 
-    host.innerHTML = statsList.map((stat, index) => `
+    const userInfoDisabled = window.APP?.includeUserInfo === 'disabled';
+    host.innerHTML = statsList.map((stat, index) => {
+        const blocked = userInfoDisabled && stat.stat_title === 'Most Active Users';
+        const hint = blocked ? "Hidden because 'Include Other Users' Info' is disabled in Settings" : '';
+        return `
         <div class="col-12 mb-2">
-            <div class="d-flex justify-content-between align-items-center p-2 border rounded snapin-row">
-                <span class="snapin-row-label" title="${stat.stat_title}">${stat.stat_title}</span>
+            <div class="d-flex justify-content-between align-items-center p-2 border rounded snapin-row${blocked ? ' opacity-50' : ''}"${blocked ? ` title="${hint}"` : ''}>
+                <span class="snapin-row-label" title="${blocked ? hint : stat.stat_title}">${stat.stat_title}</span>
                 <div class="snapin-row-actions">
                     <button hidden type="button" class="nl-btn nl-btn--ghost nl-btn--sm me-1 view-stat-btn"
                             data-target="stat-${index}" style="font-size: 0.8rem; padding: 0.25rem 0.5rem;">
@@ -170,13 +174,14 @@ function buildStatsRows() {
                     <button type="button" class="nl-btn nl-btn--primary nl-btn--sm add-stat-btn"
                             data-id="stat-${index}"
                             data-name="${stat.stat_title}"
-                            data-type="stat" style="font-size: 0.8rem; padding: 0.25rem 0.5rem;">
+                            data-type="stat"${blocked ? ' disabled title="' + hint + '"' : ''} style="font-size: 0.8rem; padding: 0.25rem 0.5rem;">
                         Add
                     </button>
                 </div>
             </div>
         </div>
-    `).join('');
+    `;
+    }).join('');
 }
 
 function buildGraphsRows() {
@@ -194,12 +199,16 @@ function buildGraphsRows() {
         return;
     }
 
+    const userInfoDisabled = window.APP?.includeUserInfo === 'disabled';
+    const userGraphs = new Set(['Plays by Top Users', 'Stream Type by Top Users']);
     host.innerHTML = graphDataList.map((graph, index) => {
         const name = graphCommands[index]?.name || `Graph ${index}`;
+        const blocked = userInfoDisabled && userGraphs.has(name);
+        const hint = blocked ? "Hidden because 'Include Other Users' Info' is disabled in Settings" : '';
         return `
             <div class="col-12 mb-2">
-                <div class="d-flex justify-content-between align-items-center p-2 border rounded snapin-row">
-                    <span class="snapin-row-label" title="${name}">${name}</span>
+                <div class="d-flex justify-content-between align-items-center p-2 border rounded snapin-row${blocked ? ' opacity-50' : ''}"${blocked ? ` title="${hint}"` : ''}>
+                    <span class="snapin-row-label" title="${blocked ? hint : name}">${name}</span>
                     <div class="snapin-row-actions">
                         <button hidden type="button" class="nl-btn nl-btn--ghost nl-btn--sm me-1 view-graph-btn"
                                 data-target="graph-${index}" style="font-size: 0.8rem; padding: 0.25rem 0.5rem;">
@@ -208,7 +217,7 @@ function buildGraphsRows() {
                         <button type="button" class="nl-btn nl-btn--primary nl-btn--sm add-graph-btn"
                                 data-id="graph-${index}"
                                 data-name="${name}"
-                                data-type="graph" style="font-size: 0.8rem; padding: 0.25rem 0.5rem;">
+                                data-type="graph"${blocked ? ' disabled title="' + hint + '"' : ''} style="font-size: 0.8rem; padding: 0.25rem 0.5rem;">
                             Add
                         </button>
                     </div>
@@ -236,16 +245,16 @@ function render(list) {
         li.dataset.lib = it.library;
         li.innerHTML = `
             <div class="ra-card-imgwrap">
-                ${imgURL ? `<img loading="lazy" src="${imgURL}">` : ''}
-                ${it.library ? `<div class="ra-pill ra-pill--lib"><span class="pill_text">${it.library}</span></div>` : ''}
-                ${it.added ? `<div class="ra-pill ra-pill--added"><span class="pill_text">${it.added}</span></div>` : ''}
+                ${imgURL ? `<img loading="lazy" src="${escapeHtml(imgURL)}">` : ''}
+                ${it.library ? `<div class="ra-pill ra-pill--lib"><span class="pill_text">${escapeHtml(it.library)}</span></div>` : ''}
+                ${it.added ? `<div class="ra-pill ra-pill--added"><span class="pill_text">${escapeHtml(it.added)}</span></div>` : ''}
             </div>
             <div class="ra-card-body">
-                <div class="ra-card-title">${it.title}</div>
+                <div class="ra-card-title">${escapeHtml(it.title)}</div>
                 <div class="ra-card-sub">
-                    ${it.sub ? it.sub + ' • ' : ''}${it.duration}
+                    ${it.sub ? escapeHtml(it.sub) + ' • ' : ''}${escapeHtml(it.duration)}
                 </div>
-                ${it.summary ? `<div class="ra-card-summary">${it.summary}</div>` : ''}
+                ${it.summary ? `<div class="ra-card-summary">${escapeHtml(it.summary)}</div>` : ''}
             </div>
         `;
         grid.appendChild(li);

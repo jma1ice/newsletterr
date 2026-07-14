@@ -6,7 +6,7 @@ Flask app packaged as `app/` with an app factory (`app/__init__.py:create_app`) 
 
 ```bash
 pip install -r requirements-dev.txt
-pytest                                  # full suite, ~13s, hermetic (no network, temp DB)
+pytest                                  # full suite, ~1 min, hermetic (no network, temp DB)
 ruff check app/ newsletterr.py tests/   # lint (F rules and E9 only)
 python newsletterr.py                   # dev server, PORT env overrides 6397
 ```
@@ -36,7 +36,7 @@ The browser check script (playwright headless chromium) exercises the index page
 
 ## Layout quick reference
 
-- `app/blueprints/` routes only; `app/emails/` builders, senders, fetchers; `app/clients/` external APIs (plex, tautulli, conjurr, droppedneedle, github)
+- `app/blueprints/` routes only; `app/emails/` builders, senders, fetchers; `app/clients/` external APIs (plex, tautulli, conjurr, droppedneedle, github, sonarr, radarr)
 - `static/js/app/` first-party frontend (numbered load order matters, classic scripts sharing globals); `static/js/vendor/` third-party, do not lint or edit
 - `templates/partials/` included sections of index.html; the inline `window.APP` bootstrap block in `partials/_index_scripts.html` is the only inline script on the index page
 - `tests/goldens/` golden MIME fixtures, force-added past the `*.json` gitignore rule

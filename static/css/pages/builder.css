@@ -257,7 +257,7 @@
     color: var(--text);
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
-    padding: 8px 10px;
+    padding: 7px 10px 8px 10px;
 }
 .builder-page input[type="text"]:focus,
 .builder-page input[type="number"]:focus,
@@ -516,8 +516,8 @@
 /* migrated inline styles */
 .builder-page #subject { width: 100%; }
 .builder-page #email_header_title { width: 100%; }
-.builder-page label[for="custom-html-toggle"] { font-size: 0.9rem; }
-.builder-page #template-selector { width: 200px; }
+.builder-page label[for="custom-html-toggle"] { font-size: 0.8rem; }
+.builder-page #template-selector { width: 165px; }
 .builder-page .send-form { margin-top: 0; }
 #sendEmailBtn { font-weight: 700; min-width: 180px; }
 .builder-page #items_to_pull { width: 8.5rem; margin-bottom: 8px; }
@@ -574,7 +574,8 @@
    selector and BCC chips, which stack under the label. */
 .builder-page .msg-field--recipients { flex: 1.4; }
 .builder-page .msg-field--recipients #bcc_chips { width: 100%; }
-.builder-page .msg-field--recipients #bcc-count { color: var(--text); font-weight: 700; }
+.builder-page .msg-field--recipients #bcc-count { color: var(--text); padding-bottom: 8px; }
+.builder-page .msg-field--recipients #bcc-toggle-icon { padding-top: 0px; }
 /* Recipients collapses to a chevron toggle so the list can be hidden; the
    list selector + BCC chips nest in the body that drops open below it. */
 .builder-page .msg-recipients-toggle {
@@ -587,7 +588,7 @@
     color: var(--text-muted);
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
-    padding: 8px 10px;
+    padding: 5px 10px 1px 10px;
     font: inherit;
     text-align: left;
     cursor: pointer;
@@ -605,6 +606,7 @@
 }
 .builder-page .msg-recipients-toggle.is-collapsed #bcc-toggle-icon .nl-icon { transform: rotate(-90deg); }
 .builder-page .msg-recipients-body { padding-top: var(--space-2); }
+.builder-page .msg-recipients-count { padding-bottom: 6px; }
 .builder-page .msg-field {
     flex: 1;
     min-width: 0;
@@ -681,6 +683,7 @@
     display: flex;
     align-items: center;
     flex-shrink: 0;
+    gap: var(--space-1);
 }
 
 @media (max-width: 768px) {

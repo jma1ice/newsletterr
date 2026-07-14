@@ -35,7 +35,7 @@
 .settings-page .settings-nav nav {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: var(--space-4);
 }
 .settings-page .settings-nav-btn {
     display: flex;

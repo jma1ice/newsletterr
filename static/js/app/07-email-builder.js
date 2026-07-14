@@ -75,15 +75,15 @@ function buildCollectionItemsDisplay(items) {
     let itemsHtml = '<div class="collection-items-list" style="max-height: 200px; overflow-y: auto;">';
     
     Object.values(items).forEach(item => {
-        const displayTitle = item.title || item.name || 'Unknown';
+        const displayTitle = escapeHtml(item.title || item.name || 'Unknown');
         const year = item.year ? ` (${item.year})` : '';
         const additionalInfo = [];
-        
+
         if (item.artist && item.type !== 'show') {
-            additionalInfo.push(`by ${item.artist}`);
+            additionalInfo.push(`by ${escapeHtml(item.artist)}`);
         }
         if (item.album && item.type === 'track') {
-            additionalInfo.push(`from ${item.album}`);
+            additionalInfo.push(`from ${escapeHtml(item.album)}`);
         }
         if (item.season_count && item.type === 'show') {
             additionalInfo.push(`${item.season_count} seasons`);
@@ -107,7 +107,7 @@ function buildCollectionItemsDisplay(items) {
                 ` : ''}
                 ${item.tagline ? `
                     <div class="text-muted" style="font-size: 0.7rem; font-style: italic;">
-                        ${item.tagline}
+                        ${escapeHtml(item.tagline)}
                     </div>
                 ` : ''}
             </div>
@@ -195,7 +195,7 @@ function updateSelectedItemsDisplay() {
                     <div class="selected-item d-flex flex-column p-2 mb-2 border rounded" 
                          data-index="${index}" draggable="true">
                         <div class="d-flex justify-content-between align-items-center mb-2">
-                            <span class="item-name">${item.name}</span>
+                            <span class="item-name">${escapeHtml(item.name)}</span>
                             <div>
                                 <span class="badge ${badgeStyle} me-2">${item.type}</span>
                                 <button type="button" class="btn btn-sm btn-outline-danger title-remove remove-item-btn" data-index="${index}">x</button>
@@ -206,7 +206,7 @@ function updateSelectedItemsDisplay() {
                             class="form-control text-block-editor" 
                             style="height: 60px; font-size: 0.9rem; resize: vertical;"
                             placeholder="${placeholderText}"
-                            oninput="updateTextBlockName('${item.id}', ${index})">${currentContent}</textarea>
+                            oninput="updateTextBlockName('${item.id}', ${index})">${escapeHtml(currentContent)}</textarea>
                         <button type="button" class="nl-btn nl-btn--ghost nl-btn--sm mt-1 emoji-toggle-btn" data-target="emoji-picker-${item.id}" title="Insert emoji into text block">
                             + Emoji
                         </button>
@@ -223,7 +223,7 @@ function updateSelectedItemsDisplay() {
                     <div class="selected-item d-flex flex-column p-2 mb-2 border rounded" 
                          data-index="${index}" draggable="true">
                         <div class="d-flex justify-content-between align-items-center mb-2">
-                            <span class="item-name">${item.name}</span>
+                            <span class="item-name">${escapeHtml(item.name)}</span>
                             <div>
                                 <span class="badge ${badgeStyle} me-2">${item.type}</span>
                                 <button type="button" class="btn btn-sm btn-outline-danger remove-item-btn" data-index="${index}">x</button>
@@ -234,7 +234,7 @@ function updateSelectedItemsDisplay() {
                             class="form-control text-block-editor" 
                             style="height: 60px; font-size: 0.9rem; resize: vertical;"
                             placeholder="${placeholderText}"
-                            oninput="updateTextBlockName('${item.id}', ${index})">${currentContent}</textarea>
+                            oninput="updateTextBlockName('${item.id}', ${index})">${escapeHtml(currentContent)}</textarea>
                         <button type="button" class="nl-btn nl-btn--ghost nl-btn--sm mt-1 emoji-toggle-btn" data-target="emoji-picker-${item.id}" title="Insert emoji into text block">
                             + Emoji
                         </button>
@@ -265,12 +265,12 @@ function updateSelectedItemsDisplay() {
                                 <button type="button" class="btn btn-sm btn-outline-danger remove-item-btn" data-index="${index}">x</button>
                             </div>
                         </div>
-                        ${item.src ? `<img src="${item.src}" style="max-height: 80px; max-width: 100%; object-fit: contain; margin-bottom: 8px; border-radius: 4px;">` : ''}
+                        ${item.src ? `<img src="${escapeHtml(item.src)}" style="max-height: 80px; max-width: 100%; object-fit: contain; margin-bottom: 8px; border-radius: 4px;">` : ''}
                         <div class="d-flex gap-2 align-items-center mb-2">
                             <input type="text" class="form-control form-control-sm media-src-input"
                                 data-index="${index}"
                                 placeholder="Image URL or upload a file..."
-                                value="${item.src || ''}"
+                                value="${escapeHtml(item.src || '')}"
                                 style="flex: 1;">
                             <button type="button" class="nl-btn nl-btn--primary nl-btn--sm media-upload-btn" data-index="${index}" title="Upload from device" aria-label="Upload from device">
                                 <svg class="nl-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
@@ -303,7 +303,7 @@ function updateSelectedItemsDisplay() {
                             <input type="text" 
                                 class="form-control form-control-sm collection-group-title" 
                                 data-index="${index}"
-                                value="${currentTitle}" 
+                                value="${escapeHtml(currentTitle)}"
                                 placeholder="Enter group name..."
                                 style="max-width: 300px;">
                             <div>
@@ -325,7 +325,7 @@ function updateSelectedItemsDisplay() {
                                             <div class="d-flex justify-content-between align-items-center py-1 border-bottom">
                                                 <div class="d-flex align-items-center">
                                                     <span>
-                                                        ${col.title} 
+                                                        ${escapeHtml(col.title)}
                                                         ${isExpanded 
                                                             ? `<small class="text-success">(showing ${expandedItemsCount} items)</small>`
                                                             : `(${col.childCount} items)`
@@ -376,7 +376,7 @@ function updateSelectedItemsDisplay() {
                 htmlContent += `
                     <div class="selected-item d-flex justify-content-between align-items-center p-2 mb-2 border rounded bg-light" 
                          data-index="${index}" draggable="true" style="padding-left: 32px !important;">
-                        <span class="item-name">${item.name}</span>
+                        <span class="item-name">${escapeHtml(item.name)}</span>
                         <div>
                             <span class="badge badge-secondary me-2">${item.type}</span>
                             <button type="button" class="btn btn-sm btn-outline-danger remove-item-btn" data-index="${index}">x</button>

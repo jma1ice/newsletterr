@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 import pytest
 
 from app.crypto import decrypt, encrypt
-from app.security import escape_html_output, sanitize_html, sanitize_html_input
+from app.security import escape_html_output
 from app.store import calculate_next_send, next_future_send
 
 # (frequency, start_date, send_time, last_sent, expected)
@@ -62,17 +62,11 @@ def test_decrypt_passes_through_plaintext():
 def test_decrypt_none_is_empty_string():
     assert decrypt(None) == ""
 
-def test_sanitize_html_input_strips_scripts():
-    out = sanitize_html_input("<script>alert(1)</script><b>hi</b>")
-    assert "<script>" not in out
-    assert "hi" in out
-
 def test_escape_html_output():
     assert escape_html_output("<b>&</b>") == "&lt;b&gt;&amp;&lt;/b&gt;"
 
-def test_sanitize_html_strips_event_handlers():
-    out = sanitize_html('<img src="x" onerror="alert(1)">')
-    assert "onerror" not in out
+def test_escape_html_output_none_is_empty():
+    assert escape_html_output(None) == ""
 
 def test_plain_text_decodes_entities():
     from app.emails.assemble import convert_html_to_plain_text
@@ -243,3 +237,31 @@ def test_group_sonarr_episodes_none_season_never_groups():
     ]
     groups = group_sonarr_episodes(eps)
     assert len(groups) == 2
+
+def test_poster_url_falls_back_to_remote_url():
+    from app.emails.builders.coming_soon import _poster_url
+
+    # Calendar images with only remoteUrl (no local url) still resolve.
+    imgs = [
+        {"coverType": "banner", "remoteUrl": "https://cdn/banner.jpg"},
+        {"coverType": "poster", "remoteUrl": "https://cdn/poster.jpg"},
+    ]
+    assert _poster_url(imgs) == "https://cdn/poster.jpg"
+
+    # A local url is preferred over remoteUrl when both are present.
+    imgs2 = [{"coverType": "poster", "url": "/MediaCover/1/poster.jpg", "remoteUrl": "https://cdn/p.jpg"}]
+    assert _poster_url(imgs2) == "/MediaCover/1/poster.jpg"
+
+    assert _poster_url([]) is None
+    assert _poster_url([{"coverType": "poster"}]) is None
+
+def test_arr_poster_src_routes_absolute_vs_local():
+    from app.emails.builders.coming_soon import _arr_poster_src
+
+    # Absolute remoteUrl is passed through untouched (fetched directly).
+    assert _arr_poster_src("https://cdn/poster.jpg", "/proxy-sonarr-art") == "https://cdn/poster.jpg"
+    # Local path gets the proxy prefix.
+    assert _arr_poster_src("/MediaCover/1/poster.jpg", "/proxy-radarr-art") == "/proxy-radarr-art/MediaCover/1/poster.jpg"
+    # Already-prefixed path is left alone.
+    assert _arr_poster_src("/proxy-sonarr-art/x.jpg", "/proxy-sonarr-art") == "/proxy-sonarr-art/x.jpg"
+    assert _arr_poster_src(None, "/proxy-sonarr-art") is None

@@ -3,19 +3,34 @@
 from datetime import datetime, timezone
 
 from app.emails.images import fetch_and_attach_image, truncate_text
+from app.security import escape_html_output as esc
 
 import logging
 
 logger = logging.getLogger(__name__)
 
 def _poster_url(images):
+    # Sonarr/Radarr calendar images often carry only remoteUrl (an absolute
+    # thetvdb/tmdb CDN link) with no local 'url' path, so fall back to it.
     for img in images or []:
-        if img.get('coverType') == 'poster' and img.get('url'):
-            return img['url']
+        if img.get('coverType') == 'poster' and (img.get('url') or img.get('remoteUrl')):
+            return img.get('url') or img.get('remoteUrl')
     for img in images or []:
-        if img.get('url'):
-            return img['url']
+        if img.get('url') or img.get('remoteUrl'):
+            return img.get('url') or img.get('remoteUrl')
     return None
+
+def _arr_poster_src(poster, arr_prefix):
+    """Given a raw poster reference and an *arr proxy prefix, return the URL to
+    hand to fetch_and_attach_image. Absolute remoteUrls are fetched directly;
+    local paths go through the authenticated /proxy-{sonarr,radarr}-art route."""
+    if not poster:
+        return None
+    if poster.startswith('http'):
+        return poster
+    if poster.startswith(arr_prefix):
+        return poster
+    return f"{arr_prefix}{poster}"
 
 def _format_relative_date(date_str):
     if not date_str:
@@ -138,6 +153,7 @@ def _build_calendar_grid_html(cards, msg_root, theme_colors, title, base_url, gr
     """
 
 def _build_card_html(theme_colors, title, subtitle, meta_text, poster_src):
+    title, subtitle, meta_text = esc(title), esc(subtitle), esc(meta_text)
     if poster_src:
         poster_html = f'<img class="card-poster-img" src="{poster_src}" alt="{title}" width="100%" style="width: 100%; height: auto; display: block; object-fit: cover; border-radius: 10px 10px 0 0; background-color: #f8f9fa;">'
     else:
@@ -237,8 +253,8 @@ def build_sonarr_coming_soon_html_with_cids(episodes, msg_root, theme_colors, ba
 
         poster = _poster_url(series.get('images')) or _poster_url(first_ep.get('images'))
         poster_src = None
-        if poster:
-            poster_url = f"/proxy-sonarr-art{poster}" if not poster.startswith('/proxy-sonarr-art') else poster
+        poster_url = _arr_poster_src(poster, '/proxy-sonarr-art')
+        if poster_url:
             poster_src = fetch_and_attach_image(poster_url, msg_root, f"sonarr-{i}", base_url, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
 
         if len(eps) >= 2:
@@ -271,8 +287,8 @@ def build_radarr_coming_soon_html_with_cids(movies, msg_root, theme_colors, base
 
         poster = _poster_url(movie.get('images'))
         poster_src = None
-        if poster:
-            poster_url = f"/proxy-radarr-art{poster}" if not poster.startswith('/proxy-radarr-art') else poster
+        poster_url = _arr_poster_src(poster, '/proxy-radarr-art')
+        if poster_url:
             poster_src = fetch_and_attach_image(poster_url, msg_root, f"radarr-{i}", base_url, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
 
         subtitle = str(year) if year else ""

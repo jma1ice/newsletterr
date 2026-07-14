@@ -1,12 +1,16 @@
 
 from app.emails.images import fetch_and_attach_image
+from app.security import escape_html_output as esc
 
 import logging
 
 logger = logging.getLogger(__name__)
 
-def build_individual_item_card_html(item, theme_colors, msg_root, base_url="", poster_max_height=0, hosted_images_enabled=False, hosted_base_url=""):
-    item_title = item.get('title', 'Unknown Title')
+def build_individual_item_card_html(item, theme_colors, msg_root, base_url="", poster_max_height=0, card_width=120, hosted_images_enabled=False, hosted_base_url=""):
+    card_width = max(60, int(card_width) if card_width else 120)
+    card_height = int(round(card_width * 1.5))
+    _target = (card_width, card_height)
+    item_title = esc(item.get('title', 'Unknown Title'))
     year = item.get('year')
     item_type = item.get('type', 'unknown')
     
@@ -25,9 +29,9 @@ def build_individual_item_card_html(item, theme_colors, msg_root, base_url="", p
     
     subtitle = ""
     if item.get('parentTitle') and item_type in ['album', 'track']:
-        subtitle = item['parentTitle']
+        subtitle = esc(item['parentTitle'])
     elif item.get('grandparentTitle') and item_type == 'track':
-        subtitle = item['grandparentTitle']
+        subtitle = esc(item['grandparentTitle'])
     elif item_type == 'show':
         season_count = item.get('childCount', 0)
         episode_count = item.get('leafCount', 0)
@@ -42,10 +46,10 @@ def build_individual_item_card_html(item, theme_colors, msg_root, base_url="", p
     if poster_url:
         logger.debug(f"Attempting to fetch thumb image: {poster_url}")
         if poster_url.startswith('http'):
-            poster_src = fetch_and_attach_image(poster_url, msg_root, f"collection_{item.get('key', 'unknown')}_thumb", base_url, max_height=_pmh, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
+            poster_src = fetch_and_attach_image(poster_url, msg_root, f"collection_{item.get('key', 'unknown')}_thumb", base_url, max_height=_pmh, target=_target, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
         else:
             full_poster_url = f"/proxy-art{poster_url if poster_url.startswith('/') else '/' + poster_url}"
-            poster_src = fetch_and_attach_image(full_poster_url, msg_root, f"collection_{item.get('key', 'unknown')}_thumb", base_url, max_height=_pmh, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
+            poster_src = fetch_and_attach_image(full_poster_url, msg_root, f"collection_{item.get('key', 'unknown')}_thumb", base_url, max_height=_pmh, target=_target, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
         logger.debug(f"Thumb src result: {poster_src}")
 
     if not poster_src:
@@ -54,10 +58,10 @@ def build_individual_item_card_html(item, theme_colors, msg_root, base_url="", p
         if art_url:
             logger.debug(f"Attempting to fetch art image: {art_url}")
             if art_url.startswith('http'):
-                poster_src = fetch_and_attach_image(art_url, msg_root, f"collection_{item.get('key', 'unknown')}_art", base_url, max_height=_pmh, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
+                poster_src = fetch_and_attach_image(art_url, msg_root, f"collection_{item.get('key', 'unknown')}_art", base_url, max_height=_pmh, target=_target, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
             else:
                 full_art_url = f"/proxy-art{art_url if art_url.startswith('/') else '/' + art_url}"
-                poster_src = fetch_and_attach_image(full_art_url, msg_root, f"collection_{item.get('key', 'unknown')}_art", base_url, max_height=_pmh, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
+                poster_src = fetch_and_attach_image(full_art_url, msg_root, f"collection_{item.get('key', 'unknown')}_art", base_url, max_height=_pmh, target=_target, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
             logger.debug(f"Art src result: {poster_src}")
 
     if poster_src:
@@ -66,15 +70,15 @@ def build_individual_item_card_html(item, theme_colors, msg_root, base_url="", p
         <table cellpadding="0" cellspacing="0" border="0" style="
             background-color: {theme_colors['card_bg']};
             border-radius: 12px;
-            width: 120px;
+            width: {card_width}px;
             margin: 0;
         ">
             <tr>
                 <td style="padding: 0; line-height: 0; font-size: 0;">
-                    <img src="{poster_src}" alt="{display_title}" width="120" height="180" style="
+                    <img src="{poster_src}" alt="{display_title}" width="{card_width}" height="{card_height}" style="
                         display: block;
-                        width: 120px;
-                        height: 180px;
+                        width: {card_width}px;
+                        height: {card_height}px;
                         object-fit: cover;
                         border-radius: 12px 12px 0 0;
                         background-color: #f8f9fa;
@@ -107,8 +111,8 @@ def build_individual_item_card_html(item, theme_colors, msg_root, base_url="", p
             background-color: {theme_colors['card_bg']};
             border-radius: 12px;
             border: 1px solid {theme_colors['border']};
-            width: 120px;
-            height: 180px;
+            width: {card_width}px;
+            height: {card_height}px;
             margin: 0;
         ">
             <tr>
@@ -141,20 +145,23 @@ def build_individual_item_card_html(item, theme_colors, msg_root, base_url="", p
         """
 
     if item.get('plex_url'):
-        return f'<a href="{item["plex_url"]}" style="text-decoration: none; color: inherit; display: block;" target="_blank">{card_html}</a>'
+        return f'<a href="{esc(item["plex_url"])}" style="text-decoration: none; color: inherit; display: block;" target="_blank">{card_html}</a>'
     return card_html
 
-def build_collection_card_html(collection, theme_colors, msg_root, base_url="", poster_max_height=0, hosted_images_enabled=False, hosted_base_url=""):
+def build_collection_card_html(collection, theme_colors, msg_root, base_url="", poster_max_height=0, card_width=120, hosted_images_enabled=False, hosted_base_url=""):
+    card_width = max(60, int(card_width) if card_width else 120)
+    card_height = int(round(card_width * 1.5))
+    _target = (card_width, card_height)
     _pmh = poster_max_height if poster_max_height else None
     poster_src = None
     poster_url = collection.get('thumb', '')
     if poster_url:
         logger.debug(f"Attempting to fetch thumb image: {poster_url}")
         if poster_url.startswith('http'):
-            poster_src = fetch_and_attach_image(poster_url, msg_root, f"collection_{collection.get('key', 'unknown')}_thumb", base_url, max_height=_pmh, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
+            poster_src = fetch_and_attach_image(poster_url, msg_root, f"collection_{collection.get('key', 'unknown')}_thumb", base_url, max_height=_pmh, target=_target, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
         else:
             full_poster_url = f"/proxy-art{poster_url if poster_url.startswith('/') else '/' + poster_url}"
-            poster_src = fetch_and_attach_image(full_poster_url, msg_root, f"collection_{collection.get('key', 'unknown')}_thumb", base_url, max_height=_pmh, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
+            poster_src = fetch_and_attach_image(full_poster_url, msg_root, f"collection_{collection.get('key', 'unknown')}_thumb", base_url, max_height=_pmh, target=_target, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
         logger.debug(f"Thumb src result: {poster_src}")
 
     if not poster_src:
@@ -163,13 +170,13 @@ def build_collection_card_html(collection, theme_colors, msg_root, base_url="", 
         if art_url:
             logger.debug(f"Attempting to fetch art image: {art_url}")
             if art_url.startswith('http'):
-                poster_src = fetch_and_attach_image(art_url, msg_root, f"collection_{collection.get('key', 'unknown')}_art", base_url, max_height=_pmh, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
+                poster_src = fetch_and_attach_image(art_url, msg_root, f"collection_{collection.get('key', 'unknown')}_art", base_url, max_height=_pmh, target=_target, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
             else:
                 full_art_url = f"/proxy-art{art_url if art_url.startswith('/') else '/' + art_url}"
-                poster_src = fetch_and_attach_image(full_art_url, msg_root, f"collection_{collection.get('key', 'unknown')}_art", base_url, max_height=_pmh, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
+                poster_src = fetch_and_attach_image(full_art_url, msg_root, f"collection_{collection.get('key', 'unknown')}_art", base_url, max_height=_pmh, target=_target, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
             logger.debug(f"Art src result: {poster_src}")
 
-    collection_title = collection.get('title', 'Unknown Collection')
+    collection_title = esc(collection.get('title', 'Unknown Collection'))
     count = collection.get('childCount', 0)
     subtype = collection.get('subtype', 'unknown')
     summary = collection.get('summary', '')
@@ -182,15 +189,15 @@ def build_collection_card_html(collection, theme_colors, msg_root, base_url="", 
             <table cellpadding="0" cellspacing="0" border="0" style="
                 background-color: {theme_colors['card_bg']};
                 border-radius: 12px;
-                width: 120px;
+                width: {card_width}px;
                 margin: 0;
             ">
                 <tr>
                     <td style="padding: 0; line-height: 0; font-size: 0;">
-                        <img src="{poster_src}" alt="{collection_title}" width="120" height="180" style="
+                        <img src="{poster_src}" alt="{collection_title}" width="{card_width}" height="{card_height}" style="
                             display: block;
-                            width: 120px;
-                            height: 180px;
+                            width: {card_width}px;
+                            height: {card_height}px;
                             object-fit: cover;
                             border-radius: 12px 12px 0 0;
                             background-color: #f8f9fa;
@@ -224,8 +231,8 @@ def build_collection_card_html(collection, theme_colors, msg_root, base_url="", 
                 background-color: {theme_colors['card_bg']};
                 border-radius: 12px;
                 border: 1px solid {theme_colors['border']};
-                width: 120px;
-                height: 180px;
+                width: {card_width}px;
+                height: {card_height}px;
                 margin: 0;
             ">
                 <tr>
@@ -253,5 +260,5 @@ def build_collection_card_html(collection, theme_colors, msg_root, base_url="", 
         """
 
     if collection.get('plex_url'):
-        return f'<a href="{collection["plex_url"]}" style="text-decoration: none; color: inherit; display: block;" target="_blank">{card_html}</a>'
+        return f'<a href="{esc(collection["plex_url"])}" style="text-decoration: none; color: inherit; display: block;" target="_blank">{card_html}</a>'
     return card_html

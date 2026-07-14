@@ -74,7 +74,6 @@ def search_plex_for_rating_key(title, year, media_type, plex_url, plex_token, tm
         decrypted_token = decrypt(plex_token)
         
         if tmdb_id:
-            guid = f"tmdb://{tmdb_id}"
             search_query = quote_plus(title)
             api_url = f"{plex_url}/search?query={search_query}&X-Plex-Token={decrypted_token}"
             

@@ -1,6 +1,7 @@
 
 from app.settings_store import get_settings
 from app.clients.plex import get_collection_items_for_email
+from app.security import escape_html_output as esc
 
 import logging
 
@@ -8,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 from app.emails.builders.cards import build_collection_card_html, build_individual_item_card_html
 
-def build_collections_html_with_cids(all_collections, msg_root, theme_colors, base_url="", custom_title=None, expanded_collections=None, group_index=0, poster_max_height=0, hosted_images_enabled=False, hosted_base_url=""):
+def build_collections_html_with_cids(all_collections, msg_root, theme_colors, base_url="", custom_title=None, expanded_collections=None, group_index=0, poster_max_height=0, grid_columns=5, hosted_images_enabled=False, hosted_base_url=""):
     if not all_collections:
         return f"""
         <div style="background-color: {theme_colors['card_bg']}; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid {theme_colors['border']}; font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;">
@@ -55,8 +56,12 @@ def build_collections_html_with_cids(all_collections, msg_root, theme_colors, ba
             all_items_to_display.append(collection)
     
     items_html = ""
-    items_per_row = 5
-    
+    items_per_row = max(1, int(grid_columns) if grid_columns else 5)
+    # Cards are fixed width; derive it from the column count so N=5 keeps the
+    # historical 120px card and higher counts shrink to avoid row overflow.
+    card_width = max(60, min(240, int(600 / items_per_row)))
+    cell_width_pct = f"{100 / items_per_row:.4f}%"
+
     for i in range(0, len(all_items_to_display), items_per_row):
         row_items = all_items_to_display[i:i + items_per_row]
         is_partial_row = len(row_items) < items_per_row
@@ -81,9 +86,9 @@ def build_collections_html_with_cids(all_collections, msg_root, theme_colors, ba
                     cell_spacing = "8px" if j < items_count - 1 else "0"
 
                 if item.get('is_individual_item'):
-                    card_html = build_individual_item_card_html(item, theme_colors, msg_root, base_url, poster_max_height=poster_max_height, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
+                    card_html = build_individual_item_card_html(item, theme_colors, msg_root, base_url, poster_max_height=poster_max_height, card_width=card_width, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
                 else:
-                    card_html = build_collection_card_html(item, theme_colors, msg_root, base_url, poster_max_height=poster_max_height, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
+                    card_html = build_collection_card_html(item, theme_colors, msg_root, base_url, poster_max_height=poster_max_height, card_width=card_width, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
 
                 row_html += f'<td style="vertical-align: top; padding-right: {cell_spacing};">{card_html}</td>'
 
@@ -94,16 +99,16 @@ def build_collections_html_with_cids(all_collections, msg_root, theme_colors, ba
 
             for j, item in enumerate(row_items):
                 cell_style = f"""
-                    width: 20%;
+                    width: {cell_width_pct};
                     padding: 8px;
                     vertical-align: top;
                     font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
                 """
 
                 if item.get('is_individual_item'):
-                    card_html = build_individual_item_card_html(item, theme_colors, msg_root, base_url, poster_max_height=poster_max_height, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
+                    card_html = build_individual_item_card_html(item, theme_colors, msg_root, base_url, poster_max_height=poster_max_height, card_width=card_width, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
                 else:
-                    card_html = build_collection_card_html(item, theme_colors, msg_root, base_url, poster_max_height=poster_max_height, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
+                    card_html = build_collection_card_html(item, theme_colors, msg_root, base_url, poster_max_height=poster_max_height, card_width=card_width, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
                 
                 row_html += f'<td style="{cell_style}">{card_html}</td>'
             
@@ -138,7 +143,7 @@ def build_collections_html_with_cids(all_collections, msg_root, theme_colors, ba
     
     return f"""
         <div style="{container_style}">
-            <h2 style="{title_style}">{display_title}</h2>
+            <h2 style="{title_style}">{esc(display_title)}</h2>
             <table cellpadding="0" cellspacing="0" border="0" style="{table_style}">
                 {items_html}
             </table>

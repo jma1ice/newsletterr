@@ -78,12 +78,6 @@ def delete_email_list(list_id):
     conn.commit()
     conn.close()
 
-def is_suppressed(email):
-    conn = db_connect()
-    row = conn.execute("SELECT 1 FROM suppressed_emails WHERE email = ?", ((email or "").strip(),)).fetchone()
-    conn.close()
-    return row is not None
-
 def add_suppressed(email):
     conn = db_connect()
     conn.execute("INSERT OR IGNORE INTO suppressed_emails (email) VALUES (?)", ((email or "").strip().lower(),))

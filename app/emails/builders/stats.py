@@ -2,6 +2,7 @@ from datetime import datetime
 
 from app.cache import get_cache_info
 from app.emails.images import fetch_and_attach_blurred_image, fetch_and_attach_small_thumbnail
+from app.security import escape_html_output as esc
 
 import logging
 
@@ -38,17 +39,17 @@ def get_stat_cells(title, row, hide_play_counts=False):
     cells = []
 
     if title == "Most Active Libraries" or title == "Library Item Counts":
-        cells.append(row.get('section_name', ''))
+        cells.append(esc(row.get('section_name', '')))
     elif title == "Most Active Users":
-        cells.append(row.get('user', ''))
+        cells.append(esc(row.get('user', '')))
     elif title == "Most Active Platforms":
-        cells.append(row.get('platform', ''))
+        cells.append(esc(row.get('platform', '')))
     else:
-        cells.append(row.get('title', ''))
+        cells.append(esc(row.get('title', '')))
 
     skip_year_stats = ["Most Active Libraries", "Library Item Counts", "Most Active Users", "Most Active Platforms", "Most Concurrent Streams"]
     if title not in skip_year_stats:
-        cells.append(row.get('year', ''))
+        cells.append(esc(str(row.get('year', ''))))
 
     skip_plays_stats = ["Library Item Counts"]
     if "Recently" not in title and "Concurrent" not in title and title not in skip_plays_stats and not hide_play_counts:
@@ -65,9 +66,9 @@ def get_stat_cells(title, row, hide_play_counts=False):
 
     skip_rating_stats = ["Most Active Libraries", "Library Item Counts", "Most Played Artists", "Most Popular Artists", "Most Active Users", "Most Active Platforms", "Most Concurrent Streams"]
     if title not in skip_rating_stats:
-        cells.append(row.get('content_rating', ''))
+        cells.append(esc(str(row.get('content_rating', ''))))
         rating = row.get('rating')
-        cells.append(f"{rating}" if rating else 'NA')
+        cells.append(esc(f"{rating}") if rating else 'NA')
 
     if title == "Most Concurrent Streams":
         cells.append(row.get('count', 0))
@@ -76,12 +77,17 @@ def get_stat_cells(title, row, hide_play_counts=False):
 
     return cells
 
-def build_stats_html_with_cid_background(stat_data, msg_root, theme_colors, base_url="", date_range="", hide_play_counts=False, show_cover_art=False, hosted_images_enabled=False, hosted_base_url=""):
+def build_stats_html_with_cid_background(stat_data, msg_root, theme_colors, base_url="", date_range="", hide_play_counts=False, show_cover_art=False, include_user_info=True, hosted_images_enabled=False, hosted_base_url=""):
     if not stat_data or not stat_data.get('rows'):
         return ""
 
     title = stat_data.get('stat_title', 'Statistics')
     rows = stat_data['rows']
+
+    # user-info toggle: the Most Active Users stat names other users; drop it
+    # server-side regardless of what a template selected
+    if title == "Most Active Users" and not include_user_info:
+        return ""
 
     background_src = None
     if rows and (rows[0].get('art') or rows[0].get('grandparent_thumb')):
@@ -114,6 +120,12 @@ def build_stats_html_with_cid_background(stat_data, msg_root, theme_colors, base
     rows_html = ""
     for row in rows:
         cells = get_stat_cells(title, row, hide_play_counts=hide_play_counts)
+        if title == "Most Active Users" and include_user_info:
+            thumb_url = row.get('user_thumb') or ''
+            if thumb_url:
+                avatar_src = fetch_and_attach_small_thumbnail(thumb_url, msg_root, f"user-avatar-{len(msg_root.get_payload())}", base_url, height=38, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
+                if avatar_src:
+                    cells[0] = f'<img src="{avatar_src}" style="height:32px;width:32px;border-radius:50%;object-fit:cover;margin-right:7px;vertical-align:middle;">{cells[0]}'
         if apply_cover_art:
             thumb_path = row.get('thumb', '') or row.get('grandparent_thumb', '')
             if thumb_path:
@@ -184,7 +196,7 @@ def build_stats_html_with_cid_background(stat_data, msg_root, theme_colors, base
         <div style="{container_style}">
             {overlay}
             <div style="position: relative; z-index: 1;">
-                <div style="{header_style}">{title}{date_suffix}</div>
+                <div style="{header_style}">{esc(title)}{date_suffix}</div>
                 <table style="{table_style}">
                     <thead>
                         <tr>{header_cells}</tr>
@@ -197,7 +209,7 @@ def build_stats_html_with_cid_background(stat_data, msg_root, theme_colors, base
         </div>
     """
 
-def build_yearly_wrapped_html_with_cids(stats_data, msg_root, theme_colors, year=None, base_url="", hosted_images_enabled=False, hosted_base_url=""):
+def build_yearly_wrapped_html_with_cids(stats_data, msg_root, theme_colors, year=None, base_url="", include_user_info=True, hosted_images_enabled=False, hosted_base_url=""):
     if not stats_data:
         return ""
 
@@ -227,14 +239,17 @@ def build_yearly_wrapped_html_with_cids(stats_data, msg_root, theme_colors, year
 
     highlights = []
     if top_movie:
-        highlights.append(('🎬 Top Movie', top_movie.get('title', ''), _thumb_src(top_movie, 'wrapped-movie')))
+        highlights.append(('🎬 Top Movie', top_movie.get('title', ''), _thumb_src(top_movie, 'wrapped-movie'), False))
     if top_show:
-        highlights.append(('📺 Top Show', top_show.get('title', ''), _thumb_src(top_show, 'wrapped-show')))
+        highlights.append(('📺 Top Show', top_show.get('title', ''), _thumb_src(top_show, 'wrapped-show'), False))
     if top_artist:
-        highlights.append(('🎵 Top Artist', top_artist.get('title', ''), _thumb_src(top_artist, 'wrapped-artist')))
-    if top_user:
-        # The user thumbnail is a plex.tv URL the /proxy-art route does not serve.
-        highlights.append(('👤 Most Active', top_user.get('user', ''), None))
+        highlights.append(('🎵 Top Artist', top_artist.get('title', ''), _thumb_src(top_artist, 'wrapped-artist'), False))
+    if top_user and include_user_info:
+        # user_thumb is an absolute plex.tv avatar URL; small-thumbnail fetch
+        # handles http URLs directly (round style variant)
+        user_thumb = top_user.get('user_thumb') or ''
+        user_avatar = fetch_and_attach_small_thumbnail(user_thumb, msg_root, 'wrapped-user', base_url, height=60, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url) if user_thumb else None
+        highlights.append(('👤 Most Active', top_user.get('user', ''), user_avatar, True))
 
     if not highlights and not total_plays:
         return ""
@@ -245,10 +260,10 @@ def build_yearly_wrapped_html_with_cids(stats_data, msg_root, theme_colors, year
         f"""
         <td style="text-align: center; padding: 12px; vertical-align: top; width: {100 // max(len(highlights), 1)}%;">
             <div style="font-size: 12px; color: {theme_colors['muted_text']}; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">{label}</div>
-            {f'<img src="{thumb_src}" alt="{value}" style="height:60px;width:auto;border-radius:4px;display:block;margin:0 auto 6px;">' if thumb_src else ''}<div style="font-size: 15px; font-weight: bold; color: white; line-height: 1.3;">{value}</div>
+            {f'<img src="{thumb_src}" alt="{esc(value)}" style="height:60px;{"width:60px;border-radius:50%;object-fit:cover;" if is_round else "width:auto;border-radius:4px;"}display:block;margin:0 auto 6px;">' if thumb_src else ''}<div style="font-size: 15px; font-weight: bold; color: white; line-height: 1.3;">{esc(value)}</div>
         </td>
         """
-        for label, value, thumb_src in highlights
+        for label, value, thumb_src, is_round in highlights
     ])
 
     display_year = year or datetime.now().year

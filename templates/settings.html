@@ -138,7 +138,7 @@
                         <h4 class="mb-4">Connections</h4>
 
                         <h6 class="text-uppercase">Plex</h6>
-                        <button id="connect_plex" type="button" class="nl-btn nl-btn--primary mb-2">Connect Plex</button>
+                        <button id="connect_plex" type="button" class="nl-btn nl-btn--primary mb-2">{% if settings.plex_token %}Reconnect{% else %}Connect Plex{% endif %}</button>
                         <div id="plex_status" class="mb-3">{% if settings.plex_token %}<p class="plex-connected">Connected</p>{% endif %}</div>
 
                         <label for="server_name">Plex Server Name:</label><br>
@@ -162,7 +162,7 @@
                         <input type="password" id="tautulli_api" name="tautulli_api" autocomplete="new-password"
                             placeholder="{% if settings.has_tautulli_api %}Saved - leave blank to keep{% else %}Tautulli API Key{% endif %}"><br>
                         <div class="svc-test">
-                            <button type="button" id="test_tautulli" class="nl-btn nl-btn--primary nl-btn--sm">Test Connection</button>
+                            <button type="button" id="test_tautulli" class="nl-btn nl-btn--primary nl-btn--sm">{% if settings.has_tautulli_api %}Retest{% else %}Test Connection{% endif %}</button>
                             <span id="tautulli_test_result"></span>
                         </div>
 
@@ -173,7 +173,7 @@
                             {% if settings.conjurr_url != "" %}value="{{ settings.conjurr_url }}"{% endif %}
                             placeholder="http://localhost:2665"><br>
                         <div class="svc-test">
-                            <button type="button" id="test_conjurr" class="nl-btn nl-btn--primary nl-btn--sm">Test Connection</button>
+                            <button type="button" id="test_conjurr" class="nl-btn nl-btn--primary nl-btn--sm">{% if settings.conjurr_url %}Retest{% else %}Test Connection{% endif %}</button>
                             <span id="conjurr_test_result"></span>
                         </div>
 
@@ -188,7 +188,7 @@
                         <input type="password" id="droppedneedle_api_key" name="droppedneedle_api_key" autocomplete="new-password"
                             placeholder="{% if settings.has_droppedneedle_api_key %}Saved - leave blank to keep{% else %}Matches WRAPPED_API_KEY in DroppedNeedle{% endif %}"><br>
                         <div class="svc-test">
-                            <button type="button" id="test_droppedneedle" class="nl-btn nl-btn--primary nl-btn--sm">Test Connection</button>
+                            <button type="button" id="test_droppedneedle" class="nl-btn nl-btn--primary nl-btn--sm">{% if settings.has_droppedneedle_api_key %}Retest{% else %}Test Connection{% endif %}</button>
                             <span id="droppedneedle_test_result"></span>
                         </div>
 
@@ -204,7 +204,7 @@
                         <input type="password" id="sonarr_api_key" name="sonarr_api_key" autocomplete="new-password"
                             placeholder="{% if settings.has_sonarr_api_key %}Saved - leave blank to keep{% else %}Settings > General > API Key in Sonarr{% endif %}"><br>
                         <div class="svc-test">
-                            <button type="button" id="test_sonarr" class="nl-btn nl-btn--primary nl-btn--sm">Test Connection</button>
+                            <button type="button" id="test_sonarr" class="nl-btn nl-btn--primary nl-btn--sm">{% if settings.has_sonarr_api_key %}Retest{% else %}Test Connection{% endif %}</button>
                             <span id="sonarr_test_result"></span>
                         </div>
 
@@ -220,7 +220,7 @@
                         <input type="password" id="radarr_api_key" name="radarr_api_key" autocomplete="new-password"
                             placeholder="{% if settings.has_radarr_api_key %}Saved - leave blank to keep{% else %}Settings > General > API Key in Radarr{% endif %}"><br>
                         <div class="svc-test">
-                            <button type="button" id="test_radarr" class="nl-btn nl-btn--primary nl-btn--sm">Test Connection</button>
+                            <button type="button" id="test_radarr" class="nl-btn nl-btn--primary nl-btn--sm">{% if settings.has_radarr_api_key %}Retest{% else %}Test Connection{% endif %}</button>
                             <span id="radarr_test_result"></span>
                         </div>
 
@@ -1049,6 +1049,7 @@
             const colors = {ok: '#01b301', error: '#770010', warning: '#e5a00d'};
             span.style.color = colors[d.status] || '';
             span.textContent = d.message;
+            if (d.status === 'ok') btn.textContent = 'Retest';
         } catch (e) {
             span.style.color = '#770010';
             span.textContent = 'Request failed';

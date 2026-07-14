@@ -231,7 +231,7 @@
 .form-check-label { cursor: pointer; }
 
 /* switch: the custom-HTML-mode pill toggle on the index builder */
-.form-switch { padding-left: 2.5em; }
+.form-switch { padding: 0em 0.5em 0em 2.5em; }
 .form-switch .form-check-input {
     width: 2em;
     margin-left: -2.5em;

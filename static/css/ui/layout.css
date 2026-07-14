@@ -188,7 +188,8 @@
     left: 50%;
     transform: translateX(-50%);
 }
-.mobile-topbar-brand { font-weight: 700; font-size: var(--text-md); }
+.mobile-topbar-brand { font-weight: 700; font-size: var(--text-md); display: inline-flex; align-items: center; }
+.mobile-topbar-brand .mobile-brand-img { height: 26px; width: auto; }
 
 /* ---- mobile shell */
 .mobile-topbar { display: none; }

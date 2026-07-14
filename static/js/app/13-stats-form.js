@@ -24,7 +24,7 @@ function updateCacheBadge(cacheInfo, timeRange) {
             <span class="text-muted" style="text-transform: capitalize;">${label}:</span>
             ${statusHtml}
         </div>`;
-    }).join('') + `<small class="text-muted d-block mt-2">Cache refreshes daily automatically. Use "Get Stats\\Users" to refresh manually.</small>`;
+    }).join('');
 }
 
 document.getElementById('stats_form').addEventListener('submit', async (e) => {
@@ -100,6 +100,11 @@ document.getElementById('stats_form').addEventListener('submit', async (e) => {
         if (errorEl) {
             errorEl.textContent = data.error || '';
             errorEl.style.display = data.error ? '' : 'none';
+        }
+
+        const plexWarnEl = document.getElementById('plex_warning_p');
+        if (plexWarnEl) {
+            plexWarnEl.style.display = data.plex_unavailable ? '' : 'none';
         }
 
         if (data.user_dict && Object.keys(data.user_dict).length > 0) {

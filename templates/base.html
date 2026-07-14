@@ -48,24 +48,24 @@
                 <img class="brand-mark brand-pride" src="/static/img/Asset_50.png" alt="newsletterr logo" />
             </a>
             <ul id="navLinks">
-                <li><a href="{{ url_for('main.index') }}"{% if request.endpoint == 'main.index' %} class="is-active"{% endif %}>{{ icon('home') }}<span class="nav-label">build</span></a></li>
-                <li><a href="{{ url_for('scheduling.scheduling') }}"{% if request.endpoint in ['scheduling.scheduling', 'emails.email_history'] %} class="is-active"{% endif %}>{{ icon('clock') }}<span class="nav-label">sends</span></a></li>
-                <li class="nav-group-gap"><a href="{{ url_for('settings.settings') }}"{% if request.endpoint == 'settings.settings' %} class="is-active"{% endif %}>{{ icon('settings') }}<span class="nav-label">settings</span></a></li>
-                <li><a href="{{ url_for('main.about') }}"{% if request.endpoint == 'main.about' %} class="is-active"{% endif %}>{{ icon('info') }}<span class="nav-label">about</span></a></li>
+                <li><a href="{{ url_for('main.index') }}" title="build"{% if request.endpoint == 'main.index' %} class="is-active"{% endif %}>{{ icon('home') }}<span class="nav-label">build</span></a></li>
+                <li><a href="{{ url_for('scheduling.scheduling') }}" title="sends"{% if request.endpoint in ['scheduling.scheduling', 'emails.email_history'] %} class="is-active"{% endif %}>{{ icon('clock') }}<span class="nav-label">sends</span></a></li>
+                <li class="nav-group-gap"><a href="{{ url_for('settings.settings') }}" title="settings"{% if request.endpoint == 'settings.settings' %} class="is-active"{% endif %}>{{ icon('settings') }}<span class="nav-label">settings</span></a></li>
+                <li><a href="{{ url_for('main.about') }}" title="about"{% if request.endpoint == 'main.about' %} class="is-active"{% endif %}>{{ icon('info') }}<span class="nav-label">about</span></a></li>
                 {% if session["username"] %}
-                <li><a href="{{ url_for('auth.logout') }}">{{ icon('log-out') }}<span class="nav-label">logout</span></a></li>
+                <li><a href="{{ url_for('auth.logout') }}" title="logout">{{ icon('log-out') }}<span class="nav-label">logout</span></a></li>
                 {% endif %}
             </ul>
             <div class="sidebar-foot">
                 {% set cache_status = get_cache_status() %}
                 <span class="sidebar-cache cache-badge-base {{ cache_status.class }}"
-                      title="{{ cache_status.status }}\nPresent: {{ cache_status.present|join(', ') if cache_status.present else 'none' }}\nMissing: {{ cache_status.missing|join(', ') if cache_status.missing else 'none' }}">
+                      title="{{ cache_status.status }}">
                     <strong id="cache-badge">Cache:
                         {% if cache_status.has_data %}{{ cache_status.age_display }}{% else %}none{% endif %}
                     </strong>
                 </span>
                 <div class="sidebar-foot-row">
-                    <button id="theme-toggle" type="button" role="switch" aria-checked="false" aria-label="Toggle dark mode" class="nl-theme-toggle">
+                    <button id="theme-toggle" type="button" role="switch" aria-checked="false" aria-label="Toggle dark mode" title="Toggle dark mode" class="nl-theme-toggle">
                         <svg class="tt-icon tt-sun" viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true">
                             <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.5">
                                 <path d="M8 1.11133V2.00022"></path>
@@ -84,7 +84,7 @@
                         </svg>
                         <span class="tt-thumb"></span>
                     </button>
-                    <button id="sidebar-toggle" type="button" class="sidebar-collapse-btn" aria-label="Collapse sidebar" aria-expanded="true">
+                    <button id="sidebar-toggle" type="button" class="sidebar-collapse-btn" aria-label="Collapse sidebar" title="Collapse sidebar" aria-expanded="true">
                         {{ icon('chevron-left') }}
                     </button>
                 </div>
@@ -99,7 +99,10 @@
             {% endif %}
             <div class="mobile-topbar">
                 <button id="mobile-menu-btn" type="button" aria-label="Open menu" aria-expanded="false">{{ icon('menu') }}</button>
-                <span class="mobile-topbar-brand">newsletterr</span>
+                <span class="mobile-topbar-brand">
+                    <img class="mobile-brand-img brand-normal" src="/static/img/Asset_94x.png" alt="newsletterr" />
+                    <img class="mobile-brand-img brand-pride" src="/static/img/Asset_51.png" alt="newsletterr" />
+                </span>
             </div>
             {# Pages opt into a header (title + actions) by overriding page_header.
                Pages not yet restyled render no header, avoiding an empty bar. #}

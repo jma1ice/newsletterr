@@ -74,6 +74,22 @@ document.getElementById('sendEmailBtn').addEventListener('click', async () => {
         const payload = await buildEmailPayload();
         payload.to_emails = toList.join(', ');
 
+        // Large-email guard: measure the rendered preview HTML and confirm
+        // before sending if it exceeds the configured threshold. The estimate
+        // excludes server-side CID image attachment overhead.
+        const warnMb = parseFloat(APP.settings?.email_size_warn_mb ?? 10);
+        if (warnMb > 0 && payload.email_html) {
+            const mb = new Blob([payload.email_html]).size / (1024 * 1024);
+            if (mb > warnMb) {
+                hideSpinner();
+                const proceed = window.confirm(
+                    `This email is roughly ${mb.toFixed(1)} MB (estimated; excludes server-side image attachments), ` +
+                    `over your ${warnMb} MB warning threshold. Large emails may be clipped or rejected by some providers.\n\nSend anyway?`
+                );
+                if (!proceed) return;
+            }
+        }
+
         showSpinner('Sending email...');
 
         const resp = await fetch('/send_email', {
@@ -102,7 +118,8 @@ document.getElementById('sendEmailBtn').addEventListener('click', async () => {
 
 document.getElementById('sendTestBtn')?.addEventListener('click', async () => {
     const subject = document.getElementById('subject').value;
-    if (!window.confirm(`Send a test copy of this email to your From address?\n\nSubject: ${subject || '(no subject)'}`)) return;
+    const testAddr = APP.settings?.from_email || 'your From address';
+    if (!window.confirm(`Send a test copy of this email to ${testAddr}?\n\nSubject: ${subject || '(no subject)'}`)) return;
 
     showSpinner('Sending test email...');
     try {

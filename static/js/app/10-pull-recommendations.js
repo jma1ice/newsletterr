@@ -1,5 +1,40 @@
+function showRecsCancelButton() {
+    const spinner = document.getElementById('spinner');
+    if (!spinner) return null;
+    let btn = document.getElementById('recs-cancel-btn');
+    if (!btn) {
+        btn = document.createElement('button');
+        btn.id = 'recs-cancel-btn';
+        btn.type = 'button';
+        btn.className = 'nl-btn nl-btn--danger nl-btn--sm mt-2';
+        spinner.appendChild(btn);
+    }
+    btn.disabled = false;
+    btn.textContent = 'Cancel';
+    btn.onclick = async () => {
+        btn.disabled = true;
+        btn.textContent = 'Canceling...';
+        const textEl = document.getElementById('loading-text');
+        if (textEl) textEl.textContent = 'Canceling after the current user...';
+        try {
+            await fetch('/pull_recommendations/cancel', {
+                method: 'POST',
+                headers: { 'X-CSRF-Token': APP.csrfToken },
+                credentials: 'same-origin'
+            });
+        } catch (_) { /* the pull will still finish and report status */ }
+    };
+    return btn;
+}
+
+function removeRecsCancelButton() {
+    const btn = document.getElementById('recs-cancel-btn');
+    if (btn) btn.remove();
+}
+
 document.getElementById('pullRecsBtn').addEventListener('click', async () => {
     showSpinner('Pulling recommendations...');
+    showRecsCancelButton();
 
     function collectEmailsFromChips() {
         return Array.from(document.querySelectorAll('#bcc_chips .nl-chip'))
@@ -14,6 +49,8 @@ document.getElementById('pullRecsBtn').addEventListener('click', async () => {
 
     const toList = collectEmailsFromChips();
         if (!toList.length) {
+            removeRecsCancelButton();
+            try { hideSpinner(); } catch(_) {}
             alert('Please add at least one recipient.');
             return;
     }
@@ -88,6 +125,7 @@ document.getElementById('pullRecsBtn').addEventListener('click', async () => {
         error_p.textContent = err;
         alert("Something went wrong while pulling recommendations.");
     } finally {
+        removeRecsCancelButton();
         try { hideSpinner(); } catch(_) {}
     }
 });

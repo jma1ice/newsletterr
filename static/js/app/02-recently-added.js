@@ -129,10 +129,6 @@ function buildRALibraryRows() {
             <div class="d-flex justify-content-between align-items-center p-2 border rounded">
                 <span style="font-size: .9rem;">${escapeHtml(lib)}</span>
                 <div>
-                    <button hidden type="button" class="nl-btn nl-btn--ghost nl-btn--sm me-1 ra-view-btn"
-                            data-lib="${escapeHtml(lib)}" data-target="${id}" style="font-size: .8rem; padding: .25rem .5rem;">
-                    View
-                    </button>
                     <button type="button" class="nl-btn nl-btn--primary nl-btn--sm ra-add-btn"
                             data-type="recently added" data-lib="${escapeHtml(lib)}" data-id="${id}" data-name="Recently Added: ${escapeHtml(lib)}"
                             style="font-size: .8rem; padding: .25rem .5rem;">
@@ -167,10 +163,6 @@ function buildStatsRows() {
             <div class="d-flex justify-content-between align-items-center p-2 border rounded snapin-row${blocked ? ' opacity-50' : ''}"${blocked ? ` title="${hint}"` : ''}>
                 <span class="snapin-row-label" title="${blocked ? hint : stat.stat_title}">${stat.stat_title}</span>
                 <div class="snapin-row-actions">
-                    <button hidden type="button" class="nl-btn nl-btn--ghost nl-btn--sm me-1 view-stat-btn"
-                            data-target="stat-${index}" style="font-size: 0.8rem; padding: 0.25rem 0.5rem;">
-                        View
-                    </button>
                     <button type="button" class="nl-btn nl-btn--primary nl-btn--sm add-stat-btn"
                             data-id="stat-${index}"
                             data-name="${stat.stat_title}"
@@ -210,10 +202,6 @@ function buildGraphsRows() {
                 <div class="d-flex justify-content-between align-items-center p-2 border rounded snapin-row${blocked ? ' opacity-50' : ''}"${blocked ? ` title="${hint}"` : ''}>
                     <span class="snapin-row-label" title="${blocked ? hint : name}">${name}</span>
                     <div class="snapin-row-actions">
-                        <button hidden type="button" class="nl-btn nl-btn--ghost nl-btn--sm me-1 view-graph-btn"
-                                data-target="graph-${index}" style="font-size: 0.8rem; padding: 0.25rem 0.5rem;">
-                            View
-                        </button>
                         <button type="button" class="nl-btn nl-btn--primary nl-btn--sm add-graph-btn"
                                 data-id="graph-${index}"
                                 data-name="${name}"

@@ -29,3 +29,8 @@ _CACHE_LOCK = threading.Lock()
 _hsts_enabled = False
 
 plex_headers = None
+
+# Set by POST /pull_recommendations/cancel to stop an in-progress conjurr
+# recommendations pull between users. run_conjurr_command clears it at the
+# start of a run and checks it between users, returning partial results.
+recommendations_cancel = threading.Event()

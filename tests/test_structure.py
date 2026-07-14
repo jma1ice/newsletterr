@@ -44,6 +44,7 @@ EXPECTED_RULES = [
     "/pull_coming_soon",
     "/pull_droppedneedle_stats",
     "/pull_recommendations",
+    "/pull_recommendations/cancel",
     "/pull_stats",
     "/scheduling",
     "/send_test_email",

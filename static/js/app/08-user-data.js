@@ -40,3 +40,31 @@ function getUserDisplayName(userKey) {
         return user.email || user.username || userKey;
     }
 }
+
+// Recipient chips carry the email as identity (data-email) but show a label
+// per the Recipient Display Name setting (email / username / friendly_name).
+function getEmailDisplayLabel(email) {
+    if (!email) return email;
+    const key = String(email).toLowerCase();
+    if (usersFullData && Array.isArray(usersFullData)) {
+        const user = usersFullData.find(u => (u.email || '').toLowerCase() === key);
+        if (user) {
+            if (displayPreference === 'username') {
+                return user.username || user.email || email;
+            } else if (displayPreference === 'friendly_name') {
+                return user.friendly_name || user.username || user.email || email;
+            }
+        }
+    }
+    return email;
+}
+window.getEmailDisplayLabel = getEmailDisplayLabel;
+
+// Alphabetical sort by the displayed label, so the recipient list matches
+// whatever value is shown.
+function sortEmailsByLabel(emails) {
+    return [...emails].sort((a, b) =>
+        getEmailDisplayLabel(a).localeCompare(getEmailDisplayLabel(b), undefined, { sensitivity: 'base' })
+    );
+}
+window.sortEmailsByLabel = sortEmailsByLabel;

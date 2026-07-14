@@ -217,6 +217,37 @@ def test_blank_secret_submission_keeps_existing(csrf_client, app):
     conn.close()
     assert decrypt(row[0]) == "keep-me"  # not clobbered to empty
 
+# --- connection test endpoints fall back to saved credentials
+
+def test_connection_test_falls_back_to_saved_key(client, app, monkeypatch):
+    # Saved-key fallback: password fields render blank ("Saved - leave blank
+    # to keep"), so a blank api_key in the POST must use the stored value
+    # rather than erroring "API key is required".
+    import sqlite3
+    from app import config
+    from app.crypto import encrypt
+    conn = sqlite3.connect(config.DB_PATH)
+    conn.execute(
+        "UPDATE settings SET tautulli_url = ?, tautulli_api = ? WHERE id = 1",
+        ("http://tt.local", encrypt("saved-tt-key")),
+    )
+    conn.commit()
+    conn.close()
+
+    captured = {}
+    def fake_test(url, api_key):
+        captured["url"] = url
+        captured["api_key"] = api_key
+        return {"status": "ok", "message": "Connected"}
+    from app.blueprints import api
+    monkeypatch.setattr(api, "test_tautulli_connection", fake_test)
+
+    resp = client.post("/api/test/tautulli", data=json.dumps({"url": "", "api_key": ""}),
+                       content_type="application/json")
+    assert resp.status_code == 200
+    assert captured["url"] == "http://tt.local"
+    assert captured["api_key"] == "saved-tt-key"
+
 # --- auth gate (uses an unauthenticated client against the seeded admin)
 
 def test_auth_gate_blocks_and_login_flow_works(anon_client, login_enabled):

@@ -683,11 +683,7 @@
     display: flex;
     align-items: center;
     flex-shrink: 0;
-}
-
-.builder-page .snapin-row-actions .view-stat-btn {
-    padding: 0px 6px 0px 0px;
-    
+    gap: var(--space-1);
 }
 
 @media (max-width: 768px) {

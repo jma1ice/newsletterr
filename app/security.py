@@ -1,6 +1,6 @@
 import hmac, html, re, time
 
-import bleach, requests
+import requests
 from flask import abort, jsonify, redirect, request, session, url_for
 from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -36,32 +36,6 @@ def json_body(required=()):
     if missing:
         return None, (jsonify({"error": f"Missing required field(s): {', '.join(missing)}"}), 400)
     return data, None
-
-def sanitize_html_input(text):
-    if not text:
-        return ""
-
-    allowed_tags = [
-        'p', 'br', 'strong', 'b', 'em', 'i', 'u', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-        'ul', 'ol', 'li', 'blockquote', 'a', 'img', 'div', 'span'
-    ]
-
-    allowed_attributes = {
-        'a': ['href', 'title'],
-        'img': ['src', 'alt', 'title', 'width', 'height'],
-        'div': ['class'],
-        'span': ['class', 'style']
-    }
-
-    allowed_protocols = ['http', 'https', 'mailto']
-
-    return bleach.clean(
-        text,
-        tags=allowed_tags,
-        attributes=allowed_attributes,
-        protocols=allowed_protocols,
-        strip=True
-    )
 
 def escape_html_output(text):
     if not text:
@@ -148,15 +122,3 @@ def redact_log_content(text: str) -> str:
     text = _REDACT_EMAIL_RE.sub('[REDACTED-EMAIL]', text)
     return text
 
-def sanitize_html(html: str) -> str:
-    allowed_tags = [
-        'p','br','strong','em','b','i','u','ul','ol','li','a','h1','h2','h3','h4','h5','h6',
-        'blockquote','code','pre','span'
-    ]
-    allowed_attrs = {
-        'a': ['href','title','target','rel'],
-        'span': ['style'],
-        '*': ['style']
-    }
-    cleaned = bleach.clean(html, tags=allowed_tags, attributes=allowed_attrs, strip=True)
-    return cleaned

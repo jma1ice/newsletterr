@@ -2,6 +2,7 @@ from urllib.parse import quote_plus
 
 from app.clients.plex import build_plex_web_link
 from app.emails.images import fetch_and_attach_image
+from app.security import escape_html_output as esc
 
 import logging
 
@@ -75,8 +76,8 @@ def build_recommendations_html_with_cids(recs_data, msg_root, theme_colors, user
             """
             
             user_section = f"""
-                <div style="{container_style}" data-recs-user="{user_id}">
-                    <h2 style="{user_title_style}">Recommendations for {display_name}</h2>
+                <div style="{container_style}" data-recs-user="{esc(str(user_id))}">
+                    <h2 style="{user_title_style}">Recommendations for {esc(display_name)}</h2>
                     {movies_html}
                     {shows_html}
                 </div>
@@ -90,7 +91,7 @@ def _wrapped_ranked_list_html(title, items, label_fn, theme_colors):
         return ""
     rows = "".join(
         f'<li style="margin: 4px 0; color: {theme_colors["text"]};">'
-        f'<strong>#{i + 1}</strong> {label_fn(item)}'
+        f'<strong>#{i + 1}</strong> {esc(label_fn(item))}'
         f'<span style="color: {theme_colors["muted_text"]}; font-size: 0.85em;"> - {item.get("listen_count", 0)} plays</span>'
         f'</li>'
         for i, item in enumerate(items)
@@ -146,8 +147,8 @@ def build_droppedneedle_wrapped_html_with_cids(wrapped_data, msg_root, theme_col
         """
 
         html_sections.append(f"""
-            <div style="{container_style}" data-wrapped-user="{user_id}">
-                <h2 style="{user_title_style}">{display_name}'s {payload.get('year', '')} Wrapped</h2>
+            <div style="{container_style}" data-wrapped-user="{esc(str(user_id))}">
+                <h2 style="{user_title_style}">{esc(display_name)}'s {payload.get('year', '')} Wrapped</h2>
                 <p style="text-align: center; color: {theme_colors['muted_text']}; margin-bottom: 16px;">
                     ~{payload.get('total_listens_estimated', 0)} plays tracked &bull; {payload.get('loved_tracks_count', 0)} loved tracks
                 </p>
@@ -167,12 +168,12 @@ def build_droppedneedle_server_stats_html_with_cids(server_data, msg_root, theme
     top_artist = server_data.get('top_artist_sitewide')
     top_album = server_data.get('top_album_sitewide')
     top_artist_html = (
-        f'<p style="color: {theme_colors["text"]};"><strong>Top Artist:</strong> {top_artist.get("name", "")} '
+        f'<p style="color: {theme_colors["text"]};"><strong>Top Artist:</strong> {esc(top_artist.get("name", ""))} '
         f'({top_artist.get("listen_count", 0)} plays)</p>'
     ) if top_artist else ""
     top_album_html = (
-        f'<p style="color: {theme_colors["text"]};"><strong>Top Album:</strong> {top_album.get("name", "")} - '
-        f'{top_album.get("artist_name", "")} ({top_album.get("listen_count", 0)} plays)</p>'
+        f'<p style="color: {theme_colors["text"]};"><strong>Top Album:</strong> {esc(top_album.get("name", ""))} - '
+        f'{esc(top_album.get("artist_name", ""))} ({top_album.get("listen_count", 0)} plays)</p>'
     ) if top_album else ""
 
     container_style = f"""
@@ -297,7 +298,7 @@ def build_recommendations_section_with_cids(available_items, unavailable_items, 
                         margin: 0 auto;
                         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
                     ">
-                        <img src="{poster_src}" alt="{title_text}" {img_attrs} style="{img_style}">
+                        <img src="{poster_src}" alt="{esc(title_text)}" {img_attrs} style="{img_style}">
                         <div style="
                             padding: 8px;
                             background-color: {theme_colors['card_bg']};
@@ -310,13 +311,13 @@ def build_recommendations_section_with_cids(available_items, unavailable_items, 
                                 color: {theme_colors['text']};
                                 line-height: 1.2;
                                 word-wrap: break-word;
-                            ">{title_text}</div>
+                            ">{esc(title_text)}</div>
                             {f'''
                             <div style="
                                 font-size: 10px;
                                 color: {theme_colors['muted_text']};
                                 margin-top: 2px;
-                            ">{meta_line}</div>
+                            ">{esc(meta_line)}</div>
                             ''' if meta_line else ''}
                             {f'''
                             <div style="
@@ -325,13 +326,13 @@ def build_recommendations_section_with_cids(available_items, unavailable_items, 
                                 margin-top: 4px;
                                 padding-top: 4px;
                                 border-top: 1px solid {theme_colors['border']};
-                            ">{overview[:80]}{'...' if len(overview) > 80 else ''}</div>
+                            ">{esc(overview[:80])}{'...' if len(overview) > 80 else ''}</div>
                             ''' if overview else ''}
                         </div>
                     </div>
                 """
 
-                card_html = f'<a href="{href}" style="text-decoration: none; color: inherit; display: block;" target="_blank" title="{link_title}">{card_content}</a>'
+                card_html = f'<a href="{esc(href)}" style="text-decoration: none; color: inherit; display: block;" target="_blank" title="{link_title}">{card_content}</a>'
             else:
                 card_html = f"""
                     <div style="
@@ -352,13 +353,13 @@ def build_recommendations_section_with_cids(available_items, unavailable_items, 
                                 color: {theme_colors['text']};
                                 margin-bottom: 8px;
                                 font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
-                            ">{title_text}</div>
+                            ">{esc(title_text)}</div>
                             <div style="
                                 font-size: 10px;
                                 color: {theme_colors['muted_text']};
                                 margin-bottom: 8px;
                                 font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
-                            ">{' • '.join(filter(None, [str(year) if year else '', vote_text, runtime, 'Unavailable' if is_unavailable else '']))}</div>
+                            ">{esc(' • '.join(filter(None, [str(year) if year else '', vote_text, runtime, 'Unavailable' if is_unavailable else ''])))}</div>
                             {f'''
                             <div style="
                                 font-size: 10px;
@@ -366,7 +367,7 @@ def build_recommendations_section_with_cids(available_items, unavailable_items, 
                                 opacity: 0.8;
                                 font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
                                 line-height: 1.3;
-                            ">{overview[:100]}{'...' if len(overview) > 100 else ''}</div>
+                            ">{esc(overview[:100])}{'...' if len(overview) > 100 else ''}</div>
                             ''' if overview else ''}
                         </div>
                     </div>

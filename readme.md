@@ -52,7 +52,7 @@ Newsletterr is a lightweight Flask application that talks to **[Tautulli](https:
 
 ### Persistence & Local Footprint
 * **SQLite storage** - schedules, templates, email history, lists & settings contained in a local database file (no external service dependency).
-* **Self‑contained runtime** - pure Python + Flask + CDN assets; no Node build or container required (optional packaging roadmap below).
+* **Self‑contained runtime** - pure Python + Flask with all frontend assets vendored locally (no CDN calls); run it bare, as a release binary, or in Docker.
 
 ### Extensibility
 * **Modular stat / graph command list** - extendable set of Tautulli commands for future metrics.
@@ -95,8 +95,7 @@ python -m playwright install chromium
 Download the zip for your platform from the latest [GitHub release](https://github.com/jma1ice/newsletterr/releases) (newsletterr-linux-x64.zip or newsletterr-windows-x64.zip), unzip it, and run the `newsletterr` executable inside. The app creates its `database/` and `env/` folders next to the executable. For chart images in scheduled emails, install the Playwright browser once with `pip install playwright && playwright install chromium`; without it, emails send without chart images.
 
 #### Docker
-On docker hub: jma1ice/newsletterr:latest
-or build locally: 
+Pull `jma1ice/newsletterr:latest` from Docker Hub (or build locally with `docker build -t jma1ice/newsletterr .`), then run:
 ```
 docker run -d --name newsletterr \
   -p 6397:6397 \
@@ -104,6 +103,26 @@ docker run -d --name newsletterr \
   -v newsletterr-env:/app/env \
   -v newsletterr-uploads:/app/static/uploads \
   jma1ice/newsletterr:latest
+```
+
+Or with docker compose, save this as `docker-compose.yml` and run `docker compose up -d`:
+```yaml
+services:
+  newsletterr:
+    image: jma1ice/newsletterr:latest
+    container_name: newsletterr
+    ports:
+      - "6397:6397"
+    volumes:
+      - newsletterr-db:/app/database
+      - newsletterr-env:/app/env
+      - newsletterr-uploads:/app/static/uploads
+    restart: unless-stopped
+
+volumes:
+  newsletterr-db:
+  newsletterr-env:
+  newsletterr-uploads:
 ```
 
 ### 3. Run
@@ -120,6 +139,8 @@ gunicorn -w 1 -k gthread --threads 8 --timeout 180 -b 0.0.0.0:6397 newsletterr:a
 
 By default the app listens on **http://127.0.0.1:6397**. Set the `PORT` environment variable to change the port when running `python newsletterr.py`.
 
+On first visit you will be asked to create a login (username and password), then a setup wizard walks you through the initial configuration. Everything the wizard covers can be changed later on the Settings page.
+
 #### Environment variables
 
 | Variable | Purpose | Default |
@@ -135,8 +156,10 @@ By default the app listens on **http://127.0.0.1:6397**. Set the `PORT` environm
 
 ## Configuration
 
+The Settings page is split into sections: **Email Server**, **Connections**, **Data and Stats**, **Email Content**, **Security**, **Hosted Features**, and **Appearance**.
+
 1. Navigate to **Settings** in the navbar.  
-2. Connect to your Plex server with **Connect Plex** button. This is used for media posters.  
+2. On the **Connections** section, connect to your Plex server with the **Connect Plex** button. This is used for media posters. Optional connections for **Sonarr** and **Radarr** (coming soon calendar) and **DroppedNeedle** (yearly wrapped music stats) live here too, each with a test button.  
 3. Fill in:
    * **From** - e‑mail address that will appear as the sender  
    * **From Name (optional)** - the name you wish to appear when your e-mail is sent  
@@ -169,8 +192,6 @@ By default the app listens on **http://127.0.0.1:6397**. Set the `PORT` environm
 
 ---
 
----
-
 ## Development
 
 ```bash
@@ -189,7 +210,7 @@ To back up your data, stop the container (or app) and copy the `database/` and `
 
 ## License
 
-Released under the **MIT License** - see [LICENSE](LICENSE) for details.
+Released under the **MIT License** - see [LICENSE](LICENSE.txt) for details.
 
 ---
 
@@ -243,7 +264,7 @@ Released under the **MIT License** - see [LICENSE](LICENSE) for details.
 * Fixed changing ra/recs grid width to maintain the correct poster ratio
 
 #### New Features:
-* Added sections to settings page (email server | external services | data settings | email styling | email body defaults | security)
+* Added sections to settings page (email server | connections | data and stats | email content | security | hosted features | appearance)
 * Settings changes are now kept on error so user won't have to re-enter them
 * Added test api buttons for conjurr and tautulli
 * Added setting for custom intro/outro text

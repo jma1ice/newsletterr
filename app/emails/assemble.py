@@ -8,6 +8,7 @@ from app.emails.images import fetch_and_attach_image
 from app.emails.blocks import build_graph_html_with_frontend_image, build_text_block_html, build_separator_html, build_image_html_with_cid, build_emoji_html
 from app.emails.builders import build_stats_html_with_cid_background, build_recently_added_html_with_cids, build_recommendations_html_with_cids, build_droppedneedle_wrapped_html_with_cids, build_droppedneedle_server_stats_html_with_cids, build_collections_html_with_cids, build_yearly_wrapped_html_with_cids, build_sonarr_coming_soon_html_with_cids, build_radarr_coming_soon_html_with_cids
 from app.theme import get_email_theme_colors, build_email_css_from_theme
+from app.security import escape_html_output as esc
 
 _BLOCK_TAGS = {'p', 'div', 'tr', 'ul', 'ol', 'table', 'blockquote', 'section', 'article'}
 _HEADING_TAGS = {'h1', 'h2', 'h3', 'h4', 'h5', 'h6'}
@@ -357,7 +358,7 @@ def build_complete_email_html_with_cid_logo(content_html, server_name, subject, 
 
     logo_html = ""
     if logo_src != "" and logo_src is not None and logo_width != "" and logo_width is not None:
-        logo_html = f'<img src="{logo_src}" alt="{server_name}" class="email-logo" style="{logo_style}">'
+        logo_html = f'<img src="{logo_src}" alt="{esc(server_name)}" class="email-logo" style="{logo_style}">'
 
     title_html = f'<h1 style="{title_style}">{email_header_title}</h1>'
     
@@ -369,7 +370,7 @@ def build_complete_email_html_with_cid_logo(content_html, server_name, subject, 
                 <meta http-equiv="X-UA-Compatible" content="IE=edge">
                 <meta name="x-apple-disable-message-reformatting">
                 <meta name="format-detection" content="telephone=no">
-                <title>{subject}</title>
+                <title>{esc(subject)}</title>
                 <!--[if mso]>
                 <noscript>
                     <xml>

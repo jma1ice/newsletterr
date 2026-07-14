@@ -1,6 +1,7 @@
 from datetime import datetime, timezone, timedelta
 
 from app.emails.images import fetch_and_attach_image, truncate_text
+from app.security import escape_html_output as esc
 
 import logging
 
@@ -31,7 +32,7 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
     if not items:
         return f"""
         <div style="background-color: {theme_colors['card_bg']}; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid {theme_colors['border']}; font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;">
-            <p style="text-align: center; color: {theme_colors['muted_text']}; padding: 20px; margin: 0; font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;">No recently added items found{f' for {library_filter}' if library_filter else ''}.</p>
+            <p style="text-align: center; color: {theme_colors['muted_text']}; padding: 20px; margin: 0; font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;">No recently added items found{f' for {esc(library_filter)}' if library_filter else ''}.</p>
         </div>
         """
     
@@ -218,7 +219,7 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
                         margin: 0 auto;
                         box-shadow: 0 6px 18px rgba(0, 0, 0, 0.6);
                     ">
-                        <img class="card-poster-img" src="{poster_src}" alt="{title}" {img_attrs} style="{img_style}">
+                        <img class="card-poster-img" src="{poster_src}" alt="{esc(title)}" {img_attrs} style="{img_style}">
 
                         <div class="card-content" style="
                             padding: 6px;
@@ -234,14 +235,14 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
                                 font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
                                 word-wrap: break-word;
                                 overflow-wrap: break-word;
-                            ">{title}</div>
+                            ">{esc(title)}</div>
 
                             <div style="
                                 font-size: 10px;
                                 color: {theme_colors['muted_text']};
                                 margin-bottom: 2px;
                                 font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
-                            ">{meta_text}</div>
+                            ">{esc(meta_text)}</div>
 
                             {f'''
                             <div style="
@@ -252,7 +253,7 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
                                 font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
                                 word-wrap: break-word;
                                 overflow-wrap: break-word;
-                            ">{summary[:summary_len]}{'...' if len(summary) > summary_len else ''}</div>
+                            ">{esc(summary[:summary_len])}{'...' if len(summary) > summary_len else ''}</div>
                             ''' if (summary and show_description) else ''}
                         </div>
                     </div>
@@ -260,7 +261,7 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
 
                 if plex_url:
                     card_html = f'''
-                        <a href="{plex_url}" 
+                        <a href="{esc(plex_url)}"
                         style="text-decoration: none; color: inherit; display: block;" 
                         target="_blank"
                         title="Open in Plex">
@@ -288,20 +289,20 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
                                 color: {theme_colors['text']};
                                 margin-bottom: 8px;
                                 font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
-                            ">{title}</div>
+                            ">{esc(title)}</div>
                             <div style="
                                 font-size: 11px;
                                 color: {theme_colors['muted_text']};
                                 margin-bottom: 8px;
                                 font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
-                            ">{' • '.join(filter(None, [str(year) if year else '', duration, library, f'Added {added_date}' if added_date else '', content_rating]))}</div>
+                            ">{esc(' • '.join(filter(None, [str(year) if year else '', duration, library, f'Added {added_date}' if added_date else '', content_rating])))}</div>
                             {f'''
                             <div style="
                                 font-size: 11px;
                                 color: {theme_colors['text']};
                                 opacity: 0.8;
                                 font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
-                            ">{summary[:100]}{'...' if len(summary) > 100 else ''}</div>
+                            ">{esc(summary[:100])}{'...' if len(summary) > 100 else ''}</div>
                             ''' if (summary and show_description) else ''}
                         </div>
                     </div>
@@ -309,7 +310,7 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
 
                 if plex_url:
                     card_html = f'''
-                        <a href="{plex_url}" 
+                        <a href="{esc(plex_url)}"
                         style="text-decoration: none; color: inherit; display: block;" 
                         target="_blank"
                         title="Open in Plex">
@@ -370,7 +371,7 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
 
     return f"""
         <div style="{container_style}">
-            <h2 style="{title_style}">{ra_title}</h2>
+            <h2 style="{title_style}">{esc(ra_title)}</h2>
             <table class="recently-added-table" style="{table_style}">
                 {items_html}
             </table>

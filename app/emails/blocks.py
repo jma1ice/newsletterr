@@ -5,6 +5,7 @@ from email.utils import make_msgid
 
 from app.theme import get_email_theme_colors
 from app.emails.images import fetch_and_attach_image
+from app.security import escape_html_output as esc
 
 import logging
 
@@ -18,7 +19,7 @@ def build_graph_html_with_frontend_image(item, msg_root):
     
     if chart_image_data and chart_image_data.startswith('data:image/png'):
         try:
-            header, encoded = chart_image_data.split(',', 1)
+            _, encoded = chart_image_data.split(',', 1)
             image_data = base64.b64decode(encoded)
             
             cid = make_msgid(domain="newsletterr.local")[1:-1]
@@ -50,7 +51,7 @@ def build_graph_html_with_frontend_image(item, msg_root):
             
             return f"""
             <div style="{container_style}">
-                <img src="cid:{cid}" alt="{chart_name}" style="{image_style}">
+                <img src="cid:{cid}" alt="{esc(chart_name)}" style="{image_style}">
             </div>
             """
             
@@ -94,7 +95,7 @@ def build_graph_html_with_frontend_image(item, msg_root):
     
     return f"""
     <div style="{placeholder_style}">
-        <h3 style="{placeholder_title_style}">{chart_name}</h3>
+        <h3 style="{placeholder_title_style}">{esc(chart_name)}</h3>
         <p style="{placeholder_text_style}">Chart image not available</p>
         <p style="{placeholder_subtext_style}">Interactive charts available in dashboard</p>
     </div>

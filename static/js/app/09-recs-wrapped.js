@@ -11,13 +11,13 @@ function posterCard(p, faded=false) {
 
     return `
         <li class="rec-poster">
-            <a href="${p.href || '#'}" target="_blank" rel="noopener">
+            <a href="${escapeHtml(p.href || '#')}" target="_blank" rel="noopener">
                 <div class="rec-poster-imgwrap">
-                    ${src ? `<img loading="eager" src="${src}">` : ''}
+                    ${src ? `<img loading="eager" src="${escapeHtml(src)}">` : ''}
                 </div>
 
                 <div class="rec-poster-meta">
-                    ${bits ? `<span class="pill"><span class="pill_text">${bits}</span></span>` : ''}
+                    ${bits ? `<span class="pill"><span class="pill_text">${escapeHtml(bits)}</span></span>` : ''}
                 </div>
 
                 ${faded ? `
@@ -26,13 +26,13 @@ function posterCard(p, faded=false) {
                     </div>` : ''}
 
                 <div class="rec-poster-caption">
-                    <div class="rec-poster-title">${title}</div>
-                    ${runtime ? `<div class="rec-poster-runtime">${runtime}</div>` : ''}
+                    <div class="rec-poster-title">${escapeHtml(title)}</div>
+                    ${runtime ? `<div class="rec-poster-runtime">${escapeHtml(runtime)}</div>` : ''}
                 </div>
             </a>
 
             ${ov ? `
-                <div class="rec-poster-overview">${ov}</div>` : ''}
+                <div class="rec-poster-overview">${escapeHtml(ov)}</div>` : ''}
         </li>`;
 }
 
@@ -168,17 +168,17 @@ function buildRecsUserRows() {
         row.className = 'col-12 mb-2';
         row.innerHTML = `
             <div class="d-flex justify-content-between align-items-center p-2 border rounded">
-                <span style="font-size: .9rem;">${display}</span>
+                <span style="font-size: .9rem;">${escapeHtml(display)}</span>
                 <div>
                     <button hidden type="button"
                             class="nl-btn nl-btn--ghost nl-btn--sm me-1 recs-view-btn"
-                            data-user-key="${userKey}" data-target="${id}"
+                            data-user-key="${escapeHtml(userKey)}" data-target="${id}"
                             style="font-size: .8rem; padding: .25rem .5rem;">View</button>
                     <button type="button"
                             class="nl-btn nl-btn--primary nl-btn--sm recs-add-btn"
                             data-type="recommendations" data-id="${id}"
-                            data-name="Recommendations: ${display}"
-                            data-user-key="${userKey}"
+                            data-name="Recommendations: ${escapeHtml(display)}"
+                            data-user-key="${escapeHtml(userKey)}"
                             style="font-size: .8rem; padding: .25rem .5rem;">Add</button>
                 </div>
             </div>`;
@@ -203,13 +203,13 @@ function buildWrappedUserRows() {
         row.className = 'col-12 mb-2';
         row.innerHTML = `
             <div class="d-flex justify-content-between align-items-center p-2 border rounded">
-                <span style="font-size: .9rem;">${display}</span>
+                <span style="font-size: .9rem;">${escapeHtml(display)}</span>
                 <div>
                     <button type="button"
                             class="nl-btn nl-btn--primary nl-btn--sm droppedneedle-add-btn"
                             data-type="droppedneedle_wrapped" data-id="${id}"
-                            data-name="Wrapped: ${display}"
-                            data-user-key="${userKey}"
+                            data-name="Wrapped: ${escapeHtml(display)}"
+                            data-user-key="${escapeHtml(userKey)}"
                             style="font-size: .8rem; padding: .25rem .5rem;">Add</button>
                 </div>
             </div>`;

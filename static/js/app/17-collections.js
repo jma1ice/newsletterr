@@ -63,37 +63,6 @@ function populateCollectionsDropdown(dropdownId, collections) {
     });
 }
 
-function buildCollectionPreviewHTML(collection) {
-    const typeIcon = collection.subtype === 'movie' ? '📽️' : collection.subtype === 'movie' ? '📺' : '🎧';
-    
-    return `
-        <div class="collection-preview card my-3">
-            <div class="card-header d-flex align-items-center">
-                <span class="me-2" style="font-size: 1.2em;">${typeIcon}</span>
-                <h5 class="mb-0">${collection.title}</h5>
-                <span class="badge bg-secondary ms-auto">${collection.childCount} items</span>
-            </div>
-            <div class="card-body">
-                <div class="row">
-                    <div class="col-md-3">
-                        ${collection.thumb ? 
-                            `<img src="${collection.thumb}" class="img-fluid rounded" alt="${collection.title}" style="max-height: 200px; object-fit: cover;">` :
-                            `<div class="placeholder-image d-flex align-items-center justify-content-center bg-light rounded" style="height: 200px;">
-                                <span class="text-muted">${typeIcon} No Poster</span>
-                            </div>`
-                        }
-                    </div>
-                    <div class="col-md-9">
-                        <p><strong>Library:</strong> ${collection.sectionTitle}</p>
-                        <p><strong>Type:</strong> ${collection.subtype.charAt(0).toUpperCase() + collection.subtype.slice(1)} Collection</p>
-                        ${collection.summary ? `<p><strong>Description:</strong> ${collection.summary}</p>` : ''}
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-}
-
 document.getElementById('movie-collections-dropdown').addEventListener('change', function() {
     const button = document.getElementById('add-movie-collection-btn');
     

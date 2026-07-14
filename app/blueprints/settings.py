@@ -696,7 +696,15 @@ def upload_media():
         upload_dir = os.path.join(current_app.static_folder, 'uploads', 'media')
         os.makedirs(upload_dir, exist_ok=True)
 
-        file.save(os.path.join(upload_dir, new_filename))
+        media_path = os.path.join(upload_dir, new_filename)
+        file.save(media_path)
+
+        try:
+            with Image.open(media_path) as img:
+                img.verify()
+        except Exception:
+            os.remove(media_path)
+            return jsonify({"status": "error", "message": "File is not a valid image"}), 400
 
         return jsonify({
             "status": "success",

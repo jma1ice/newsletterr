@@ -358,7 +358,6 @@ def preview_schedule(schedule_id):
             "graph_data": tautulli_data.get('graph_data', []),
             "recent_data": tautulli_data.get('recent_data', []),
             "graph_commands": tautulli_data.get('graph_commands', []),
-            "recent_commands": [{'command': 'movie'}, {'command': 'show'}],
             "recommendations": recommendations_data or {},
             "yearly_wrapped": yearly_wrapped_data,
             "droppedneedle_wrapped": droppedneedle_wrapped_data,

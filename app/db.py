@@ -437,10 +437,10 @@ def migrate_email_templates_for_header_title():
 
         if 'email_header_title' not in columns:
             logger.info("Adding email_header_title column to email_templates table...")
-            cursor.execute(f"ALTER TABLE email_templates ADD COLUMN email_header_title TEXT DEFAULT '{server_name} Newsletter'")
+            cursor.execute("ALTER TABLE email_templates ADD COLUMN email_header_title TEXT")
             conn.commit()
 
-            cursor.execute(f"UPDATE email_templates SET email_header_title = '{server_name} Newsletter' WHERE email_header_title IS NULL")
+            cursor.execute("UPDATE email_templates SET email_header_title = ? WHERE email_header_title IS NULL", (f"{server_name} Newsletter",))
             conn.commit()
             logger.info("Successfully added and backfilled email_header_title column")
 

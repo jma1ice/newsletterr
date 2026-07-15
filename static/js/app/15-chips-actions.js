@@ -31,7 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <span>${escapeHtml(label)}</span>
             <button type="button" class="remove" aria-label="Remove ${escapeHtml(label)}">x</button>
         `;
-        bccChipsContainer.after(chip, emailInput);
+        bccChipsContainer.appendChild(chip);
     }
 
     function sortEmails(emails) {

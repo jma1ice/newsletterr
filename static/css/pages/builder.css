@@ -231,8 +231,13 @@
     position: sticky;
     top: var(--space-5);
     z-index: 3;
-    max-height: calc(100vh - var(--space-5) * 2);
+    /* Leave breathing room on short screens instead of filling edge to edge;
+       the drag handle (resize: vertical) lets the user grow it toward this cap
+       and the height is persisted in localStorage by 25-shell.js. */
+    max-height: calc(100vh - 96px);
     overflow-y: auto;
+    resize: vertical;
+    min-height: 160px;
 }
 /* Snap-ins only sticks at full width; at mid and mobile widths it flows inline
    so it doesn't float over and cover too much of the narrower column. */
@@ -241,7 +246,18 @@
         position: static;
         max-height: none;
         overflow-y: visible;
+        resize: none;
     }
+}
+/* Appearance toggle: floating snap-ins off -> the pane flows inline (same as the
+   mid-width behavior). The class lives on <html>, persisted with the other
+   appearance settings; height: auto drops any user-dragged height. */
+:root.snapins-static #selected-items-pane {
+    position: static;
+    max-height: none;
+    overflow-y: visible;
+    resize: none;
+    height: auto !important;
 }
 
 /* collection expand/collapse toggle: size the inline chevron to sit in the
@@ -365,11 +381,14 @@
 .builder-page #delete-template-btn { color: var(--danger); border-color: var(--border); }
 .builder-page #delete-template-btn:hover { border-color: var(--danger); background: var(--danger-soft); }
 
-/* collection headings: inline icon aligned with the label text */
+/* collection headings: inline icon aligned with the label text. A consistent
+   min-height + bottom alignment keeps the select+Add rows below lined up even
+   when one heading wraps to two lines (3+ library columns). */
 .builder-page .collection-heading {
     display: flex;
-    align-items: center;
+    align-items: flex-end;
     gap: var(--space-2);
+    min-height: 2.6em;
 }
 .builder-page .collection-heading .nl-icon { color: var(--text-muted); }
 
@@ -591,6 +610,9 @@
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-1);
+    /* containing block for the recipients dropdown, which opens centered
+       under the whole bar rather than inside its narrow third */
+    position: relative;
 }
 /* Recipients sits alongside Subject + Header; give it extra room for the list
    selector and BCC chips, which stack under the label. */
@@ -627,7 +649,38 @@
     transition: transform 0.3s ease;
 }
 .builder-page .msg-recipients-toggle.is-collapsed #bcc-toggle-icon .nl-icon { transform: rotate(-90deg); }
-.builder-page .msg-recipients-body { padding-top: var(--space-2); }
+/* Nothing lives below the msg-bar, so the recipients panel drops open centered
+   under the bar at ~half the preview column width instead of squeezing into
+   its third. Full width and back in-flow on phones. */
+.builder-page .msg-recipients-body {
+    position: absolute;
+    top: calc(100% + var(--space-2));
+    left: 50%;
+    transform: translateX(-50%);
+    width: 50%;
+    min-width: 320px;
+    max-width: calc(100% - var(--space-4) * 2);
+    z-index: 20;
+    padding: var(--space-3);
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-3);
+}
+@media (max-width: 768px) {
+    .builder-page .msg-recipients-body {
+        position: static;
+        transform: none;
+        width: 100%;
+        min-width: 0;
+        max-width: none;
+        z-index: auto;
+        padding: var(--space-2) 0 0;
+        background: transparent;
+        border: none;
+        box-shadow: none;
+    }
+}
 .builder-page .msg-recipients-count { padding-bottom: 6px; }
 .builder-page .msg-field {
     flex: 1;
@@ -648,6 +701,14 @@
 
 /* preview toolbar (Export / Import / Pop-out) reads as a caption row */
 .builder-page .preview-toolbar span { color: var(--text-muted); font-weight: 600; }
+/* File import/export and window.open are not useful on phones: hide the whole
+   toolbar button group and the pop-out status line under 768px. */
+@media (max-width: 768px) {
+    .builder-page #export-html-btn,
+    .builder-page #import-html-btn,
+    .builder-page #popout-preview-btn,
+    .builder-page #popout-status { display: none !important; }
+}
 /* let the toolbar and its export/import/pop-out group wrap instead of
    overflowing the (narrower at mid widths) preview column */
 .builder-page .preview-toolbar { flex-wrap: wrap; gap: var(--space-2); }
@@ -696,6 +757,72 @@
    no longer wrap as a whole, so headings and stat/graph labels stay put. */
 .builder-page #content-row .d-flex.gap-2 { flex-wrap: wrap; }
 
+/* Two-per-row grid for the lighter snap-in source cards (text blocks, media,
+   recently added, DroppedNeedle, year in plex, coming soon). Single column
+   below 992px; recommendations / collections / stats+graphs live outside this
+   grid and stay full width. */
+.builder-page .snapin-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--space-4);
+    align-items: start;
+}
+@media (min-width: 992px) {
+    .builder-page .snapin-grid { grid-template-columns: repeat(2, 1fr); }
+}
+/* grid gap owns the vertical rhythm; drop the per-card bottom margin inside it */
+.builder-page .snapin-grid > *,
+.builder-page .snapin-grid .builder-card { margin-bottom: 0; }
+/* wrappers with no rendered card (no pulled data yet) must not hold a cell */
+.builder-page .snapin-grid > .snapin-grid-hidden { display: none; }
+/* odd visible count: the layout helper spans the last card across both columns */
+.builder-page .snapin-grid > .span-2 { grid-column: 1 / -1; }
+/* a half-width DroppedNeedle / coming soon card stacks its internal halves */
+.builder-page .snapin-internal-stack .row > [class*="col-md-6"] {
+    flex: 0 0 100%;
+    max-width: 100%;
+}
+
+/* Collapsible source cards: a chevron toggle in each card header hides the card
+   body (and, for header-only cards like text blocks, the button cluster). */
+.builder-page .snapin-card-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+    row-gap: var(--space-2);
+}
+.builder-page .snapin-card-header > h2 {
+    margin: 0;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+.builder-page .snapin-card-header .snapin-card-cluster { margin-left: auto; }
+.builder-page .snapin-collapse-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-1);
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-muted);
+    flex-shrink: 0;
+}
+.builder-page .snapin-collapse-toggle .nl-icon { transition: transform .15s ease; }
+.builder-page .snapin-card-header.is-collapsed .snapin-collapse-toggle .nl-icon { transform: rotate(-90deg); }
+.builder-page .snapin-card-header.is-collapsed + .snapin-card-body { display: none; }
+.builder-page .snapin-card-header.is-collapsed .snapin-card-cluster { display: none; }
+
+/* snap-in source rows (stats, graphs, libraries, users, wrapped, coming soon):
+   Add button first so it never wraps under the label, label second with an
+   ellipsis. flex-start + gap keeps the button pinned to the left edge. */
+.builder-page .snapin-row {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: var(--space-2);
+}
 /* stat/graph snap-in rows: keep the label on one line with an ellipsis (full
    name in the title attr) and pin the button pair so nothing wraps or drops. */
 .builder-page .snapin-row-label {

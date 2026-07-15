@@ -46,6 +46,9 @@ DEFAULTS = {
     "hosted_images_enabled": "disabled",
     "ra_show_description": "enabled",
     "include_user_info": "enabled",
+    "appearance_theme": "dark",
+    "pride_flag": "off",
+    "snapins_floating": "1",
 }
 
 INT_COLUMNS = {

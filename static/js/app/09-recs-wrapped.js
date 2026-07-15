@@ -167,11 +167,10 @@ function buildRecsUserRows() {
         const row = document.createElement('div');
         row.className = 'col-12 mb-2';
         row.innerHTML = `
-            <div class="d-flex justify-content-between align-items-center p-2 border rounded">
-                <span style="font-size: .9rem;">${escapeHtml(display)}</span>
-                <div>
+            <div class="snapin-row p-2 border rounded">
+                <div class="snapin-row-actions">
                     <button hidden type="button"
-                            class="nl-btn nl-btn--ghost nl-btn--sm me-1 recs-view-btn"
+                            class="nl-btn nl-btn--ghost nl-btn--sm recs-view-btn"
                             data-user-key="${escapeHtml(userKey)}" data-target="${id}"
                             style="font-size: .8rem; padding: .25rem .5rem;">View</button>
                     <button type="button"
@@ -181,6 +180,7 @@ function buildRecsUserRows() {
                             data-user-key="${escapeHtml(userKey)}"
                             style="font-size: .8rem; padding: .25rem .5rem;">Add</button>
                 </div>
+                <span class="snapin-row-label" title="${escapeHtml(display)}">${escapeHtml(display)}</span>
             </div>`;
         host.appendChild(row);
     });
@@ -202,9 +202,8 @@ function buildWrappedUserRows() {
         const row = document.createElement('div');
         row.className = 'col-12 mb-2';
         row.innerHTML = `
-            <div class="d-flex justify-content-between align-items-center p-2 border rounded">
-                <span style="font-size: .9rem;">${escapeHtml(display)}</span>
-                <div>
+            <div class="snapin-row p-2 border rounded">
+                <div class="snapin-row-actions">
                     <button type="button"
                             class="nl-btn nl-btn--primary nl-btn--sm droppedneedle-add-btn"
                             data-type="droppedneedle_wrapped" data-id="${id}"
@@ -212,6 +211,7 @@ function buildWrappedUserRows() {
                             data-user-key="${escapeHtml(userKey)}"
                             style="font-size: .8rem; padding: .25rem .5rem;">Add</button>
                 </div>
+                <span class="snapin-row-label" title="${escapeHtml(display)}">${escapeHtml(display)}</span>
             </div>`;
         host.appendChild(row);
     });
@@ -228,15 +228,15 @@ function buildDroppedNeedleServerRow() {
     const row = document.createElement('div');
     row.className = 'col-12 mb-2';
     row.innerHTML = `
-        <div class="d-flex justify-content-between align-items-center p-2 border rounded">
-            <span style="font-size: .9rem;">Server Stats (${droppedneedleServerPayload.year || ''})</span>
-            <div>
+        <div class="snapin-row p-2 border rounded">
+            <div class="snapin-row-actions">
                 <button type="button"
                         class="nl-btn nl-btn--primary nl-btn--sm droppedneedle-server-add-btn"
                         data-type="droppedneedle_server_stats" data-id="droppedneedle-server-stats"
                         data-name="DroppedNeedle Server Stats"
                         style="font-size: .8rem; padding: .25rem .5rem;">Add</button>
             </div>
+            <span class="snapin-row-label" title="Server Stats (${droppedneedleServerPayload.year || ''})">Server Stats (${droppedneedleServerPayload.year || ''})</span>
         </div>`;
     host.appendChild(row);
 };
@@ -252,15 +252,15 @@ function buildYearlyWrappedRow() {
     const row = document.createElement('div');
     row.className = 'col-12 mb-2';
     row.innerHTML = `
-        <div class="d-flex justify-content-between align-items-center p-2 border rounded">
-            <span style="font-size: .9rem;">Year in Review</span>
-            <div>
+        <div class="snapin-row p-2 border rounded">
+            <div class="snapin-row-actions">
                 <button type="button"
                         class="nl-btn nl-btn--primary nl-btn--sm yearly-wrapped-add-btn"
                         data-type="yearly_wrapped" data-id="yearly-wrapped"
-                        data-name="Year in Review"
+                        data-name="Year in Plex"
                         style="font-size: .8rem; padding: .25rem .5rem;">Add</button>
             </div>
+            <span class="snapin-row-label" title="Year in Plex">Year in Plex</span>
         </div>`;
     host.appendChild(row);
 };

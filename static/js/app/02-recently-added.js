@@ -126,15 +126,15 @@ function buildRALibraryRows() {
         const id = `ra-lib-${slug(lib)}`;
 
         row.innerHTML = `
-            <div class="d-flex justify-content-between align-items-center p-2 border rounded">
-                <span style="font-size: .9rem;">${escapeHtml(lib)}</span>
-                <div>
+            <div class="snapin-row p-2 border rounded">
+                <div class="snapin-row-actions">
                     <button type="button" class="nl-btn nl-btn--primary nl-btn--sm ra-add-btn"
                             data-type="recently added" data-lib="${escapeHtml(lib)}" data-id="${id}" data-name="Recently Added: ${escapeHtml(lib)}"
                             style="font-size: .8rem; padding: .25rem .5rem;">
                     Add
                     </button>
                 </div>
+                <span class="snapin-row-label" title="${escapeHtml(lib)}">${escapeHtml(lib)}</span>
             </div>`;
         host.appendChild(row);
     });
@@ -160,8 +160,7 @@ function buildStatsRows() {
         const hint = blocked ? "Hidden because 'Include Other Users' Info' is disabled in Settings" : '';
         return `
         <div class="col-12 mb-2">
-            <div class="d-flex justify-content-between align-items-center p-2 border rounded snapin-row${blocked ? ' opacity-50' : ''}"${blocked ? ` title="${hint}"` : ''}>
-                <span class="snapin-row-label" title="${blocked ? hint : stat.stat_title}">${stat.stat_title}</span>
+            <div class="snapin-row p-2 border rounded${blocked ? ' opacity-50' : ''}"${blocked ? ` title="${hint}"` : ''}>
                 <div class="snapin-row-actions">
                     <button type="button" class="nl-btn nl-btn--primary nl-btn--sm add-stat-btn"
                             data-id="stat-${index}"
@@ -170,6 +169,7 @@ function buildStatsRows() {
                         Add
                     </button>
                 </div>
+                <span class="snapin-row-label" title="${blocked ? hint : stat.stat_title}">${stat.stat_title}</span>
             </div>
         </div>
     `;
@@ -199,8 +199,7 @@ function buildGraphsRows() {
         const hint = blocked ? "Hidden because 'Include Other Users' Info' is disabled in Settings" : '';
         return `
             <div class="col-12 mb-2">
-                <div class="d-flex justify-content-between align-items-center p-2 border rounded snapin-row${blocked ? ' opacity-50' : ''}"${blocked ? ` title="${hint}"` : ''}>
-                    <span class="snapin-row-label" title="${blocked ? hint : name}">${name}</span>
+                <div class="snapin-row p-2 border rounded${blocked ? ' opacity-50' : ''}"${blocked ? ` title="${hint}"` : ''}>
                     <div class="snapin-row-actions">
                         <button type="button" class="nl-btn nl-btn--primary nl-btn--sm add-graph-btn"
                                 data-id="graph-${index}"
@@ -209,6 +208,7 @@ function buildGraphsRows() {
                             Add
                         </button>
                     </div>
+                    <span class="snapin-row-label" title="${blocked ? hint : name}">${name}</span>
                 </div>
             </div>
         `;

@@ -4,6 +4,16 @@
 <head>
     <script nonce="{{ nonce }}">
         try {
+            {% if appearance_boot %}
+            // Authenticated pages: the server-stored appearance follows the login.
+            // Mirror it to localStorage so pre-auth pages and the first paint can
+            // reuse the last-known values.
+            var _ab = {{ appearance_boot | tojson }};
+            localStorage.setItem('theme', _ab.theme);
+            if (_ab.pride && _ab.pride !== 'off') localStorage.setItem('pride', _ab.pride);
+            else localStorage.removeItem('pride');
+            localStorage.setItem('snapinsFloating', _ab.snapins_floating);
+            {% endif %}
             const pref = localStorage.getItem('theme');
             const dark = pref ? (pref === 'dark') :
             window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -13,6 +23,9 @@
             }
             const pride = localStorage.getItem('pride');
             if (pride) document.documentElement.classList.add('pride', 'pride-' + pride);
+            if (localStorage.getItem('snapinsFloating') === '0') {
+                document.documentElement.classList.add('snapins-static');
+            }
         } catch (_) {}
     </script>
     <meta charset="UTF-8" name="viewport" content="width=device-width, initial-scale=1">
@@ -139,9 +152,19 @@
         btn?.addEventListener('click', () => {
             const root = document.documentElement;
             const isDark = root.classList.toggle('dark');
-            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+            const theme = isDark ? 'dark' : 'light';
+            localStorage.setItem('theme', theme);
             syncAria();
             if (typeof updatePreview === 'function') updatePreview();
+            // Persist so the theme follows the login, not just this browser.
+            try {
+                fetch('/api/appearance', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': '{{ csrf_token }}' },
+                    body: JSON.stringify({ theme: theme }),
+                    credentials: 'same-origin'
+                }).catch(() => {});
+            } catch (_) {}
         });
     </script>
     <script src="{{ url_for('static', filename='js/app/25-shell.js') }}" nonce="{{ nonce }}"></script>

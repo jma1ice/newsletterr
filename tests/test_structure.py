@@ -7,6 +7,7 @@ import pytest
 EXPECTED_RULES = [
     "/",
     "/about",
+    "/api/appearance",
     "/api/gif/search",
     "/api/plex/info",
     "/api/plex/pin",

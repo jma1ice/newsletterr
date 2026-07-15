@@ -13,15 +13,15 @@ function buildSonarrComingSoonRow() {
     const row = document.createElement('div');
     row.className = 'col-12 mb-2';
     row.innerHTML = `
-        <div class="d-flex justify-content-between align-items-center p-2 border rounded">
-            <span style="font-size: .9rem;">Coming Soon (TV)</span>
-            <div>
+        <div class="snapin-row p-2 border rounded">
+            <div class="snapin-row-actions">
                 <button type="button"
                         class="nl-btn nl-btn--primary nl-btn--sm sonarr-coming-soon-add-btn"
                         data-type="sonarr_coming_soon" data-id="sonarr-coming-soon"
                         data-name="Coming Soon (TV)"
                         style="font-size: .8rem; padding: .25rem .5rem;">Add</button>
             </div>
+            <span class="snapin-row-label" title="Coming Soon (TV)">Coming Soon (TV)</span>
         </div>`;
     host.appendChild(row);
 };
@@ -42,15 +42,15 @@ function buildRadarrComingSoonRow() {
     const row = document.createElement('div');
     row.className = 'col-12 mb-2';
     row.innerHTML = `
-        <div class="d-flex justify-content-between align-items-center p-2 border rounded">
-            <span style="font-size: .9rem;">Coming Soon (Movies)</span>
-            <div>
+        <div class="snapin-row p-2 border rounded">
+            <div class="snapin-row-actions">
                 <button type="button"
                         class="nl-btn nl-btn--primary nl-btn--sm radarr-coming-soon-add-btn"
                         data-type="radarr_coming_soon" data-id="radarr-coming-soon"
                         data-name="Coming Soon (Movies)"
                         style="font-size: .8rem; padding: .25rem .5rem;">Add</button>
             </div>
+            <span class="snapin-row-label" title="Coming Soon (Movies)">Coming Soon (Movies)</span>
         </div>`;
     host.appendChild(row);
 };

@@ -765,7 +765,10 @@
     display: grid;
     grid-template-columns: 1fr;
     gap: var(--space-4);
-    align-items: start;
+    /* stretch so the two cards in a row share a height and their bottoms line up */
+    align-items: stretch;
+    /* the grid owns its own bottom gap from the full-width cards below it */
+    margin-bottom: var(--space-4);
 }
 @media (min-width: 992px) {
     .builder-page .snapin-grid { grid-template-columns: repeat(2, 1fr); }
@@ -773,15 +776,14 @@
 /* grid gap owns the vertical rhythm; drop the per-card bottom margin inside it */
 .builder-page .snapin-grid > *,
 .builder-page .snapin-grid .builder-card { margin-bottom: 0; }
+/* make each card fill its (stretched) cell so paired cards match height */
+.builder-page .snapin-grid > .builder-card { height: 100%; }
+.builder-page .snapin-grid > div:not(.builder-card) { display: flex; flex-direction: column; }
+.builder-page .snapin-grid > div:not(.builder-card) > .builder-card { flex: 1 1 auto; width: 100%; }
 /* wrappers with no rendered card (no pulled data yet) must not hold a cell */
 .builder-page .snapin-grid > .snapin-grid-hidden { display: none; }
 /* odd visible count: the layout helper spans the last card across both columns */
 .builder-page .snapin-grid > .span-2 { grid-column: 1 / -1; }
-/* a half-width DroppedNeedle / coming soon card stacks its internal halves */
-.builder-page .snapin-internal-stack .row > [class*="col-md-6"] {
-    flex: 0 0 100%;
-    max-width: 100%;
-}
 
 /* Collapsible source cards: a chevron toggle in each card header hides the card
    body (and, for header-only cards like text blocks, the button cluster). */
@@ -812,7 +814,9 @@
 .builder-page .snapin-collapse-toggle .nl-icon { transition: transform .15s ease; }
 .builder-page .snapin-card-header.is-collapsed .snapin-collapse-toggle .nl-icon { transform: rotate(-90deg); }
 .builder-page .snapin-card-header.is-collapsed + .snapin-card-body { display: none; }
-.builder-page .snapin-card-header.is-collapsed .snapin-card-cluster { display: none; }
+/* !important so it beats the Bootstrap .d-flex utility (also !important) that
+   the button clusters carry, otherwise the + buttons stay visible collapsed. */
+.builder-page .snapin-card-header.is-collapsed .snapin-card-cluster { display: none !important; }
 
 /* snap-in source rows (stats, graphs, libraries, users, wrapped, coming soon):
    Add button first so it never wraps under the label, label second with an

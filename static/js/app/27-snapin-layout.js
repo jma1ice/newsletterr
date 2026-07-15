@@ -56,14 +56,6 @@
         if (twoCol && visible.length % 2 === 1) {
             visible[visible.length - 1].classList.add('span-2');
         }
-
-        visible.forEach(function (el) {
-            var card = el.classList.contains('builder-card') ? el : el.querySelector('.builder-card');
-            if (!card) return;
-            var hasHalves = !!card.querySelector('.row > [class*="col-md-6"]');
-            var isHalf = twoCol && !el.classList.contains('span-2');
-            card.classList.toggle('snapin-internal-stack', hasHalves && isHalf);
-        });
     }
 
     function setCollapsed(header, collapsed) {

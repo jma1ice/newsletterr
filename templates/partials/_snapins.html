@@ -34,7 +34,9 @@
                             <div class="snapin-card-header">
                                 <button type="button" class="snapin-collapse-toggle" aria-expanded="true" aria-label="Collapse section">{{ icon('chevron-down') }}</button>
                                 <h2>media</h2>
-                                <div class="d-flex gap-2 snapin-card-cluster">
+                            </div>
+                            <div class="snapin-card-body">
+                                <div class="d-flex gap-2">
                                     <button type="button" class="nl-btn nl-btn--ghost nl-btn--sm" id="add-image-btn" title="Add an image or GIF from file or URL">
                                         + Image/GIF
                                     </button>
@@ -61,11 +63,11 @@
                                     </div>
                                     <div class="snapin-card-body">
                                         <div class="row">
-                                            <div class="col-md-6">
+                                            <div class="col-12">
                                                 <h3 class="card-subhead">wrapped</h3>
                                                 <div id="droppedneedle-user-list" class="row"></div>
                                             </div>
-                                            <div class="col-md-6">
+                                            <div class="col-12">
                                                 <h3 class="card-subhead">server stats</h3>
                                                 <div id="droppedneedle-server-list" class="row"></div>
                                             </div>
@@ -76,44 +78,16 @@
                         </div>
 
                         <div id="yearly-wrapped-col">
-                            {% if yearly_wrapped_json %}
-                                <div class="builder-card snapin-card">
-                                    <div class="snapin-card-header">
-                                        <button type="button" class="snapin-collapse-toggle" aria-expanded="true" aria-label="Collapse section">{{ icon('chevron-down') }}</button>
-                                        <h2>year in plex</h2>
-                                    </div>
-                                    <div class="snapin-card-body">
-                                        <div id="yearly-wrapped-list" class="row"></div>
-                                    </div>
+                            <div class="builder-card snapin-card" id="yearly-wrapped-card" style="{{ '' if yearly_wrapped_json else 'display:none;' }}">
+                                <div class="snapin-card-header">
+                                    <button type="button" class="snapin-collapse-toggle" aria-expanded="true" aria-label="Collapse section">{{ icon('chevron-down') }}</button>
+                                    <h2>year in plex</h2>
                                 </div>
-                            {% endif %}
-                        </div>
-
-                        <div id="coming-soon-col">
-                            {% if sonarr_coming_soon_json or radarr_coming_soon_json %}
-                                <div class="builder-card snapin-card">
-                                    <div class="snapin-card-header">
-                                        <button type="button" class="snapin-collapse-toggle" aria-expanded="true" aria-label="Collapse section">{{ icon('chevron-down') }}</button>
-                                        <h2>coming soon</h2>
-                                    </div>
-                                    <div class="snapin-card-body">
-                                        <div class="row">
-                                            <div class="col-md-6" id="sonarr-coming-soon-block" style="{{ '' if sonarr_coming_soon_json else 'display:none;' }}">
-                                                <h3 class="card-subhead">TV</h3>
-                                                <div id="sonarr-coming-soon-list" class="row"></div>
-                                            </div>
-                                            <div class="col-md-6" id="radarr-coming-soon-block" style="{{ '' if radarr_coming_soon_json else 'display:none;' }}">
-                                                <h3 class="card-subhead">Movies</h3>
-                                                <div id="radarr-coming-soon-list" class="row"></div>
-                                            </div>
-                                        </div>
-                                    </div>
+                                <div class="snapin-card-body">
+                                    <div id="yearly-wrapped-list" class="row"></div>
                                 </div>
-                            {% endif %}
+                            </div>
                         </div>
-                        </div>
-
-                        <input type="file" id="media-upload-input" accept=".png,.jpg,.jpeg,.webp,.gif" style="display: none;">
 
                         <div id="recs-col">
                             {% if recommendations_json %}
@@ -128,6 +102,32 @@
                                 </div>
                             {% endif %}
                         </div>
+
+                        <div id="coming-soon-col">
+                            {% if sonarr_coming_soon_json or radarr_coming_soon_json %}
+                                <div class="builder-card snapin-card">
+                                    <div class="snapin-card-header">
+                                        <button type="button" class="snapin-collapse-toggle" aria-expanded="true" aria-label="Collapse section">{{ icon('chevron-down') }}</button>
+                                        <h2>coming soon</h2>
+                                    </div>
+                                    <div class="snapin-card-body">
+                                        <div class="row">
+                                            <div class="col-12" id="sonarr-coming-soon-block" style="{{ '' if sonarr_coming_soon_json else 'display:none;' }}">
+                                                <h3 class="card-subhead">TV</h3>
+                                                <div id="sonarr-coming-soon-list" class="row"></div>
+                                            </div>
+                                            <div class="col-12" id="radarr-coming-soon-block" style="{{ '' if radarr_coming_soon_json else 'display:none;' }}">
+                                                <h3 class="card-subhead">Movies</h3>
+                                                <div id="radarr-coming-soon-list" class="row"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endif %}
+                        </div>
+                        </div>
+
+                        <input type="file" id="media-upload-input" accept=".png,.jpg,.jpeg,.webp,.gif" style="display: none;">
 
                         <div class="builder-card snapin-card">
                             <div class="snapin-card-header">

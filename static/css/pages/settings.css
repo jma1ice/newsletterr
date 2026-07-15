@@ -108,8 +108,11 @@
     grid-template-columns: 1fr;
     gap: var(--space-4) var(--space-5);
     align-items: start;
+    /* clear the block above (Plex block / section heading) so the first grouped
+       heading (e.g. Tautulli) isn't jammed against it */
+    margin-top: var(--space-5);
 }
-@container (min-width: 900px) {
+@container (min-width: 700px) {
     .settings-page .settings-field-grid { grid-template-columns: repeat(2, 1fr); }
 }
 .settings-page .settings-field-group { min-width: 0; }

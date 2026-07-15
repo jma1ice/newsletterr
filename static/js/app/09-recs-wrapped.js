@@ -169,10 +169,6 @@ function buildRecsUserRows() {
         row.innerHTML = `
             <div class="snapin-row p-2 border rounded">
                 <div class="snapin-row-actions">
-                    <button hidden type="button"
-                            class="nl-btn nl-btn--ghost nl-btn--sm recs-view-btn"
-                            data-user-key="${escapeHtml(userKey)}" data-target="${id}"
-                            style="font-size: .8rem; padding: .25rem .5rem;">View</button>
                     <button type="button"
                             class="nl-btn nl-btn--primary nl-btn--sm recs-add-btn"
                             data-type="recommendations" data-id="${id}"
@@ -247,7 +243,14 @@ function buildYearlyWrappedRow() {
     const host = document.getElementById('yearly-wrapped-list');
     if (!host) return;
     host.innerHTML = '';
-    if (!yearlyWrappedPayload) return;
+    // The card is always present but hidden until data arrives, so a stats pull
+    // reveals it without needing a page reload.
+    const card = document.getElementById('yearly-wrapped-card');
+    if (!yearlyWrappedPayload) {
+        if (card) card.style.display = 'none';
+        return;
+    }
+    if (card) card.style.display = '';
 
     const row = document.createElement('div');
     row.className = 'col-12 mb-2';

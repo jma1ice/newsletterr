@@ -31,6 +31,12 @@
     flex-shrink: 0;
     border-right: 1px solid var(--border);
     padding: 0 var(--space-3) 0 0;
+    /* follow the page while a long section scrolls (desktop only; the mobile
+       block below resets this to static for the horizontal tab row) */
+    position: sticky;
+    top: var(--space-5);
+    max-height: calc(100vh - var(--footer-h) - var(--space-5));
+    overflow-y: auto;
 }
 .settings-page .settings-nav nav {
     display: flex;
@@ -90,7 +96,28 @@
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     padding: var(--space-5) var(--space-5) var(--space-6);
+    /* container for the field-group grid below, which switches to two columns
+       when the section itself (not the viewport) is wide enough */
+    container-type: inline-size;
 }
+
+/* External Services and Data & Stats lay their labeled groups out two-per-row
+   when there is room; single column otherwise. Inputs shrink to fit a column. */
+.settings-page .settings-field-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--space-4) var(--space-5);
+    align-items: start;
+}
+@container (min-width: 900px) {
+    .settings-page .settings-field-grid { grid-template-columns: repeat(2, 1fr); }
+}
+.settings-page .settings-field-group { min-width: 0; }
+.settings-page .settings-field-group > h6:first-child { margin-top: 0; }
+.settings-page .settings-field-group input[type="text"],
+.settings-page .settings-field-group input[type="password"],
+.settings-page .settings-field-group input[type="number"],
+.settings-page .settings-field-group select { max-width: 100%; }
 .settings-page .settings-section h4 {
     margin-top: 0;
     margin-bottom: var(--space-5);
@@ -157,6 +184,9 @@
         border-right: none;
         border-bottom: 1px solid var(--border);
         padding: 0 0 var(--space-2);
+        position: static;
+        max-height: none;
+        overflow-y: visible;
     }
     .settings-page .settings-nav nav {
         flex-direction: row;
@@ -194,7 +224,7 @@
 .settings-page .plex-connected { color: #01b301; text-shadow: 1px 0 #000, 0 1px #000, -1px 0 #000, 0 -1px #000; }
 .settings-page .w-num { width: 80px; }
 .settings-page .w-num-lg { width: 120px; }
-.settings-page .w-field { width: 24rem; }
+.settings-page .w-field { width: 100%; max-width: 24rem; }
 .settings-page .ta-resize { width: 100%; resize: vertical; }
 
 /* Appearance section: pride flag gradient preview swatch. Shows the active

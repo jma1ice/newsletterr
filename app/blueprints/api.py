@@ -8,7 +8,7 @@ from app.db import db_connect
 from app.settings_store import get_settings
 from app.cache import gkak
 from app.crypto import encrypt, decrypt
-from app.security import requires_auth, safe_get
+from app.security import requires_auth, safe_get, require_csrf_for_json
 from app.clients.plex import get_plex_client_identifier, get_plex_headers
 
 import logging
@@ -151,6 +151,46 @@ def test_radarr():
     url = _fallback(data.get('url'), s.get('radarr_url'))
     api_key = _fallback(data.get('api_key'), s.get('radarr_api_key'))
     return jsonify(test_radarr_connection(url, api_key))
+
+PRIDE_FLAGS = frozenset({'off', 'rainbow', 'trans', 'bi', 'pan', 'nonbinary', 'lesbian', 'ace', 'progress'})
+
+@bp.route('/api/appearance', methods=['POST'])
+@requires_auth
+def set_appearance():
+    # Instant appearance changes (the sidebar theme toggle) persist here so they
+    # follow the login. Pride and floating also persist through the settings
+    # form; this endpoint only touches the three appearance columns.
+    require_csrf_for_json()
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"error": "Request body must be a JSON object"}), 400
+
+    updates = {}
+    if 'theme' in data:
+        theme = str(data.get('theme') or '').strip().lower()
+        if theme not in ('light', 'dark'):
+            return jsonify({"error": "theme must be light or dark"}), 400
+        updates['appearance_theme'] = theme
+    if 'pride' in data:
+        pride = str(data.get('pride') or 'off').strip().lower()
+        if pride not in PRIDE_FLAGS:
+            return jsonify({"error": "invalid pride flag"}), 400
+        updates['pride_flag'] = pride
+    if 'snapins_floating' in data:
+        updates['snapins_floating'] = '0' if str(data.get('snapins_floating')).lower() in ('0', 'false') else '1'
+
+    if not updates:
+        return jsonify({"error": "no appearance fields provided"}), 400
+
+    # Column names come from the fixed whitelist above, never user input.
+    conn = db_connect()
+    try:
+        assignments = ', '.join(f"{col} = ?" for col in updates)
+        conn.execute(f"UPDATE settings SET {assignments} WHERE id = 1", list(updates.values()))
+        conn.commit()
+    finally:
+        conn.close()
+    return jsonify({"status": "ok", **updates})
 
 @bp.route('/api/gif/search', methods=['GET'])
 @requires_auth

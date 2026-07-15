@@ -1,8 +1,10 @@
 {% from '_icons.html' import icon %}
-                        <div class="builder-card">
-                            <div class="d-flex justify-content-between align-items-center">
+                        <div id="snapin-grid" class="snapin-grid">
+                        <div class="builder-card snapin-card">
+                            <div class="snapin-card-header">
+                                <button type="button" class="snapin-collapse-toggle" aria-expanded="true" aria-label="Collapse section">{{ icon('chevron-down') }}</button>
                                 <h2>text blocks</h2>
-                                <div class="d-flex gap-2">
+                                <div class="d-flex gap-2 snapin-card-cluster">
                                     <button type="button" class="nl-btn nl-btn--ghost nl-btn--sm" id="add-title-btn" title="Add a title block with large heading text">
                                         + Title
                                     </button>
@@ -28,44 +30,45 @@
                             </div>
                         </div>
 
-                        <div class="builder-card">
-                            <div class="d-flex justify-content-between align-items-center">
+                        <div class="builder-card snapin-card">
+                            <div class="snapin-card-header">
+                                <button type="button" class="snapin-collapse-toggle" aria-expanded="true" aria-label="Collapse section">{{ icon('chevron-down') }}</button>
                                 <h2>media</h2>
-                                <div class="d-flex gap-2">
+                                <div class="d-flex gap-2 snapin-card-cluster">
                                     <button type="button" class="nl-btn nl-btn--ghost nl-btn--sm" id="add-image-btn" title="Add an image or GIF from file or URL">
                                         + Image/GIF
                                     </button>
                                 </div>
                             </div>
                         </div>
-                        <input type="file" id="media-upload-input" accept=".png,.jpg,.jpeg,.webp,.gif" style="display: none;">
 
-                        <div class="builder-card" id="ra-card" style="{{ '' if recent_data else 'display:none;' }}">
-                            <h2 id="ra-header" style="{{ '' if recent_data else 'display:none;' }}">recently added</h2>
-                            <div id="ra-lib-list" class="row" style="{{ '' if recent_data else 'display:none;' }}"></div>
-                        </div>
-
-                        <div id="recs-col">
-                            {% if recommendations_json %}
-                                <div class="builder-card">
-                                    <h2>recommendations</h2>
-                                    <div id="recs-user-list" class="row"></div>
-                                </div>
-                            {% endif %}
+                        <div class="builder-card snapin-card" id="ra-card" style="{{ '' if recent_data else 'display:none;' }}">
+                            <div class="snapin-card-header">
+                                <button type="button" class="snapin-collapse-toggle" aria-expanded="true" aria-label="Collapse section">{{ icon('chevron-down') }}</button>
+                                <h2 id="ra-header" style="{{ '' if recent_data else 'display:none;' }}">recently added</h2>
+                            </div>
+                            <div class="snapin-card-body">
+                                <div id="ra-lib-list" class="row" style="{{ '' if recent_data else 'display:none;' }}"></div>
+                            </div>
                         </div>
 
                         <div id="droppedneedle-col">
                             {% if droppedneedle_wrapped_json or droppedneedle_server_json %}
-                                <div class="builder-card">
-                                    <h2>DroppedNeedle stats</h2>
-                                    <div class="row">
-                                        <div class="col-md-6">
-                                            <h3 class="card-subhead">wrapped</h3>
-                                            <div id="droppedneedle-user-list" class="row"></div>
-                                        </div>
-                                        <div class="col-md-6">
-                                            <h3 class="card-subhead">server stats</h3>
-                                            <div id="droppedneedle-server-list" class="row"></div>
+                                <div class="builder-card snapin-card">
+                                    <div class="snapin-card-header">
+                                        <button type="button" class="snapin-collapse-toggle" aria-expanded="true" aria-label="Collapse section">{{ icon('chevron-down') }}</button>
+                                        <h2>DroppedNeedle stats</h2>
+                                    </div>
+                                    <div class="snapin-card-body">
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <h3 class="card-subhead">wrapped</h3>
+                                                <div id="droppedneedle-user-list" class="row"></div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <h3 class="card-subhead">server stats</h3>
+                                                <div id="droppedneedle-server-list" class="row"></div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -74,109 +77,148 @@
 
                         <div id="yearly-wrapped-col">
                             {% if yearly_wrapped_json %}
-                                <div class="builder-card">
-                                    <h2>year in review</h2>
-                                    <div id="yearly-wrapped-list" class="row"></div>
+                                <div class="builder-card snapin-card">
+                                    <div class="snapin-card-header">
+                                        <button type="button" class="snapin-collapse-toggle" aria-expanded="true" aria-label="Collapse section">{{ icon('chevron-down') }}</button>
+                                        <h2>year in plex</h2>
+                                    </div>
+                                    <div class="snapin-card-body">
+                                        <div id="yearly-wrapped-list" class="row"></div>
+                                    </div>
                                 </div>
                             {% endif %}
                         </div>
 
                         <div id="coming-soon-col">
                             {% if sonarr_coming_soon_json or radarr_coming_soon_json %}
-                                <div class="builder-card">
-                                    <h2>coming soon</h2>
-                                    <div class="row">
-                                        <div class="col-md-6" id="sonarr-coming-soon-block" style="{{ '' if sonarr_coming_soon_json else 'display:none;' }}">
-                                            <h3 class="card-subhead">TV</h3>
-                                            <div id="sonarr-coming-soon-list" class="row"></div>
-                                        </div>
-                                        <div class="col-md-6" id="radarr-coming-soon-block" style="{{ '' if radarr_coming_soon_json else 'display:none;' }}">
-                                            <h3 class="card-subhead">Movies</h3>
-                                            <div id="radarr-coming-soon-list" class="row"></div>
+                                <div class="builder-card snapin-card">
+                                    <div class="snapin-card-header">
+                                        <button type="button" class="snapin-collapse-toggle" aria-expanded="true" aria-label="Collapse section">{{ icon('chevron-down') }}</button>
+                                        <h2>coming soon</h2>
+                                    </div>
+                                    <div class="snapin-card-body">
+                                        <div class="row">
+                                            <div class="col-md-6" id="sonarr-coming-soon-block" style="{{ '' if sonarr_coming_soon_json else 'display:none;' }}">
+                                                <h3 class="card-subhead">TV</h3>
+                                                <div id="sonarr-coming-soon-list" class="row"></div>
+                                            </div>
+                                            <div class="col-md-6" id="radarr-coming-soon-block" style="{{ '' if radarr_coming_soon_json else 'display:none;' }}">
+                                                <h3 class="card-subhead">Movies</h3>
+                                                <div id="radarr-coming-soon-list" class="row"></div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
                             {% endif %}
                         </div>
+                        </div>
 
-                        <div class="builder-card">
-                            <h2>Plex collections</h2>
-                            <button type="button" class="nl-btn nl-btn--ghost nl-btn--sm mb-2" id="add-collection-group-btn">
-                                + Collection Group
-                            </button>
-                            <div class="row">
-                                <div class="col-md-4">
-                                    <h5 class="collection-heading">{{ icon('film') }} movie collections</h5>
-                                    <div class="d-flex align-items-center gap-2 mb-3">
-                                        <select id="movie-collections-dropdown" class="form-select flex-1">
-                                            <option value="">Pick collection...</option>
-                                        </select>
-                                        <button id="add-movie-collection-btn" class="nl-btn nl-btn--primary nl-btn--sm" disabled>
-                                            Add
-                                        </button>
+                        <input type="file" id="media-upload-input" accept=".png,.jpg,.jpeg,.webp,.gif" style="display: none;">
+
+                        <div id="recs-col">
+                            {% if recommendations_json %}
+                                <div class="builder-card snapin-card">
+                                    <div class="snapin-card-header">
+                                        <button type="button" class="snapin-collapse-toggle" aria-expanded="true" aria-label="Collapse section">{{ icon('chevron-down') }}</button>
+                                        <h2>recommendations</h2>
                                     </div>
-                                    <div id="movie-collections-loading" class="text-center d-none">
-                                        <div class="spinner-border spinner-border-sm" role="status">
-                                            <span class="visually-hidden">Loading...</span>
-                                        </div>
-                                        <span class="ms-2">Loading movie collections...</span>
+                                    <div class="snapin-card-body">
+                                        <div id="recs-user-list" class="row"></div>
                                     </div>
                                 </div>
-                                <div class="col-md-4">
-                                    <h5 class="collection-heading">{{ icon('tv') }} TV show collections</h5>
-                                    <div class="d-flex align-items-center gap-2 mb-3">
-                                        <select id="show-collections-dropdown" class="form-select flex-1">
-                                            <option value="">Pick collection...</option>
-                                        </select>
-                                        <button id="add-show-collection-btn" class="nl-btn nl-btn--primary nl-btn--sm" disabled>
-                                            Add
-                                        </button>
-                                    </div>
-                                    <div id="show-collections-loading" class="text-center d-none">
-                                        <div class="spinner-border spinner-border-sm" role="status">
-                                            <span class="visually-hidden">Loading...</span>
-                                        </div>
-                                        <span class="ms-2">Loading TV collections...</span>
-                                    </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="builder-card snapin-card">
+                            <div class="snapin-card-header">
+                                <button type="button" class="snapin-collapse-toggle" aria-expanded="true" aria-label="Collapse section">{{ icon('chevron-down') }}</button>
+                                <h2>Plex collections</h2>
+                                <div class="d-flex gap-2 snapin-card-cluster">
+                                    <button type="button" class="nl-btn nl-btn--ghost nl-btn--sm" id="add-collection-group-btn">
+                                        + Collection Group
+                                    </button>
                                 </div>
-                                <div class="col-md-4">
-                                    <h5 class="collection-heading">{{ icon('music') }} audio collections</h5>
-                                    <div class="d-flex align-items-center gap-2 mb-3">
-                                        <select id="audio-collections-dropdown" class="form-select flex-1">
-                                            <option value="">Pick collection...</option>
-                                        </select>
-                                        <button id="add-audio-collection-btn" class="nl-btn nl-btn--primary nl-btn--sm" disabled>
-                                            Add
-                                        </button>
-                                    </div>
-                                    <div id="audio-collections-loading" class="text-center d-none">
-                                        <div class="spinner-border spinner-border-sm" role="status">
-                                            <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <div class="snapin-card-body">
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <h5 class="collection-heading">{{ icon('film') }} movie collections</h5>
+                                        <div class="d-flex align-items-center gap-2 mb-3">
+                                            <select id="movie-collections-dropdown" class="form-select flex-1">
+                                                <option value="">Pick collection...</option>
+                                            </select>
+                                            <button id="add-movie-collection-btn" class="nl-btn nl-btn--primary nl-btn--sm" disabled>
+                                                Add
+                                            </button>
                                         </div>
-                                        <span class="ms-2">Loading audio collections...</span>
+                                        <div id="movie-collections-loading" class="text-center d-none">
+                                            <div class="spinner-border spinner-border-sm" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                            <span class="ms-2">Loading movie collections...</span>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <h5 class="collection-heading">{{ icon('tv') }} TV show collections</h5>
+                                        <div class="d-flex align-items-center gap-2 mb-3">
+                                            <select id="show-collections-dropdown" class="form-select flex-1">
+                                                <option value="">Pick collection...</option>
+                                            </select>
+                                            <button id="add-show-collection-btn" class="nl-btn nl-btn--primary nl-btn--sm" disabled>
+                                                Add
+                                            </button>
+                                        </div>
+                                        <div id="show-collections-loading" class="text-center d-none">
+                                            <div class="spinner-border spinner-border-sm" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                            <span class="ms-2">Loading TV collections...</span>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <h5 class="collection-heading">{{ icon('music') }} audio collections</h5>
+                                        <div class="d-flex align-items-center gap-2 mb-3">
+                                            <select id="audio-collections-dropdown" class="form-select flex-1">
+                                                <option value="">Pick collection...</option>
+                                            </select>
+                                            <button id="add-audio-collection-btn" class="nl-btn nl-btn--primary nl-btn--sm" disabled>
+                                                Add
+                                            </button>
+                                        </div>
+                                        <div id="audio-collections-loading" class="text-center d-none">
+                                            <div class="spinner-border spinner-border-sm" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                            <span class="ms-2">Loading audio collections...</span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        <div class="builder-card">
-                            <h2>stats and graphs</h2>
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <h3 class="card-subhead">stats</h3>
-                                    <div id="stats-list" class="row">
-                                        <div class="alert alert-info snapin-note">
-                                            <i class="fas fa-info-circle me-2"></i>
-                                            No stats data available. Click <strong>"Get Stats\Users"</strong> to load data.
+                        <div class="builder-card snapin-card">
+                            <div class="snapin-card-header">
+                                <button type="button" class="snapin-collapse-toggle" aria-expanded="true" aria-label="Collapse section">{{ icon('chevron-down') }}</button>
+                                <h2>stats and graphs</h2>
+                            </div>
+                            <div class="snapin-card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <h3 class="card-subhead">stats</h3>
+                                        <div id="stats-list" class="row">
+                                            <div class="alert alert-info snapin-note">
+                                                <i class="fas fa-info-circle me-2"></i>
+                                                No stats data available. Click <strong>"Get Stats\Users"</strong> to load data.
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                                <div class="col-md-6">
-                                    <h3 class="card-subhead">graphs</h3>
-                                    <div id="graphs-list" class="row">
-                                        <div class="alert alert-info snapin-note">
-                                            <i class="fas fa-info-circle me-2"></i>
-                                            No graph data available. Click <strong>"Get Stats\Users"</strong> to load data.
+                                    <div class="col-md-6">
+                                        <h3 class="card-subhead">graphs</h3>
+                                        <div id="graphs-list" class="row">
+                                            <div class="alert alert-info snapin-note">
+                                                <i class="fas fa-info-circle me-2"></i>
+                                                No graph data available. Click <strong>"Get Stats\Users"</strong> to load data.
+                                            </div>
                                         </div>
                                     </div>
                                 </div>

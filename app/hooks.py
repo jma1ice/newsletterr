@@ -1,6 +1,6 @@
 import secrets
 
-from flask import Response, g
+from flask import Response, g, session
 
 from app import config, state
 from app.settings_store import get_settings
@@ -16,6 +16,30 @@ def mint_csp_nonce():
 def inject_csp_nonce():
     # every template gets the same per-request nonce the CSP header carries
     return {"nonce": g.csp_nonce}
+
+def inject_csrf_token():
+    # Every page needs a token so the instant appearance toggle (base.html) can
+    # POST /api/appearance. Routes that pass csrf_token explicitly still win.
+    if not session.get('csrf_token'):
+        session['csrf_token'] = secrets.token_urlsafe(32)
+    return {"csrf_token": session['csrf_token']}
+
+def inject_appearance():
+    # Server-stored appearance follows the login: only expose it to authenticated
+    # requests so the pre-auth login/setup pages fall back to the localStorage
+    # mirror (or defaults) instead of surfacing a configured user's preferences.
+    if not session.get('authenticated'):
+        return {"appearance_boot": None}
+    try:
+        s = get_settings(decrypt_secrets=False)
+        return {"appearance_boot": {
+            "theme": s.get("appearance_theme", "dark"),
+            "pride": s.get("pride_flag", "off"),
+            "snapins_floating": str(s.get("snapins_floating", "1")),
+        }}
+    except Exception:
+        logger.debug("suppressed exception; using fallback", exc_info=True)
+        return {"appearance_boot": None}
 
 def inject_update_info():
     _ensure_recent_check()
@@ -64,5 +88,7 @@ def set_security_headers(resp: Response):
 def register(app):
     app.before_request(mint_csp_nonce)
     app.context_processor(inject_csp_nonce)
+    app.context_processor(inject_csrf_token)
+    app.context_processor(inject_appearance)
     app.context_processor(inject_update_info)
     app.after_request(set_security_headers)

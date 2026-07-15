@@ -115,6 +115,15 @@ document.getElementById('stats_form').addEventListener('submit', async (e) => {
                 recsBtn.disabled = false;
                 recsBtn.classList.remove('opacity-50', 'cursor-not-allowed');
             }
+
+            const dnBtn = document.getElementById('pullDroppedNeedleBtn');
+            // Same treatment for the DroppedNeedle button: only re-enable when
+            // the service is configured, otherwise leave it greyed with tooltip.
+            if (dnBtn && window.APP?.serviceFlags?.droppedneedle) {
+                dnBtn.disabled = false;
+                dnBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                dnBtn.removeAttribute('title');
+            }
         }
 
         if (data.time_range) currentTimeRange = parseInt(data.time_range);

@@ -191,6 +191,10 @@
 #content-row {
     align-self: start;
 }
+/* the snap-in source grid sizes its columns off this column's real width */
+#content-row {
+    container: snapins / inline-size;
+}
 
 /* One card treatment shared by every builder section so the columns read as
    a single system instead of ragged headings. */
@@ -765,21 +769,22 @@
     display: grid;
     grid-template-columns: 1fr;
     gap: var(--space-4);
-    /* stretch so the two cards in a row share a height and their bottoms line up */
-    align-items: stretch;
+    align-items: start;
     /* the grid owns its own bottom gap from the full-width cards below it */
     margin-bottom: var(--space-4);
 }
-@media (min-width: 992px) {
+/* Two columns only when the source column itself is wide enough (container
+   query, not viewport): this column is a narrow third of the builder, so a
+   viewport width tells us nothing about whether two cards actually fit. */
+@container snapins (min-width: 400px) {
     .builder-page .snapin-grid { grid-template-columns: repeat(2, 1fr); }
 }
 /* grid gap owns the vertical rhythm; drop the per-card bottom margin inside it */
 .builder-page .snapin-grid > *,
 .builder-page .snapin-grid .builder-card { margin-bottom: 0; }
-/* make each card fill its (stretched) cell so paired cards match height */
-.builder-page .snapin-grid > .builder-card { height: 100%; }
-.builder-page .snapin-grid > div:not(.builder-card) { display: flex; flex-direction: column; }
-.builder-page .snapin-grid > div:not(.builder-card) > .builder-card { flex: 1 1 auto; width: 100%; }
+/* a shared floor so paired cards read as a balanced row without forcing a short
+   card to stretch to a tall neighbor's full height */
+.builder-page .snapin-grid .builder-card { min-height: 96px; }
 /* wrappers with no rendered card (no pulled data yet) must not hold a cell */
 .builder-page .snapin-grid > .snapin-grid-hidden { display: none; }
 /* odd visible count: the layout helper spans the last card across both columns */

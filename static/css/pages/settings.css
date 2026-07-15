@@ -117,6 +117,25 @@
 }
 .settings-page .settings-field-group { min-width: 0; }
 .settings-page .settings-field-group > h6:first-child { margin-top: 0; }
+
+/* Data & Stats packs its individual fields two-per-row under full-width section
+   headings, so related controls sit side by side instead of a tall single
+   column with a mostly-empty neighbor. */
+.settings-page .settings-fields {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--space-2) var(--space-5);
+    align-items: start;
+    margin-top: var(--space-2);
+}
+@container (min-width: 700px) {
+    .settings-page .settings-fields { grid-template-columns: repeat(2, 1fr); }
+}
+.settings-page .settings-field { min-width: 0; }
+.settings-page .settings-field > label { display: block; }
+.settings-page .settings-field input,
+.settings-page .settings-field select { max-width: 100%; }
+.settings-page .settings-field .field-hint { margin-bottom: 0; }
 .settings-page .settings-field-group input[type="text"],
 .settings-page .settings-field-group input[type="password"],
 .settings-page .settings-field-group input[type="number"],

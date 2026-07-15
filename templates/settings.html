@@ -259,128 +259,147 @@
                     <div class="settings-section d-none" id="section-data-settings">
                         <h4 class="mb-4">data and stats</h4>
 
-                        <div class="settings-field-grid">
-                        <div class="settings-field-group">
                         <h6 class="text-uppercase">Recently Added</h6>
-                        <label for="recently_added_mode">Recently Added Mode:</label><br>
-                        <select id="recently_added_mode" name="recently_added_mode">
-                            <option value="items" {% if settings.recently_added_mode != 'days' %}selected{% endif %}>Items: pull a fixed number of recently added items</option>
-                            <option value="days"  {% if settings.recently_added_mode == 'days'  %}selected{% endif %}>Days: pull all items added within the last N days</option>
-                        </select><br>
-                        <p class="text-info mt-2 field-hint">
-                            Controls how the "Recently Added Items" input on the dashboard is interpreted.
-                            In <strong>Items</strong> mode the number is a count; in <strong>Days</strong> mode it is a day range and the section title will show "Added to [Library] since MM/DD/YY".
-                        </p><br>
-
-                        <label for="recently_added_sort">Recently Added Sort:</label><br>
-                        <select id="recently_added_sort" name="recently_added_sort">
-                            <option value="date"   {% if settings.get('recently_added_sort', 'date') != 'rating' %}selected{% endif %}>Date Added: most recently added first</option>
-                            <option value="rating" {% if settings.get('recently_added_sort', 'date') == 'rating' %}selected{% endif %}>Rating: highest rated first</option>
-                        </select><br>
-                        <p class="text-info mt-2 field-hint">
-                            Controls the sort order of recently added items. In <strong>Rating</strong> mode, items are fetched by date then re-sorted by their Plex rating.
-                        </p><br>
-
-                        <label for="ra_grid_columns">Recently Added Grid Columns:</label><br>
-                        <input type="number" id="ra_grid_columns" name="ra_grid_columns" min="1" max="10"
-                               value="{{ settings.get('ra_grid_columns', '5') }}"
-                               class="w-num"><br>
-                        <p class="text-info mt-2 field-hint">Number of columns in the Recently Added grid (default: 5).</p><br>
-
-                        <label for="ra_show_description">Recently Added Descriptions:</label><br>
-                        <select id="ra_show_description" name="ra_show_description">
-                            <option value="enabled"  {% if settings.get('ra_show_description', 'enabled') != 'disabled' %}selected{% endif %}>Show</option>
-                            <option value="disabled" {% if settings.get('ra_show_description', 'enabled') == 'disabled' %}selected{% endif %}>Hide</option>
-                        </select><br>
-                        <p class="text-info mt-2 field-hint">Show or hide the summary/description text under each Recently Added item in emails.</p><br>
-
+                        <div class="settings-fields">
+                            <div class="settings-field">
+                                <label for="recently_added_mode">Recently Added Mode:</label><br>
+                                <select id="recently_added_mode" name="recently_added_mode">
+                                    <option value="items" {% if settings.recently_added_mode != 'days' %}selected{% endif %}>Items: pull a fixed number of recently added items</option>
+                                    <option value="days"  {% if settings.recently_added_mode == 'days'  %}selected{% endif %}>Days: pull all items added within the last N days</option>
+                                </select>
+                                <p class="text-info mt-2 field-hint">
+                                    Controls how the "Recently Added Items" input on the dashboard is interpreted.
+                                    In <strong>Items</strong> mode the number is a count; in <strong>Days</strong> mode it is a day range and the section title will show "Added to [Library] since MM/DD/YY".
+                                </p>
+                            </div>
+                            <div class="settings-field">
+                                <label for="recently_added_sort">Recently Added Sort:</label><br>
+                                <select id="recently_added_sort" name="recently_added_sort">
+                                    <option value="date"   {% if settings.get('recently_added_sort', 'date') != 'rating' %}selected{% endif %}>Date Added: most recently added first</option>
+                                    <option value="rating" {% if settings.get('recently_added_sort', 'date') == 'rating' %}selected{% endif %}>Rating: highest rated first</option>
+                                </select>
+                                <p class="text-info mt-2 field-hint">
+                                    Controls the sort order of recently added items. In <strong>Rating</strong> mode, items are fetched by date then re-sorted by their Plex rating.
+                                </p>
+                            </div>
+                            <div class="settings-field">
+                                <label for="ra_grid_columns">Recently Added Grid Columns:</label><br>
+                                <input type="number" id="ra_grid_columns" name="ra_grid_columns" min="1" max="10"
+                                       value="{{ settings.get('ra_grid_columns', '5') }}" class="w-num">
+                                <p class="text-info mt-2 field-hint">Number of columns in the Recently Added grid (default: 5).</p>
+                            </div>
+                            <div class="settings-field">
+                                <label for="ra_show_description">Recently Added Descriptions:</label><br>
+                                <select id="ra_show_description" name="ra_show_description">
+                                    <option value="enabled"  {% if settings.get('ra_show_description', 'enabled') != 'disabled' %}selected{% endif %}>Show</option>
+                                    <option value="disabled" {% if settings.get('ra_show_description', 'enabled') == 'disabled' %}selected{% endif %}>Hide</option>
+                                </select>
+                                <p class="text-info mt-2 field-hint">Show or hide the summary/description text under each Recently Added item in emails.</p>
+                            </div>
                         </div>
-                        <div class="settings-field-group">
+
                         <h6 class="text-uppercase">Recommendations</h6>
-                        <label for="recs_grid_columns">Recommendations Grid Columns:</label><br>
-                        <input type="number" id="recs_grid_columns" name="recs_grid_columns" min="1" max="10"
-                               value="{{ settings.get('recs_grid_columns', '5') }}"
-                               class="w-num"><br>
-                        <p class="text-info mt-2 field-hint">Number of columns in the Recommendations grid (default: 5).</p><br>
-
+                        <div class="settings-fields">
+                            <div class="settings-field">
+                                <label for="recs_grid_columns">Recommendations Grid Columns:</label><br>
+                                <input type="number" id="recs_grid_columns" name="recs_grid_columns" min="1" max="10"
+                                       value="{{ settings.get('recs_grid_columns', '5') }}" class="w-num">
+                                <p class="text-info mt-2 field-hint">Number of columns in the Recommendations grid (default: 5).</p>
+                            </div>
                         </div>
-                        <div class="settings-field-group">
+
                         <h6 class="text-uppercase">Stats and Graphs</h6>
-                        <label for="stats_type">Stats &amp; Graph Metric:</label><br>
-                        <select id="stats_type" name="stats_type">
-                            <option value="plays"    {% if settings.stats_type != 'duration' %}selected{% endif %}>Plays</option>
-                            <option value="duration" {% if settings.stats_type == 'duration' %}selected{% endif %}>Duration</option>
-                        </select><br><br>
-
-                        <label for="stat_cover_art">Show Cover Art in Stat Tables:</label><br>
-                        <select id="stat_cover_art" name="stat_cover_art">
-                            <option value="disabled" {% if settings.get('stat_cover_art', 'disabled') != 'enabled' %}selected{% endif %}>Disabled</option>
-                            <option value="enabled"  {% if settings.get('stat_cover_art', 'disabled') == 'enabled' %}selected{% endif %}>Enabled</option>
-                        </select><br>
-                        <p class="text-info mt-2 field-hint">Shows a small poster thumbnail inline with each item's title in media stat tables (Movies, TV Shows, Artists, Recently Watched).</p><br>
-
-                        <label for="hide_stat_play_counts">Hide Play Counts in Stat Cards:</label><br>
-                        <select id="hide_stat_play_counts" name="hide_stat_play_counts">
-                            <option value="disabled" {% if settings.hide_stat_play_counts != 'enabled' %}selected{% endif %}>Show</option>
-                            <option value="enabled"  {% if settings.hide_stat_play_counts == 'enabled' %}selected{% endif %}>Hide</option>
-                        </select><br><br>
-
-                        <label for="hide_graph_play_counts">Hide Play Counts in Graphs (y-axis labels &amp; tooltips):</label><br>
-                        <select id="hide_graph_play_counts" name="hide_graph_play_counts">
-                            <option value="disabled" {% if settings.hide_graph_play_counts != 'enabled' %}selected{% endif %}>Show</option>
-                            <option value="enabled"  {% if settings.hide_graph_play_counts == 'enabled' %}selected{% endif %}>Hide</option>
-                        </select><br><br>
-
-                        <label for="include_user_info">Include Other Users' Info:</label><br>
-                        <select id="include_user_info" name="include_user_info">
-                            <option value="enabled"  {% if settings.get('include_user_info', 'enabled') != 'disabled' %}selected{% endif %}>Include</option>
-                            <option value="disabled" {% if settings.get('include_user_info', 'enabled') == 'disabled' %}selected{% endif %}>Exclude</option>
-                        </select><br>
-                        <p class="text-info mt-2 field-hint">When set to Include, usernames and profile pictures of other users appear in the "Most Active Users" stat, the Wrapped "Most Active" highlight, and the top-users graphs. When set to Exclude, that content is removed from emails regardless of what a template selected. A recipient's own DroppedNeedle Wrapped is not affected.</p><br>
-
+                        <div class="settings-fields">
+                            <div class="settings-field">
+                                <label for="stats_type">Stats &amp; Graph Metric:</label><br>
+                                <select id="stats_type" name="stats_type">
+                                    <option value="plays"    {% if settings.stats_type != 'duration' %}selected{% endif %}>Plays</option>
+                                    <option value="duration" {% if settings.stats_type == 'duration' %}selected{% endif %}>Duration</option>
+                                </select>
+                            </div>
+                            <div class="settings-field">
+                                <label for="stat_cover_art">Show Cover Art in Stat Tables:</label><br>
+                                <select id="stat_cover_art" name="stat_cover_art">
+                                    <option value="disabled" {% if settings.get('stat_cover_art', 'disabled') != 'enabled' %}selected{% endif %}>Disabled</option>
+                                    <option value="enabled"  {% if settings.get('stat_cover_art', 'disabled') == 'enabled' %}selected{% endif %}>Enabled</option>
+                                </select>
+                                <p class="text-info mt-2 field-hint">Shows a small poster thumbnail inline with each item's title in media stat tables (Movies, TV Shows, Artists, Recently Watched).</p>
+                            </div>
+                            <div class="settings-field">
+                                <label for="hide_stat_play_counts">Hide Play Counts in Stat Cards:</label><br>
+                                <select id="hide_stat_play_counts" name="hide_stat_play_counts">
+                                    <option value="disabled" {% if settings.hide_stat_play_counts != 'enabled' %}selected{% endif %}>Show</option>
+                                    <option value="enabled"  {% if settings.hide_stat_play_counts == 'enabled' %}selected{% endif %}>Hide</option>
+                                </select>
+                            </div>
+                            <div class="settings-field">
+                                <label for="hide_graph_play_counts">Hide Play Counts in Graphs (y-axis labels &amp; tooltips):</label><br>
+                                <select id="hide_graph_play_counts" name="hide_graph_play_counts">
+                                    <option value="disabled" {% if settings.hide_graph_play_counts != 'enabled' %}selected{% endif %}>Show</option>
+                                    <option value="enabled"  {% if settings.hide_graph_play_counts == 'enabled' %}selected{% endif %}>Hide</option>
+                                </select>
+                            </div>
+                            <div class="settings-field">
+                                <label for="include_user_info">Include Other Users' Info:</label><br>
+                                <select id="include_user_info" name="include_user_info">
+                                    <option value="enabled"  {% if settings.get('include_user_info', 'enabled') != 'disabled' %}selected{% endif %}>Include</option>
+                                    <option value="disabled" {% if settings.get('include_user_info', 'enabled') == 'disabled' %}selected{% endif %}>Exclude</option>
+                                </select>
+                                <p class="text-info mt-2 field-hint">When set to Include, usernames and profile pictures of other users appear in the "Most Active Users" stat, the Wrapped "Most Active" highlight, and the top-users graphs. When set to Exclude, that content is removed from emails regardless of what a template selected. A recipient's own DroppedNeedle Wrapped is not affected.</p>
+                            </div>
                         </div>
-                        <div class="settings-field-group">
+
                         <h6 class="text-uppercase">Coming Soon</h6>
-                        <label for="coming_soon_days_ahead">Coming Soon Calendar Window (days ahead):</label><br>
-                        <input type="number" id="coming_soon_days_ahead" name="coming_soon_days_ahead" min="1" max="90"
-                            value="{{ settings.get('coming_soon_days_ahead', '14') }}"><br><br>
-
-                        <label for="coming_soon_grid_columns">Coming Soon Grid Columns:</label><br>
-                        <input type="number" id="coming_soon_grid_columns" name="coming_soon_grid_columns" min="1" max="10"
-                            value="{{ settings.get('coming_soon_grid_columns', '5') }}"><br><br>
-
+                        <div class="settings-fields">
+                            <div class="settings-field">
+                                <label for="coming_soon_days_ahead">Coming Soon Calendar Window (days ahead):</label><br>
+                                <input type="number" id="coming_soon_days_ahead" name="coming_soon_days_ahead" min="1" max="90"
+                                    value="{{ settings.get('coming_soon_days_ahead', '14') }}" class="w-num-lg">
+                            </div>
+                            <div class="settings-field">
+                                <label for="coming_soon_grid_columns">Coming Soon Grid Columns:</label><br>
+                                <input type="number" id="coming_soon_grid_columns" name="coming_soon_grid_columns" min="1" max="10"
+                                    value="{{ settings.get('coming_soon_grid_columns', '5') }}" class="w-num">
+                            </div>
                         </div>
-                        <div class="settings-field-group">
+
                         <h6 class="text-uppercase">Collections</h6>
-                        <label for="collections_grid_columns">Collections Grid Columns:</label><br>
-                        <input type="number" id="collections_grid_columns" name="collections_grid_columns" min="1" max="10"
-                            value="{{ settings.get('collections_grid_columns', '5') }}"><br>
-                        <p class="text-info mt-2 field-hint">Number of collection/item cards per row in Collections email blocks (default: 5).</p><br>
-
+                        <div class="settings-fields">
+                            <div class="settings-field">
+                                <label for="collections_grid_columns">Collections Grid Columns:</label><br>
+                                <input type="number" id="collections_grid_columns" name="collections_grid_columns" min="1" max="10"
+                                    value="{{ settings.get('collections_grid_columns', '5') }}" class="w-num">
+                                <p class="text-info mt-2 field-hint">Number of collection/item cards per row in Collections email blocks (default: 5).</p>
+                            </div>
                         </div>
-                        <div class="settings-field-group">
+
                         <h6 class="text-uppercase">Posters</h6>
-                        <label for="poster_max_height">Poster Max Height (px):</label><br>
-                        <input type="number" id="poster_max_height" name="poster_max_height" min="50" max="2000"
-                               value="{{ settings.get('poster_max_height', '') }}"
-                               placeholder="Original" class="w-num-lg"><br>
-                        <p class="text-info mt-2 field-hint">Caps the pixel height of posters embedded in emails (Recently Added, Recommendations, Collections). Width scales automatically to preserve aspect ratio. Leave blank to use original resolution.</p><br>
-
+                        <div class="settings-fields">
+                            <div class="settings-field">
+                                <label for="poster_max_height">Poster Max Height (px):</label><br>
+                                <input type="number" id="poster_max_height" name="poster_max_height" min="50" max="2000"
+                                       value="{{ settings.get('poster_max_height', '') }}"
+                                       placeholder="Original" class="w-num-lg">
+                                <p class="text-info mt-2 field-hint">Caps the pixel height of posters embedded in emails (Recently Added, Recommendations, Collections). Width scales automatically to preserve aspect ratio. Leave blank to use original resolution.</p>
+                            </div>
                         </div>
-                        <div class="settings-field-group">
+
                         <h6 class="text-uppercase">Recipients</h6>
-                        <label for="exclude_inactive_days">Skip Recipients Inactive For (days):</label><br>
-                        <input type="number" id="exclude_inactive_days" name="exclude_inactive_days" min="0" max="3650"
-                            value="{{ settings.get('exclude_inactive_days', '0') }}" class="w-num-lg"><br>
-                        <p class="text-info mt-2 field-hint">Skip sending to recipients who have not streamed on Tautulli within this many days (0 = send to everyone). Recipients not found among Tautulli users are always kept. Requires Tautulli to be configured.</p><br>
-
-                        <label for="recipient_display_name">Recipient Display Name (used in recommendation emails):</label><br>
-                        <select id="recipient_display_name" name="recipient_display_name">
-                            <option value="email" {% if settings.recipient_display_name == 'email' %}selected{% endif %}>Email Address</option>
-                            <option value="username" {% if settings.recipient_display_name == 'username' %}selected{% endif %}>Username</option>
-                            <option value="friendly_name" {% if settings.recipient_display_name == 'friendly_name' %}selected{% endif %}>Friendly Name</option>
-                        </select><br><br>
-                        </div>
+                        <div class="settings-fields">
+                            <div class="settings-field">
+                                <label for="exclude_inactive_days">Skip Recipients Inactive For (days):</label><br>
+                                <input type="number" id="exclude_inactive_days" name="exclude_inactive_days" min="0" max="3650"
+                                    value="{{ settings.get('exclude_inactive_days', '0') }}" class="w-num-lg">
+                                <p class="text-info mt-2 field-hint">Skip sending to recipients who have not streamed on Tautulli within this many days (0 = send to everyone). Recipients not found among Tautulli users are always kept. Requires Tautulli to be configured.</p>
+                            </div>
+                            <div class="settings-field">
+                                <label for="recipient_display_name">Recipient Display Name (used in recommendation emails):</label><br>
+                                <select id="recipient_display_name" name="recipient_display_name">
+                                    <option value="email" {% if settings.recipient_display_name == 'email' %}selected{% endif %}>Email Address</option>
+                                    <option value="username" {% if settings.recipient_display_name == 'username' %}selected{% endif %}>Username</option>
+                                    <option value="friendly_name" {% if settings.recipient_display_name == 'friendly_name' %}selected{% endif %}>Friendly Name</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
 

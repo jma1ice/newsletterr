@@ -21,12 +21,11 @@
     {% endif %}
 
     {% if audit_results %}
-        <div class="mb-3">
-            {% set audit_class = {'ok': 'nl-alert--success', 'error': 'nl-alert--danger', 'warning': 'nl-alert--warning'} %}
+        <div class="settings-audit mb-3">
             {% for result in audit_results %}
-                <p class="nl-alert {{ audit_class.get(result.status, '') }} mb-1">
+                <div class="settings-audit-line settings-audit-line--{{ result.status }}">
                     {{ result.service }}: {{ result.message }}
-                </p>
+                </div>
             {% endfor %}
         </div>
     {% endif %}

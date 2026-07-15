@@ -191,11 +191,12 @@
     border: 1px solid var(--border);
     font-size: var(--text-base);
 }
+/* Fades the alert out; 25-shell.js then sets display:none on animationend so the
+   space it occupied is reclaimed. */
 @keyframes alertFadeOut {
     to {
         opacity: 0;
         visibility: hidden;
-        display: none;
     }
 }
 .nl-alert--success { background: var(--success-soft); border-color: var(--success); color: var(--success); animation: alertFadeOut 300ms ease 5s forwards; }
@@ -393,13 +394,19 @@ body.nl-modal-open { overflow: hidden; }
     align-items: center;
     gap: var(--space-3);
 
-    padding: 24px 32px;
+    padding: 44px 64px;
+    min-width: 360px;
+    min-height: 260px;
+    justify-content: center;
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-lg);
 }
 .spinner-card img { max-width: 120px; height: auto; }
+/* the recommendations pull appends its Cancel button here so the border box
+   wraps the spinner, text and cancel together */
+.spinner-card #recs-cancel-btn { margin-top: var(--space-2); }
 .spinner-card p { margin-top: var(--space-3); }
 /* Rotating flavor line under the pinned action text. The scrim is always dark
    (theme-independent), so this uses a fixed light-muted color, not a token. */

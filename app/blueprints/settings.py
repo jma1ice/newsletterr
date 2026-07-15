@@ -474,6 +474,8 @@ def settings():
     hosted_base_url = s.get("hosted_base_url")
     hosted_images_enabled = s.get("hosted_images_enabled")
     email_size_warn_mb = s.get("email_size_warn_mb")
+    pride_flag = s.get("pride_flag")
+    snapins_floating = s.get("snapins_floating")
 
     current_theme = email_theme or "newsletterr_blue"
     if current_theme in theme_presets and current_theme != "custom":
@@ -536,6 +538,8 @@ def settings():
         "hosted_base_url": hosted_base_url or "",
         "hosted_images_enabled": hosted_images_enabled or "disabled",
         "email_size_warn_mb": email_size_warn_mb if email_size_warn_mb is not None else "10",
+        "pride_flag": pride_flag or "off",
+        "snapins_floating": snapins_floating if snapins_floating not in (None, "") else "1",
     }
     # secrets are never sent to the browser; the form shows a placeholder and
     # a blank submission keeps the stored value (write-only fields)

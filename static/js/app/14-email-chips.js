@@ -43,7 +43,7 @@
         if (box.querySelector(sel)) {
             return;
         };
-        box.insertBefore(makeChip(email), input);
+        box.after(makeChip(email), input);
         syncHiddenFromDOM();
     }
 

@@ -12,4 +12,12 @@ function escapeHtml(value) {
     const e = document.getElementById('error_p');
     if (a && a.textContent.trim()) a.style.display = '';
     if (e && e.textContent.trim()) e.style.display = '';
+
+    const plexClose = document.getElementById('plex_warning_close');
+    if (plexClose) {
+        plexClose.addEventListener('click', () => {
+            const banner = document.getElementById('plex_warning_p');
+            if (banner) banner.style.display = 'none';
+        });
+    }
 })();

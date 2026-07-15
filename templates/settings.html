@@ -21,12 +21,11 @@
     {% endif %}
 
     {% if audit_results %}
-        <div class="mb-3">
-            {% set audit_class = {'ok': 'nl-alert--success', 'error': 'nl-alert--danger', 'warning': 'nl-alert--warning'} %}
+        <div class="settings-audit mb-3">
             {% for result in audit_results %}
-                <p class="nl-alert {{ audit_class.get(result.status, '') }} mb-1">
+                <div class="settings-audit-line settings-audit-line--{{ result.status }}">
                     {{ result.service }}: {{ result.message }}
-                </p>
+                </div>
             {% endfor %}
         </div>
     {% endif %}
@@ -41,25 +40,25 @@
             <div class="settings-nav">
                 <nav>
                     <button type="button" class="settings-nav-btn active" data-section="email-server">
-                        Email Server
+                        email server
                     </button>
                     <button type="button" class="settings-nav-btn" data-section="external-services">
-                        Connections
+                        connections
                     </button>
                     <button type="button" class="settings-nav-btn" data-section="data-settings">
-                        Data and Stats
+                        data and stats
                     </button>
                     <button type="button" class="settings-nav-btn" data-section="email-styling">
-                        Email Content
+                        email content
                     </button>
                     <button type="button" class="settings-nav-btn" data-section="security">
-                        Security
+                        security
                     </button>
                     <button type="button" class="settings-nav-btn" data-section="hosted-features">
-                        Hosted Features
+                        hosted features
                     </button>
                     <button type="button" class="settings-nav-btn" data-section="appearance">
-                        Appearance
+                        appearance
                     </button>
                 </nav>
             </div>
@@ -69,7 +68,7 @@
                     <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
 
                     <div class="settings-section" id="section-email-server">
-                        <h4 class="mb-4">Email Server</h4>
+                        <h4 class="mb-4">email server</h4>
 
                         <p>
                             <button type="button" class="nl-btn nl-btn--primary nl-btn--sm" data-bs-toggle="modal" data-bs-target="#emailWizardModal">Email Setup Wizard</button>
@@ -128,236 +127,283 @@
                         </select><br>
                         <p class="text-info mt-2 field-hint">In <strong>To:</strong> mode each recipient gets an individual send with their own address in the To: header. No automatic sender copy.</p><br>
 
-                        <button id="apply_settings" class="nl-btn nl-btn--primary">Apply Settings</button>
+                        <label for="email_size_warn_mb">Large Email Warning Threshold (MB):</label><br>
+                        <input type="number" id="email_size_warn_mb" name="email_size_warn_mb" min="0" max="100"
+                            value="{{ settings.get('email_size_warn_mb', '10') }}" class="w-num"><br>
+                        <p class="text-info mt-2 field-hint">Before a real send, if the rendered email is larger than this, a confirm dialog asks you to proceed. Set to 0 to disable the warning. Does not apply to Send Test.</p><br>
+
                         <button type="button" id="send_test_email_btn" class="nl-btn nl-btn--primary">Send Test Email</button>
                         <span id="send_test_email_result" class="test-result"></span>
-                        <p class="field-hint mt-2">Send Test Email uses your <em>saved</em> settings and delivers to your From address. Apply Settings first if you just changed anything.</p>
+                        <p class="field-hint mt-2">Send Test Email uses your <em>saved</em> settings and delivers to
+                            {% if settings.from_email %}<strong>{{ settings.from_email }}</strong>{% else %}your From address{% endif %}.
+                            Apply Settings first if you just changed anything.</p>
                     </div>
 
                     <div class="settings-section d-none" id="section-external-services">
-                        <h4 class="mb-4">Connections</h4>
-
-                        <h6 class="text-uppercase">Plex</h6>
-                        <button id="connect_plex" type="button" class="nl-btn nl-btn--primary mb-2">{% if settings.plex_token %}Reconnect{% else %}Connect Plex{% endif %}</button>
-                        <div id="plex_status" class="mb-3">{% if settings.plex_token %}<p class="plex-connected">Connected</p>{% endif %}</div>
-
-                        <label for="server_name">Plex Server Name:</label><br>
-                        <input type="text" id="server_name" name="server_name"
-                            {% if settings.server_name != "" %}value="{{ settings.server_name }}"{% endif %}
-                            placeholder="Paramount Plex" required><br><br>
-
-                        <label for="plex_url">Plex URL (Optional - for posters on recently added and stats):</label><br>
-                        <input type="text" id="plex_url" name="plex_url"
-                            {% if settings.plex_url != "" %}value="{{ settings.plex_url }}"{% endif %}
-                            placeholder="http://localhost:32400"><br><br>
-
-                        <hr>
-                        <h6 class="text-uppercase">Tautulli</h6>
-                        <label for="tautulli_url">Tautulli Base URL (Optional - for user emails, stats, graphs, recently added):</label><br>
-                        <input type="text" id="tautulli_url" name="tautulli_url"
-                            {% if settings.tautulli_url != "" %}value="{{ settings.tautulli_url }}"{% endif %}
-                            placeholder="http://localhost:8181"><br><br>
-
-                        <label for="tautulli_api">Tautulli API Key (Optional):</label><br>
-                        <input type="password" id="tautulli_api" name="tautulli_api" autocomplete="new-password"
-                            placeholder="{% if settings.has_tautulli_api %}Saved - leave blank to keep{% else %}Tautulli API Key{% endif %}"><br>
-                        <div class="svc-test">
-                            <button type="button" id="test_tautulli" class="nl-btn nl-btn--primary nl-btn--sm">{% if settings.has_tautulli_api %}Retest{% else %}Test Connection{% endif %}</button>
-                            <span id="tautulli_test_result"></span>
+                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
+                            <h4 class="mb-0">connections</h4>
+                            <div class="svc-test mb-0">
+                                <button type="button" id="test_all_btn" class="nl-btn nl-btn--primary nl-btn--sm">Test All</button>
+                                <span id="test_all_result"></span>
+                            </div>
                         </div>
 
-                        <hr>
-                        <h6 class="text-uppercase">Conjurr</h6>
-                        <label for="conjurr_url">Conjurr Base URL (Optional - for recommendations):</label><br>
-                        <input type="text" id="conjurr_url" name="conjurr_url"
-                            {% if settings.conjurr_url != "" %}value="{{ settings.conjurr_url }}"{% endif %}
-                            placeholder="http://localhost:2665"><br>
-                        <div class="svc-test">
-                            <button type="button" id="test_conjurr" class="nl-btn nl-btn--primary nl-btn--sm">{% if settings.conjurr_url %}Retest{% else %}Test Connection{% endif %}</button>
-                            <span id="conjurr_test_result"></span>
+                        <div class="settings-field-group">
+                            <h6 class="text-uppercase">Plex</h6>
+                            <button id="connect_plex" type="button" class="nl-btn nl-btn--primary mb-2">{% if settings.plex_token %}Force Reconnect{% else %}Connect Plex{% endif %}</button>
+                            <div id="plex_status" class="mb-3">{% if settings.plex_token %}<p class="plex-connected">Connected</p>{% endif %}</div>
+
+                            <label for="server_name">Plex Server Name:</label><br>
+                            <input type="text" id="server_name" name="server_name"
+                                {% if settings.server_name != "" %}value="{{ settings.server_name }}"{% endif %}
+                                placeholder="Paramount Plex" required><br><br>
+
+                            <label for="plex_url">Plex URL (Optional - for posters on recently added and stats):</label><br>
+                            <input type="text" id="plex_url" name="plex_url"
+                                {% if settings.plex_url != "" %}value="{{ settings.plex_url }}"{% endif %}
+                                placeholder="http://localhost:32400"><br>
                         </div>
 
-                        <hr>
-                        <h6 class="text-uppercase">DroppedNeedle</h6>
-                        <label for="droppedneedle_url">DroppedNeedle Base URL (Optional - for year-in-review stats):</label><br>
-                        <input type="text" id="droppedneedle_url" name="droppedneedle_url"
-                            {% if settings.droppedneedle_url != "" %}value="{{ settings.droppedneedle_url }}"{% endif %}
-                            placeholder="http://localhost:8688"><br><br>
+                        <div class="settings-field-grid">
+                            <div class="settings-field-group">
+                                <h6 class="text-uppercase">Tautulli</h6>
+                                <label for="tautulli_url">Tautulli Base URL (Optional - for user emails, stats, graphs, recently added):</label><br>
+                                <input type="text" id="tautulli_url" name="tautulli_url"
+                                    {% if settings.tautulli_url != "" %}value="{{ settings.tautulli_url }}"{% endif %}
+                                    placeholder="http://localhost:8181" class="w-field"><br><br>
 
-                        <label for="droppedneedle_api_key">DroppedNeedle Wrapped API Key:</label><br>
-                        <input type="password" id="droppedneedle_api_key" name="droppedneedle_api_key" autocomplete="new-password"
-                            placeholder="{% if settings.has_droppedneedle_api_key %}Saved - leave blank to keep{% else %}Matches WRAPPED_API_KEY in DroppedNeedle{% endif %}"><br>
-                        <div class="svc-test">
-                            <button type="button" id="test_droppedneedle" class="nl-btn nl-btn--primary nl-btn--sm">{% if settings.has_droppedneedle_api_key %}Retest{% else %}Test Connection{% endif %}</button>
-                            <span id="droppedneedle_test_result"></span>
+                                <label for="tautulli_api">Tautulli API Key (Optional):</label><br>
+                                <input type="password" id="tautulli_api" name="tautulli_api" autocomplete="new-password" class="w-field"
+                                    placeholder="{% if settings.has_tautulli_api %}Saved - leave blank to keep{% else %}Tautulli API Key{% endif %}"><br>
+                                <div class="svc-test">
+                                    <button type="button" id="test_tautulli" class="nl-btn nl-btn--primary nl-btn--sm">Test Connection</button>
+                                    <span id="tautulli_test_result"></span>
+                                </div>
+                            </div>
+
+                            <div class="settings-field-group">
+                                <h6 class="text-uppercase">Conjurr</h6>
+                                <label for="conjurr_url">Conjurr Base URL (Optional - for recommendations):</label><br>
+                                <input type="text" id="conjurr_url" name="conjurr_url"
+                                    {% if settings.conjurr_url != "" %}value="{{ settings.conjurr_url }}"{% endif %}
+                                    placeholder="http://localhost:2665" class="w-field"><br>
+                                <div class="svc-test">
+                                    <button type="button" id="test_conjurr" class="nl-btn nl-btn--primary nl-btn--sm">Test Connection</button>
+                                    <span id="conjurr_test_result"></span>
+                                </div>
+                            </div>
+
+                            <div class="settings-field-group">
+                                <h6 class="text-uppercase">DroppedNeedle</h6>
+                                <label for="droppedneedle_url">DroppedNeedle Base URL (Optional - for year-in-review stats):</label><br>
+                                <input type="text" id="droppedneedle_url" name="droppedneedle_url"
+                                    {% if settings.droppedneedle_url != "" %}value="{{ settings.droppedneedle_url }}"{% endif %}
+                                    placeholder="http://localhost:8688" class="w-field"><br><br>
+
+                                <label for="droppedneedle_api_key">DroppedNeedle Wrapped API Key:</label><br>
+                                <input type="password" id="droppedneedle_api_key" name="droppedneedle_api_key" autocomplete="new-password" class="w-field"
+                                    placeholder="{% if settings.has_droppedneedle_api_key %}Saved - leave blank to keep{% else %}Matches WRAPPED_API_KEY in DroppedNeedle{% endif %}"><br>
+                                <div class="svc-test">
+                                    <button type="button" id="test_droppedneedle" class="nl-btn nl-btn--primary nl-btn--sm">Test Connection</button>
+                                    <span id="droppedneedle_test_result"></span>
+                                </div>
+                            </div>
+
+                            <div class="settings-field-group">
+                                <h6 class="text-uppercase">Sonarr</h6>
+                                <label for="sonarr_url">Sonarr Base URL (Optional - for the coming soon calendar):</label><br>
+                                <input type="text" id="sonarr_url" name="sonarr_url"
+                                    {% if settings.sonarr_url != "" %}value="{{ settings.sonarr_url }}"{% endif %}
+                                    placeholder="http://localhost:8989" class="w-field"><br>
+                                <small class="form-text text-muted">Leave blank to use http://localhost:8989. Clear the API key to disable.</small><br><br>
+
+                                <label for="sonarr_api_key">Sonarr API Key:</label><br>
+                                <input type="password" id="sonarr_api_key" name="sonarr_api_key" autocomplete="new-password" class="w-field"
+                                    placeholder="{% if settings.has_sonarr_api_key %}Saved - leave blank to keep{% else %}Settings > General > API Key in Sonarr{% endif %}"><br>
+                                <div class="svc-test">
+                                    <button type="button" id="test_sonarr" class="nl-btn nl-btn--primary nl-btn--sm">Test Connection</button>
+                                    <span id="sonarr_test_result"></span>
+                                </div>
+                            </div>
+
+                            <div class="settings-field-group">
+                                <h6 class="text-uppercase">Radarr</h6>
+                                <label for="radarr_url">Radarr Base URL (Optional - for the coming soon calendar):</label><br>
+                                <input type="text" id="radarr_url" name="radarr_url"
+                                    {% if settings.radarr_url != "" %}value="{{ settings.radarr_url }}"{% endif %}
+                                    placeholder="http://localhost:7878" class="w-field"><br>
+                                <small class="form-text text-muted">Leave blank to use http://localhost:7878. Clear the API key to disable.</small><br><br>
+
+                                <label for="radarr_api_key">Radarr API Key:</label><br>
+                                <input type="password" id="radarr_api_key" name="radarr_api_key" autocomplete="new-password" class="w-field"
+                                    placeholder="{% if settings.has_radarr_api_key %}Saved - leave blank to keep{% else %}Settings > General > API Key in Radarr{% endif %}"><br>
+                                <div class="svc-test">
+                                    <button type="button" id="test_radarr" class="nl-btn nl-btn--primary nl-btn--sm">Test Connection</button>
+                                    <span id="radarr_test_result"></span>
+                                </div>
+                            </div>
+
+                            <div class="settings-field-group">
+                                <h6 class="text-uppercase">Discord</h6>
+                                <label for="discord_webhook_url">Discord Webhook URL (optional):</label><br>
+                                <input type="password" id="discord_webhook_url" name="discord_webhook_url" autocomplete="off" class="w-field"
+                                    placeholder="{% if settings.has_discord_webhook_url %}Saved - leave blank to keep{% else %}https://discord.com/api/webhooks/...{% endif %}"><br>
+                                <p class="text-info mt-2 field-hint">
+                                    Used by the "Send to Discord" button on the Export Logs page to attach a redacted log file to a channel or forum thread of your choosing.
+                                </p>
+                            </div>
                         </div>
-
-                        <hr>
-                        <h6 class="text-uppercase">Sonarr</h6>
-                        <label for="sonarr_url">Sonarr Base URL (Optional - for the coming soon calendar):</label><br>
-                        <input type="text" id="sonarr_url" name="sonarr_url"
-                            {% if settings.sonarr_url != "" %}value="{{ settings.sonarr_url }}"{% endif %}
-                            placeholder="http://localhost:8989"><br>
-                        <small class="form-text text-muted">Leave blank to use http://localhost:8989. Clear the API key to disable.</small><br><br>
-
-                        <label for="sonarr_api_key">Sonarr API Key:</label><br>
-                        <input type="password" id="sonarr_api_key" name="sonarr_api_key" autocomplete="new-password"
-                            placeholder="{% if settings.has_sonarr_api_key %}Saved - leave blank to keep{% else %}Settings > General > API Key in Sonarr{% endif %}"><br>
-                        <div class="svc-test">
-                            <button type="button" id="test_sonarr" class="nl-btn nl-btn--primary nl-btn--sm">{% if settings.has_sonarr_api_key %}Retest{% else %}Test Connection{% endif %}</button>
-                            <span id="sonarr_test_result"></span>
-                        </div>
-
-                        <hr>
-                        <h6 class="text-uppercase">Radarr</h6>
-                        <label for="radarr_url">Radarr Base URL (Optional - for the coming soon calendar):</label><br>
-                        <input type="text" id="radarr_url" name="radarr_url"
-                            {% if settings.radarr_url != "" %}value="{{ settings.radarr_url }}"{% endif %}
-                            placeholder="http://localhost:7878"><br>
-                        <small class="form-text text-muted">Leave blank to use http://localhost:7878. Clear the API key to disable.</small><br><br>
-
-                        <label for="radarr_api_key">Radarr API Key:</label><br>
-                        <input type="password" id="radarr_api_key" name="radarr_api_key" autocomplete="new-password"
-                            placeholder="{% if settings.has_radarr_api_key %}Saved - leave blank to keep{% else %}Settings > General > API Key in Radarr{% endif %}"><br>
-                        <div class="svc-test">
-                            <button type="button" id="test_radarr" class="nl-btn nl-btn--primary nl-btn--sm">{% if settings.has_radarr_api_key %}Retest{% else %}Test Connection{% endif %}</button>
-                            <span id="radarr_test_result"></span>
-                        </div>
-
-                        <hr>
-                        <h6 class="text-uppercase">Discord</h6>
-                        <label for="discord_webhook_url">Discord Webhook URL (optional):</label><br>
-                        <input type="password" id="discord_webhook_url" name="discord_webhook_url" autocomplete="off" class="w-field"
-                            placeholder="{% if settings.has_discord_webhook_url %}Saved - leave blank to keep{% else %}https://discord.com/api/webhooks/...{% endif %}"><br>
-                        <p class="text-info mt-2 field-hint">
-                            Used by the "Send to Discord" button on the Export Logs page to attach a redacted log file to a channel or forum thread of your choosing.
-                        </p><br>
-
-                        <button id="apply_settings_ext" class="nl-btn nl-btn--primary">Apply Settings</button>
                     </div>
 
                     <div class="settings-section d-none" id="section-data-settings">
-                        <h4 class="mb-4">Data and Stats</h4>
+                        <h4 class="mb-4">data and stats</h4>
 
                         <h6 class="text-uppercase">Recently Added</h6>
-                        <label for="recently_added_mode">Recently Added Mode:</label><br>
-                        <select id="recently_added_mode" name="recently_added_mode">
-                            <option value="items" {% if settings.recently_added_mode != 'days' %}selected{% endif %}>Items: pull a fixed number of recently added items</option>
-                            <option value="days"  {% if settings.recently_added_mode == 'days'  %}selected{% endif %}>Days: pull all items added within the last N days</option>
-                        </select><br>
-                        <p class="text-info mt-2 field-hint">
-                            Controls how the "Recently Added Items" input on the dashboard is interpreted.
-                            In <strong>Items</strong> mode the number is a count; in <strong>Days</strong> mode it is a day range and the section title will show "Added to [Library] since MM/DD/YY".
-                        </p><br>
+                        <div class="settings-fields">
+                            <div class="settings-field">
+                                <label for="recently_added_mode">Recently Added Mode:</label><br>
+                                <select id="recently_added_mode" name="recently_added_mode">
+                                    <option value="items" {% if settings.recently_added_mode != 'days' %}selected{% endif %}>Items: pull a fixed number of recently added items</option>
+                                    <option value="days"  {% if settings.recently_added_mode == 'days'  %}selected{% endif %}>Days: pull all items added within the last N days</option>
+                                </select>
+                                <p class="text-info mt-2 field-hint">
+                                    Controls how the "Recently Added Items" input on the dashboard is interpreted.
+                                    In <strong>Items</strong> mode the number is a count; in <strong>Days</strong> mode it is a day range and the section title will show "Added to [Library] since MM/DD/YY".
+                                </p>
+                            </div>
+                            <div class="settings-field">
+                                <label for="recently_added_sort">Recently Added Sort:</label><br>
+                                <select id="recently_added_sort" name="recently_added_sort">
+                                    <option value="date"   {% if settings.get('recently_added_sort', 'date') != 'rating' %}selected{% endif %}>Date Added: most recently added first</option>
+                                    <option value="rating" {% if settings.get('recently_added_sort', 'date') == 'rating' %}selected{% endif %}>Rating: highest rated first</option>
+                                </select>
+                                <p class="text-info mt-2 field-hint">
+                                    Controls the sort order of recently added items. In <strong>Rating</strong> mode, items are fetched by date then re-sorted by their Plex rating.
+                                </p>
+                            </div>
+                            <div class="settings-field">
+                                <label for="ra_grid_columns">Recently Added Grid Columns:</label><br>
+                                <input type="number" id="ra_grid_columns" name="ra_grid_columns" min="1" max="10"
+                                       value="{{ settings.get('ra_grid_columns', '5') }}" class="w-num">
+                                <p class="text-info mt-2 field-hint">Number of columns in the Recently Added grid (default: 5).</p>
+                            </div>
+                            <div class="settings-field">
+                                <label for="ra_show_description">Recently Added Descriptions:</label><br>
+                                <select id="ra_show_description" name="ra_show_description">
+                                    <option value="enabled"  {% if settings.get('ra_show_description', 'enabled') != 'disabled' %}selected{% endif %}>Show</option>
+                                    <option value="disabled" {% if settings.get('ra_show_description', 'enabled') == 'disabled' %}selected{% endif %}>Hide</option>
+                                </select>
+                                <p class="text-info mt-2 field-hint">Show or hide the summary/description text under each Recently Added item in emails.</p>
+                            </div>
+                        </div>
 
-                        <label for="recently_added_sort">Recently Added Sort:</label><br>
-                        <select id="recently_added_sort" name="recently_added_sort">
-                            <option value="date"   {% if settings.get('recently_added_sort', 'date') != 'rating' %}selected{% endif %}>Date Added: most recently added first</option>
-                            <option value="rating" {% if settings.get('recently_added_sort', 'date') == 'rating' %}selected{% endif %}>Rating: highest rated first</option>
-                        </select><br>
-                        <p class="text-info mt-2 field-hint">
-                            Controls the sort order of recently added items. In <strong>Rating</strong> mode, items are fetched by date then re-sorted by their Plex rating.
-                        </p><br>
-
-                        <label for="ra_grid_columns">Recently Added Grid Columns:</label><br>
-                        <input type="number" id="ra_grid_columns" name="ra_grid_columns" min="1" max="10"
-                               value="{{ settings.get('ra_grid_columns', '5') }}"
-                               class="w-num"><br>
-                        <p class="text-info mt-2 field-hint">Number of columns in the Recently Added grid (default: 5).</p><br>
-
-                        <label for="ra_show_description">Recently Added Descriptions:</label><br>
-                        <select id="ra_show_description" name="ra_show_description">
-                            <option value="enabled"  {% if settings.get('ra_show_description', 'enabled') != 'disabled' %}selected{% endif %}>Show</option>
-                            <option value="disabled" {% if settings.get('ra_show_description', 'enabled') == 'disabled' %}selected{% endif %}>Hide</option>
-                        </select><br>
-                        <p class="text-info mt-2 field-hint">Show or hide the summary/description text under each Recently Added item in emails.</p><br>
-
-                        <hr>
                         <h6 class="text-uppercase">Recommendations</h6>
-                        <label for="recs_grid_columns">Recommendations Grid Columns:</label><br>
-                        <input type="number" id="recs_grid_columns" name="recs_grid_columns" min="1" max="10"
-                               value="{{ settings.get('recs_grid_columns', '5') }}"
-                               class="w-num"><br>
-                        <p class="text-info mt-2 field-hint">Number of columns in the Recommendations grid (default: 5).</p><br>
+                        <div class="settings-fields">
+                            <div class="settings-field">
+                                <label for="recs_grid_columns">Recommendations Grid Columns:</label><br>
+                                <input type="number" id="recs_grid_columns" name="recs_grid_columns" min="1" max="10"
+                                       value="{{ settings.get('recs_grid_columns', '5') }}" class="w-num">
+                                <p class="text-info mt-2 field-hint">Number of columns in the Recommendations grid (default: 5).</p>
+                            </div>
+                        </div>
 
-                        <hr>
                         <h6 class="text-uppercase">Stats and Graphs</h6>
-                        <label for="stats_type">Stats &amp; Graph Metric:</label><br>
-                        <select id="stats_type" name="stats_type">
-                            <option value="plays"    {% if settings.stats_type != 'duration' %}selected{% endif %}>Plays</option>
-                            <option value="duration" {% if settings.stats_type == 'duration' %}selected{% endif %}>Duration</option>
-                        </select><br><br>
+                        <div class="settings-fields">
+                            <div class="settings-field">
+                                <label for="stats_type">Stats &amp; Graph Metric:</label><br>
+                                <select id="stats_type" name="stats_type">
+                                    <option value="plays"    {% if settings.stats_type != 'duration' %}selected{% endif %}>Plays</option>
+                                    <option value="duration" {% if settings.stats_type == 'duration' %}selected{% endif %}>Duration</option>
+                                </select>
+                            </div>
+                            <div class="settings-field">
+                                <label for="stat_cover_art">Show Cover Art in Stat Tables:</label><br>
+                                <select id="stat_cover_art" name="stat_cover_art">
+                                    <option value="disabled" {% if settings.get('stat_cover_art', 'disabled') != 'enabled' %}selected{% endif %}>Disabled</option>
+                                    <option value="enabled"  {% if settings.get('stat_cover_art', 'disabled') == 'enabled' %}selected{% endif %}>Enabled</option>
+                                </select>
+                                <p class="text-info mt-2 field-hint">Shows a small poster thumbnail inline with each item's title in media stat tables (Movies, TV Shows, Artists, Recently Watched).</p>
+                            </div>
+                            <div class="settings-field">
+                                <label for="hide_stat_play_counts">Hide Play Counts in Stat Cards:</label><br>
+                                <select id="hide_stat_play_counts" name="hide_stat_play_counts">
+                                    <option value="disabled" {% if settings.hide_stat_play_counts != 'enabled' %}selected{% endif %}>Show</option>
+                                    <option value="enabled"  {% if settings.hide_stat_play_counts == 'enabled' %}selected{% endif %}>Hide</option>
+                                </select>
+                            </div>
+                            <div class="settings-field">
+                                <label for="hide_graph_play_counts">Hide Play Counts in Graphs (y-axis labels &amp; tooltips):</label><br>
+                                <select id="hide_graph_play_counts" name="hide_graph_play_counts">
+                                    <option value="disabled" {% if settings.hide_graph_play_counts != 'enabled' %}selected{% endif %}>Show</option>
+                                    <option value="enabled"  {% if settings.hide_graph_play_counts == 'enabled' %}selected{% endif %}>Hide</option>
+                                </select>
+                            </div>
+                            <div class="settings-field">
+                                <label for="include_user_info">Include Other Users' Info:</label><br>
+                                <select id="include_user_info" name="include_user_info">
+                                    <option value="enabled"  {% if settings.get('include_user_info', 'enabled') != 'disabled' %}selected{% endif %}>Include</option>
+                                    <option value="disabled" {% if settings.get('include_user_info', 'enabled') == 'disabled' %}selected{% endif %}>Exclude</option>
+                                </select>
+                                <p class="text-info mt-2 field-hint">When set to Include, usernames and profile pictures of other users appear in the "Most Active Users" stat, the Wrapped "Most Active" highlight, and the top-users graphs. When set to Exclude, that content is removed from emails regardless of what a template selected. A recipient's own DroppedNeedle Wrapped is not affected.</p>
+                            </div>
+                        </div>
 
-                        <label for="stat_cover_art">Show Cover Art in Stat Tables:</label><br>
-                        <select id="stat_cover_art" name="stat_cover_art">
-                            <option value="disabled" {% if settings.get('stat_cover_art', 'disabled') != 'enabled' %}selected{% endif %}>Disabled</option>
-                            <option value="enabled"  {% if settings.get('stat_cover_art', 'disabled') == 'enabled' %}selected{% endif %}>Enabled</option>
-                        </select><br>
-                        <p class="text-info mt-2 field-hint">Shows a small poster thumbnail inline with each item's title in media stat tables (Movies, TV Shows, Artists, Recently Watched).</p><br>
-
-                        <label for="hide_stat_play_counts">Hide Play Counts in Stat Cards:</label><br>
-                        <select id="hide_stat_play_counts" name="hide_stat_play_counts">
-                            <option value="disabled" {% if settings.hide_stat_play_counts != 'enabled' %}selected{% endif %}>Show</option>
-                            <option value="enabled"  {% if settings.hide_stat_play_counts == 'enabled' %}selected{% endif %}>Hide</option>
-                        </select><br><br>
-
-                        <label for="hide_graph_play_counts">Hide Play Counts in Graphs (y-axis labels &amp; tooltips):</label><br>
-                        <select id="hide_graph_play_counts" name="hide_graph_play_counts">
-                            <option value="disabled" {% if settings.hide_graph_play_counts != 'enabled' %}selected{% endif %}>Show</option>
-                            <option value="enabled"  {% if settings.hide_graph_play_counts == 'enabled' %}selected{% endif %}>Hide</option>
-                        </select><br><br>
-
-                        <label for="include_user_info">Include Other Users' Info:</label><br>
-                        <select id="include_user_info" name="include_user_info">
-                            <option value="enabled"  {% if settings.get('include_user_info', 'enabled') != 'disabled' %}selected{% endif %}>Include</option>
-                            <option value="disabled" {% if settings.get('include_user_info', 'enabled') == 'disabled' %}selected{% endif %}>Exclude</option>
-                        </select><br>
-                        <p class="text-info mt-2 field-hint">When set to Include, usernames and profile pictures of other users appear in the "Most Active Users" stat, the Wrapped "Most Active" highlight, and the top-users graphs. When set to Exclude, that content is removed from emails regardless of what a template selected. A recipient's own DroppedNeedle Wrapped is not affected.</p><br>
-
-                        <hr>
                         <h6 class="text-uppercase">Coming Soon</h6>
-                        <label for="coming_soon_days_ahead">Coming Soon Calendar Window (days ahead):</label><br>
-                        <input type="number" id="coming_soon_days_ahead" name="coming_soon_days_ahead" min="1" max="90"
-                            value="{{ settings.get('coming_soon_days_ahead', '14') }}"><br><br>
+                        <div class="settings-fields">
+                            <div class="settings-field">
+                                <label for="coming_soon_days_ahead">Coming Soon Calendar Window (days ahead):</label><br>
+                                <input type="number" id="coming_soon_days_ahead" name="coming_soon_days_ahead" min="1" max="90"
+                                    value="{{ settings.get('coming_soon_days_ahead', '14') }}" class="w-num-lg">
+                            </div>
+                            <div class="settings-field">
+                                <label for="coming_soon_grid_columns">Coming Soon Grid Columns:</label><br>
+                                <input type="number" id="coming_soon_grid_columns" name="coming_soon_grid_columns" min="1" max="10"
+                                    value="{{ settings.get('coming_soon_grid_columns', '5') }}" class="w-num">
+                            </div>
+                        </div>
 
-                        <label for="coming_soon_grid_columns">Coming Soon Grid Columns:</label><br>
-                        <input type="number" id="coming_soon_grid_columns" name="coming_soon_grid_columns" min="1" max="10"
-                            value="{{ settings.get('coming_soon_grid_columns', '5') }}"><br><br>
-
-                        <hr>
                         <h6 class="text-uppercase">Collections</h6>
-                        <label for="collections_grid_columns">Collections Grid Columns:</label><br>
-                        <input type="number" id="collections_grid_columns" name="collections_grid_columns" min="1" max="10"
-                            value="{{ settings.get('collections_grid_columns', '5') }}"><br>
-                        <p class="text-info mt-2 field-hint">Number of collection/item cards per row in Collections email blocks (default: 5).</p><br>
+                        <div class="settings-fields">
+                            <div class="settings-field">
+                                <label for="collections_grid_columns">Collections Grid Columns:</label><br>
+                                <input type="number" id="collections_grid_columns" name="collections_grid_columns" min="1" max="10"
+                                    value="{{ settings.get('collections_grid_columns', '5') }}" class="w-num">
+                                <p class="text-info mt-2 field-hint">Number of collection/item cards per row in Collections email blocks (default: 5).</p>
+                            </div>
+                        </div>
 
-                        <hr>
                         <h6 class="text-uppercase">Posters</h6>
-                        <label for="poster_max_height">Poster Max Height (px):</label><br>
-                        <input type="number" id="poster_max_height" name="poster_max_height" min="50" max="2000"
-                               value="{{ settings.get('poster_max_height', '') }}"
-                               placeholder="Original" class="w-num-lg"><br>
-                        <p class="text-info mt-2 field-hint">Caps the pixel height of posters embedded in emails (Recently Added, Recommendations, Collections). Width scales automatically to preserve aspect ratio. Leave blank to use original resolution.</p><br>
+                        <div class="settings-fields">
+                            <div class="settings-field">
+                                <label for="poster_max_height">Poster Max Height (px):</label><br>
+                                <input type="number" id="poster_max_height" name="poster_max_height" min="50" max="2000"
+                                       value="{{ settings.get('poster_max_height', '') }}"
+                                       placeholder="Original" class="w-num-lg">
+                                <p class="text-info mt-2 field-hint">Caps the pixel height of posters embedded in emails (Recently Added, Recommendations, Collections). Width scales automatically to preserve aspect ratio. Leave blank to use original resolution.</p>
+                            </div>
+                        </div>
 
-                        <hr>
                         <h6 class="text-uppercase">Recipients</h6>
-                        <label for="exclude_inactive_days">Skip Recipients Inactive For (days):</label><br>
-                        <input type="number" id="exclude_inactive_days" name="exclude_inactive_days" min="0" max="3650"
-                            value="{{ settings.get('exclude_inactive_days', '0') }}" class="w-num-lg"><br>
-                        <p class="text-info mt-2 field-hint">Skip sending to recipients who have not streamed on Tautulli within this many days (0 = send to everyone). Recipients not found among Tautulli users are always kept. Requires Tautulli to be configured.</p><br>
-
-                        <label for="recipient_display_name">Recipient Display Name (used in recommendation emails):</label><br>
-                        <select id="recipient_display_name" name="recipient_display_name">
-                            <option value="email" {% if settings.recipient_display_name == 'email' %}selected{% endif %}>Email Address</option>
-                            <option value="username" {% if settings.recipient_display_name == 'username' %}selected{% endif %}>Username</option>
-                            <option value="friendly_name" {% if settings.recipient_display_name == 'friendly_name' %}selected{% endif %}>Friendly Name</option>
-                        </select><br><br>
-
-                        <button id="apply_settings_data" class="nl-btn nl-btn--primary">Apply Settings</button>
+                        <div class="settings-fields">
+                            <div class="settings-field">
+                                <label for="exclude_inactive_days">Skip Recipients Inactive For (days):</label><br>
+                                <input type="number" id="exclude_inactive_days" name="exclude_inactive_days" min="0" max="3650"
+                                    value="{{ settings.get('exclude_inactive_days', '0') }}" class="w-num-lg">
+                                <p class="text-info mt-2 field-hint">Skip sending to recipients who have not streamed on Tautulli within this many days (0 = send to everyone). Recipients not found among Tautulli users are always kept. Requires Tautulli to be configured.</p>
+                            </div>
+                            <div class="settings-field">
+                                <label for="recipient_display_name">Recipient Display Name (used in recommendation emails):</label><br>
+                                <select id="recipient_display_name" name="recipient_display_name">
+                                    <option value="email" {% if settings.recipient_display_name == 'email' %}selected{% endif %}>Email Address</option>
+                                    <option value="username" {% if settings.recipient_display_name == 'username' %}selected{% endif %}>Username</option>
+                                    <option value="friendly_name" {% if settings.recipient_display_name == 'friendly_name' %}selected{% endif %}>Friendly Name</option>
+                                </select>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="settings-section d-none" id="section-email-styling">
-                        <h4 class="mb-4">Email Content</h4>
+                        <h4 class="mb-4">email content</h4>
 
                         <label for="logo_filename">Logo (Optional - for custom logos in emails. Email Theme must be custom to change!):</label><br>
                         <select id="logo_filename" name="logo_filename">
@@ -461,12 +507,10 @@
                             <option value="enabled" {% if settings.scheduled_subject_prefix == 'enabled' %}selected{% endif %}>Enabled: subjects read "[SCHEDULED] Your Subject"</option>
                             <option value="disabled" {% if settings.scheduled_subject_prefix == 'disabled' %}selected{% endif %}>Disabled: subjects read "Your Subject"</option>
                         </select><br><br>
-
-                        <button id="apply_settings_styling" class="nl-btn nl-btn--primary">Apply Settings</button>
                     </div>
 
                     <div class="settings-section d-none" id="section-security">
-                        <h4 class="mb-4">Security</h4>
+                        <h4 class="mb-4">security</h4>
 
                         <label>Login Account:</label><br>
                         <p class="login-note">Login is required. Update your account credentials below.</p>
@@ -479,6 +523,11 @@
                             <label for="nl_password">Password:</label><br>
                             <input type="password" id="nl_password" name="nl_password" autocomplete="new-password"
                                 placeholder="{% if settings.has_nl_password %}Saved - leave blank to keep{% else %}Newsletterr Password{% endif %}"><br><br>
+
+                            <label for="nl_password_confirm">Confirm Password:</label><br>
+                            <input type="password" id="nl_password_confirm" name="nl_password_confirm" autocomplete="new-password"
+                                placeholder="Re-enter to confirm (leave blank to keep)"><br>
+                            <span id="nl_password_error" class="test-result" style="color: #770010;"></span><br><br>
                         </div>
 
                         <label for="hsts_enabled">HTTP Strict Transport Security (HSTS):</label><br>
@@ -490,12 +539,10 @@
                             Only enable HSTS if this app is running behind HTTPS (e.g. a reverse proxy with a valid certificate).
                             Enabling it on plain HTTP will cause browsers to block access to the site until the max-age expires (2 years).
                         </p><br>
-
-                        <button id="apply_settings_security" class="nl-btn nl-btn--primary">Apply Settings</button>
                     </div>
 
                     <div class="settings-section d-none" id="section-hosted-features">
-                        <h4 class="mb-4">Hosted Features</h4>
+                        <h4 class="mb-4">hosted features</h4>
 
                         <label for="hosted_enabled">Enable Hosted Features:</label><br>
                         <select id="hosted_enabled" name="hosted_enabled">
@@ -527,30 +574,45 @@
                             message size. This exposes a proxy of your Plex art publicly (behind non-guessable per-image
                             tokens) only enable if you're comfortable with that tradeoff. Requires Hosted Features to be enabled.
                         </p><br>
-
-                        <button id="apply_settings_hosted" class="nl-btn nl-btn--primary">Apply Settings</button>
                     </div>
 
                     <div class="settings-section d-none" id="section-appearance">
-                        <h4 class="mb-4">Appearance</h4>
+                        <h4 class="mb-4">appearance</h4>
 
+                        {% set _pride = settings.get('pride_flag', 'off') %}
                         <label for="pride_flag">Pride Theme:</label><br>
-                        <select id="pride_flag">
-                            <option value="off">Off</option>
-                            <option value="rainbow">Rainbow</option>
-                            <option value="trans">Transgender</option>
-                            <option value="bi">Bisexual</option>
-                            <option value="pan">Pansexual</option>
-                            <option value="nonbinary">Nonbinary</option>
-                            <option value="lesbian">Lesbian</option>
-                            <option value="ace">Asexual</option>
-                            <option value="progress">Progress</option>
+                        <select id="pride_flag" name="pride_flag">
+                            <option value="off" {% if _pride == 'off' %}selected{% endif %}>Off</option>
+                            <option value="rainbow" {% if _pride == 'rainbow' %}selected{% endif %}>Rainbow</option>
+                            <option value="trans" {% if _pride == 'trans' %}selected{% endif %}>Transgender</option>
+                            <option value="bi" {% if _pride == 'bi' %}selected{% endif %}>Bisexual</option>
+                            <option value="pan" {% if _pride == 'pan' %}selected{% endif %}>Pansexual</option>
+                            <option value="nonbinary" {% if _pride == 'nonbinary' %}selected{% endif %}>Nonbinary</option>
+                            <option value="lesbian" {% if _pride == 'lesbian' %}selected{% endif %}>Lesbian</option>
+                            <option value="ace" {% if _pride == 'ace' %}selected{% endif %}>Asexual</option>
+                            <option value="progress" {% if _pride == 'progress' %}selected{% endif %}>Progress</option>
                         </select><br>
                         <div class="pride-preview" aria-hidden="true"></div>
                         <p class="text-info mt-2 field-hint">
                             Recolors the whole interface with your chosen pride flag palette, in both
-                            light and dark mode. Saved in this browser only, like the dark mode toggle.
+                            light and dark mode. Saved to your account and applied wherever you sign in.
                         </p>
+
+                        <br>
+                        <label for="snapins_floating">Floating Snap-ins Pane:</label><br>
+                        <select id="snapins_floating" name="snapins_floating">
+                            <option value="1" {% if settings.get('snapins_floating', '1') != '0' %}selected{% endif %}>On (pane floats alongside the builder)</option>
+                            <option value="0" {% if settings.get('snapins_floating', '1') == '0' %}selected{% endif %}>Off (pane flows inline with the page)</option>
+                        </select><br>
+                        <p class="text-info mt-2 field-hint">
+                            When on, the Snap-ins pane on the email builder stays pinned and stays in view
+                            while the source cards scroll. Turn it off to let the pane flow inline instead.
+                            The dark mode toggle and this setting all follow your sign-in.
+                        </p>
+                    </div>
+
+                    <div class="settings-actions-bar">
+                        <button id="apply_settings" class="nl-btn nl-btn--primary">Apply Settings</button>
                     </div>
                 </form>
             </div>
@@ -586,6 +648,21 @@
     });
 
     document.getElementById('settings_form').addEventListener('submit', (e) => {
+        // A new password must match its confirmation. Never rely on this alone;
+        // the server rejects a mismatch too.
+        const pw = document.getElementById('nl_password');
+        const pwConfirm = document.getElementById('nl_password_confirm');
+        const pwError = document.getElementById('nl_password_error');
+        if (pw && pwConfirm && pw.value && pw.value !== pwConfirm.value) {
+            if (pwError) pwError.textContent = 'Passwords do not match.';
+            const section = pw.closest('.settings-section');
+            if (section) switchSection(section.id.replace('section-', ''));
+            pwConfirm.focus();
+            e.preventDefault();
+            return;
+        }
+        if (pwError) pwError.textContent = '';
+
         window.fillDefaultUrlIfKeyed('sonarr_url', 'sonarr_api_key', HAS_SONARR_API_KEY, 'http://localhost:8989');
         window.fillDefaultUrlIfKeyed('radarr_url', 'radarr_api_key', HAS_RADARR_API_KEY, 'http://localhost:7878');
         const requiredFields = e.target.querySelectorAll('[required]');
@@ -617,26 +694,30 @@
             [...root.classList].forEach(c => { if (c.indexOf('pride-') === 0) root.classList.remove(c); });
         }
 
-        const stored = localStorage.getItem('pride');
-        const current = FLAGS.indexOf(stored) !== -1 ? stored : 'off';
-        sel.value = current;
-        if (stored && current === 'off') {
-            // Invalid stored slug: clean up localStorage and the stray classes
-            // the boot script added.
-            localStorage.removeItem('pride');
-            stripPride();
-        }
-
+        // The select value comes from the server (settings.pride_flag). Apply
+        // the choice instantly and keep the localStorage mirror in sync; the
+        // form POST is what persists it to the account.
         sel.addEventListener('change', () => {
             const val = sel.value;
             stripPride();
-            if (val === 'off') {
+            if (val === 'off' || FLAGS.indexOf(val) === -1) {
                 localStorage.removeItem('pride');
             } else {
                 root.classList.add('pride', 'pride-' + val);
                 localStorage.setItem('pride', val);
             }
         });
+
+        // Floating snap-ins: flip the <html> class instantly; the form POST
+        // persists snapins_floating alongside the pride flag.
+        const floatSel = document.getElementById('snapins_floating');
+        if (floatSel) {
+            floatSel.addEventListener('change', () => {
+                const off = floatSel.value === '0';
+                root.classList.toggle('snapins-static', off);
+                localStorage.setItem('snapinsFloating', off ? '0' : '1');
+            });
+        }
     })();
 </script>
 
@@ -1036,6 +1117,8 @@
 <script nonce="{{ nonce }}">
     const HAS_SONARR_API_KEY = {{ 'true' if settings.has_sonarr_api_key else 'false' }};
     const HAS_RADARR_API_KEY = {{ 'true' if settings.has_radarr_api_key else 'false' }};
+    const HAS_TAUTULLI_API = {{ 'true' if settings.has_tautulli_api else 'false' }};
+    const HAS_DROPPEDNEEDLE_API_KEY = {{ 'true' if settings.has_droppedneedle_api_key else 'false' }};
 
     // When an API key is present (typed now or already saved) but the URL is
     // blank, fill in the default so the user sees what will be tested and saved.
@@ -1064,7 +1147,6 @@
             const colors = {ok: '#01b301', error: '#770010', warning: '#e5a00d'};
             span.style.color = colors[d.status] || '';
             span.textContent = d.message;
-            if (d.status === 'ok') btn.textContent = 'Retest';
         } catch (e) {
             span.style.color = '#770010';
             span.textContent = 'Request failed';
@@ -1106,6 +1188,50 @@
             url: document.getElementById('radarr_url').value.trim(),
             api_key: document.getElementById('radarr_api_key').value.trim()
         }, 'radarr_test_result', 'test_radarr');
+    });
+
+    // Test All: run each configured service in turn, reusing its inline result
+    // display. Unconfigured services (no URL/key entered and no saved key) are
+    // skipped. Plex has its own Reconnect flow and is not included.
+    document.getElementById('test_all_btn')?.addEventListener('click', async () => {
+        const btn = document.getElementById('test_all_btn');
+        const summary = document.getElementById('test_all_result');
+        const val = id => (document.getElementById(id)?.value || '').trim();
+
+        const services = [
+            { configured: () => !!val('tautulli_url') || !!val('tautulli_api') || HAS_TAUTULLI_API,
+              run: () => runConnectionTest('/api/test/tautulli',
+                  { url: val('tautulli_url'), api_key: val('tautulli_api') }, 'tautulli_test_result', 'test_tautulli') },
+            { configured: () => !!val('conjurr_url'),
+              run: () => runConnectionTest('/api/test/conjurr',
+                  { url: val('conjurr_url') }, 'conjurr_test_result', 'test_conjurr') },
+            { configured: () => !!val('droppedneedle_url') || !!val('droppedneedle_api_key') || HAS_DROPPEDNEEDLE_API_KEY,
+              run: () => runConnectionTest('/api/test/droppedneedle',
+                  { url: val('droppedneedle_url'), api_key: val('droppedneedle_api_key') }, 'droppedneedle_test_result', 'test_droppedneedle') },
+            { configured: () => !!val('sonarr_url') || !!val('sonarr_api_key') || HAS_SONARR_API_KEY,
+              run: () => { window.fillDefaultUrlIfKeyed('sonarr_url', 'sonarr_api_key', HAS_SONARR_API_KEY, 'http://localhost:8989');
+                  return runConnectionTest('/api/test/sonarr',
+                  { url: val('sonarr_url'), api_key: val('sonarr_api_key') }, 'sonarr_test_result', 'test_sonarr'); } },
+            { configured: () => !!val('radarr_url') || !!val('radarr_api_key') || HAS_RADARR_API_KEY,
+              run: () => { window.fillDefaultUrlIfKeyed('radarr_url', 'radarr_api_key', HAS_RADARR_API_KEY, 'http://localhost:7878');
+                  return runConnectionTest('/api/test/radarr',
+                  { url: val('radarr_url'), api_key: val('radarr_api_key') }, 'radarr_test_result', 'test_radarr'); } },
+        ];
+
+        btn.disabled = true;
+        summary.style.color = '';
+        summary.textContent = 'Testing…';
+        let tested = 0;
+        for (const svc of services) {
+            if (!svc.configured()) continue;
+            tested++;
+            await svc.run();
+        }
+        summary.style.color = '';
+        summary.textContent = tested
+            ? `Tested ${tested} service${tested === 1 ? '' : 's'}.`
+            : 'No services configured.';
+        btn.disabled = false;
     });
 </script>
 

@@ -31,6 +31,12 @@
     flex-shrink: 0;
     border-right: 1px solid var(--border);
     padding: 0 var(--space-3) 0 0;
+    /* follow the page while a long section scrolls (desktop only; the mobile
+       block below resets this to static for the horizontal tab row) */
+    position: sticky;
+    top: var(--space-5);
+    max-height: calc(100vh - var(--footer-h) - var(--space-5));
+    overflow-y: auto;
 }
 .settings-page .settings-nav nav {
     display: flex;
@@ -68,12 +74,72 @@
     flex: 1;
     min-width: 0;
 }
+/* single Apply button pinned near the bottom-right so it is always reachable
+   regardless of which settings section is open. Sits above the fixed footer
+   (not a full bar); the transparent strip lets clicks pass through to the
+   fields behind it. */
+.settings-actions-bar {
+    position: sticky;
+    bottom: calc(var(--footer-h) + var(--space-3));
+    z-index: 20;
+    display: flex;
+    justify-content: flex-end;
+    margin-top: var(--space-4);
+    pointer-events: none;
+}
+.settings-actions-bar > .nl-btn {
+    pointer-events: auto;
+    box-shadow: var(--shadow-3);
+}
 .settings-page .settings-section {
     background: var(--surface-1);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     padding: var(--space-5) var(--space-5) var(--space-6);
+    /* container for the field-group grid below, which switches to two columns
+       when the section itself (not the viewport) is wide enough */
+    container-type: inline-size;
 }
+
+/* External Services and Data & Stats lay their labeled groups out two-per-row
+   when there is room; single column otherwise. Inputs shrink to fit a column. */
+.settings-page .settings-field-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--space-4) var(--space-5);
+    align-items: start;
+    /* clear the block above (Plex block / section heading) so the first grouped
+       heading (e.g. Tautulli) isn't jammed against it */
+    margin-top: var(--space-5);
+}
+@container (min-width: 700px) {
+    .settings-page .settings-field-grid { grid-template-columns: repeat(2, 1fr); }
+}
+.settings-page .settings-field-group { min-width: 0; }
+.settings-page .settings-field-group > h6:first-child { margin-top: 0; }
+
+/* Data & Stats packs its individual fields two-per-row under full-width section
+   headings, so related controls sit side by side instead of a tall single
+   column with a mostly-empty neighbor. */
+.settings-page .settings-fields {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--space-2) var(--space-5);
+    align-items: start;
+    margin-top: var(--space-2);
+}
+@container (min-width: 700px) {
+    .settings-page .settings-fields { grid-template-columns: repeat(2, 1fr); }
+}
+.settings-page .settings-field { min-width: 0; }
+.settings-page .settings-field > label { display: block; }
+.settings-page .settings-field input,
+.settings-page .settings-field select { max-width: 100%; }
+.settings-page .settings-field .field-hint { margin-bottom: 0; }
+.settings-page .settings-field-group input[type="text"],
+.settings-page .settings-field-group input[type="password"],
+.settings-page .settings-field-group input[type="number"],
+.settings-page .settings-field-group select { max-width: 100%; }
 .settings-page .settings-section h4 {
     margin-top: 0;
     margin-bottom: var(--space-5);
@@ -123,6 +189,23 @@
 /* buttons: .nl-btn variants (components.css) own these now; the page-scoped
    .button definition retired with the Phase 8d rename. */
 
+/* Settings-save connection audit: one themed block (surface bg, not per-line
+   alert colors), success/error text colored, and it fades + reclaims its space
+   on the same alertFadeOut animation as the other alerts. */
+.settings-page .settings-audit {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: var(--space-3) var(--space-4);
+    overflow: hidden;
+    animation: alertFadeOut 300ms ease 5s forwards;
+}
+.settings-page .settings-audit-line { font-size: var(--text-base); }
+.settings-page .settings-audit-line + .settings-audit-line { margin-top: var(--space-1); }
+.settings-page .settings-audit-line--ok { color: var(--success); }
+.settings-page .settings-audit-line--error { color: var(--danger); }
+.settings-page .settings-audit-line--warning { color: var(--warning); }
+
 /* test-connection result text */
 .settings-page .test-result {
     font-size: var(--text-sm);
@@ -140,6 +223,9 @@
         border-right: none;
         border-bottom: 1px solid var(--border);
         padding: 0 0 var(--space-2);
+        position: static;
+        max-height: none;
+        overflow-y: visible;
     }
     .settings-page .settings-nav nav {
         flex-direction: row;
@@ -177,7 +263,7 @@
 .settings-page .plex-connected { color: #01b301; text-shadow: 1px 0 #000, 0 1px #000, -1px 0 #000, 0 -1px #000; }
 .settings-page .w-num { width: 80px; }
 .settings-page .w-num-lg { width: 120px; }
-.settings-page .w-field { width: 24rem; }
+.settings-page .w-field { width: 100%; max-width: 24rem; }
 .settings-page .ta-resize { width: 100%; resize: vertical; }
 
 /* Appearance section: pride flag gradient preview swatch. Shows the active

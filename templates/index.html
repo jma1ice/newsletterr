@@ -6,7 +6,7 @@
 <header class="page-header">
     <h1 id="welcome-message">build</h1>
     <div class="page-actions">
-        <button id="sendTestBtn" class="nl-btn nl-btn--ghost" title="Send this email only to your From address">
+        <button id="sendTestBtn" class="nl-btn nl-btn--ghost" title="Send this email only to {{ settings.from_email or 'your From address' }}">
             Send Test
         </button>
         <button id="sendEmailBtn" class="nl-btn nl-btn--primary nl-btn--lg">
@@ -19,6 +19,10 @@
 <div class="container-fluid builder-page">
     <p id="alert_p" class="nl-alert nl-alert--success mb-3" style="display: none;">{{ alert or '' }}</p>
     <p id="error_p" class="nl-alert nl-alert--danger mb-3" style="display: none;">{{ error or '' }}</p>
+    <div id="plex_warning_p" class="nl-alert nl-alert--warning nl-alert--dismissible mb-3" style="display: none;">
+        <span>Plex connection failed, showing cached/Tautulli data (previews, images, and collections may be missing). Use Force Reconnect in settings.</span>
+        <button type="button" class="nl-alert__close" id="plex_warning_close" aria-label="Dismiss">&times;</button>
+    </div>
     <div class="foreground">
         <div class="builder-grid">
             <div class="builder-col mobile-content-panel mobile-section-config active" id="config-row">
@@ -92,7 +96,7 @@
             <div class="builder-col mobile-content-panel mobile-section-content" id="content-row">
                 <div id="selected-items-pane" class="builder-card">
                     <div class="d-flex justify-content-between align-items-center mb-3 snapins-toolbar">
-                        <h2>Snap-ins</h2>
+                        <h2>snap-ins</h2>
                         <div class="snapins-tools">
                             <button id="reset-template-btn" class="nl-btn nl-btn--ghost nl-btn--sm" title="Clear all items and reset to Custom template">
                                 {{ icon('refresh') }} Reset

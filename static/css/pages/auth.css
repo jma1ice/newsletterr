@@ -27,7 +27,7 @@
 .auth-card--wide { max-width: 640px; }
 
 .auth-logo { text-align: center; margin-bottom: var(--space-4); }
-.auth-logo-img { height: 64px; margin-bottom: var(--space-3); }
+.auth-logo-img { display: block; margin: 0 auto var(--space-3); max-width: 100%; height: auto; max-height: 64px; }
 .auth-sub { margin: 0; color: var(--text-muted); }
 .auth-title { text-align: center; margin: 0 0 var(--space-4); font-size: var(--text-xl); font-weight: 700; }
 
@@ -147,6 +147,13 @@
 .auth-card .alert { border-radius: var(--radius-md); padding: var(--space-3) var(--space-4); }
 .auth-card .alert-danger { background: var(--danger-soft); border: 1px solid var(--danger); color: var(--danger); }
 .auth-card .alert-success { background: var(--success-soft); border: 1px solid var(--success); color: var(--success); }
+
+/* Very narrow / zoomed viewports (e.g. iOS display zoom): trim padding so the
+ * centered card and its banner logo do not overflow to one side. */
+@media (max-width: 380px) {
+    .auth-body { padding: var(--space-3); }
+    .auth-card { padding: var(--space-4); }
+}
 
 .step-title { text-align: center; margin-bottom: var(--space-4); color: var(--text); }
 .step-subtitle { text-align: center; color: var(--text-muted); font-size: 0.9rem; margin-bottom: var(--space-4); }

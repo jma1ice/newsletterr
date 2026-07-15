@@ -191,9 +191,34 @@
     border: 1px solid var(--border);
     font-size: var(--text-base);
 }
-.nl-alert--success { background: var(--success-soft); border-color: var(--success); color: var(--success); }
-.nl-alert--danger { background: var(--danger-soft); border-color: var(--danger); color: var(--danger); }
+/* Fades the alert out; 25-shell.js then sets display:none on animationend so the
+   space it occupied is reclaimed. */
+@keyframes alertFadeOut {
+    to {
+        opacity: 0;
+        visibility: hidden;
+    }
+}
+.nl-alert--success { background: var(--success-soft); border-color: var(--success); color: var(--success); animation: alertFadeOut 300ms ease 5s forwards; }
+.nl-alert--danger { background: var(--danger-soft); border-color: var(--danger); color: var(--danger); animation: alertFadeOut 300ms ease 10s forwards; }
+.nl-alert--warning { background: var(--warning-soft); border-color: var(--warning); color: var(--warning); }
 .nl-alert--info { background: var(--accent-soft); border-color: var(--accent-strong); color: var(--accent-strong); }
+.nl-alert--dismissible {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-3);
+}
+.nl-alert__close {
+    flex: 0 0 auto;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+    padding: 0;
+}
 
 .nl-banner {
     display: flex;
@@ -363,8 +388,26 @@ body.nl-modal-open { overflow: hidden; }
        light color (not the theme --text, which is dark in light mode). */
     color: #eaf3f7;
 }
-.spinner img { max-width: 120px; height: auto; }
-.spinner p { margin-top: var(--space-3); }
+.spinner-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-3);
+
+    padding: 44px 64px;
+    min-width: 625px;
+    min-height: 525px;
+    justify-content: center;
+    background: var(--surface);
+    border: 3px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+}
+.spinner-card img { max-width: 120px; height: auto; }
+/* the recommendations pull appends its Cancel button here so the border box
+   wraps the spinner, text and cancel together */
+.spinner-card #recs-cancel-btn { margin-top: var(--space-2); }
+.spinner-card p { margin-top: var(--space-3); }
 /* Rotating flavor line under the pinned action text. The scrim is always dark
    (theme-independent), so this uses a fixed light-muted color, not a token. */
 .spinner-tip {
@@ -390,6 +433,8 @@ body.nl-modal-open { overflow: hidden; }
     align-items: stretch;
     padding: 8px;
     min-height: 44px;
+    max-height: 240px;
+    overflow-y: auto;
     border-radius: var(--radius-md);
     background: var(--surface-2);
     border: 1px solid var(--border);
@@ -404,6 +449,7 @@ body.nl-modal-open { overflow: hidden; }
     align-items: center;
     justify-content: space-between;
     width: 100%;
+    min-width: 0;
     gap: 6px;
     border-radius: var(--radius-full);
     padding: 4px 10px;
@@ -411,7 +457,15 @@ body.nl-modal-open { overflow: hidden; }
     color: var(--accent-strong);
     font-size: var(--text-xs);
 }
+/* long emails/usernames truncate rather than overhang the chip */
+.nl-chip > span:first-child {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
 .nl-chip .remove {
+    flex: 0 0 auto;
     border: 0;
     background: transparent;
     cursor: pointer;

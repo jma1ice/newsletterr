@@ -71,11 +71,21 @@
     window.showSpinner = function (passedText) {
         const spinner = document.getElementById('spinner');
         if (!spinner) return;
-        const img = spinner.querySelector('img');
-        if (img) img.src = randomGif();
+        // Reveal the overlay before swapping the mascot: Safari sometimes never
+        // starts animating a gif whose src changed while display was none.
+        spinner.style.display = 'flex';
+        const oldImg = spinner.querySelector('img');
+        if (oldImg) {
+            // A fresh <img> node (rather than mutating .src) plus a cache-busting
+            // query reliably kicks Safari into playing the gif from frame 0.
+            const fresh = document.createElement('img');
+            fresh.alt = oldImg.alt || 'Loading...';
+            if (oldImg.className) fresh.className = oldImg.className;
+            fresh.src = randomGif() + '?t=' + Date.now();
+            oldImg.replaceWith(fresh);
+        }
         const textEl = document.getElementById('loading-text');
         if (textEl) textEl.textContent = passedText || '';
-        spinner.style.display = 'flex';
         rotateTip();
         clearInterval(tipTimer);
         tipTimer = setInterval(rotateTip, 5000);

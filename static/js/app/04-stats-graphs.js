@@ -243,7 +243,6 @@ function buildGraphPreviewHTML(graphId) {
                 <div style="margin: 20px 0; padding: 30px; background: #f8f9fa; border: 2px dashed #dee2e6; border-radius: 8px; text-align: center;">
                     <h3 style="color: #6c757d; margin-bottom: 10px;">${commandInfo.name}</h3>
                     <p style="color: #6c757d; margin: 0; font-size: 14px;">Error creating chart</p>
-                    <p style="color: #6c757d; margin: 5px 0 0; font-size: 12px; font-style: italic;">Try clicking "View" first to render the chart</p>
                 </div>
             `;
         }
@@ -281,7 +280,6 @@ function buildGraphPreviewHTML(graphId) {
         <div style="margin: 20px 0; padding: 30px; background: #f8f9fa; border: 2px dashed #dee2e6; border-radius: 8px; text-align: center;">
             <h3 style="color: #6c757d; margin-bottom: 10px;">${commandInfo.name}</h3>
             <p style="color: #6c757d; margin: 0; font-size: 14px;">Chart rendering failed</p>
-            <p style="color: #6c757d; margin: 5px 0 0; font-size: 12px; font-style: italic;">Try clicking "View" in the dashboard to render the chart first</p>
         </div>
     `;
 }
@@ -608,7 +606,7 @@ function buildYearlyWrappedPreviewHTML() {
     return `
         <div style="margin: 20px 0; border-radius: 12px; overflow: hidden; background: linear-gradient(135deg, var(--email-primary) 0%, var(--email-accent) 100%); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);">
             <div style="padding: 20px 20px 4px 20px; text-align: center;">
-                <div style="font-size: 13px; color: rgba(255,255,255,0.85); text-transform: uppercase; letter-spacing: 0.1em;">Year in Review</div>
+                <div style="font-size: 13px; color: rgba(255,255,255,0.85); text-transform: uppercase; letter-spacing: 0.1em;">Year in Plex</div>
                 <div style="font-size: 26px; font-weight: bold; color: white; margin: 4px 0 4px 0;">${displayYear} Wrapped</div>
                 ${totalPlays ? `<div style="font-size: 14px; color: rgba(255,255,255,0.9); margin-bottom: 8px;">~${totalPlays} plays this year</div>` : ''}
             </div>

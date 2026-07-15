@@ -280,7 +280,7 @@ def build_yearly_wrapped_html_with_cids(stats_data, msg_root, theme_colors, year
     return f"""
         <div style="{container_style}">
             <div style="padding: 20px 20px 4px 20px; text-align: center;">
-                <div style="font-size: 13px; color: rgba(255,255,255,0.85); text-transform: uppercase; letter-spacing: 0.1em;">Year in Review</div>
+                <div style="font-size: 13px; color: rgba(255,255,255,0.85); text-transform: uppercase; letter-spacing: 0.1em;">Year in Plex</div>
                 <div style="font-size: 26px; font-weight: bold; color: white; margin: 4px 0 4px 0;">{display_year} Wrapped</div>
                 {f'<div style="font-size: 14px; color: rgba(255,255,255,0.9); margin-bottom: 8px;">~{total_plays} plays this year</div>' if total_plays else ''}
             </div>

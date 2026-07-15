@@ -24,12 +24,13 @@
     }
 
     function makeChip(email) {
+        const label = window.getEmailDisplayLabel ? window.getEmailDisplayLabel(email) : email;
         const chip = document.createElement('span');
         chip.className = 'nl-chip';
         chip.dataset.email = email;
         chip.innerHTML = `
-            <span>${escapeHtml(email)}</span>
-            <button type="button" class="remove" aria-label="Remove ${escapeHtml(email)}">x</button>
+            <span>${escapeHtml(label)}</span>
+            <button type="button" class="remove" aria-label="Remove ${escapeHtml(label)}">x</button>
         `;
         return chip;
     }
@@ -42,7 +43,18 @@
         if (box.querySelector(sel)) {
             return;
         };
-        box.insertBefore(makeChip(email), input);
+        
+        const chip = makeChip(email);
+        const chips = [...box.querySelectorAll('.nl-chip')];
+        const insertBefore = chips.find(c =>
+            c.dataset.email.localeCompare(email, undefined, { sensitivity: 'base' }) > 0
+        );
+        if (insertBefore) {
+            box.insertBefore(chip, insertBefore);
+        } else {
+            box.insertBefore(chip, input.nextSibling);
+        }
+
         syncHiddenFromDOM();
     }
 
@@ -50,6 +62,13 @@
         String(str).split(/[,\n;\s]+/).filter(Boolean).forEach(t => {
             addEmail(normalize(t));
         });
+    }
+    // Initial populate is sorted alphabetically by the displayed label; later
+    // typed/pasted additions just append.
+    function addTokensSorted(str) {
+        const emails = String(str).split(/[,\n;\s]+/).filter(Boolean).map(normalize);
+        const sorted = window.sortEmailsByLabel ? window.sortEmailsByLabel(emails) : emails;
+        sorted.forEach(addEmail);
     }
     window.chipsAddTokens = (str) => {
         chipsObserver.disconnect();
@@ -65,7 +84,7 @@
         chipsObserver.observe(box, { childList: true });
         syncHiddenFromDOM();
     };
-    addTokens(ta.value || '');
+    addTokensSorted(ta.value || '');
 
     input.addEventListener('keydown', (e) => {
         if (['Enter', 'Tab'].includes(e.key) || e.key === ',' || e.key === ';') {

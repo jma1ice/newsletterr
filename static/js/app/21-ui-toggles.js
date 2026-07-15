@@ -20,4 +20,15 @@ if (bccCardHeader) {
         e.currentTarget.classList.toggle('is-collapsed', collapsed);
         e.currentTarget.setAttribute('aria-expanded', String(!collapsed));
     });
+
+    // The recipients panel opens as a floating dropdown; a click anywhere
+    // outside it (and outside its toggle) closes it, like a normal menu.
+    document.addEventListener('click', (e) => {
+        const panel = document.getElementById('bcc-collapse');
+        if (!panel || panel.classList.contains('d-none')) return;
+        if (panel.contains(e.target) || bccCardHeader.contains(e.target)) return;
+        panel.classList.add('d-none');
+        bccCardHeader.classList.add('is-collapsed');
+        bccCardHeader.setAttribute('aria-expanded', 'false');
+    });
 }

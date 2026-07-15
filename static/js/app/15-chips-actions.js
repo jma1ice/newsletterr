@@ -22,15 +22,20 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return;
         const sel = `.nl-chip[data-email="${CSS.escape(email)}"]`;
         if (bccChipsContainer.querySelector(sel)) return;
-        
+
+        const label = window.getEmailDisplayLabel ? window.getEmailDisplayLabel(email) : email;
         const chip = document.createElement('span');
         chip.className = 'nl-chip';
         chip.dataset.email = email;
         chip.innerHTML = `
-            <span>${escapeHtml(email)}</span>
-            <button type="button" class="remove" aria-label="Remove ${escapeHtml(email)}">x</button>
+            <span>${escapeHtml(label)}</span>
+            <button type="button" class="remove" aria-label="Remove ${escapeHtml(label)}">x</button>
         `;
-        bccChipsContainer.insertBefore(chip, emailInput);
+        bccChipsContainer.appendChild(chip);
+    }
+
+    function sortEmails(emails) {
+        return window.sortEmailsByLabel ? window.sortEmailsByLabel(emails) : emails;
     }
     
     function setReadOnlyMode(readOnly) {
@@ -56,7 +61,7 @@ document.addEventListener('DOMContentLoaded', () => {
             setReadOnlyMode(false);
         } else if (selectedValue === 'ALL') {
             clearAllChips();
-            allUserEmails.forEach(email => addEmailChip(email));
+            sortEmails(allUserEmails).forEach(email => addEmailChip(email));
             setReadOnlyMode(true);
         } else if (selectedValue === '(Save new list)') {
             saveContainer.classList.remove('d-none');
@@ -67,7 +72,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (option) {
                 const emails = option.dataset.emails;
                 clearAllChips();
-                emails.split(', ').forEach(email => addEmailChip(email.trim()));
+                sortEmails(emails.split(', ').map(e => e.trim())).forEach(email => addEmailChip(email));
                 deleteBtn.classList.remove('d-none');
                 setReadOnlyMode(false);
             }

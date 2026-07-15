@@ -3,12 +3,13 @@ import time
 import requests
 from flask import Blueprint, jsonify, render_template, request, session
 
+from app import state
 from app.settings_store import get_service_flags, get_settings
 from app.cache import set_cached_data, get_cache_info
 from app.crypto import decrypt
 from app.security import require_csrf_for_json, requires_auth, safe_get, json_body
 from app.theme import get_theme_settings
-from app.clients.plex import get_plex_headers, get_plex_machine_id, build_plex_web_link
+from app.clients.plex import get_plex_headers, get_plex_machine_id, build_plex_web_link, reset_plex_health, plex_call_failed
 from app.clients.tautulli import run_tautulli_command, days_since_year_start
 from app.clients.conjurr import run_conjurr_command
 from app.clients.droppedneedle import run_droppedneedle_command, fetch_droppedneedle_server_stats
@@ -109,7 +110,12 @@ def pull_stats():
         if isinstance(library, dict) and 'section_id' in library:
             library_section_ids[f"{library['section_id']}"] = library.get("section_name")
 
+    # Track whether Plex silently degraded to Tautulli/cached data during the
+    # recently-added pull, so the UI can warn instead of showing partial data.
+    plex_configured = bool(_s.get("plex_url") and _s.get("plex_token"))
+    reset_plex_health()
     recent_data = fetch_recent_data_for_index(tautulli_base_url, tautulli_api_key, count, recently_added_mode=recently_added_mode, recently_added_sort=recently_added_sort)
+    plex_unavailable = plex_configured and plex_call_failed()
     set_cached_data('recent_data', recent_data, cache_params)
 
     user_dict = {}
@@ -140,6 +146,7 @@ def pull_stats():
         },
         "time_range": time_range,
         "count": count,
+        "plex_unavailable": plex_unavailable,
         "error": error
     })
 
@@ -192,7 +199,11 @@ def pull_recommendations():
         else:
             conjurr_base_url = conjurr_settings['conjurr_url']
             recommendations_json, error = run_conjurr_command(conjurr_base_url, filtered_users, error)
-            if error:
+            if state.recommendations_cancel.is_set():
+                state.recommendations_cancel.clear()
+                alert = "Recommendations pull canceled. Partial results kept."
+                error = None
+            elif error:
                 alert = None
             else:
                 alert = "User recommendations pulled from conjurr!"
@@ -218,6 +229,15 @@ def pull_recommendations():
                             recommendations_json=recommendations_json, filtered_users=filtered_users, alert=alert,
                             error=error, theme_settings=theme_settings, service_flags=get_service_flags(_s),
                             csrf_token=session.get("csrf_token", ""))
+
+@bp.route('/pull_recommendations/cancel', methods=['POST'])
+@requires_auth
+def pull_recommendations_cancel():
+    require_csrf_for_json()
+    # Signal the in-progress conjurr loop to stop between users. The pull
+    # request itself returns partial results and reports the cancellation.
+    state.recommendations_cancel.set()
+    return jsonify({"status": "success", "message": "Cancellation requested"})
 
 @bp.route('/pull_droppedneedle_stats', methods=['POST'])
 @requires_auth

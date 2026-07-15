@@ -218,6 +218,7 @@ Released under the **MIT License** - see [LICENSE](LICENSE.txt) for details.
 
 ### For the v2026.3 sprint, these items are to be addressed:
 * Email click for recently added/available recommendations is going to browser on mobile instead of Plex app - this is an issue with the new Plex client, have not seen a fix yet and no info released by Plex at this time
+* Email BG color not respected by mac mail app
 
 ### And these items are feature requests:
 --- Integrations ---
@@ -240,6 +241,7 @@ Released under the **MIT License** - see [LICENSE](LICENSE.txt) for details.
 --- Misc. ---
 * Can Snap-Ins work with custom HTML?
 * CSP out of Report-Only after trial run
+* Searchable settings
 
 ---
 

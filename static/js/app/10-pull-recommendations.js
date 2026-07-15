@@ -1,13 +1,16 @@
 function showRecsCancelButton() {
     const spinner = document.getElementById('spinner');
     if (!spinner) return null;
+    // Append inside the spinner card so the bordered box wraps the cancel button
+    // along with the mascot and text; fall back to the overlay if absent.
+    const host = spinner.querySelector('.spinner-card') || spinner;
     let btn = document.getElementById('recs-cancel-btn');
     if (!btn) {
         btn = document.createElement('button');
         btn.id = 'recs-cancel-btn';
         btn.type = 'button';
         btn.className = 'nl-btn nl-btn--danger nl-btn--sm mt-2';
-        spinner.appendChild(btn);
+        host.appendChild(btn);
     }
     btn.disabled = false;
     btn.textContent = 'Cancel';

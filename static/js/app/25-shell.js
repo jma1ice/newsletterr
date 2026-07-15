@@ -10,6 +10,13 @@
 (function () {
     var root = document.documentElement;
 
+    // Alerts / audit blocks fade via the alertFadeOut CSS animation; once it
+    // finishes, reclaim the layout space they held (CSS alone cannot, since a
+    // faded-but-still-displayed box keeps its height).
+    document.addEventListener('animationend', function (e) {
+        if (e.animationName === 'alertFadeOut') e.target.style.display = 'none';
+    });
+
     function setCollapsed(collapsed) {
         root.classList.toggle('sidebar-collapsed', collapsed);
         try { localStorage.setItem('sidebar', collapsed ? 'collapsed' : 'expanded'); } catch (e) {}

@@ -189,6 +189,23 @@
 /* buttons: .nl-btn variants (components.css) own these now; the page-scoped
    .button definition retired with the Phase 8d rename. */
 
+/* Settings-save connection audit: one themed block (surface bg, not per-line
+   alert colors), success/error text colored, and it fades + reclaims its space
+   on the same alertFadeOut animation as the other alerts. */
+.settings-page .settings-audit {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: var(--space-3) var(--space-4);
+    overflow: hidden;
+    animation: alertFadeOut 300ms ease 5s forwards;
+}
+.settings-page .settings-audit-line { font-size: var(--text-base); }
+.settings-page .settings-audit-line + .settings-audit-line { margin-top: var(--space-1); }
+.settings-page .settings-audit-line--ok { color: var(--success); }
+.settings-page .settings-audit-line--error { color: var(--danger); }
+.settings-page .settings-audit-line--warning { color: var(--warning); }
+
 /* test-connection result text */
 .settings-page .test-result {
     font-size: var(--text-sm);

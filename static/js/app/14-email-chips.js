@@ -43,7 +43,18 @@
         if (box.querySelector(sel)) {
             return;
         };
-        box.after(makeChip(email), input);
+        
+        const chip = makeChip(email);
+        const chips = [...box.querySelectorAll('.nl-chip')];
+        const insertBefore = chips.find(c =>
+            c.dataset.email.localeCompare(email, undefined, { sensitivity: 'base' }) > 0
+        );
+        if (insertBefore) {
+            box.insertBefore(chip, insertBefore);
+        } else {
+            box.insertBefore(chip, input.nextSibling);
+        }
+
         syncHiddenFromDOM();
     }
 

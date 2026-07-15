@@ -195,6 +195,7 @@
     to {
         opacity: 0;
         visibility: hidden;
+        display: none;
     }
 }
 .nl-alert--success { background: var(--success-soft); border-color: var(--success); color: var(--success); animation: alertFadeOut 300ms ease 5s forwards; }
@@ -386,8 +387,20 @@ body.nl-modal-open { overflow: hidden; }
        light color (not the theme --text, which is dark in light mode). */
     color: #eaf3f7;
 }
-.spinner img { max-width: 120px; height: auto; }
-.spinner p { margin-top: var(--space-3); }
+.spinner-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-3);
+
+    padding: 24px 32px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+}
+.spinner-card img { max-width: 120px; height: auto; }
+.spinner-card p { margin-top: var(--space-3); }
 /* Rotating flavor line under the pinned action text. The scrim is always dark
    (theme-independent), so this uses a fixed light-muted color, not a token. */
 .spinner-tip {

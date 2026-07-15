@@ -395,11 +395,11 @@ body.nl-modal-open { overflow: hidden; }
     gap: var(--space-3);
 
     padding: 44px 64px;
-    min-width: 360px;
-    min-height: 260px;
+    min-width: 625px;
+    min-height: 525px;
     justify-content: center;
     background: var(--surface);
-    border: 1px solid var(--border);
+    border: 3px solid var(--border);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-lg);
 }

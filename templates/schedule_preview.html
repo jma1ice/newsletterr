@@ -1046,7 +1046,7 @@
         
         if (libraryFilter) {
             allItems = allItems.filter(item => 
-                item.library_name && item.library_name.toLowerCase().includes(libraryFilter.toLowerCase())
+                item.library_name && item.library_name.toLowerCase() === libraryFilter.toLowerCase()
             );
         }
         

@@ -24,7 +24,7 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
                 items.append(item)
     
     if library_filter:
-        items = [item for item in items if library_filter.lower() in item.get('library_name', '').lower()]
+        items = [item for item in items if library_filter.lower() == item.get('library_name', '').lower()]
 
     if recently_added_mode != "days" and max_items and len(items) > max_items:
         items = items[:max_items]

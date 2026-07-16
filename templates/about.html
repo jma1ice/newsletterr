@@ -103,23 +103,6 @@
     <hr class="info-hr">
 
     <h2>recent changes</h2>
-    <p class="info-subhead">Fixes:</p>
-    <ul class="info-list mb-4">
-        <li>Thanks @2wheelsdown for the blank emails fix</li>
-        <li>Fixed issue where fresh setup `migrate_email_templates_for_header_title()` calls for `server_name` failed creating a missing `email_header_title` column</li>
-        <li>Patched up some SSRF/secrete containment</li>
-        <li>CSRF fixes</li>
-        <li>Fixed possible double send on scheduled emails</li>
-        <li>Bimonthly cadence fix</li>
-        <li>Schedule fix for recommendation emails</li>
-        <li>API fields in settings are now a password field</li>
-        <li>Fixed ra/recs card differing width issues when &gt;5 columns used</li>
-        <li>Added a 'pop-up blocked' to index for `save_template()` and similar</li>
-        <li>Adjusted issue where some email clients show posters as small slivers</li>
-        <li>Fixed where contributor area would start clipping out on lower size screens</li>
-        <li>Removed plex-api-client as plexapi.plex was no longer supported</li>
-        <li>Fixed changing ra/recs grid width to maintain the correct poster ratio</li>
-    </ul>
     <p class="info-subhead">New Features:</p>
     <ul class="info-list">
         <li>Added sections to settings page (email server | connections | data and stats | email content | security | hosted features | appearance)</li>
@@ -164,6 +147,23 @@
         <li>Pride UI themes</li>
         <li>Option to show or hide description on recently added posters</li>
         <li>Setting for collection group grid width</li>
+    </ul>
+    <p class="info-subhead">Fixes:</p>
+    <ul class="info-list mb-4">
+        <li>Thanks @2wheelsdown for the blank emails fix</li>
+        <li>Fixed issue where fresh setup `migrate_email_templates_for_header_title()` calls for `server_name` failed creating a missing `email_header_title` column</li>
+        <li>Patched up some SSRF/secrete containment</li>
+        <li>CSRF fixes</li>
+        <li>Fixed possible double send on scheduled emails</li>
+        <li>Bimonthly cadence fix</li>
+        <li>Schedule fix for recommendation emails</li>
+        <li>API fields in settings are now a password field</li>
+        <li>Fixed ra/recs card differing width issues when &gt;5 columns used</li>
+        <li>Added a 'pop-up blocked' to index for `save_template()` and similar</li>
+        <li>Adjusted issue where some email clients show posters as small slivers</li>
+        <li>Fixed where contributor area would start clipping out on lower size screens</li>
+        <li>Removed plex-api-client as plexapi.plex was no longer supported</li>
+        <li>Fixed changing ra/recs grid width to maintain the correct poster ratio</li>
     </ul>
 </div>
 {% endblock %}

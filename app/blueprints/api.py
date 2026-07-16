@@ -346,7 +346,18 @@ def plex_get_info():
     if not isinstance(data, list) or not data:
         return jsonify({"connected": False, "error": "No Plex servers found on this account"}), 400
 
-    server = data[0]
+    # Prefer an owned server; fall back to the first entry.
+    server = next((srv for srv in data if srv.get('owned')), data[0])
+
+    # Root cause of #159: /resources returns a per-server accessToken. When the
+    # server comes back owned:true it equals the account OAuth token, but when it
+    # comes back owned:false (seen intermittently for the same server, Plex Home/
+    # session dependent) it is a distinct server-scoped token that the Plex Media
+    # Server requires for direct API calls. The account PIN token 401s on library
+    # endpoints in that case. Store the per-server accessToken for all PMS calls,
+    # falling back to the account token when the server did not provide one.
+    server_access_token = server.get('accessToken') or plain_token
+
     connections = [
         {
             'uri': c.get('uri'),
@@ -370,29 +381,29 @@ def plex_get_info():
     existing_url = settings.get('plex_url') or ''
     save_url = existing_url or recommended_url
 
+    logger.info(f"Plex resource {server.get('name')} owned={server.get('owned')} server_token_differs={server_access_token != plain_token}")
+
     conn = db_connect()
     conn.execute("""
-        INSERT INTO settings (id, server_name, plex_url)
-        VALUES (1, ?, ?)
-        ON CONFLICT(id) DO UPDATE SET server_name = excluded.server_name, plex_url = excluded.plex_url
-    """, (server.get('name'), save_url))
+        INSERT INTO settings (id, server_name, plex_url, plex_token)
+        VALUES (1, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET server_name = excluded.server_name, plex_url = excluded.plex_url, plex_token = excluded.plex_token
+    """, (server.get('name'), save_url, encrypt(server_access_token)))
     conn.commit()
     conn.close()
 
-    # Diagnostic for #159: plex.tv accepted this token (the resources call above
-    # succeeded), but the real test is whether the Plex Media Server itself
-    # accepts it. /identity is unauthenticated and cannot reveal a bad token;
-    # /library/sections requires a valid one. Log the outcome so a linking
-    # attempt tells us conclusively whether the token has library scope.
+    # Diagnostic for #159: confirm the server-scoped token we just stored is
+    # actually accepted by the Plex Media Server. /identity is unauthenticated
+    # and cannot reveal a bad token; /library/sections requires a valid one.
     probe_url = (save_url or recommended_url or '').rstrip('/')
     if probe_url:
         try:
             probe = safe_get(
                 f"{probe_url}/library/sections",
-                headers=get_plex_headers({"X-Plex-Token": plain_token}),
+                headers=get_plex_headers({"X-Plex-Token": server_access_token}),
                 timeout=10,
             )
-            logger.info(f"Plex library probe {probe_url} -> HTTP {probe.status_code} (token_len={len(plain_token)})")
+            logger.info(f"Plex library probe {probe_url} -> HTTP {probe.status_code} (server_token_differs={server_access_token != plain_token})")
             if probe.status_code == 401:
                 logger.warning(
                     f"Plex token rejected by the media server at {probe_url} (401) despite "

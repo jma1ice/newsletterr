@@ -6,31 +6,43 @@ from email.utils import make_msgid
 from app.theme import get_email_theme_colors
 from app.emails.images import fetch_and_attach_image
 from app.security import escape_html_output as esc
+from app.store import save_hosted_image
 
 import logging
 
 logger = logging.getLogger(__name__)
 
-def build_graph_html_with_frontend_image(item, msg_root):
+def build_graph_html_with_frontend_image(item, msg_root, hosted_images_enabled=False, hosted_base_url=""):
     chart_name = item.get('name', 'Chart')
     chart_image_data = item.get('chartImage', '')
-    
+
     logger.debug(f"Processing graph: {chart_name}")
-    
+
     if chart_image_data and chart_image_data.startswith('data:image/png'):
         try:
             _, encoded = chart_image_data.split(',', 1)
             image_data = base64.b64decode(encoded)
-            
-            cid = make_msgid(domain="newsletterr.local")[1:-1]
-            
-            img_part = MIMEImage(image_data, _subtype='png')
-            img_part.add_header('Content-ID', f'<{cid}>')
-            img_part.add_header('Content-Disposition', 'inline', filename=f'chart-{cid}.png')
-            msg_root.attach(img_part)
-            
-            logger.debug(f"Successfully attached PNG chart with CID: {cid}")
-            
+
+            img_src = None
+            if hosted_images_enabled and hosted_base_url:
+                try:
+                    token = save_hosted_image(image_data, "image/png")
+                    img_src = f"{hosted_base_url.rstrip('/')}/i/{token}"
+                    logger.debug(f"Successfully saved hosted chart image with token: {token}")
+                except Exception:
+                    logger.warning("hosted image write failed, falling back to CID attachment", exc_info=True)
+
+            if img_src is None:
+                cid = make_msgid(domain="newsletterr.local")[1:-1]
+
+                img_part = MIMEImage(image_data, _subtype='png')
+                img_part.add_header('Content-ID', f'<{cid}>')
+                img_part.add_header('Content-Disposition', 'inline', filename=f'chart-{cid}.png')
+                msg_root.attach(img_part)
+
+                logger.debug(f"Successfully attached PNG chart with CID: {cid}")
+                img_src = f"cid:{cid}"
+
             container_style = """
                 border-radius: 8px;
                 text-align: center;
@@ -51,7 +63,7 @@ def build_graph_html_with_frontend_image(item, msg_root):
             
             return f"""
             <div style="{container_style}">
-                <img src="cid:{cid}" alt="{esc(chart_name)}" style="{image_style}">
+                <img src="{img_src}" alt="{esc(chart_name)}" style="{image_style}">
             </div>
             """
             

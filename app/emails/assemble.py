@@ -13,6 +13,15 @@ from app.security import escape_html_output as esc
 _BLOCK_TAGS = {'p', 'div', 'tr', 'ul', 'ol', 'table', 'blockquote', 'section', 'article'}
 _HEADING_TAGS = {'h1', 'h2', 'h3', 'h4', 'h5', 'h6'}
 
+def minify_email_html(html):
+    """Strip the source-formatting whitespace (indentation, blank lines) that
+    every builder's f-strings carry, without touching runs of whitespace
+    inside text content."""
+    html = re.sub(r'>[ \t\r\n]+<', '><', html)
+    html = re.sub(r'[ \t]*\r?\n[ \t]*', ' ', html)
+    html = re.sub(r' {2,}', ' ', html)
+    return html.strip()
+
 class _PlainTextExtractor(HTMLParser):
     """Walk email HTML and emit a readable text/plain alternative: entities
     are decoded (convert_charrefs), block elements and headings become line
@@ -199,7 +208,7 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, displ
             # them server-side regardless of what the template selected
             if not include_user_info and item.get('name') in ('Plays by Top Users', 'Stream Type by Top Users'):
                 continue
-            content_html += build_graph_html_with_frontend_image(item, msg_root)
+            content_html += build_graph_html_with_frontend_image(item, msg_root, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
         
         elif item_type == 'recently added':
             library_filter = item.get('raLibrary')
@@ -362,7 +371,7 @@ def build_complete_email_html_with_cid_logo(content_html, server_name, subject, 
 
     title_html = f'<h1 style="{title_style}">{email_header_title}</h1>'
     
-    return f"""<!DOCTYPE html>
+    return minify_email_html(f"""<!DOCTYPE html>
         <html lang="en" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
             <head>
                 <meta charset="UTF-8">
@@ -416,4 +425,4 @@ def build_complete_email_html_with_cid_logo(content_html, server_name, subject, 
                     <![endif]-->
                 </div>
             </body>
-        </html>"""
+        </html>""")

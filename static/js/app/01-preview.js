@@ -326,8 +326,9 @@ async function updatePreview() {
         }
 
         const hostedEnabled = APP.settings.hosted_enabled === 'enabled';
-        const hostedBaseUrl = APP.settings.hosted_base_url || '';
-        const completeHTML = buildPreviewEmailHTML(contentHTML, serverName, subject, emailHeaderTitle, logoFilename, logoWidth, customLogoFilename, themedCSS, logoPosition, hostedEnabled, hostedBaseUrl);
+        const hostedLinksEnabled = APP.settings.hosted_links_enabled === 'enabled' && APP.settings.hosted_links_base_url;
+        const linksBaseUrl = hostedLinksEnabled ? APP.settings.hosted_links_base_url : (APP.settings.hosted_base_url || '');
+        const completeHTML = buildPreviewEmailHTML(contentHTML, serverName, subject, emailHeaderTitle, logoFilename, logoWidth, customLogoFilename, themedCSS, logoPosition, hostedEnabled, linksBaseUrl);
         
         const frame = document.getElementById('preview');
         if (!frame) {

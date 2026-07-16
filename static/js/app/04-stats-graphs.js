@@ -1309,7 +1309,7 @@ function buildPreviewEmailHTML(contentHTML, serverName, subject, emailHeaderTitl
 
     const viewOnlineHTML = (hostedEnabled && hostedBaseUrl) ? `
                     <div style="text-align: center; padding: 8px 15px; background-color: var(--email-secondary); color: var(--email-muted); font-size: 12px;">
-                        <a href="${hostedBaseUrl.replace(/\/$/, '')}/newsletter">View latest newsletter online</a>
+                        <a href="${hostedBaseUrl.replace(/\/$/, '')}/newsletter" style="color: var(--email-accent); text-decoration: none;">View latest newsletter</a>
                     </div>` : '';
 
     const unsubscribeHTML = (hostedEnabled && hostedBaseUrl) ? `
@@ -1327,11 +1327,11 @@ function buildPreviewEmailHTML(contentHTML, serverName, subject, emailHeaderTitl
             </head>
             <body>
                 <div class="email-container">
-                    ${viewOnlineHTML}
                     <div class="email-header">
                         ${logoHTML}
                         <h1 class="email-title">${emailHeaderTitle}</h1>
                     </div>
+                    ${viewOnlineHTML}
 
                     <div class="email-content">
                         ${contentHTML}

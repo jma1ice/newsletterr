@@ -44,6 +44,8 @@ DEFAULTS = {
     "hosted_enabled": "disabled",
     "hosted_base_url": "",
     "hosted_images_enabled": "disabled",
+    "hosted_links_enabled": "disabled",
+    "hosted_links_base_url": "",
     "ra_show_description": "enabled",
     "include_user_info": "enabled",
     "appearance_theme": "dark",
@@ -59,6 +61,7 @@ INT_COLUMNS = {
     "collections_grid_columns": 5,
     "exclude_inactive_days": 0,
     "email_size_warn_mb": 10,
+    "hosted_image_retention_days": 90,
 }
 
 def get_settings(decrypt_secrets=True):

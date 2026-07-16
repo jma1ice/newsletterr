@@ -560,9 +560,31 @@
                             {% if settings.hosted_base_url != "" %}value="{{ settings.hosted_base_url }}"{% endif %}
                             placeholder="https://newsletterr.example.com"><br>
                         <p class="text-info mt-2 field-hint">
-                            The externally-reachable URL recipients use for unsubscribe links and the hosted newsletter page.
-                            Required when Hosted Features are enabled.
+                            The externally-reachable URL recipients use for unsubscribe links and the hosted newsletter page
+                            (and for hosted images, if enabled below). Required when Hosted Features are enabled.
                         </p><br>
+
+                        <label for="hosted_links_enabled">Use a Separate URL for Unsubscribe/View Links (optional):</label><br>
+                        <select id="hosted_links_enabled" name="hosted_links_enabled">
+                            <option value="disabled" {% if settings.hosted_links_enabled == 'disabled' %}selected{% endif %}>Disabled (use Hosted Base URL above)</option>
+                            <option value="enabled" {% if settings.hosted_links_enabled == 'enabled' %}selected{% endif %}>Enabled (use a different URL for unsubscribe/view-online links)</option>
+                        </select><br>
+                        <p class="text-info mt-2 field-hint">
+                            Useful if your hosted images need a publicly-reachable URL (e.g. for mail providers that proxy-fetch
+                            images) but you'd rather keep the unsubscribe and "view latest newsletter" links on a private URL,
+                            such as one only reachable over your own tailnet/VPN. Requires Hosted Features to be enabled.
+                        </p><br>
+
+                        <div id="hosted_links_base_url_container" class="d-none">
+                            <label for="hosted_links_base_url">Links Base URL:</label><br>
+                            <input type="text" id="hosted_links_base_url" name="hosted_links_base_url" class="w-field"
+                                {% if settings.hosted_links_base_url != "" %}value="{{ settings.hosted_links_base_url }}"{% endif %}
+                                placeholder="https://newsletterr.internal.example.com"><br>
+                            <p class="text-info mt-2 field-hint">
+                                The URL used for unsubscribe links and the "view latest newsletter" link instead of Hosted Base
+                                URL. Required when this is enabled.
+                            </p><br>
+                        </div>
 
                         <label for="hosted_images_enabled">Hosted Images (optional):</label><br>
                         <select id="hosted_images_enabled" name="hosted_images_enabled">
@@ -573,6 +595,13 @@
                             Serves poster art via tokenized public URLs instead of embedding it in each email, which shrinks
                             message size. This exposes a proxy of your Plex art publicly (behind non-guessable per-image
                             tokens) only enable if you're comfortable with that tradeoff. Requires Hosted Features to be enabled.
+                        </p><br>
+
+                        <label for="hosted_image_retention_days">Hosted Image Retention (days):</label><br>
+                        <input type="number" id="hosted_image_retention_days" name="hosted_image_retention_days" class="w-field" min="1"
+                            value="{{ settings.hosted_image_retention_days or 90 }}"><br>
+                        <p class="text-info mt-2 field-hint">
+                            How long hosted images are kept on disk before being deleted. Applies only when Hosted Images is enabled.
                         </p><br>
 
                         <hr>
@@ -1391,6 +1420,20 @@
         }
         btn.disabled = false;
     });
+</script>
+
+<script nonce="{{ nonce }}">
+    (function() {
+        const linksSel = document.getElementById('hosted_links_enabled');
+        const linksContainer = document.getElementById('hosted_links_base_url_container');
+        if (!linksSel || !linksContainer) return;
+
+        function syncLinksVisibility() {
+            linksContainer.classList.toggle('d-none', linksSel.value !== 'enabled');
+        }
+        linksSel.addEventListener('change', syncLinksVisibility);
+        syncLinksVisibility();
+    })();
 </script>
 
 <script nonce="{{ nonce }}">

@@ -13,6 +13,15 @@ from app.security import escape_html_output as esc
 _BLOCK_TAGS = {'p', 'div', 'tr', 'ul', 'ol', 'table', 'blockquote', 'section', 'article'}
 _HEADING_TAGS = {'h1', 'h2', 'h3', 'h4', 'h5', 'h6'}
 
+def minify_email_html(html):
+    """Strip the source-formatting whitespace (indentation, blank lines) that
+    every builder's f-strings carry, without touching runs of whitespace
+    inside text content."""
+    html = re.sub(r'>[ \t\r\n]+<', '><', html)
+    html = re.sub(r'[ \t]*\r?\n[ \t]*', ' ', html)
+    html = re.sub(r' {2,}', ' ', html)
+    return html.strip()
+
 class _PlainTextExtractor(HTMLParser):
     """Walk email HTML and emit a readable text/plain alternative: entities
     are decoded (convert_charrefs), block elements and headings become line
@@ -106,7 +115,7 @@ def attach_logo_image(msg_root, logo_filename, custom_logo_filename, base_url=""
         logo_url = f"/static/img/{logo_filename}"
     return fetch_and_attach_image(logo_url, msg_root, "logo", base_url, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
 
-def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, display_preference, users_data, recommendations_data=None, user_dict=None, base_url="", target_user_key=None, is_scheduled=False, items_count=None, date_range="", expanded_collections=None, email_header_title=None, droppedneedle_wrapped_data=None, droppedneedle_server_data=None, yearly_wrapped_data=None, sonarr_coming_soon_data=None, radarr_coming_soon_data=None, unsubscribe_placeholder=None, hosted_base_url="", hosted_images_enabled=False, build_hosted_variant=False):
+def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, display_preference, users_data, recommendations_data=None, user_dict=None, base_url="", target_user_key=None, is_scheduled=False, items_count=None, date_range="", expanded_collections=None, email_header_title=None, droppedneedle_wrapped_data=None, droppedneedle_server_data=None, yearly_wrapped_data=None, sonarr_coming_soon_data=None, radarr_coming_soon_data=None, unsubscribe_placeholder=None, hosted_base_url="", hosted_images_enabled=False, build_hosted_variant=False, hosted_enabled=False, links_base_url=""):
     """Returns (email_html, hosted_html). hosted_html is None unless
     build_hosted_variant=True, only the non-personalized 'single body for
     everyone' senders should ever pass that, since the hosted newsletter
@@ -199,7 +208,7 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, displ
             # them server-side regardless of what the template selected
             if not include_user_info and item.get('name') in ('Plays by Top Users', 'Stream Type by Top Users'):
                 continue
-            content_html += build_graph_html_with_frontend_image(item, msg_root)
+            content_html += build_graph_html_with_frontend_image(item, msg_root, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
         
         elif item_type == 'recently added':
             library_filter = item.get('raLibrary')
@@ -258,7 +267,7 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, displ
             if group_collections:
                 content_html += build_collections_html_with_cids(group_collections, msg_root, theme_colors, base_url, group_title, expanded_collections, group_index, poster_max_height=poster_max_height, grid_columns=collections_grid_columns, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
 
-    email_html = build_complete_email_html_with_cid_logo(content_html, server_name, subject, email_header_title, logo_src, logo_width, is_scheduled, logo_position=logo_position, unsubscribe_placeholder=unsubscribe_placeholder, hosted_base_url=hosted_base_url)
+    email_html = build_complete_email_html_with_cid_logo(content_html, server_name, subject, email_header_title, logo_src, logo_width, is_scheduled, logo_position=logo_position, unsubscribe_placeholder=unsubscribe_placeholder, hosted_base_url=hosted_base_url, hosted_enabled=hosted_enabled, links_base_url=links_base_url)
 
     hosted_html = None
     if build_hosted_variant:
@@ -266,8 +275,9 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, displ
 
     return email_html, hosted_html
 
-def build_complete_email_html_with_cid_logo(content_html, server_name, subject, email_header_title, logo_src, logo_width, is_scheduled=False, logo_position='center', unsubscribe_placeholder=None, hosted_base_url=""):
+def build_complete_email_html_with_cid_logo(content_html, server_name, subject, email_header_title, logo_src, logo_width, is_scheduled=False, logo_position='center', unsubscribe_placeholder=None, hosted_base_url="", hosted_enabled=False, links_base_url=""):
     theme_colors = get_email_theme_colors()
+    links_base_url = links_base_url or hosted_base_url
     
     css = build_email_css_from_theme(theme_colors, logo_width)
     
@@ -350,11 +360,27 @@ def build_complete_email_html_with_cid_logo(content_html, server_name, subject, 
     """
 
     unsubscribe_footer_html = ""
-    if unsubscribe_placeholder and hosted_base_url:
+    if unsubscribe_placeholder and links_base_url:
         unsubscribe_footer_html = f"""
                             <div style="margin-top: 10px;">
-                                <a href="{hosted_base_url.rstrip('/')}/u/{unsubscribe_placeholder}" style="{footer_link_style}">Unsubscribe</a>
+                                <a href="{links_base_url.rstrip('/')}/u/{unsubscribe_placeholder}" style="{footer_link_style}">Unsubscribe</a>
                             </div>"""
+
+    view_online_style = f"""
+        text-align: center;
+        padding: 8px 15px;
+        background-color: {theme_colors['secondary']};
+        color: {theme_colors['muted_text']};
+        font-size: 12px;
+        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
+    """
+
+    view_online_html = ""
+    if hosted_enabled and links_base_url:
+        view_online_html = f"""
+                        <div style="{view_online_style}">
+                            <a href="{links_base_url.rstrip('/')}/newsletter" style="{footer_link_style}">View latest newsletter</a>
+                        </div>"""
 
     logo_html = ""
     if logo_src != "" and logo_src is not None and logo_width != "" and logo_width is not None:
@@ -362,7 +388,7 @@ def build_complete_email_html_with_cid_logo(content_html, server_name, subject, 
 
     title_html = f'<h1 style="{title_style}">{email_header_title}</h1>'
     
-    return f"""<!DOCTYPE html>
+    return minify_email_html(f"""<!DOCTYPE html>
         <html lang="en" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
             <head>
                 <meta charset="UTF-8">
@@ -394,7 +420,7 @@ def build_complete_email_html_with_cid_logo(content_html, server_name, subject, 
                             {logo_html}
                             {title_html}
                         </div>
-                        
+                        {view_online_html}
                         <div style="{content_style}">
                             {content_html}
                         </div>
@@ -416,4 +442,4 @@ def build_complete_email_html_with_cid_logo(content_html, server_name, subject, 
                     <![endif]-->
                 </div>
             </body>
-        </html>"""
+        </html>""")

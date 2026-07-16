@@ -85,6 +85,10 @@ def index():
         "coming_soon_days_ahead": s["coming_soon_days_ahead"],
         "coming_soon_grid_columns": s["coming_soon_grid_columns"],
         "email_size_warn_mb": s["email_size_warn_mb"],
+        "hosted_enabled": s.get("hosted_enabled") or "disabled",
+        "hosted_base_url": s.get("hosted_base_url") or "",
+        "hosted_links_enabled": s.get("hosted_links_enabled") or "disabled",
+        "hosted_links_base_url": s.get("hosted_links_base_url") or "",
     }
 
     service_flags = get_service_flags(s)

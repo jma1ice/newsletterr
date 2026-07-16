@@ -202,7 +202,37 @@ def test_scheduled_single_email_hosted_gives_each_recipient_a_distinct_token(hos
         assert msg.get("List-Unsubscribe-Post") == "List-Unsubscribe=One-Click"
         assert "/u/" in list_unsub
         tokens.add(list_unsub.split("/u/")[1].split(">")[0])
+        html_part = next(p for p in msg.walk() if p.get_content_type() == "text/html")
+        assert "https://nl.example.com/newsletter" in html_part.get_payload(decode=True).decode("utf-8")
     assert len(tokens) == 3
+
+@pytest.fixture()
+def hosted_links_override_env(send_env):
+    from app import config
+    conn = sqlite3.connect(config.DB_PATH)
+    conn.execute(
+        "UPDATE settings SET hosted_enabled='enabled', hosted_base_url='https://nl.example.com', "
+        "hosted_links_enabled='enabled', hosted_links_base_url='https://private.example.com' WHERE id = 1"
+    )
+    conn.commit()
+    conn.close()
+    return send_env
+
+def test_scheduled_email_uses_separate_links_base_url_for_unsubscribe_and_view_online(hosted_links_override_env):
+    ok = hosted_links_override_env.send_scheduled_email_with_cids(9001, 9001, 9001)
+    assert ok is True
+    sends = [s for inst in RecorderSMTP.instances for s in inst.sent]
+    assert len(sends) == 3
+
+    for from_addr, to_addrs, content in sends:
+        msg = email_lib.message_from_string(content)
+        list_unsub = msg.get("List-Unsubscribe", "")
+        assert "https://private.example.com/u/" in list_unsub
+        assert "https://nl.example.com/u/" not in list_unsub
+        html_part = next(p for p in msg.walk() if p.get_content_type() == "text/html")
+        html = html_part.get_payload(decode=True).decode("utf-8")
+        assert "https://private.example.com/newsletter" in html
+        assert "https://nl.example.com/newsletter" not in html
 
 def test_scheduled_user_email_hosted_gives_each_recipient_a_distinct_token(hosted_scheduled_env):
     ok = hosted_scheduled_env.send_scheduled_email_with_cids(9001, 9001, 9002)

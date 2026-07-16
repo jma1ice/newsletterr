@@ -6,7 +6,7 @@ from flask import Blueprint, jsonify, redirect, render_template, request, sessio
 from app.db import db_connect
 from app.settings_store import get_settings
 from app.security import require_csrf_for_json, requires_auth, json_body
-from app.store import get_saved_email_lists, save_email_list, delete_email_list
+from app.store import get_saved_email_lists, save_email_list, delete_email_list, get_suppressed_emails, remove_suppressed
 from app.emails.send import SendRequest, send_standard_email_with_cids, send_recommendations_email_with_cids, resend_email_from_history
 
 import logging
@@ -217,6 +217,25 @@ def delete_email_list_route(list_id):
     try:
         delete_email_list(list_id)
         return jsonify({"status": "success", "message": "List deleted successfully"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@bp.route('/suppressed_emails', methods=['GET'])
+@requires_auth
+def get_suppressed_emails_route():
+    try:
+        rows = get_suppressed_emails()
+        return jsonify({"status": "success", "suppressed": rows})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@bp.route('/suppressed_emails/<int:entry_id>', methods=['DELETE'])
+@requires_auth
+def delete_suppressed_email_route(entry_id):
+    require_csrf_for_json()
+    try:
+        remove_suppressed(entry_id)
+        return jsonify({"status": "success", "message": "Recipient removed from suppression list"})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 

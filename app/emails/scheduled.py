@@ -400,6 +400,9 @@ def send_scheduled_user_email_with_cids(ctx, settings, recipients, user_key):
         hosted_enabled = settings.get("hosted_enabled") == "enabled"
         hosted_base_url = (settings.get("hosted_base_url") or "").rstrip('/')
         hosted_images_enabled = settings.get("hosted_images_enabled") == "enabled"
+        hosted_links_enabled = settings.get("hosted_links_enabled") == "enabled"
+        hosted_links_base_url = (settings.get("hosted_links_base_url") or "").rstrip('/')
+        links_base_url = hosted_links_base_url if (hosted_links_enabled and hosted_links_base_url) else hosted_base_url
         use_personalized_send = hosted_enabled and bool(hosted_base_url)
         unsub_placeholder = make_unsubscribe_placeholder() if use_personalized_send else None
 
@@ -430,7 +433,9 @@ def send_scheduled_user_email_with_cids(ctx, settings, recipients, user_key):
             radarr_coming_soon_data=radarr_coming_soon_data,
             unsubscribe_placeholder=unsub_placeholder,
             hosted_base_url=hosted_base_url,
-            hosted_images_enabled=hosted_images_enabled
+            hosted_images_enabled=hosted_images_enabled,
+            hosted_enabled=hosted_enabled,
+            links_base_url=links_base_url
         )
 
         plain_text = convert_html_to_plain_text(email_html)
@@ -462,7 +467,7 @@ def send_scheduled_user_email_with_cids(ctx, settings, recipients, user_key):
             all_recipients = recipients if send_mode == 'to' else [from_addr] + recipients
             email_content = send_personalized_per_recipient(
                 server, msg_root, from_addr, all_recipients, email_html, plain_text,
-                unsub_placeholder, hosted_base_url, send_mode
+                unsub_placeholder, links_base_url, send_mode
             )
         elif send_mode == 'to':
             email_content = msg_root.as_string()
@@ -618,6 +623,9 @@ def send_scheduled_single_email_with_cids(ctx, settings, to_emails_list):
         hosted_enabled = settings.get("hosted_enabled") == "enabled"
         hosted_base_url = (settings.get("hosted_base_url") or "").rstrip('/')
         hosted_images_enabled = settings.get("hosted_images_enabled") == "enabled"
+        hosted_links_enabled = settings.get("hosted_links_enabled") == "enabled"
+        hosted_links_base_url = (settings.get("hosted_links_base_url") or "").rstrip('/')
+        links_base_url = hosted_links_base_url if (hosted_links_enabled and hosted_links_base_url) else hosted_base_url
         use_personalized_send = hosted_enabled and bool(hosted_base_url)
         unsub_placeholder = make_unsubscribe_placeholder() if use_personalized_send else None
 
@@ -643,7 +651,9 @@ def send_scheduled_single_email_with_cids(ctx, settings, to_emails_list):
             unsubscribe_placeholder=unsub_placeholder,
             hosted_base_url=hosted_base_url,
             hosted_images_enabled=hosted_images_enabled,
-            build_hosted_variant=use_personalized_send
+            build_hosted_variant=use_personalized_send,
+            hosted_enabled=hosted_enabled,
+            links_base_url=links_base_url
         )
 
         plain_text = convert_html_to_plain_text(email_html)
@@ -675,7 +685,7 @@ def send_scheduled_single_email_with_cids(ctx, settings, to_emails_list):
             all_recipients = to_emails_list if send_mode == 'to' else [from_addr] + to_emails_list
             email_content = send_personalized_per_recipient(
                 server, msg_root, from_addr, all_recipients, email_html, plain_text,
-                unsub_placeholder, hosted_base_url, send_mode
+                unsub_placeholder, links_base_url, send_mode
             )
         elif send_mode == 'to':
             email_content = msg_root.as_string()

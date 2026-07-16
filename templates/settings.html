@@ -560,9 +560,31 @@
                             {% if settings.hosted_base_url != "" %}value="{{ settings.hosted_base_url }}"{% endif %}
                             placeholder="https://newsletterr.example.com"><br>
                         <p class="text-info mt-2 field-hint">
-                            The externally-reachable URL recipients use for unsubscribe links and the hosted newsletter page.
-                            Required when Hosted Features are enabled.
+                            The externally-reachable URL recipients use for unsubscribe links and the hosted newsletter page
+                            (and for hosted images, if enabled below). Required when Hosted Features are enabled.
                         </p><br>
+
+                        <label for="hosted_links_enabled">Use a Separate URL for Unsubscribe/View Links (optional):</label><br>
+                        <select id="hosted_links_enabled" name="hosted_links_enabled">
+                            <option value="disabled" {% if settings.hosted_links_enabled == 'disabled' %}selected{% endif %}>Disabled (use Hosted Base URL above)</option>
+                            <option value="enabled" {% if settings.hosted_links_enabled == 'enabled' %}selected{% endif %}>Enabled (use a different URL for unsubscribe/view-online links)</option>
+                        </select><br>
+                        <p class="text-info mt-2 field-hint">
+                            Useful if your hosted images need a publicly-reachable URL (e.g. for mail providers that proxy-fetch
+                            images) but you'd rather keep the unsubscribe and "view latest newsletter" links on a private URL,
+                            such as one only reachable over your own tailnet/VPN. Requires Hosted Features to be enabled.
+                        </p><br>
+
+                        <div id="hosted_links_base_url_container" class="d-none">
+                            <label for="hosted_links_base_url">Links Base URL:</label><br>
+                            <input type="text" id="hosted_links_base_url" name="hosted_links_base_url" class="w-field"
+                                {% if settings.hosted_links_base_url != "" %}value="{{ settings.hosted_links_base_url }}"{% endif %}
+                                placeholder="https://newsletterr.internal.example.com"><br>
+                            <p class="text-info mt-2 field-hint">
+                                The URL used for unsubscribe links and the "view latest newsletter" link instead of Hosted Base
+                                URL. Required when this is enabled.
+                            </p><br>
+                        </div>
 
                         <label for="hosted_images_enabled">Hosted Images (optional):</label><br>
                         <select id="hosted_images_enabled" name="hosted_images_enabled">
@@ -574,6 +596,30 @@
                             message size. This exposes a proxy of your Plex art publicly (behind non-guessable per-image
                             tokens) only enable if you're comfortable with that tradeoff. Requires Hosted Features to be enabled.
                         </p><br>
+
+                        <label for="hosted_image_retention_days">Hosted Image Retention (days):</label><br>
+                        <input type="number" id="hosted_image_retention_days" name="hosted_image_retention_days" class="w-field" min="1"
+                            value="{{ settings.hosted_image_retention_days or 90 }}"><br>
+                        <p class="text-info mt-2 field-hint">
+                            How long hosted images are kept on disk before being deleted. Applies only when Hosted Images is enabled.
+                        </p><br>
+
+                        <hr>
+                        <label>Unsubscribed Recipients:</label><br>
+                        <p class="text-info mt-2 field-hint">
+                            Recipients who used the hosted unsubscribe link. They are always excluded from future
+                            sends, even if Hosted Features are later disabled. Remove someone here to let them
+                            receive newsletters again.
+                        </p>
+                        <div id="suppressed_emails_container" class="mt-2">
+                            <table class="table table-striped" id="suppressed_emails_table">
+                                <thead>
+                                    <tr><th>Email</th><th>Unsubscribed</th><th></th></tr>
+                                </thead>
+                                <tbody id="suppressed_emails_tbody"></tbody>
+                            </table>
+                            <p id="suppressed_emails_empty" class="text-info d-none">No unsubscribed recipients.</p>
+                        </div>
                     </div>
 
                     <div class="settings-section d-none" id="section-appearance">
@@ -1374,6 +1420,84 @@
         }
         btn.disabled = false;
     });
+</script>
+
+<script nonce="{{ nonce }}">
+    (function() {
+        const linksSel = document.getElementById('hosted_links_enabled');
+        const linksContainer = document.getElementById('hosted_links_base_url_container');
+        if (!linksSel || !linksContainer) return;
+
+        function syncLinksVisibility() {
+            linksContainer.classList.toggle('d-none', linksSel.value !== 'enabled');
+        }
+        linksSel.addEventListener('change', syncLinksVisibility);
+        syncLinksVisibility();
+    })();
+</script>
+
+<script nonce="{{ nonce }}">
+    (function() {
+        const tbody = document.getElementById('suppressed_emails_tbody');
+        const emptyMsg = document.getElementById('suppressed_emails_empty');
+        if (!tbody) return;
+
+        function renderRows(rows) {
+            tbody.innerHTML = '';
+            if (!rows.length) {
+                emptyMsg.classList.remove('d-none');
+                return;
+            }
+            emptyMsg.classList.add('d-none');
+            rows.forEach((row) => {
+                const tr = document.createElement('tr');
+
+                const emailTd = document.createElement('td');
+                emailTd.textContent = row.email;
+                tr.appendChild(emailTd);
+
+                const dateTd = document.createElement('td');
+                dateTd.textContent = row.unsubscribed_at || '';
+                tr.appendChild(dateTd);
+
+                const actionTd = document.createElement('td');
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'nl-btn nl-btn--sm';
+                btn.textContent = 'Remove';
+                btn.addEventListener('click', async () => {
+                    if (!confirm(`Remove ${row.email} from the unsubscribe list?`)) return;
+                    try {
+                        const resp = await fetch(`/suppressed_emails/${row.id}`, {
+                            method: 'DELETE',
+                            headers: { 'X-CSRF-Token': '{{ csrf_token }}' },
+                        });
+                        const data = await resp.json();
+                        if (data.status === 'success') {
+                            loadSuppressed();
+                        } else {
+                            alert(data.message || 'Failed to remove recipient.');
+                        }
+                    } catch (e) {
+                        alert('Request failed');
+                    }
+                });
+                actionTd.appendChild(btn);
+                tr.appendChild(actionTd);
+
+                tbody.appendChild(tr);
+            });
+        }
+
+        function loadSuppressed() {
+            fetch('/suppressed_emails')
+                .then((r) => r.json())
+                .then((data) => renderRows(data.suppressed || []))
+                .catch(() => {});
+        }
+
+        loadSuppressed();
+    })();
 </script>
 
 {% endblock %}

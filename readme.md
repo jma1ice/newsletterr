@@ -233,6 +233,8 @@ Released under the **MIT License** - see [LICENSE](LICENSE.txt) for details.
 
 --- UI ---
 * Email preview: desktop/tablet/phone views
+* Spinner board - filled and smaller
+* Custom Theme
 
 --- Email ---
 * Possible default email layout/UI overhaul with pride theme
@@ -242,28 +244,24 @@ Released under the **MIT License** - see [LICENSE](LICENSE.txt) for details.
 * Can Snap-Ins work with custom HTML?
 * CSP out of Report-Only after trial run
 * Searchable settings
+* bferd to GH contribs
 
 ---
 
 ## Recent Changes
 
-### v2026.2:
+### v2026.2.1:
+
+#### New Features:
+* Unsubscribed list
+* Hosted image retention moved into settings
 
 #### Fixed:
-* Thanks @2wheelsdown for the blank emails fix
-* Fixed issue where fresh setup `migrate_email_templates_for_header_title()` calls for `server_name` failed creating a missing `email_header_title` column
-* Patched up some SSRF/secrete containment
-* CSRF fixes
-* Fixed possible double send on scheduled emails
-* Bimonthly cadence fix
-* Schedule fix for recommendation emails
-* API fields in settings are now a password field
-* Fixed ra/recs card differing width issues when >5 columns used
-* Added a 'pop-up blocked' to index for `save_template()` and similar
-* Adjusted issue where some email clients show posters as small slivers
-* Fixed where contributor area would start clipping out on lower size screens
-* Removed plex-api-client as plexapi.plex was no longer supported
-* Fixed changing ra/recs grid width to maintain the correct poster ratio
+* Thanks @bferd for the `includes` to `==` to fix similar library name issue
+* Fixed whitespace issue that made emails bigger
+* Preview now shows unsubscribe and view in browser link
+
+### v2026.2:
 
 #### New Features:
 * Added sections to settings page (email server | connections | data and stats | email content | security | hosted features | appearance)
@@ -309,19 +307,23 @@ Released under the **MIT License** - see [LICENSE](LICENSE.txt) for details.
 * Option to show or hide description on recently added posters
 * Setting for collection group grid width
 
-### v2026.1:
-
 #### Fixed:
-* Some CSS Optimizations for mobile - more still in the works
-* Timeout on safe_get() extended to 120s so that conjurr api call has enough time to generate the recommendations
-* Fixed authentication issue with /proxy-art that made art unavailble in the sent email if a login page was set up
-* Fixed a bug where libraries that share name similarities were causing both libraries to be pulled into the 'recently added' snap in
-* Fixed graph hanging bug by moving some variable declarations higher and packaging highcharts with the app instead of calls to the CDN
-* While we're at it, moved all CDN calls to local files
-* Fixed missing smtp_username variable from scheduled email send logic
-* Added consistent headers to avoid repeated 'New Device Connected' notifications on Plex API calls
-* Fixed bug where recommendations pull would hang for a short period if conjurr is not running
-* Fixed bug where missing theme_settings in an early return to index was causing an error updating the preview
+* Thanks @2wheelsdown for the blank emails fix
+* Fixed issue where fresh setup `migrate_email_templates_for_header_title()` calls for `server_name` failed creating a missing `email_header_title` column
+* Patched up some SSRF/secrete containment
+* CSRF fixes
+* Fixed possible double send on scheduled emails
+* Bimonthly cadence fix
+* Schedule fix for recommendation emails
+* API fields in settings are now a password field
+* Fixed ra/recs card differing width issues when >5 columns used
+* Added a 'pop-up blocked' to index for `save_template()` and similar
+* Adjusted issue where some email clients show posters as small slivers
+* Fixed where contributor area would start clipping out on lower size screens
+* Removed plex-api-client as plexapi.plex was no longer supported
+* Fixed changing ra/recs grid width to maintain the correct poster ratio
+
+### v2026.1:
 
 #### New Features:
 * GitHub link is now a stylized logo
@@ -338,6 +340,18 @@ Released under the **MIT License** - see [LICENSE](LICENSE.txt) for details.
 * Added snap-ins for images/gifs
 * Added emoji support to various Text Block Snap-ins
 * Pop out preview now updates with changes to the email
+
+#### Fixed:
+* Some CSS Optimizations for mobile - more still in the works
+* Timeout on safe_get() extended to 120s so that conjurr api call has enough time to generate the recommendations
+* Fixed authentication issue with /proxy-art that made art unavailble in the sent email if a login page was set up
+* Fixed a bug where libraries that share name similarities were causing both libraries to be pulled into the 'recently added' snap in
+* Fixed graph hanging bug by moving some variable declarations higher and packaging highcharts with the app instead of calls to the CDN
+* While we're at it, moved all CDN calls to local files
+* Fixed missing smtp_username variable from scheduled email send logic
+* Added consistent headers to avoid repeated 'New Device Connected' notifications on Plex API calls
+* Fixed bug where recommendations pull would hang for a short period if conjurr is not running
+* Fixed bug where missing theme_settings in an early return to index was causing an error updating the preview
 
 ---
 

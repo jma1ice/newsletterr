@@ -66,6 +66,8 @@ EXPECTED_RULES = [
     "/scheduling/create",
     "/send_email",
     "/settings",
+    "/suppressed_emails",
+    "/suppressed_emails/<int:entry_id>",
     "/u/<token>",
     "/upload-logo",
     "/upload/media",

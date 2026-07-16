@@ -239,7 +239,6 @@ Released under the **MIT License** - see [LICENSE](LICENSE.txt) for details.
 --- Email ---
 * Possible default email layout/UI overhaul with pride theme
 * SVG over emoji if possible in emails
-* Hosted image retention moved into settings
 
 --- Misc. ---
 * Can Snap-Ins work with custom HTML?
@@ -255,6 +254,7 @@ Released under the **MIT License** - see [LICENSE](LICENSE.txt) for details.
 
 #### New Features:
 * Unsubscribed list
+* Hosted image retention moved into settings
 
 #### Fixed:
 * Thanks @bferd for the `includes` to `==` to fix similar library name issue

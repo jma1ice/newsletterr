@@ -2,13 +2,13 @@ import calendar, os, secrets, sqlite3
 from datetime import datetime, timedelta
 
 from app.db import db_connect
+from app.settings_store import get_settings
 
 import logging
 
 logger = logging.getLogger(__name__)
 
 HOSTED_IMAGES_DIR = os.path.join("database", "hosted_images")
-HOSTED_IMAGE_RETENTION_DAYS = 90
 
 def save_hosted_image(image_bytes, content_type):
     token = secrets.token_urlsafe(24)
@@ -32,8 +32,9 @@ def get_hosted_image(token):
     return path, row[0]
 
 def cleanup_expired_hosted_images():
+    retention_days = get_settings().get("hosted_image_retention_days", 90)
     conn = db_connect()
-    cutoff = f'-{HOSTED_IMAGE_RETENTION_DAYS} days'
+    cutoff = f'-{retention_days} days'
     rows = conn.execute("SELECT token FROM hosted_images WHERE created_at < datetime('now', ?)", (cutoff,)).fetchall()
     for (token,) in rows:
         try:

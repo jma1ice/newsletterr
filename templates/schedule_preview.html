@@ -2008,7 +2008,8 @@
         const customLogoFilename = "{{ settings.custom_logo_filename }}"
         const logoPosition = "{{ settings.get('logo_position', 'center') }}";
         const hostedEnabled = {{ (settings.get('hosted_enabled') == 'enabled') | tojson }};
-        const hostedBaseUrl = "{{ settings.get('hosted_base_url', '') }}";
+        {% set _use_links_url = settings.get('hosted_links_enabled') == 'enabled' and settings.get('hosted_links_base_url') %}
+        const hostedBaseUrl = "{{ settings.get('hosted_links_base_url', '') if _use_links_url else settings.get('hosted_base_url', '') }}";
         const themedCSS = getThemedEmailCSS();
 
         let logoHTML = "";
@@ -2024,7 +2025,7 @@
         
         const viewOnlineHTML = (hostedEnabled && hostedBaseUrl) ? `
                         <div style="text-align: center; padding: 8px 15px; background-color: var(--email-secondary); color: var(--email-muted); font-size: 12px;">
-                            <a href="${hostedBaseUrl.replace(/\/$/, '')}/newsletter">View latest newsletter online</a>
+                            <a href="${hostedBaseUrl.replace(/\/$/, '')}/newsletter" style="color: var(--email-accent); text-decoration: none;">View latest newsletter</a>
                         </div>` : '';
 
         const unsubscribeHTML = (hostedEnabled && hostedBaseUrl) ? `
@@ -2042,11 +2043,11 @@
                 </head>
                 <body>
                     <div class="email-container">
-                        ${viewOnlineHTML}
                         <div class="email-header">
                             ${logoHTML}
                             ${headerTitle ? `<h1 class="email-title">${headerTitle}</h1>` : ''}
                         </div>
+                        ${viewOnlineHTML}
 
                         <div class="email-content">
                             ${contentHTML}

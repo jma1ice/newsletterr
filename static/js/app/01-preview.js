@@ -325,7 +325,9 @@ async function updatePreview() {
             }
         }
 
-        const completeHTML = buildPreviewEmailHTML(contentHTML, serverName, subject, emailHeaderTitle, logoFilename, logoWidth, customLogoFilename, themedCSS, logoPosition);
+        const hostedEnabled = APP.settings.hosted_enabled === 'enabled';
+        const hostedBaseUrl = APP.settings.hosted_base_url || '';
+        const completeHTML = buildPreviewEmailHTML(contentHTML, serverName, subject, emailHeaderTitle, logoFilename, logoWidth, customLogoFilename, themedCSS, logoPosition, hostedEnabled, hostedBaseUrl);
         
         const frame = document.getElementById('preview');
         if (!frame) {

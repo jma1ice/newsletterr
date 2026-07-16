@@ -390,7 +390,7 @@ def preview_schedule_page(schedule_id):
         date_range = 7
 
     _s = get_settings(decrypt_secrets=False)
-    settings_row = (_s.get("logo_filename"), _s.get("logo_width"), _s.get("tautulli_url"), _s.get("tautulli_api"), _s.get("custom_logo_filename"), _s.get("recipient_display_name"), _s.get("hide_graph_play_counts"), _s.get("stats_type"), _s.get("recently_added_mode"), _s.get("recently_added_sort"), _s.get("ra_grid_columns"), _s.get("recs_grid_columns"), _s.get("stat_cover_art"), _s.get("poster_max_height"), _s.get("logo_position"), _s.get("collections_grid_columns"), _s.get("ra_show_description"), _s.get("include_user_info")) if "id" in _s else None
+    settings_row = (_s.get("logo_filename"), _s.get("logo_width"), _s.get("tautulli_url"), _s.get("tautulli_api"), _s.get("custom_logo_filename"), _s.get("recipient_display_name"), _s.get("hide_graph_play_counts"), _s.get("stats_type"), _s.get("recently_added_mode"), _s.get("recently_added_sort"), _s.get("ra_grid_columns"), _s.get("recs_grid_columns"), _s.get("stat_cover_art"), _s.get("poster_max_height"), _s.get("logo_position"), _s.get("collections_grid_columns"), _s.get("ra_show_description"), _s.get("include_user_info"), _s.get("hosted_enabled"), _s.get("hosted_base_url")) if "id" in _s else None
     logo_filename = settings_row[0] if settings_row else 'Asset_94x.png'
     logo_width = settings_row[1] if settings_row else 80
     tautulli_url = settings_row[2] if settings_row else ''
@@ -409,6 +409,8 @@ def preview_schedule_page(schedule_id):
     collections_grid_columns = settings_row[15] if settings_row else '5'
     ra_show_description = settings_row[16] if settings_row else 'enabled'
     include_user_info = settings_row[17] if settings_row else 'enabled'
+    hosted_enabled = settings_row[18] if settings_row else 'disabled'
+    hosted_base_url = settings_row[19] if settings_row else ''
 
     settings = {
         "logo_filename": logo_filename,
@@ -427,6 +429,8 @@ def preview_schedule_page(schedule_id):
         "collections_grid_columns": collections_grid_columns or '5',
         "ra_show_description": ra_show_description or 'enabled',
         "include_user_info": include_user_info or 'enabled',
+        "hosted_enabled": hosted_enabled or 'disabled',
+        "hosted_base_url": hosted_base_url or '',
     }
     conn.close()
 

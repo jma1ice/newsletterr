@@ -202,6 +202,8 @@ def test_scheduled_single_email_hosted_gives_each_recipient_a_distinct_token(hos
         assert msg.get("List-Unsubscribe-Post") == "List-Unsubscribe=One-Click"
         assert "/u/" in list_unsub
         tokens.add(list_unsub.split("/u/")[1].split(">")[0])
+        html_part = next(p for p in msg.walk() if p.get_content_type() == "text/html")
+        assert "https://nl.example.com/newsletter" in html_part.get_payload(decode=True).decode("utf-8")
     assert len(tokens) == 3
 
 def test_scheduled_user_email_hosted_gives_each_recipient_a_distinct_token(hosted_scheduled_env):

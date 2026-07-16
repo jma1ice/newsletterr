@@ -115,7 +115,7 @@ def attach_logo_image(msg_root, logo_filename, custom_logo_filename, base_url=""
         logo_url = f"/static/img/{logo_filename}"
     return fetch_and_attach_image(logo_url, msg_root, "logo", base_url, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
 
-def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, display_preference, users_data, recommendations_data=None, user_dict=None, base_url="", target_user_key=None, is_scheduled=False, items_count=None, date_range="", expanded_collections=None, email_header_title=None, droppedneedle_wrapped_data=None, droppedneedle_server_data=None, yearly_wrapped_data=None, sonarr_coming_soon_data=None, radarr_coming_soon_data=None, unsubscribe_placeholder=None, hosted_base_url="", hosted_images_enabled=False, build_hosted_variant=False):
+def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, display_preference, users_data, recommendations_data=None, user_dict=None, base_url="", target_user_key=None, is_scheduled=False, items_count=None, date_range="", expanded_collections=None, email_header_title=None, droppedneedle_wrapped_data=None, droppedneedle_server_data=None, yearly_wrapped_data=None, sonarr_coming_soon_data=None, radarr_coming_soon_data=None, unsubscribe_placeholder=None, hosted_base_url="", hosted_images_enabled=False, build_hosted_variant=False, hosted_enabled=False):
     """Returns (email_html, hosted_html). hosted_html is None unless
     build_hosted_variant=True, only the non-personalized 'single body for
     everyone' senders should ever pass that, since the hosted newsletter
@@ -267,7 +267,7 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, displ
             if group_collections:
                 content_html += build_collections_html_with_cids(group_collections, msg_root, theme_colors, base_url, group_title, expanded_collections, group_index, poster_max_height=poster_max_height, grid_columns=collections_grid_columns, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
 
-    email_html = build_complete_email_html_with_cid_logo(content_html, server_name, subject, email_header_title, logo_src, logo_width, is_scheduled, logo_position=logo_position, unsubscribe_placeholder=unsubscribe_placeholder, hosted_base_url=hosted_base_url)
+    email_html = build_complete_email_html_with_cid_logo(content_html, server_name, subject, email_header_title, logo_src, logo_width, is_scheduled, logo_position=logo_position, unsubscribe_placeholder=unsubscribe_placeholder, hosted_base_url=hosted_base_url, hosted_enabled=hosted_enabled)
 
     hosted_html = None
     if build_hosted_variant:
@@ -275,7 +275,7 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, displ
 
     return email_html, hosted_html
 
-def build_complete_email_html_with_cid_logo(content_html, server_name, subject, email_header_title, logo_src, logo_width, is_scheduled=False, logo_position='center', unsubscribe_placeholder=None, hosted_base_url=""):
+def build_complete_email_html_with_cid_logo(content_html, server_name, subject, email_header_title, logo_src, logo_width, is_scheduled=False, logo_position='center', unsubscribe_placeholder=None, hosted_base_url="", hosted_enabled=False):
     theme_colors = get_email_theme_colors()
     
     css = build_email_css_from_theme(theme_colors, logo_width)
@@ -365,6 +365,22 @@ def build_complete_email_html_with_cid_logo(content_html, server_name, subject, 
                                 <a href="{hosted_base_url.rstrip('/')}/u/{unsubscribe_placeholder}" style="{footer_link_style}">Unsubscribe</a>
                             </div>"""
 
+    view_online_style = f"""
+        text-align: center;
+        padding: 8px 15px;
+        background-color: {theme_colors['secondary']};
+        color: {theme_colors['muted_text']};
+        font-size: 12px;
+        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
+    """
+
+    view_online_html = ""
+    if hosted_enabled and hosted_base_url:
+        view_online_html = f"""
+                        <div style="{view_online_style}">
+                            <a href="{hosted_base_url.rstrip('/')}/newsletter" style="{footer_link_style}">View latest newsletter online</a>
+                        </div>"""
+
     logo_html = ""
     if logo_src != "" and logo_src is not None and logo_width != "" and logo_width is not None:
         logo_html = f'<img src="{logo_src}" alt="{esc(server_name)}" class="email-logo" style="{logo_style}">'
@@ -399,6 +415,7 @@ def build_complete_email_html_with_cid_logo(content_html, server_name, subject, 
                     <td>
                     <![endif]-->
                     <div class="email-container" style="{container_style}">
+                        {view_online_html}
                         <div style="{header_style}">
                             {logo_html}
                             {title_html}

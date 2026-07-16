@@ -247,7 +247,8 @@ def send_standard_email_with_cids(req, settings, to_emails):
             unsubscribe_placeholder=unsub_placeholder,
             hosted_base_url=hosted_base_url,
             hosted_images_enabled=hosted_images_enabled,
-            build_hosted_variant=build_hosted_variant
+            build_hosted_variant=build_hosted_variant,
+            hosted_enabled=hosted_enabled
         )
 
         plain_text = convert_html_to_plain_text(email_html)
@@ -499,7 +500,8 @@ def send_single_user_email_with_cids(req, settings, recipients, user_key, recomm
             radarr_coming_soon_data=radarr_coming_soon_data,
             unsubscribe_placeholder=unsub_placeholder,
             hosted_base_url=hosted_base_url,
-            hosted_images_enabled=hosted_images_enabled
+            hosted_images_enabled=hosted_images_enabled,
+            hosted_enabled=hosted_enabled
         )
 
         plain_text = convert_html_to_plain_text(email_html)

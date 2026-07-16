@@ -32,16 +32,31 @@ def plex_call_failed():
 def get_plex_client_identifier():
     try:
         _s = get_settings(decrypt_secrets=False)
-        row = (_s.get("plex_client_id"),) if "id" in _s else None
-        if row and row[0]:
-            return row[0]
+        existing = _s.get("plex_client_id")
+        if existing:
+            return existing
+        # No identifier yet. Persist a stable one with an upsert so this works
+        # even on a fresh install where no settings row exists (a bare UPDATE
+        # would match zero rows and silently persist nothing, handing out a
+        # fresh random id on every call). The client identifier must stay
+        # constant: Plex scopes an OAuth token to the identifier that minted it,
+        # and library endpoints 401 if a later request uses a different one.
         client_id = str(uuid.uuid4())
         conn = db_connect()
-        cursor = conn.cursor()
-        cursor.execute("UPDATE settings SET plex_client_id = ? WHERE id = 1", (client_id,))
-        conn.commit()
-        conn.close()
-        return client_id
+        try:
+            conn.execute("""
+                INSERT INTO settings (id, plex_client_id)
+                VALUES (1, ?)
+                ON CONFLICT(id) DO UPDATE SET plex_client_id = excluded.plex_client_id
+                    WHERE settings.plex_client_id IS NULL OR settings.plex_client_id = ''
+            """, (client_id,))
+            conn.commit()
+            # Read back the stored value: a concurrent caller may have won the
+            # race and persisted a different id that we must agree with.
+            row = conn.execute("SELECT plex_client_id FROM settings WHERE id = 1").fetchone()
+        finally:
+            conn.close()
+        return row[0] if row and row[0] else client_id
     except Exception:
         logger.debug("suppressed exception; using fallback", exc_info=True)
         return str(uuid.uuid4())

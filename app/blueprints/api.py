@@ -290,7 +290,8 @@ def plex_poll_pin(pin_id: int):
 @bp.get('/api/plex/info')
 @requires_auth
 def plex_get_info():
-    token = get_settings(decrypt_secrets=False).get("plex_token")
+    settings = get_settings(decrypt_secrets=False)
+    token = settings.get("plex_token")
     if not token:
         return jsonify({"connected": False, "error": "Plex is not connected"}), 400
 
@@ -307,34 +308,64 @@ def plex_get_info():
         logger.debug("plex info fetch/parse failed", exc_info=True)
         return jsonify({"connected": False, "error": "Could not reach Plex.tv"}), 502
 
+    def connection_label(connection):
+        if connection.get('relay'):
+            return 'Relay'
+        return 'Local' if connection.get('local') else 'Remote'
+
     def select_best_connection(connections):
-        https_connections = [connection for connection in connections if connection.get('protocol') == 'https']
-
-        if https_connections:
-            local_https = [connection for connection in https_connections if connection.get('local')]
-            if local_https:
-                return local_https[0]['uri']
-
-            return https_connections[0]['uri']
-
+        # Direct connections first (local https), then any direct https, then
+        # any non-relay, and only fall back to a relay if nothing else exists.
+        for predicate in (
+            lambda c: c['protocol'] == 'https' and c['local'] and not c['relay'],
+            lambda c: c['protocol'] == 'https' and not c['relay'],
+            lambda c: not c['relay'],
+        ):
+            match = [c for c in connections if predicate(c)]
+            if match:
+                return match[0]['uri']
         return connections[0]['uri'] if connections else None
 
     if not isinstance(data, list) or not data:
         return jsonify({"connected": False, "error": "No Plex servers found on this account"}), 400
 
     server = data[0]
-    best_url = select_best_connection(server.get('connections') or [])
+    connections = [
+        {
+            'uri': c.get('uri'),
+            'local': bool(c.get('local')),
+            'relay': bool(c.get('relay')),
+            'protocol': c.get('protocol'),
+            'label': connection_label(c),
+        }
+        for c in (server.get('connections') or [])
+        if c.get('uri')
+    ]
 
-    if not best_url:
+    recommended_url = select_best_connection(connections)
+
+    if not recommended_url:
         return jsonify({"connected": False, "error": "No suitable connection found"})
+
+    # Respect a user-chosen URL: only auto-fill plex_url on first connect (when
+    # it is empty). Force Reconnect must not clobber a manual LAN address; the
+    # frontend offers the full connection list as a dropdown for switching.
+    existing_url = settings.get('plex_url') or ''
+    save_url = existing_url or recommended_url
 
     conn = db_connect()
     conn.execute("""
         INSERT INTO settings (id, server_name, plex_url)
         VALUES (1, ?, ?)
         ON CONFLICT(id) DO UPDATE SET server_name = excluded.server_name, plex_url = excluded.plex_url
-    """, (server.get('name'), best_url))
+    """, (server.get('name'), save_url))
     conn.commit()
     conn.close()
 
-    return jsonify({"connected": True})
+    return jsonify({
+        "connected": True,
+        "server_name": server.get('name'),
+        "connections": connections,
+        "recommended_url": recommended_url,
+        "plex_url": save_url,
+    })

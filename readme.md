@@ -246,18 +246,20 @@ Released under the **MIT License** - see [LICENSE](LICENSE.txt) for details.
 * CSP out of Report-Only after trial run
 * Searchable settings
 * bferd to GH contribs
-* Unsubscribed list
 
 ---
 
 ## Recent Changes
 
-### v2026.3:
+### v2026.2.1:
 
 #### New Features:
+* Unsubscribed list
 
 #### Fixed:
 * Thanks @bferd for the `includes` to `==` to fix similar library name issue
+* Fixed whitespace issue that made emails bigger
+* Preview now shows unsubscribe and view in browser link
 
 ### v2026.2:
 

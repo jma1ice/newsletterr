@@ -1293,7 +1293,7 @@ function buildCollectionPreviewHTMLForEmail(title, collections, stableGroupId = 
     `;
 }
 
-function buildPreviewEmailHTML(contentHTML, serverName, subject, emailHeaderTitle, logoFilename, logoWidth, customLogoFilename, themedCSS, logoPosition) {
+function buildPreviewEmailHTML(contentHTML, serverName, subject, emailHeaderTitle, logoFilename, logoWidth, customLogoFilename, themedCSS, logoPosition, hostedEnabled = false, hostedBaseUrl = '') {
     let logoHTML = "";
     let logoSrc = "";
     if (logoFilename && logoWidth) {
@@ -1307,6 +1307,16 @@ function buildPreviewEmailHTML(contentHTML, serverName, subject, emailHeaderTitl
         logoHTML = `<img src="${logoSrc}" alt="${escapeHtml(serverName)}" class="email-logo" style="max-width: ${logoWidth}px; width: auto; height: auto; display: block; margin-left: ${_ml}; margin-right: ${_mr};">`;
     }
 
+    const viewOnlineHTML = (hostedEnabled && hostedBaseUrl) ? `
+                    <div style="text-align: center; padding: 8px 15px; background-color: var(--email-secondary); color: var(--email-muted); font-size: 12px;">
+                        <a href="${hostedBaseUrl.replace(/\/$/, '')}/newsletter">View latest newsletter online</a>
+                    </div>` : '';
+
+    const unsubscribeHTML = (hostedEnabled && hostedBaseUrl) ? `
+                        <div style="margin-top: 10px;">
+                            <a href="#">Unsubscribe</a>
+                        </div>` : '';
+
     return `<!DOCTYPE html>
         <html lang="en">
             <head>
@@ -1317,23 +1327,24 @@ function buildPreviewEmailHTML(contentHTML, serverName, subject, emailHeaderTitl
             </head>
             <body>
                 <div class="email-container">
+                    ${viewOnlineHTML}
                     <div class="email-header">
                         ${logoHTML}
                         <h1 class="email-title">${emailHeaderTitle}</h1>
                     </div>
-                    
+
                     <div class="email-content">
                         ${contentHTML}
                     </div>
-                    
+
                     <div class="email-footer">
                         <div style="margin-bottom: 10px;">
-                            Generated for Plex Media Server by 
+                            Generated for Plex Media Server by
                             <a href="https://github.com/jma1ice/newsletterr">newsletterr</a>
                         </div>
                         <div>
                             newsletterr is not affiliated with or a product of Plex, Inc.
-                        </div>
+                        </div>${unsubscribeHTML}
                     </div>
                 </div>
             </body>

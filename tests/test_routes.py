@@ -30,6 +30,7 @@ def test_delete_routes_require_csrf(csrf_client):
     assert client.delete("/email_lists/1").status_code == 400
     assert client.delete("/email_templates/1").status_code == 400
     assert client.delete("/scheduling/1").status_code == 400
+    assert client.delete("/suppressed_emails/1").status_code == 400
 
 # --- input validation returns 400, not 500
 
@@ -92,6 +93,22 @@ def test_email_list_requires_name_and_emails(csrf_client):
     client, token = csrf_client
     assert _post_json(client, token, "/email_lists", {"name": "", "emails": "a@b.c"}).status_code == 400
     assert _post_json(client, token, "/email_lists", {"name": "x", "emails": ""}).status_code == 400
+
+# --- suppressed (unsubscribed) recipients
+
+def test_suppressed_emails_list_and_remove(csrf_client):
+    client, token = csrf_client
+    from app.store import add_suppressed
+    add_suppressed("bye@example.com")
+
+    rows = client.get("/suppressed_emails").get_json()["suppressed"]
+    ours = [r for r in rows if r["email"] == "bye@example.com"]
+    assert len(ours) == 1
+
+    resp = client.delete(f"/suppressed_emails/{ours[0]['id']}", headers={"X-CSRF-Token": token})
+    assert resp.get_json()["status"] == "success"
+    rows = client.get("/suppressed_emails").get_json()["suppressed"]
+    assert not [r for r in rows if r["email"] == "bye@example.com"]
 
 # --- template CRUD
 

@@ -430,7 +430,8 @@ def send_scheduled_user_email_with_cids(ctx, settings, recipients, user_key):
             radarr_coming_soon_data=radarr_coming_soon_data,
             unsubscribe_placeholder=unsub_placeholder,
             hosted_base_url=hosted_base_url,
-            hosted_images_enabled=hosted_images_enabled
+            hosted_images_enabled=hosted_images_enabled,
+            hosted_enabled=hosted_enabled
         )
 
         plain_text = convert_html_to_plain_text(email_html)
@@ -643,7 +644,8 @@ def send_scheduled_single_email_with_cids(ctx, settings, to_emails_list):
             unsubscribe_placeholder=unsub_placeholder,
             hosted_base_url=hosted_base_url,
             hosted_images_enabled=hosted_images_enabled,
-            build_hosted_variant=use_personalized_send
+            build_hosted_variant=use_personalized_send,
+            hosted_enabled=hosted_enabled
         )
 
         plain_text = convert_html_to_plain_text(email_html)

@@ -96,6 +96,18 @@ def filter_suppressed(emails):
         (suppressed if (e or "").strip().lower() in blocked else deliverable).append(e)
     return deliverable, suppressed
 
+def get_suppressed_emails():
+    conn = db_connect()
+    rows = conn.execute("SELECT id, email, unsubscribed_at FROM suppressed_emails ORDER BY unsubscribed_at DESC").fetchall()
+    conn.close()
+    return [{"id": r[0], "email": r[1], "unsubscribed_at": r[2]} for r in rows]
+
+def remove_suppressed(entry_id):
+    conn = db_connect()
+    conn.execute("DELETE FROM suppressed_emails WHERE id = ?", (entry_id,))
+    conn.commit()
+    conn.close()
+
 EMAIL_HISTORY_RETENTION = 1000
 
 # email_content stores the full raw MIME (msg_root.as_string()) so a send can

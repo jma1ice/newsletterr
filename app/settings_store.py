@@ -15,6 +15,7 @@ SECRET_COLUMNS = frozenset({
     "discord_webhook_url",
     "sonarr_api_key",
     "radarr_api_key",
+    "ombi_api_key",
 })
 
 # Empty/NULL columns are normalized with `or`-semantics, matching the
@@ -103,4 +104,5 @@ def get_service_flags(s):
             (s.get("sonarr_url") and s.get("sonarr_api_key"))
             or (s.get("radarr_url") and s.get("radarr_api_key"))
         ),
+        "ombi": bool(s.get("ombi_url") and s.get("ombi_api_key")),
     }

@@ -249,6 +249,23 @@
                             </div>
 
                             <div class="settings-field-group">
+                                <h6 class="text-uppercase">Ombi</h6>
+                                <label for="ombi_url">Ombi Base URL (Optional - for the recent requests snap-in):</label><br>
+                                <input type="text" id="ombi_url" name="ombi_url"
+                                    {% if settings.ombi_url != "" %}value="{{ settings.ombi_url }}"{% endif %}
+                                    placeholder="http://localhost:3579" class="w-field"><br>
+                                <small class="form-text text-muted">Leave blank to use http://localhost:3579 (linuxserver/ombi Docker default - native installs typically use port 5000). Clear the API key to disable.</small><br><br>
+
+                                <label for="ombi_api_key">Ombi API Key:</label><br>
+                                <input type="password" id="ombi_api_key" name="ombi_api_key" autocomplete="new-password" class="w-field"
+                                    placeholder="{% if settings.has_ombi_api_key %}Saved - leave blank to keep{% else %}Settings > Configuration > API Key in Ombi{% endif %}"><br>
+                                <div class="svc-test">
+                                    <button type="button" id="test_ombi" class="nl-btn nl-btn--primary nl-btn--sm">Test Connection</button>
+                                    <span id="ombi_test_result"></span>
+                                </div>
+                            </div>
+
+                            <div class="settings-field-group">
                                 <h6 class="text-uppercase">Discord</h6>
                                 <label for="discord_webhook_url">Discord Webhook URL (optional):</label><br>
                                 <input type="password" id="discord_webhook_url" name="discord_webhook_url" autocomplete="off" class="w-field"
@@ -716,6 +733,7 @@
 
         window.fillDefaultUrlIfKeyed('sonarr_url', 'sonarr_api_key', HAS_SONARR_API_KEY, 'http://localhost:8989');
         window.fillDefaultUrlIfKeyed('radarr_url', 'radarr_api_key', HAS_RADARR_API_KEY, 'http://localhost:7878');
+        window.fillDefaultUrlIfKeyed('ombi_url', 'ombi_api_key', HAS_OMBI_API_KEY, 'http://localhost:3579');
         const requiredFields = e.target.querySelectorAll('[required]');
         for (const field of requiredFields) {
             if (!field.validity.valid) {
@@ -1222,6 +1240,7 @@
 <script nonce="{{ nonce }}">
     const HAS_SONARR_API_KEY = {{ 'true' if settings.has_sonarr_api_key else 'false' }};
     const HAS_RADARR_API_KEY = {{ 'true' if settings.has_radarr_api_key else 'false' }};
+    const HAS_OMBI_API_KEY = {{ 'true' if settings.has_ombi_api_key else 'false' }};
     const HAS_TAUTULLI_API = {{ 'true' if settings.has_tautulli_api else 'false' }};
     const HAS_DROPPEDNEEDLE_API_KEY = {{ 'true' if settings.has_droppedneedle_api_key else 'false' }};
 
@@ -1295,6 +1314,14 @@
         }, 'radarr_test_result', 'test_radarr');
     });
 
+    document.getElementById('test_ombi')?.addEventListener('click', () => {
+        window.fillDefaultUrlIfKeyed('ombi_url', 'ombi_api_key', HAS_OMBI_API_KEY, 'http://localhost:3579');
+        runConnectionTest('/api/test/ombi', {
+            url: document.getElementById('ombi_url').value.trim(),
+            api_key: document.getElementById('ombi_api_key').value.trim()
+        }, 'ombi_test_result', 'test_ombi');
+    });
+
     // Test All: run each configured service in turn, reusing its inline result
     // display. Unconfigured services (no URL/key entered and no saved key) are
     // skipped. Plex has its own Reconnect flow and is not included.
@@ -1321,6 +1348,10 @@
               run: () => { window.fillDefaultUrlIfKeyed('radarr_url', 'radarr_api_key', HAS_RADARR_API_KEY, 'http://localhost:7878');
                   return runConnectionTest('/api/test/radarr',
                   { url: val('radarr_url'), api_key: val('radarr_api_key') }, 'radarr_test_result', 'test_radarr'); } },
+            { configured: () => !!val('ombi_url') || !!val('ombi_api_key') || HAS_OMBI_API_KEY,
+              run: () => { window.fillDefaultUrlIfKeyed('ombi_url', 'ombi_api_key', HAS_OMBI_API_KEY, 'http://localhost:3579');
+                  return runConnectionTest('/api/test/ombi',
+                  { url: val('ombi_url'), api_key: val('ombi_api_key') }, 'ombi_test_result', 'test_ombi'); } },
         ];
 
         btn.disabled = true;

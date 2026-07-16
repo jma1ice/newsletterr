@@ -137,7 +137,7 @@ def test_setup_radarr_blank_url_falls_back_to_default(anon_client, seeded_settin
             "radarr_url": "",
             "radarr_api_key": "radarr-key-1",
         })
-        assert resp.status_code == 302
+        assert resp.status_code == 302 and "/setup/ombi" in resp.headers["Location"]
 
         conn = sqlite3.connect(config.DB_PATH)
         radarr_url = conn.execute("SELECT radarr_url FROM settings WHERE id = 1").fetchone()[0]
@@ -146,6 +146,30 @@ def test_setup_radarr_blank_url_falls_back_to_default(anon_client, seeded_settin
     finally:
         conn = sqlite3.connect(config.DB_PATH)
         conn.execute("UPDATE settings SET radarr_url = '', radarr_api_key = '' WHERE id = 1")
+        conn.commit()
+        conn.close()
+
+def test_setup_ombi_blank_url_falls_back_to_default(anon_client, seeded_settings):
+    client = anon_client
+    with client.session_transaction() as sess:
+        sess["authenticated"] = True
+        sess["username"] = "admin"
+        sess["csrf_token"] = "wizard-token"
+    try:
+        resp = client.post("/setup/ombi", data={
+            "csrf_token": "wizard-token",
+            "ombi_url": "",
+            "ombi_api_key": "ombi-key-1",
+        })
+        assert resp.status_code == 302
+
+        conn = sqlite3.connect(config.DB_PATH)
+        ombi_url = conn.execute("SELECT ombi_url FROM settings WHERE id = 1").fetchone()[0]
+        conn.close()
+        assert ombi_url == config.DEFAULT_OMBI_URL
+    finally:
+        conn = sqlite3.connect(config.DB_PATH)
+        conn.execute("UPDATE settings SET ombi_url = '', ombi_api_key = '' WHERE id = 1")
         conn.commit()
         conn.close()
 
@@ -166,6 +190,40 @@ def test_setup_sonarr_no_key_does_not_persist(anon_client, seeded_settings):
     sonarr_url = conn.execute("SELECT sonarr_url FROM settings WHERE id = 1").fetchone()[0]
     conn.close()
     assert not sonarr_url
+
+def test_setup_ombi_no_key_does_not_persist(anon_client, seeded_settings):
+    client = anon_client
+    with client.session_transaction() as sess:
+        sess["authenticated"] = True
+        sess["username"] = "admin"
+        sess["csrf_token"] = "wizard-token"
+    resp = client.post("/setup/ombi", data={
+        "csrf_token": "wizard-token",
+        "ombi_url": "",
+        "ombi_api_key": "",
+    })
+    assert resp.status_code == 302
+
+    conn = sqlite3.connect(config.DB_PATH)
+    ombi_url = conn.execute("SELECT ombi_url FROM settings WHERE id = 1").fetchone()[0]
+    conn.close()
+    assert not ombi_url
+
+def test_setup_completes_with_ombi_step_blank(anon_client, seeded_settings):
+    # Ombi is the terminal wizard step; leaving it blank (same as skipping
+    # Sonarr/Radarr) must still finish the wizard rather than get stuck.
+    client = anon_client
+    with client.session_transaction() as sess:
+        sess["authenticated"] = True
+        sess["username"] = "admin"
+        sess["csrf_token"] = "wizard-token"
+    resp = client.post("/setup/ombi", data={
+        "csrf_token": "wizard-token",
+        "ombi_url": "",
+        "ombi_api_key": "",
+    })
+    assert resp.status_code == 302
+    assert resp.headers["Location"] == "/"  # -> main.index, wizard complete
 
 def test_setup_optional_step_skip_does_not_require_data(anon_client, seeded_settings):
     client = anon_client

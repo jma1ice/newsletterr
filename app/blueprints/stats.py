@@ -15,6 +15,7 @@ from app.clients.conjurr import run_conjurr_command
 from app.clients.droppedneedle import run_droppedneedle_command, fetch_droppedneedle_server_stats
 from app.clients.sonarr import fetch_sonarr_calendar
 from app.clients.radarr import fetch_radarr_calendar
+from app.clients.ombi import fetch_ombi_movie_requests, fetch_ombi_tv_requests
 from app.emails.fetchers import fetch_recent_data_for_index
 
 from datetime import datetime, timedelta
@@ -396,6 +397,81 @@ def pull_coming_soon():
     return render_template('index.html', stats=stats, user_dict=user_dict, graph_data=graph_data, cache_info=cache_info,
                             graph_commands=graph_commands, recent_data=recent_data, libs=libs, settings=settings,
                             sonarr_coming_soon_json=sonarr_coming_soon_json, radarr_coming_soon_json=radarr_coming_soon_json,
+                            alert=alert, error=error, theme_settings=theme_settings, service_flags=get_service_flags(_s),
+                            csrf_token=session.get("csrf_token", ""))
+
+@bp.route('/pull_ombi_requests', methods=['POST'])
+@requires_auth
+def pull_ombi_requests():
+    require_csrf_for_json()
+    ombi_requests_json = None
+    error = None
+    alert = None
+
+    data, err = json_body()
+    if err:
+        return err
+    stats = data.get('stats')
+    user_dict = data.get('user_dict', {})
+    graph_data = data.get('graph_data')
+    graph_commands = data.get('graph_commands')
+    recent_data = data.get('recent_data')
+    libs = data.get('libs')
+    settings = data.get('settings', {})
+
+    _s = get_settings(decrypt_secrets=False)
+    row = (_s.get("ombi_url"), _s.get("ombi_api_key")) if "id" in _s else None
+
+    ombi_url = (row[0] or "").strip() if row else ""
+    ombi_api_key = decrypt(row[1]) if row and row[1] else ""
+
+    if not ombi_url or not ombi_api_key:
+        return render_template('index.html', error='Please enter an Ombi URL and API key on settings page',
+                                stats=stats, user_dict=user_dict, graph_data=graph_data,
+                                graph_commands=graph_commands, recent_data=recent_data,
+                                libs=libs, settings=settings, theme_settings=get_theme_settings(),
+                                service_flags=get_service_flags(_s),
+                                csrf_token=session.get("csrf_token", ""))
+
+    movies, movies_error = fetch_ombi_movie_requests(ombi_url, ombi_api_key)
+    if movies_error:
+        error = (error + ", " if error else "") + movies_error
+
+    tv, tv_error = fetch_ombi_tv_requests(ombi_url, ombi_api_key)
+    if tv_error:
+        error = (error + ", " if error else "") + tv_error
+
+    ombi_requests_json = {'movies': movies or [], 'tv': tv or []}
+
+    if error:
+        alert = None
+    else:
+        alert = "Ombi requests pulled!"
+
+    cache_params = {'timestamp': time.time()}
+    set_cached_data('ombi_requests_json', ombi_requests_json, cache_params)
+
+    cache_info = {
+        'stats': get_cache_info('stats'),
+        'users': get_cache_info('users'),
+        'graph_data': get_cache_info('graph_data'),
+        'recent_data': get_cache_info('recent_data'),
+        'recommendations_json': get_cache_info('recommendations_json'),
+        'filtered_users': get_cache_info('filtered_users')
+    }
+
+    if not cache_info['graph_data'] or 'params' not in cache_info['graph_data']:
+        if not cache_info['graph_data']:
+            cache_info['graph_data'] = {}
+        cache_info['graph_data']['params'] = {
+            'time_range': 30
+        }
+
+    theme_settings = get_theme_settings()
+
+    return render_template('index.html', stats=stats, user_dict=user_dict, graph_data=graph_data, cache_info=cache_info,
+                            graph_commands=graph_commands, recent_data=recent_data, libs=libs, settings=settings,
+                            ombi_requests_json=ombi_requests_json,
                             alert=alert, error=error, theme_settings=theme_settings, service_flags=get_service_flags(_s),
                             csrf_token=session.get("csrf_token", ""))
 

@@ -38,6 +38,7 @@ def init_db(db_path):
             smtp_protocol TEXT,
             server_name TEXT,
             plex_url TEXT,
+            plex_web_url TEXT DEFAULT 'https://app.plex.tv/desktop',
             plex_token TEXT,
             tautulli_url TEXT,
             tautulli_api TEXT,

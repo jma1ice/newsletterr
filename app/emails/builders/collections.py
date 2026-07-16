@@ -27,7 +27,8 @@ def build_collections_html_with_cids(all_collections, msg_root, theme_colors, ba
     if row and row[0] and row[1]:
         plex_settings = {
             'plex_url': row[0],
-            'plex_token': row[1]
+            'plex_token': row[1],
+            'plex_web_url': _s.get("plex_web_url")
         }
     else:
         plex_settings = None

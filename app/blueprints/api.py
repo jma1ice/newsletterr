@@ -254,15 +254,30 @@ def gif_search():
 @bp.post('/api/plex/pin')
 @requires_auth
 def plex_create_pin():
-    response = requests.post("https://plex.tv/api/v2/pins", headers=state.plex_headers, timeout=10)
+    # strong=true yields a full account token via the canonical Plex OAuth flow
+    # (app.plex.tv/auth). The old plex.tv/link device flow produced a limited
+    # token that plex.tv honored but the Plex Media Server rejected with 401 on
+    # library endpoints (issue #159).
+    response = requests.post(
+        "https://plex.tv/api/v2/pins",
+        headers=state.plex_headers,
+        params={"strong": "true"},
+        timeout=10,
+    )
     response.raise_for_status()
     data = response.json()
 
+    client_id = state.plex_headers['X-Plex-Client-Identifier']
+    product = state.plex_headers.get('X-Plex-Product', 'Newsletterr')
+    device_name = state.plex_headers.get('X-Plex-Device-Name', 'Newsletterr')
     auth_url = (
-        "https://plex.tv/link?"
-        f"clientID={quote_plus(state.plex_headers['X-Plex-Client-Identifier'])}"
+        "https://app.plex.tv/auth#?"
+        f"clientID={quote_plus(client_id)}"
         f"&code={quote_plus(data['code'])}"
+        f"&context%5Bdevice%5D%5Bproduct%5D={quote_plus(product)}"
+        f"&context%5Bdevice%5D%5BdeviceName%5D={quote_plus(device_name)}"
     )
+    logger.info(f"Created Plex OAuth PIN {data["id"]} (strong)")
     return jsonify({"pin_id": data["id"], "code": data["code"], "auth_url": auth_url, "expires_in": data.get("expiresIn", 900)})
 
 @bp.get('/api/plex/pin/<int:pin_id>')
@@ -274,6 +289,7 @@ def plex_poll_pin(pin_id: int):
 
     token = data.get("authToken")
     if token:
+        logger.info(f"Plex PIN {pin_id} authorized; token length={len(token)}")
         conn = db_connect()
         cursor = conn.cursor()
         cursor.execute("""
@@ -295,8 +311,9 @@ def plex_get_info():
     if not token:
         return jsonify({"connected": False, "error": "Plex is not connected"}), 400
 
+    plain_token = decrypt(token)
     url = "https://plex.tv/api/v2/resources"
-    headers = get_plex_headers({"X-Plex-Token": decrypt(token)})
+    headers = get_plex_headers({"X-Plex-Token": plain_token})
     params = {
         "includeHttps": "1"
     }
@@ -361,6 +378,27 @@ def plex_get_info():
     """, (server.get('name'), save_url))
     conn.commit()
     conn.close()
+
+    # Diagnostic for #159: plex.tv accepted this token (the resources call above
+    # succeeded), but the real test is whether the Plex Media Server itself
+    # accepts it. /identity is unauthenticated and cannot reveal a bad token;
+    # /library/sections requires a valid one. Log the outcome so a linking
+    # attempt tells us conclusively whether the token has library scope.
+    probe_url = (save_url or recommended_url or '').rstrip('/')
+    if probe_url:
+        try:
+            probe = safe_get(
+                f"{probe_url}/library/sections",
+                headers=get_plex_headers({"X-Plex-Token": plain_token}),
+                timeout=10,
+            )
+            logger.info(f"Plex library probe {probe_url} -> HTTP {probe.status_code} (token_len={len(plain_token)})")
+            if probe.status_code == 401:
+                logger.warning(
+                    f"Plex token rejected by the media server at {probe_url} (401) despite "
+                    "plex.tv accepting it. This is the #159 symptom.")
+        except Exception:
+            logger.debug("Plex library probe failed", exc_info=True)
 
     return jsonify({
         "connected": True,

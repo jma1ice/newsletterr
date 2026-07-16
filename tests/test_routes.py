@@ -297,18 +297,24 @@ def test_plex_pin_uses_strong_oauth_flow(client, monkeypatch):
     assert "code=longstrongcode" in d["auth_url"]
     assert "context%5Bdevice%5D%5Bproduct%5D=" in d["auth_url"]
 
-def _fake_plex_resources():
+def _fake_plex_resources(owned=True, access_token=None):
     class _Resp:
+        status_code = 200
+
         def json(self):
-            return [{
+            server = {
                 "name": "MyServer",
+                "owned": owned,
                 "connections": [
                     {"protocol": "https", "local": False, "relay": False, "uri": "https://remote.plex.direct:32400"},
                     {"protocol": "https", "local": True, "relay": False, "uri": "https://local.plex.direct:32400"},
                     {"protocol": "http", "local": True, "relay": False, "uri": "http://192.168.1.5:32400"},
                     {"protocol": "https", "local": False, "relay": True, "uri": "https://relay.plex.direct:32400"},
                 ],
-            }]
+            }
+            if access_token is not None:
+                server["accessToken"] = access_token
+            return [server]
     return _Resp()
 
 def _stored_plex_url():
@@ -373,6 +379,65 @@ def test_plex_info_autofills_when_empty(client, app, monkeypatch):
     d = resp.get_json()
     assert d["plex_url"] == "https://local.plex.direct:32400"
     assert _stored_plex_url() == "https://local.plex.direct:32400"
+
+def test_plex_info_stores_server_access_token(client, app, monkeypatch):
+    # #159 root cause (per bferd): when /resources reports the server as
+    # owned:false it hands back a distinct server-scoped accessToken that the
+    # Plex Media Server requires for direct calls. The account PIN token 401s on
+    # library endpoints, so we must store the per-server token instead.
+    import sqlite3
+    from app import config
+    from app.crypto import encrypt, decrypt
+    conn = sqlite3.connect(config.DB_PATH)
+    conn.execute(
+        "UPDATE settings SET plex_token = ?, plex_url = '' WHERE id = 1",
+        (encrypt("account-token"),),
+    )
+    conn.commit()
+    conn.close()
+
+    from app.blueprints import api
+    monkeypatch.setattr(
+        api, "safe_get",
+        lambda *a, **k: _fake_plex_resources(owned=False, access_token="server-scoped-token"),
+    )
+
+    resp = client.get("/api/plex/info")
+    assert resp.status_code == 200
+
+    conn = sqlite3.connect(config.DB_PATH)
+    try:
+        stored = conn.execute("SELECT plex_token FROM settings WHERE id = 1").fetchone()[0]
+    finally:
+        conn.close()
+    assert decrypt(stored) == "server-scoped-token"
+
+def test_plex_info_keeps_account_token_when_owned(client, app, monkeypatch):
+    # owned:true servers return an accessToken equal to the account token; with
+    # no accessToken in the payload we fall back to the account token unchanged.
+    import sqlite3
+    from app import config
+    from app.crypto import encrypt, decrypt
+    conn = sqlite3.connect(config.DB_PATH)
+    conn.execute(
+        "UPDATE settings SET plex_token = ?, plex_url = '' WHERE id = 1",
+        (encrypt("account-token"),),
+    )
+    conn.commit()
+    conn.close()
+
+    from app.blueprints import api
+    monkeypatch.setattr(api, "safe_get", lambda *a, **k: _fake_plex_resources(owned=True))
+
+    resp = client.get("/api/plex/info")
+    assert resp.status_code == 200
+
+    conn = sqlite3.connect(config.DB_PATH)
+    try:
+        stored = conn.execute("SELECT plex_token FROM settings WHERE id = 1").fetchone()[0]
+    finally:
+        conn.close()
+    assert decrypt(stored) == "account-token"
 
 # --- auth gate (uses an unauthenticated client against the seeded admin)
 

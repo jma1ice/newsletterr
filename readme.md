@@ -255,7 +255,7 @@ Released under the **MIT License** - see [LICENSE](LICENSE.txt) for details.
 * Plex URL input moved to a dropdown
 
 #### Fixed:
-* Plex OAuth database issue
+* Plex OAuth database issue, thanks @bferd for the diagnostics and iasue fins
 
 ### v2026.2.1:
 

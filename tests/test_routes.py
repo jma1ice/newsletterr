@@ -265,6 +265,38 @@ def test_connection_test_falls_back_to_saved_key(client, app, monkeypatch):
     assert captured["url"] == "http://tt.local"
     assert captured["api_key"] == "saved-tt-key"
 
+def test_plex_pin_uses_strong_oauth_flow(client, monkeypatch):
+    # #159: the limited plex.tv/link device flow produced a token the media
+    # server rejected. The PIN must be created with strong=true and link via
+    # the canonical app.plex.tv/auth OAuth endpoint.
+    from app.blueprints import api
+
+    captured = {}
+
+    class _Resp:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"id": 42, "code": "longstrongcode", "expiresIn": 900}
+
+    def fake_post(url, headers=None, params=None, timeout=None):
+        captured["url"] = url
+        captured["params"] = params
+        return _Resp()
+
+    monkeypatch.setattr(api.requests, "post", fake_post)
+
+    resp = client.post("/api/plex/pin")
+    assert resp.status_code == 200
+    d = resp.get_json()
+    assert captured["url"] == "https://plex.tv/api/v2/pins"
+    assert captured["params"] == {"strong": "true"}
+    assert d["pin_id"] == 42
+    assert d["auth_url"].startswith("https://app.plex.tv/auth#?")
+    assert "code=longstrongcode" in d["auth_url"]
+    assert "context%5Bdevice%5D%5Bproduct%5D=" in d["auth_url"]
+
 def _fake_plex_resources():
     class _Resp:
         def json(self):

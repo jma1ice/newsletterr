@@ -839,9 +839,8 @@
         statusEl.innerHTML = `
             <div style="color: #3498db; margin: 10px 0;">
                 <strong>Manual Authorization May Be Required</strong><br>
-                Enter this code into Plex: <strong style="background: #f8f9fa; padding: 2px 6px; border-radius: 3px;">${code}</strong><br>
                 <a href="${authUrl}" target="_blank" rel="noopener noreferrer" style="color: #007bff; text-decoration: underline;">
-                    Click here to open Plex authorization page if it did not pop up
+                    Click here to open the Plex sign-in page if it did not pop up
                 </a>
             </div>
         `;
@@ -863,8 +862,8 @@
             const data = await r.json();
 
             hideSpinner();
-            showSpinner(`Enter this code into Plex: ${data.code}`);
-            const authWin = openCenteredPopup(data.auth_url, 520, 480, 'plex-auth', 520);
+            showSpinner('Waiting for Plex sign-in...');
+            const authWin = openCenteredPopup(data.auth_url, 520, 680, 'plex-auth', 520);
 
             if (!authWin) {
                 hideSpinner();

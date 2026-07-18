@@ -94,11 +94,14 @@ def get_plex_machine_id():
         mark_plex_failed()
         return None
 
-def build_plex_web_link(rating_key, machine_id):
+def build_plex_web_link(rating_key, machine_id, plex_web_url=None):
     if not machine_id or not rating_key:
         return ""
-    
-    return f"https://app.plex.tv/web/app#!/server/{machine_id}/details?key=/library/metadata/{rating_key}"
+
+    # Single fallback chokepoint: callers may pass a value straight off an item
+    # dict that never went through get_settings(), so it can still be None.
+    base = (plex_web_url or config.DEFAULT_PLEX_WEB_URL).rstrip('/')
+    return f"{base}#!/server/{machine_id}/details?key=/library/metadata/{rating_key}"
 
 def search_plex_for_rating_key(title, year, media_type, plex_url, plex_token, tmdb_id=None):
     try:
@@ -205,6 +208,7 @@ def fetch_tv_shows_from_plex_sdk(section_id, limit=10, machine_id=None, days=Non
 
         plex_url = plex_settings[0].rstrip('/')
         plex_token = decrypt(plex_settings[1])
+        plex_web_url = _s.get("plex_web_url")
 
         if days:
             api_url = (
@@ -260,7 +264,7 @@ def fetch_tv_shows_from_plex_sdk(section_id, limit=10, machine_id=None, days=Non
                 'media_type': 'show',
                 'type': 'show',
                 'library_name': library_name,
-                'plex_url': build_plex_web_link(rating_key, machine_id) if rating_key else '',
+                'plex_url': build_plex_web_link(rating_key, machine_id, plex_web_url) if rating_key else '',
                 'rating': str(directory.get('rating', ''))
             }
             shows.append(show)
@@ -284,6 +288,7 @@ def fetch_movies_from_plex_sdk(section_id, limit=10, machine_id=None, days=None)
 
         plex_url = plex_settings[0].rstrip('/')
         plex_token = decrypt(plex_settings[1])
+        plex_web_url = _s.get("plex_web_url")
 
         if days:
             api_url = (
@@ -339,7 +344,7 @@ def fetch_movies_from_plex_sdk(section_id, limit=10, machine_id=None, days=None)
                 'media_type': 'movie',
                 'type': 'movie',
                 'library_name': library_name,
-                'plex_url': build_plex_web_link(rating_key, machine_id) if rating_key else '',
+                'plex_url': build_plex_web_link(rating_key, machine_id, plex_web_url) if rating_key else '',
                 'rating': str(video.get('rating', ''))
             }
             movies.append(movie)
@@ -363,6 +368,7 @@ def fetch_albums_from_plex_sdk(section_id, limit=10, machine_id=None, days=None)
 
         plex_url = plex_settings[0].rstrip('/')
         plex_token = decrypt(plex_settings[1])
+        plex_web_url = _s.get("plex_web_url")
 
         if days:
             api_url = (
@@ -415,7 +421,7 @@ def fetch_albums_from_plex_sdk(section_id, limit=10, machine_id=None, days=None)
                 'media_type': 'album',
                 'type': 'album',
                 'library_name': library_name,
-                'plex_url': build_plex_web_link(rating_key, machine_id) if rating_key else '',
+                'plex_url': build_plex_web_link(rating_key, machine_id, plex_web_url) if rating_key else '',
                 'rating': str(album.get('rating', ''))
             }
             albums.append(album_data)
@@ -431,6 +437,9 @@ def fetch_albums_from_plex_sdk(section_id, limit=10, machine_id=None, days=None)
 def fetch_recently_added_using_plex_sdk(tautulli_base_url, tautulli_api_key, items_count=10, recently_added_mode="items", recently_added_sort="date"):
     recent_data = []
     days_mode = recently_added_mode == "days"
+
+    _s = get_settings(decrypt_secrets=False)
+    plex_web_url = _s.get("plex_web_url")
 
     machine_id = get_plex_machine_id()
     if machine_id:
@@ -472,7 +481,7 @@ def fetch_recently_added_using_plex_sdk(tautulli_base_url, tautulli_api_key, ite
                 for item in items:
                     item['library_name'] = library_name
                     if 'rating_key' in item and machine_id:
-                        item['plex_url'] = build_plex_web_link(item['rating_key'], machine_id)
+                        item['plex_url'] = build_plex_web_link(item['rating_key'], machine_id, plex_web_url)
 
         if recently_added_sort == "rating":
             items.sort(key=lambda x: float(x.get('rating', '') or 0), reverse=True)
@@ -491,6 +500,7 @@ def get_collection_items_for_email(collection_key, settings):
     try:
         plex_url = settings.get('plex_url', '').rstrip('/')
         plex_token = settings.get('plex_token', '')
+        plex_web_url = settings.get('plex_web_url')
         
         if not plex_url or not plex_token:
             logger.error(f"ERROR: Plex connection not configured for collection {collection_key}")
@@ -537,7 +547,7 @@ def get_collection_items_for_email(collection_key, settings):
                     'parentTitle': item.get('parentTitle'),
                     'grandparentTitle': item.get('grandparentTitle'),
                     'subtype': item.get('type'),
-                    'plex_url': build_plex_web_link(item.get('ratingKey'), machine_id)
+                    'plex_url': build_plex_web_link(item.get('ratingKey'), machine_id, plex_web_url)
                 }
                 items.append(item_info)
         

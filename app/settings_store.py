@@ -1,5 +1,6 @@
 import sqlite3
 
+from app.config import DEFAULT_PLEX_WEB_URL
 from app.db import db_connect
 from app.crypto import decrypt
 
@@ -52,6 +53,7 @@ DEFAULTS = {
     "appearance_theme": "dark",
     "pride_flag": "off",
     "snapins_floating": "1",
+    "plex_web_url": DEFAULT_PLEX_WEB_URL,
 }
 
 INT_COLUMNS = {

@@ -6,6 +6,35 @@ on:
   pull_request:
 
 jobs:
+  base-branch:
+    # Contributions land in `nightly` first; `main` is release-facing. Two cases
+    # are always allowed: the `nightly -> main` promotion, and any PR carrying
+    # the `override-base` label for a one-off hotfix.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check PR base branch
+        env:
+          BASE: ${{ github.event.pull_request.base.ref }}
+          HEAD: ${{ github.event.pull_request.head.ref }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+        run: |
+          if [ "$BASE" != "main" ]; then
+            echo "Base branch is '$BASE', nothing to check."
+            exit 0
+          fi
+          if [ "$HEAD" = "nightly" ] && [ "$HEAD_REPO" = "$GITHUB_REPOSITORY" ]; then
+            echo "This is the nightly -> main promotion, allowed."
+            exit 0
+          fi
+          if printf '%s' "$LABELS" | grep -q '"override-base"'; then
+            echo "PR is labelled override-base, allowed."
+            exit 0
+          fi
+          echo "::error title=Wrong base branch::This PR targets 'main'. Pull requests go to 'nightly' first, see CONTRIBUTING.md. Retarget it with the Edit button next to the PR title (no need to close and reopen), or add the 'override-base' label if this is a deliberate hotfix."
+          exit 1
+
   test:
     runs-on: ubuntu-latest
     steps:

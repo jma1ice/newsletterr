@@ -40,6 +40,7 @@ def create_app():
     db.migrate_schema("logo_width INTEGER")
     db.migrate_schema("recipient_display_name TEXT DEFAULT 'email'")
     db.migrate_schema("plex_client_id TEXT")
+    db.migrate_schema("plex_web_url TEXT DEFAULT 'https://app.plex.tv/desktop'")
     db.migrate_ra_recs_to_recently_added_recommendations()
     db.migrate_email_templates_for_expanded_collections()
     db.migrate_email_templates_for_header_title()

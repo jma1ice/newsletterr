@@ -44,6 +44,11 @@ DEFAULT_SONARR_URL = "http://localhost:8989"
 DEFAULT_RADARR_URL = "http://localhost:7878"
 DEFAULT_OMBI_URL = "http://localhost:3579"
 
+# Base URL for "Open in Plex" deep links in emails. Overridable per install so
+# self-hosters can point at their own Plex web client instead of the cloud one.
+# The DDL default in db.py and the migration in __init__.py must match this.
+DEFAULT_PLEX_WEB_URL = "https://app.plex.tv/desktop"
+
 CACHE_DURATION = 86400
 CACHE_EXTENDED_DURATION = 86400 * 7
 

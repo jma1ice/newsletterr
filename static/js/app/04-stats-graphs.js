@@ -840,11 +840,12 @@ function _filterOmbiPending(payload) {
     (data.tv || []).forEach(req => {
         const children = req.childRequests || [];
         if (!children.length) return;
-        const available = children.every(c => c.available);
-        const denied = children.every(c => c.denied);
-        if (available || denied) return;
+        // A show stays only while some season is still pending. No pending
+        // seasons means every one is resolved (available/denied, in any mix),
+        // matching the drop in _normalize_tv_request/filter_ombi_pending.
         const pendingChildren = children.filter(c => !c.available && !c.denied);
-        const relevant = pendingChildren.length ? pendingChildren : children;
+        if (!pendingChildren.length) return;
+        const relevant = pendingChildren;
         const requestedDates = children.map(c => c.requestedDate).filter(Boolean);
         entries.push({
             title: req.title || 'Unknown',

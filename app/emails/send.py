@@ -12,7 +12,7 @@ from app.db import db_connect
 from app.store import filter_suppressed, record_email_history
 from app.tokens import make_unsubscribe_placeholder, sign_unsubscribe_token
 from app.emails.assemble import convert_html_to_plain_text, build_email_html_with_all_cids
-from app.emails.fetchers import get_current_tautulli_data_for_email, get_recommendations_for_users, get_droppedneedle_wrapped_for_users, get_droppedneedle_server_stats_cached, get_yearly_wrapped_cached, get_sonarr_coming_soon_cached, get_radarr_coming_soon_cached, get_ombi_requests_cached
+from app.emails.fetchers import get_current_tautulli_data_for_email, get_recommendations_for_users, get_droppedneedle_wrapped_for_users, get_droppedneedle_server_stats_cached, get_yearly_wrapped_cached, get_sonarr_coming_soon_cached, get_radarr_coming_soon_cached, get_ombi_requests_cached, get_seerr_requests_cached
 
 import logging
 
@@ -209,6 +209,7 @@ def send_standard_email_with_cids(req, settings, to_emails):
         sonarr_coming_soon_data = get_sonarr_coming_soon_cached(use_cache=True, days_ahead=settings.get("coming_soon_days_ahead") or 14)
         radarr_coming_soon_data = get_radarr_coming_soon_cached(use_cache=True, days_ahead=settings.get("coming_soon_days_ahead") or 14)
         ombi_requests_data = get_ombi_requests_cached(use_cache=True)
+        seerr_requests_data = get_seerr_requests_cached(use_cache=True)
 
         template_data = {
             'selected_items': json.dumps(selected_items),
@@ -249,6 +250,7 @@ def send_standard_email_with_cids(req, settings, to_emails):
             sonarr_coming_soon_data=sonarr_coming_soon_data,
             radarr_coming_soon_data=radarr_coming_soon_data,
             ombi_requests_data=ombi_requests_data,
+            seerr_requests_data=seerr_requests_data,
             unsubscribe_placeholder=unsub_placeholder,
             hosted_base_url=hosted_base_url,
             hosted_images_enabled=hosted_images_enabled,
@@ -361,6 +363,7 @@ def send_recommendations_email_with_cids(req, settings, to_emails):
         sonarr_coming_soon_data = get_sonarr_coming_soon_cached(use_cache=True, days_ahead=settings.get("coming_soon_days_ahead") or 14)
         radarr_coming_soon_data = get_radarr_coming_soon_cached(use_cache=True, days_ahead=settings.get("coming_soon_days_ahead") or 14)
         ombi_requests_data = get_ombi_requests_cached(use_cache=True)
+        seerr_requests_data = get_seerr_requests_cached(use_cache=True)
 
         if rec_user_keys and not recommendations_data:
             return {"error": "No recommendations data available. Please pull recommendations first."}, 400
@@ -386,6 +389,7 @@ def send_recommendations_email_with_cids(req, settings, to_emails):
                 sonarr_coming_soon_data=sonarr_coming_soon_data,
                 radarr_coming_soon_data=radarr_coming_soon_data,
                 ombi_requests_data=ombi_requests_data,
+                seerr_requests_data=seerr_requests_data,
             )
 
             if success:
@@ -401,7 +405,7 @@ def send_recommendations_email_with_cids(req, settings, to_emails):
         logger.error("%s %s", "Error in send_recommendations_email_with_cids:", e)
         return {"error": str(e)}, 500
 
-def send_single_user_email_with_cids(req, settings, recipients, user_key, recommendations_data=None, droppedneedle_wrapped_data=None, droppedneedle_server_data=None, yearly_wrapped_data=None, sonarr_coming_soon_data=None, radarr_coming_soon_data=None, ombi_requests_data=None):
+def send_single_user_email_with_cids(req, settings, recipients, user_key, recommendations_data=None, droppedneedle_wrapped_data=None, droppedneedle_server_data=None, yearly_wrapped_data=None, sonarr_coming_soon_data=None, radarr_coming_soon_data=None, ombi_requests_data=None, seerr_requests_data=None):
     try:
         from_email = settings.get("from_email") or ""
         alias_email = settings.get("alias_email") or ""
@@ -510,6 +514,7 @@ def send_single_user_email_with_cids(req, settings, recipients, user_key, recomm
             sonarr_coming_soon_data=sonarr_coming_soon_data,
             radarr_coming_soon_data=radarr_coming_soon_data,
             ombi_requests_data=ombi_requests_data,
+            seerr_requests_data=seerr_requests_data,
             unsubscribe_placeholder=unsub_placeholder,
             hosted_base_url=hosted_base_url,
             hosted_images_enabled=hosted_images_enabled,

@@ -252,6 +252,7 @@ Released under the **MIT License** - see [LICENSE](LICENSE.txt) for details.
 * Email preview: desktop/tablet/phone views
 * Spinner board - filled and smaller
 * Custom Theme
+* Settings sections further moved into cards
 
 --- Email ---
 * Possible default email layout/UI overhaul with pride theme options
@@ -272,6 +273,7 @@ Released under the **MIT License** - see [LICENSE](LICENSE.txt) for details.
 * Plex URL input moved to a dropdown
 * Thanks @s3ntin3l8 for the Plex Web URL option for where email links go
 * Thanks @bferd for the Ombi integration functionality and the Recently Requested snap-in
+* Seerr integration (works with Overseerr and Jellyseerr) for the Recently Requested snap-in
 
 #### Fixed:
 * Plex OAuth issue, thanks @bferd for the diagnostics and issue fixes
@@ -358,6 +360,7 @@ Released under the **MIT License** - see [LICENSE](LICENSE.txt) for details.
 * [DroppedNeedle](https://github.com/HabiRabbu/DroppedNeedle) for user yearly wrapped music  
 * [Sonarr](https://github.com/Sonarr/Sonarr) & [Radarr](https://github.com/Radarr/Radarr) for coming soon calendar  
 - [Ombi](https://github.com/Ombi-app/Ombi) for recently requested  
+- [Seerr](https://github.com/seerr-team/seerr) (works with Overseerr and Jellyseerr) for recently requested  
 * [Highcharts](https://www.highcharts.com/) for charting  
 
 Happy streaming!

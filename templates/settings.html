@@ -271,6 +271,23 @@
                             </div>
 
                             <div class="settings-field-group">
+                                <h6 class="text-uppercase">Seerr</h6>
+                                <label for="seerr_url">Seerr Base URL (Optional - for the recent requests snap-in):</label><br>
+                                <input type="text" id="seerr_url" name="seerr_url"
+                                    {% if settings.seerr_url != "" %}value="{{ settings.seerr_url }}"{% endif %}
+                                    placeholder="http://localhost:5055" class="w-field"><br>
+                                <small class="form-text text-muted">Leave blank to use http://localhost:5055 (the Seerr default). Also works with Overseerr and Jellyseerr. Clear the API key to disable.</small><br><br>
+
+                                <label for="seerr_api_key">Seerr API Key:</label><br>
+                                <input type="password" id="seerr_api_key" name="seerr_api_key" autocomplete="new-password" class="w-field"
+                                    placeholder="{% if settings.has_seerr_api_key %}Saved - leave blank to keep{% else %}Settings > General > API Key in Seerr{% endif %}"><br>
+                                <div class="svc-test">
+                                    <button type="button" id="test_seerr" class="nl-btn nl-btn--primary nl-btn--sm">Test Connection</button>
+                                    <span id="seerr_test_result"></span>
+                                </div>
+                            </div>
+
+                            <div class="settings-field-group">
                                 <h6 class="text-uppercase">Discord</h6>
                                 <label for="discord_webhook_url">Discord Webhook URL (optional):</label><br>
                                 <input type="password" id="discord_webhook_url" name="discord_webhook_url" autocomplete="off" class="w-field"
@@ -739,6 +756,7 @@
         window.fillDefaultUrlIfKeyed('sonarr_url', 'sonarr_api_key', HAS_SONARR_API_KEY, 'http://localhost:8989');
         window.fillDefaultUrlIfKeyed('radarr_url', 'radarr_api_key', HAS_RADARR_API_KEY, 'http://localhost:7878');
         window.fillDefaultUrlIfKeyed('ombi_url', 'ombi_api_key', HAS_OMBI_API_KEY, 'http://localhost:3579');
+        window.fillDefaultUrlIfKeyed('seerr_url', 'seerr_api_key', HAS_SEERR_API_KEY, 'http://localhost:5055');
         const requiredFields = e.target.querySelectorAll('[required]');
         for (const field of requiredFields) {
             if (!field.validity.valid) {
@@ -1245,6 +1263,7 @@
     const HAS_SONARR_API_KEY = {{ 'true' if settings.has_sonarr_api_key else 'false' }};
     const HAS_RADARR_API_KEY = {{ 'true' if settings.has_radarr_api_key else 'false' }};
     const HAS_OMBI_API_KEY = {{ 'true' if settings.has_ombi_api_key else 'false' }};
+    const HAS_SEERR_API_KEY = {{ 'true' if settings.has_seerr_api_key else 'false' }};
     const HAS_TAUTULLI_API = {{ 'true' if settings.has_tautulli_api else 'false' }};
     const HAS_DROPPEDNEEDLE_API_KEY = {{ 'true' if settings.has_droppedneedle_api_key else 'false' }};
 
@@ -1326,6 +1345,14 @@
         }, 'ombi_test_result', 'test_ombi');
     });
 
+    document.getElementById('test_seerr')?.addEventListener('click', () => {
+        window.fillDefaultUrlIfKeyed('seerr_url', 'seerr_api_key', HAS_SEERR_API_KEY, 'http://localhost:5055');
+        runConnectionTest('/api/test/seerr', {
+            url: document.getElementById('seerr_url').value.trim(),
+            api_key: document.getElementById('seerr_api_key').value.trim()
+        }, 'seerr_test_result', 'test_seerr');
+    });
+
     // Test All: run each configured service in turn, reusing its inline result
     // display. Unconfigured services (no URL/key entered and no saved key) are
     // skipped. Plex has its own Reconnect flow and is not included.
@@ -1356,6 +1383,10 @@
               run: () => { window.fillDefaultUrlIfKeyed('ombi_url', 'ombi_api_key', HAS_OMBI_API_KEY, 'http://localhost:3579');
                   return runConnectionTest('/api/test/ombi',
                   { url: val('ombi_url'), api_key: val('ombi_api_key') }, 'ombi_test_result', 'test_ombi'); } },
+            { configured: () => !!val('seerr_url') || !!val('seerr_api_key') || HAS_SEERR_API_KEY,
+              run: () => { window.fillDefaultUrlIfKeyed('seerr_url', 'seerr_api_key', HAS_SEERR_API_KEY, 'http://localhost:5055');
+                  return runConnectionTest('/api/test/seerr',
+                  { url: val('seerr_url'), api_key: val('seerr_api_key') }, 'seerr_test_result', 'test_seerr'); } },
         ];
 
         btn.disabled = true;

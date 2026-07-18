@@ -16,6 +16,7 @@ from app.clients.droppedneedle import run_droppedneedle_command, fetch_droppedne
 from app.clients.sonarr import fetch_sonarr_calendar
 from app.clients.radarr import fetch_radarr_calendar
 from app.clients.ombi import fetch_ombi_movie_requests, fetch_ombi_tv_requests
+from app.clients.seerr import fetch_seerr_requests
 from app.emails.fetchers import fetch_recent_data_for_index
 
 from datetime import datetime, timedelta
@@ -472,6 +473,73 @@ def pull_ombi_requests():
     return render_template('index.html', stats=stats, user_dict=user_dict, graph_data=graph_data, cache_info=cache_info,
                             graph_commands=graph_commands, recent_data=recent_data, libs=libs, settings=settings,
                             ombi_requests_json=ombi_requests_json,
+                            alert=alert, error=error, theme_settings=theme_settings, service_flags=get_service_flags(_s),
+                            csrf_token=session.get("csrf_token", ""))
+
+@bp.route('/pull_seerr_requests', methods=['POST'])
+@requires_auth
+def pull_seerr_requests():
+    require_csrf_for_json()
+    seerr_requests_json = None
+    error = None
+    alert = None
+
+    data, err = json_body()
+    if err:
+        return err
+    stats = data.get('stats')
+    user_dict = data.get('user_dict', {})
+    graph_data = data.get('graph_data')
+    graph_commands = data.get('graph_commands')
+    recent_data = data.get('recent_data')
+    libs = data.get('libs')
+    settings = data.get('settings', {})
+
+    _s = get_settings(decrypt_secrets=False)
+    row = (_s.get("seerr_url"), _s.get("seerr_api_key")) if "id" in _s else None
+
+    seerr_url = (row[0] or "").strip() if row else ""
+    seerr_api_key = decrypt(row[1]) if row and row[1] else ""
+
+    if not seerr_url or not seerr_api_key:
+        return render_template('index.html', error='Please enter a Seerr URL and API key on settings page',
+                                stats=stats, user_dict=user_dict, graph_data=graph_data,
+                                graph_commands=graph_commands, recent_data=recent_data,
+                                libs=libs, settings=settings, theme_settings=get_theme_settings(),
+                                service_flags=get_service_flags(_s),
+                                csrf_token=session.get("csrf_token", ""))
+
+    entries, error = fetch_seerr_requests(seerr_url, seerr_api_key)
+
+    seerr_requests_json = {'requests': entries or []}
+
+    if not error:
+        alert = "Seerr requests pulled!"
+
+    cache_params = {'timestamp': time.time()}
+    set_cached_data('seerr_requests_json', seerr_requests_json, cache_params)
+
+    cache_info = {
+        'stats': get_cache_info('stats'),
+        'users': get_cache_info('users'),
+        'graph_data': get_cache_info('graph_data'),
+        'recent_data': get_cache_info('recent_data'),
+        'recommendations_json': get_cache_info('recommendations_json'),
+        'filtered_users': get_cache_info('filtered_users')
+    }
+
+    if not cache_info['graph_data'] or 'params' not in cache_info['graph_data']:
+        if not cache_info['graph_data']:
+            cache_info['graph_data'] = {}
+        cache_info['graph_data']['params'] = {
+            'time_range': 30
+        }
+
+    theme_settings = get_theme_settings()
+
+    return render_template('index.html', stats=stats, user_dict=user_dict, graph_data=graph_data, cache_info=cache_info,
+                            graph_commands=graph_commands, recent_data=recent_data, libs=libs, settings=settings,
+                            seerr_requests_json=seerr_requests_json,
                             alert=alert, error=error, theme_settings=theme_settings, service_flags=get_service_flags(_s),
                             csrf_token=session.get("csrf_token", ""))
 

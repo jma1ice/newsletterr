@@ -16,6 +16,7 @@ from app.clients.droppedneedle import run_droppedneedle_command, fetch_droppedne
 from app.clients.sonarr import fetch_sonarr_calendar
 from app.clients.radarr import fetch_radarr_calendar
 from app.clients.ombi import fetch_ombi_movie_requests, fetch_ombi_tv_requests
+from app.clients.seerr import fetch_seerr_requests
 
 from datetime import datetime, timedelta
 from app.tokens import make_unsubscribe_placeholder
@@ -48,6 +49,7 @@ class ScheduleContext:
     sonarr_coming_soon_data: list = None
     radarr_coming_soon_data: list = None
     ombi_requests_data: dict = None
+    seerr_requests_data: dict = None
     email_text: str = ""
 
 def send_scheduled_email(schedule_id, email_list_id, template_id):
@@ -188,6 +190,13 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
             ombi_tv, _ = fetch_ombi_tv_requests(ombi_url, ombi_api_key)
             ombi_requests_data = {'movies': ombi_movies or [], 'tv': ombi_tv or []}
 
+        seerr_url = (s.get("seerr_url") or "").strip()
+        seerr_api_key = s.get("seerr_api_key") or ""
+        seerr_requests_data = None
+        if seerr_url and seerr_api_key:
+            seerr_entries, _ = fetch_seerr_requests(seerr_url, seerr_api_key)
+            seerr_requests_data = {'requests': seerr_entries or []}
+
         ctx = ScheduleContext(
             schedule_id=schedule_id,
             template_name=template_name,
@@ -205,6 +214,7 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
             sonarr_coming_soon_data=sonarr_coming_soon_data,
             radarr_coming_soon_data=radarr_coming_soon_data,
             ombi_requests_data=ombi_requests_data,
+            seerr_requests_data=seerr_requests_data,
         )
 
         if has_recs or has_wrapped:
@@ -344,6 +354,7 @@ def send_scheduled_user_email_with_cids(ctx, settings, recipients, user_key):
         sonarr_coming_soon_data = ctx.sonarr_coming_soon_data
         radarr_coming_soon_data = ctx.radarr_coming_soon_data
         ombi_requests_data = ctx.ombi_requests_data
+        seerr_requests_data = ctx.seerr_requests_data
         logger.info(f"SMTP Config: {smtp_server}:{smtp_port} using {smtp_protocol}")
 
         if smtp_port == 465 and smtp_protocol == 'TLS':
@@ -444,6 +455,7 @@ def send_scheduled_user_email_with_cids(ctx, settings, recipients, user_key):
             sonarr_coming_soon_data=sonarr_coming_soon_data,
             radarr_coming_soon_data=radarr_coming_soon_data,
             ombi_requests_data=ombi_requests_data,
+            seerr_requests_data=seerr_requests_data,
             unsubscribe_placeholder=unsub_placeholder,
             hosted_base_url=hosted_base_url,
             hosted_images_enabled=hosted_images_enabled,
@@ -568,6 +580,7 @@ def send_scheduled_single_email_with_cids(ctx, settings, to_emails_list):
         sonarr_coming_soon_data = ctx.sonarr_coming_soon_data
         radarr_coming_soon_data = ctx.radarr_coming_soon_data
         ombi_requests_data = ctx.ombi_requests_data
+        seerr_requests_data = ctx.seerr_requests_data
         email_text = ctx.email_text
         logger.info(f"SMTP Config: {smtp_server}:{smtp_port} using {smtp_protocol}")
 
@@ -663,6 +676,7 @@ def send_scheduled_single_email_with_cids(ctx, settings, to_emails_list):
             sonarr_coming_soon_data=sonarr_coming_soon_data,
             radarr_coming_soon_data=radarr_coming_soon_data,
             ombi_requests_data=ombi_requests_data,
+            seerr_requests_data=seerr_requests_data,
             unsubscribe_placeholder=unsub_placeholder,
             hosted_base_url=hosted_base_url,
             hosted_images_enabled=hosted_images_enabled,

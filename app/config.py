@@ -43,6 +43,7 @@ k2 = "754c514b50483558474a5935514b7a45494165796866"
 DEFAULT_SONARR_URL = "http://localhost:8989"
 DEFAULT_RADARR_URL = "http://localhost:7878"
 DEFAULT_OMBI_URL = "http://localhost:3579"
+DEFAULT_SEERR_URL = "http://localhost:5055"
 
 # Base URL for "Open in Plex" deep links in emails. Overridable per install so
 # self-hosters can point at their own Plex web client instead of the cloud one.

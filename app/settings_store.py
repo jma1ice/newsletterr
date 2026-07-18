@@ -17,6 +17,7 @@ SECRET_COLUMNS = frozenset({
     "sonarr_api_key",
     "radarr_api_key",
     "ombi_api_key",
+    "seerr_api_key",
 })
 
 # Empty/NULL columns are normalized with `or`-semantics, matching the
@@ -107,4 +108,5 @@ def get_service_flags(s):
             or (s.get("radarr_url") and s.get("radarr_api_key"))
         ),
         "ombi": bool(s.get("ombi_url") and s.get("ombi_api_key")),
+        "seerr": bool(s.get("seerr_url") and s.get("seerr_api_key")),
     }

@@ -10,6 +10,7 @@ from app.clients.droppedneedle import run_droppedneedle_command, fetch_droppedne
 from app.clients.sonarr import fetch_sonarr_calendar
 from app.clients.radarr import fetch_radarr_calendar
 from app.clients.ombi import fetch_ombi_movie_requests, fetch_ombi_tv_requests
+from app.clients.seerr import fetch_seerr_requests
 
 from datetime import datetime, timedelta
 
@@ -361,4 +362,32 @@ def get_ombi_requests_cached(use_cache=True):
 
     except Exception as e:
         logger.error(f"Error getting Ombi requests: {e}")
+        return None
+
+def get_seerr_requests_cached(use_cache=True):
+    try:
+        if use_cache:
+            cached = get_cached_data('seerr_requests_json', strict=True) or get_cached_data('seerr_requests_json', strict=False)
+            if cached:
+                return cached
+
+        _s = get_settings(decrypt_secrets=False)
+        row = (_s.get("seerr_url"), _s.get("seerr_api_key")) if "id" in _s else None
+
+        if not row or not row[0] or not row[1]:
+            return None
+
+        seerr_url = row[0].rstrip('/')
+        seerr_api_key = decrypt(row[1])
+
+        entries, _ = fetch_seerr_requests(seerr_url, seerr_api_key)
+        data = {'requests': entries or []}
+
+        if use_cache and data['requests']:
+            set_cached_data('seerr_requests_json', data, {'timestamp': time.time(), 'manual_fetch': True})
+
+        return data
+
+    except Exception as e:
+        logger.error(f"Error getting Seerr requests: {e}")
         return None

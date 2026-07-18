@@ -244,7 +244,7 @@ Released under the **MIT License** - see [LICENSE](LICENSE.txt) for details.
 * GitHub webhook to pull submitted issues to Discord channel
 * Ko-fi -> Discord integration for contributor role
  -- Other --
-* Does this work with Emby/Jellyfin? - jellyfin doesn't use tautulli
+* Does this work with Emby/Jellyfin? - jellyfin uses jellywatch over tautulli
 * Servarr PR
 * Clean up looks on DN stats, coming soon, and wrapped
 
@@ -252,7 +252,6 @@ Released under the **MIT License** - see [LICENSE](LICENSE.txt) for details.
 * Email preview: desktop/tablet/phone views
 * Spinner board - filled and smaller
 * Custom Theme
-* Settings sections further moved into cards
 
 --- Email ---
 * Possible default email layout/UI overhaul with pride theme options
@@ -274,6 +273,7 @@ Released under the **MIT License** - see [LICENSE](LICENSE.txt) for details.
 * Thanks @s3ntin3l8 for the Plex Web URL option for where email links go
 * Thanks @bferd for the Ombi integration functionality and the Recently Requested snap-in
 * Seerr integration (works with Overseerr and Jellyseerr) for the Recently Requested snap-in
+* Settings sections further moved into cards
 
 #### Fixed:
 * Plex OAuth issue, thanks @bferd for the diagnostics and issue fixes

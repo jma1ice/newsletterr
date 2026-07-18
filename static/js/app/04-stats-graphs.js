@@ -811,6 +811,74 @@ function buildRadarrComingSoonPreviewHTML() {
     return _comingSoonGridHTML(cardsHTML, 'Coming Soon (Movies)', gridColumns);
 }
 
+// Mirrors TMDB_POSTER_BASE/_poster_src in app/emails/builders/ombi_requests.py.
+// Ombi's posterPath is a public TMDB CDN fragment, so it goes through the
+// generic /proxy-img route rather than an Ombi-specific art proxy.
+function _ombiPosterSrc(posterPath) {
+    if (!posterPath) return '';
+    const url = posterPath.startsWith('http') ? posterPath : `https://image.tmdb.org/t/p/w300${posterPath}`;
+    return _comingSoonPosterSrc(url, '');
+}
+
+// Mirrors _normalize_movie_request/_normalize_tv_request/filter_ombi_pending in
+// app/emails/builders/ombi_requests.py
+function _filterOmbiPending(payload) {
+    const data = payload || {};
+    const entries = [];
+
+    (data.movies || []).forEach(req => {
+        if (req.available || req.denied) return;
+        entries.push({
+            title: req.title || 'Unknown',
+            year: (req.releaseDate || '').slice(0, 4),
+            poster: req.posterPath,
+            approved: !!req.approved,
+            requestedDate: req.requestedDate || null,
+        });
+    });
+
+    (data.tv || []).forEach(req => {
+        const children = req.childRequests || [];
+        if (!children.length) return;
+        const available = children.every(c => c.available);
+        const denied = children.every(c => c.denied);
+        if (available || denied) return;
+        const pendingChildren = children.filter(c => !c.available && !c.denied);
+        const relevant = pendingChildren.length ? pendingChildren : children;
+        const requestedDates = children.map(c => c.requestedDate).filter(Boolean);
+        entries.push({
+            title: req.title || 'Unknown',
+            year: (req.releaseDate || '').slice(0, 4),
+            poster: req.posterPath,
+            approved: relevant.some(c => c.approved),
+            requestedDate: requestedDates.length ? requestedDates.sort().slice(-1)[0] : null,
+        });
+    });
+
+    entries.sort((a, b) => new Date(b.requestedDate || 0) - new Date(a.requestedDate || 0));
+    return entries;
+}
+
+// Kept in sync by hand with app/emails/builders/ombi_requests.py:build_ombi_requests_html_with_cids
+function buildOmbiRequestsPreviewHTML() {
+    const entries = _filterOmbiPending(ombiRequestsPayload);
+    if (!entries.length) {
+        return `<div><p style="text-align: center; color: var(--email-muted); padding: 20px;">No pending or approved requests found.</p></div>`;
+    }
+
+    const gridColumns = parseInt(APP.comingSoonGridColumns) || 5;
+
+    const cardsHTML = entries.map(entry => {
+        const status = entry.approved ? 'Approved' : 'Pending Approval';
+        const relative = _comingSoonRelativeDate(entry.requestedDate);
+        const metaText = [status, relative ? `Requested ${relative}` : ''].filter(Boolean).join(' • ');
+        const posterSrc = _ombiPosterSrc(entry.poster);
+        return _comingSoonCardHTML(entry.title, entry.year, metaText, posterSrc);
+    });
+
+    return _comingSoonGridHTML(cardsHTML, 'Recent Requests', gridColumns);
+}
+
 function buildRecommendationsSectionHTML(availableItems, unavailableItems, title) {
     const allItems = [...availableItems, ...unavailableItems];
     

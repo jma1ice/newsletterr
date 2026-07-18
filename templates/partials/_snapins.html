@@ -125,6 +125,20 @@
                                 </div>
                             {% endif %}
                         </div>
+
+                        <div id="ombi-requests-col">
+                            {% if ombi_requests_json %}
+                                <div class="builder-card snapin-card">
+                                    <div class="snapin-card-header">
+                                        <button type="button" class="snapin-collapse-toggle" aria-expanded="true" aria-label="Collapse section">{{ icon('chevron-down') }}</button>
+                                        <h2>recent requests</h2>
+                                    </div>
+                                    <div class="snapin-card-body">
+                                        <div id="ombi-requests-list" class="row"></div>
+                                    </div>
+                                </div>
+                            {% endif %}
+                        </div>
                         </div>
 
                         <input type="file" id="media-upload-input" accept=".png,.jpg,.jpeg,.webp,.gif" style="display: none;">

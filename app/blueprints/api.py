@@ -104,6 +104,24 @@ def test_radarr_connection(url, api_key):
     except Exception as e:
         return {'status': 'error', 'message': str(e)}
 
+def test_ombi_connection(url, api_key):
+    url = (url or '').rstrip('/')
+    api_key = (api_key or '').strip()
+    if not url:
+        return {'status': 'error', 'message': 'Ombi URL is required'}
+    if not api_key:
+        return {'status': 'error', 'message': 'Ombi API key is required'}
+    try:
+        r = safe_get(f"{url}/api/v1/Status", timeout=10, headers={'ApiKey': api_key})
+        if r.status_code == 401:
+            return {'status': 'error', 'message': 'Ombi rejected the API key'}
+        r.raise_for_status()
+        return {'status': 'ok', 'message': 'Connected to Ombi'}
+    except requests.exceptions.ConnectionError:
+        return {'status': 'error', 'message': 'Ombi is unreachable at that URL'}
+    except Exception as e:
+        return {'status': 'error', 'message': str(e)}
+
 def _fallback(posted, saved):
     posted = (posted or '').strip()
     return posted or (saved or '')
@@ -151,6 +169,15 @@ def test_radarr():
     url = _fallback(data.get('url'), s.get('radarr_url'))
     api_key = _fallback(data.get('api_key'), s.get('radarr_api_key'))
     return jsonify(test_radarr_connection(url, api_key))
+
+@bp.route('/api/test/ombi', methods=['POST'])
+@requires_auth
+def test_ombi():
+    data = request.get_json()
+    s = get_settings()
+    url = _fallback(data.get('url'), s.get('ombi_url'))
+    api_key = _fallback(data.get('api_key'), s.get('ombi_api_key'))
+    return jsonify(test_ombi_connection(url, api_key))
 
 PRIDE_FLAGS = frozenset({'off', 'rainbow', 'trans', 'bi', 'pan', 'nonbinary', 'lesbian', 'ace', 'progress'})
 

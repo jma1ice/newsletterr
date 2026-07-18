@@ -9,6 +9,7 @@ from app.clients.conjurr import run_conjurr_command
 from app.clients.droppedneedle import run_droppedneedle_command, fetch_droppedneedle_server_stats
 from app.clients.sonarr import fetch_sonarr_calendar
 from app.clients.radarr import fetch_radarr_calendar
+from app.clients.ombi import fetch_ombi_movie_requests, fetch_ombi_tv_requests
 
 from datetime import datetime, timedelta
 
@@ -331,4 +332,33 @@ def get_radarr_coming_soon_cached(use_cache=True, days_ahead=14):
 
     except Exception as e:
         logger.error(f"Error getting Radarr coming soon calendar: {e}")
+        return None
+
+def get_ombi_requests_cached(use_cache=True):
+    try:
+        if use_cache:
+            cached = get_cached_data('ombi_requests_json', strict=True) or get_cached_data('ombi_requests_json', strict=False)
+            if cached:
+                return cached
+
+        _s = get_settings(decrypt_secrets=False)
+        row = (_s.get("ombi_url"), _s.get("ombi_api_key")) if "id" in _s else None
+
+        if not row or not row[0] or not row[1]:
+            return None
+
+        ombi_url = row[0].rstrip('/')
+        ombi_api_key = decrypt(row[1])
+
+        movies, _ = fetch_ombi_movie_requests(ombi_url, ombi_api_key)
+        tv, _ = fetch_ombi_tv_requests(ombi_url, ombi_api_key)
+        data = {'movies': movies or [], 'tv': tv or []}
+
+        if use_cache and (data['movies'] or data['tv']):
+            set_cached_data('ombi_requests_json', data, {'timestamp': time.time(), 'manual_fetch': True})
+
+        return data
+
+    except Exception as e:
+        logger.error(f"Error getting Ombi requests: {e}")
         return None

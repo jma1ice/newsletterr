@@ -54,6 +54,7 @@ def index():
     yearly_wrapped_json = None
     sonarr_coming_soon_json = None
     radarr_coming_soon_json = None
+    ombi_requests_json = None
     error = None
     alert = None
 
@@ -140,6 +141,7 @@ def index():
         yearly_wrapped_json = get_cached_data('yearly_wrapped_json', strict=True) or get_cached_data('yearly_wrapped_json', strict=False)
         sonarr_coming_soon_json = get_cached_data('sonarr_coming_soon_json', strict=True) or get_cached_data('sonarr_coming_soon_json', strict=False)
         radarr_coming_soon_json = get_cached_data('radarr_coming_soon_json', strict=True) or get_cached_data('radarr_coming_soon_json', strict=False)
+        ombi_requests_json = get_cached_data('ombi_requests_json', strict=True) or get_cached_data('ombi_requests_json', strict=False)
 
         if users:
             users_full_data = users
@@ -190,6 +192,7 @@ def index():
                            droppedneedle_wrapped_json=droppedneedle_wrapped_json, droppedneedle_server_json=droppedneedle_server_json,
                            yearly_wrapped_json=yearly_wrapped_json,
                            sonarr_coming_soon_json=sonarr_coming_soon_json, radarr_coming_soon_json=radarr_coming_soon_json,
+                           ombi_requests_json=ombi_requests_json,
                            csrf_token=session["csrf_token"], username=username, service_flags=service_flags
                         )
 

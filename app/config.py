@@ -42,6 +42,7 @@ k2 = "754c514b50483558474a5935514b7a45494165796866"
 # These match the placeholder text shown in the setup/settings forms.
 DEFAULT_SONARR_URL = "http://localhost:8989"
 DEFAULT_RADARR_URL = "http://localhost:7878"
+DEFAULT_OMBI_URL = "http://localhost:3579"
 
 CACHE_DURATION = 86400
 CACHE_EXTENDED_DURATION = 86400 * 7

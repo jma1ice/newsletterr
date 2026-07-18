@@ -229,11 +229,34 @@
                         <span id="radarr_test_result" class="test-result"></span>
                     </div>
                     <div class="d-flex gap-2 mt-4">
+                        <a href="{{ url_for('auth.setup_ombi') }}" class="btn btn-outline-secondary w-100">Skip</a>
+                        <button type="submit" class="btn btn-primary btn-login w-100">Continue</button>
+                    </div>
+                </form>
+                <p class="text-center mt-3"><a href="{{ url_for('auth.setup_sonarr') }}">&larr; Back</a></p>
+
+            {% elif step == 'ombi' %}
+                <h5 class="step-title">Ombi (optional)</h5>
+                <p class="step-subtitle">Powers the "recent requests" snap-in in emails.</p>
+                <form method="POST" id="ombi-form">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+                    <div class="mb-3">
+                        <label for="ombi_url" class="form-label">Ombi URL</label>
+                        <input type="text" class="form-control" id="ombi_url" name="ombi_url" value="{{ settings.ombi_url or '' }}" placeholder="http://localhost:3579">
+                        <small class="form-text text-muted">Leave blank to use http://localhost:3579 (linuxserver/ombi Docker default - native installs typically use port 5000). Clear the API key to disable.</small>
+                    </div>
+                    <div class="mb-3">
+                        <label for="ombi_api_key" class="form-label">Ombi API Key</label>
+                        <input type="password" class="form-control" id="ombi_api_key" name="ombi_api_key" autocomplete="off">
+                        <button type="button" id="test_ombi" class="btn btn-outline-secondary btn-sm mt-2">Test Connection</button>
+                        <span id="ombi_test_result" class="test-result"></span>
+                    </div>
+                    <div class="d-flex gap-2 mt-4">
                         <a href="{{ url_for('main.index') }}" class="btn btn-outline-secondary w-100">Skip &amp; Finish</a>
                         <button type="submit" class="btn btn-primary btn-login w-100">Finish</button>
                     </div>
                 </form>
-                <p class="text-center mt-3"><a href="{{ url_for('auth.setup_sonarr') }}">&larr; Back</a></p>
+                <p class="text-center mt-3"><a href="{{ url_for('auth.setup_radarr') }}">&larr; Back</a></p>
             {% endif %}
 
             <div class="step-dots">
@@ -510,6 +533,14 @@
                 }, 'radarr_test_result', 'test_radarr');
             });
 
+            document.getElementById('test_ombi')?.addEventListener('click', () => {
+                fillDefaultUrlIfKeyed('ombi_url', 'ombi_api_key', 'http://localhost:3579');
+                runConnectionTest('/api/test/ombi', {
+                    url: document.getElementById('ombi_url').value.trim(),
+                    api_key: document.getElementById('ombi_api_key').value.trim()
+                }, 'ombi_test_result', 'test_ombi');
+            });
+
             // First-run email step: provider dropdown autofills SMTP fields and
             // shows app-password guidance. Non-modal counterpart of the settings wizard.
             document.getElementById('email_provider')?.addEventListener('change', (e) => {
@@ -551,6 +582,10 @@
 
             document.getElementById('radarr-form')?.addEventListener('submit', () => {
                 fillDefaultUrlIfKeyed('radarr_url', 'radarr_api_key', 'http://localhost:7878');
+            });
+
+            document.getElementById('ombi-form')?.addEventListener('submit', () => {
+                fillDefaultUrlIfKeyed('ombi_url', 'ombi_api_key', 'http://localhost:3579');
             });
         </script>
     </body>

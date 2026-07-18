@@ -6,6 +6,7 @@ from app.emails.builders.cards import build_individual_item_card_html, build_col
 from app.emails.builders.recommendations import build_recommendations_html_with_cids, _wrapped_ranked_list_html, build_droppedneedle_wrapped_html_with_cids, build_droppedneedle_server_stats_html_with_cids, build_recommendations_section_with_cids
 from app.emails.builders.collections import build_collections_html_with_cids
 from app.emails.builders.coming_soon import build_sonarr_coming_soon_html_with_cids, build_radarr_coming_soon_html_with_cids
+from app.emails.builders.ombi_requests import build_ombi_requests_html_with_cids
 
 __all__ = [
     "get_user_display_name",
@@ -25,4 +26,5 @@ __all__ = [
     "build_collections_html_with_cids",
     "build_sonarr_coming_soon_html_with_cids",
     "build_radarr_coming_soon_html_with_cids",
+    "build_ombi_requests_html_with_cids",
 ]

@@ -343,6 +343,7 @@ def preview_schedule(schedule_id):
         droppedneedle_server_data = get_cached_data('droppedneedle_server_json', strict=False) or None
         sonarr_coming_soon_data = get_cached_data('sonarr_coming_soon_json', strict=False) or []
         radarr_coming_soon_data = get_cached_data('radarr_coming_soon_json', strict=False) or []
+        ombi_requests_data = get_cached_data('ombi_requests_json', strict=False) or {}
 
         return jsonify({
             "status": "success",
@@ -364,6 +365,7 @@ def preview_schedule(schedule_id):
             "droppedneedle_server": droppedneedle_server_data,
             "sonarr_coming_soon": sonarr_coming_soon_data,
             "radarr_coming_soon": radarr_coming_soon_data,
+            "ombi_requests": ombi_requests_data,
             "user_dict": user_dict,
             "users_full_data": users_full_data,
             "expanded_collections": expanded_collections,

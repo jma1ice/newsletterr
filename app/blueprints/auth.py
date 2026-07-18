@@ -4,7 +4,7 @@ import time
 
 from flask import Blueprint, abort, redirect, render_template, request, session, url_for
 
-from app.config import DEFAULT_RADARR_URL, DEFAULT_SONARR_URL, DEFAULT_OMBI_URL, DEFAULT_SEERR_URL
+from app.config import DEFAULT_RADARR_URL, DEFAULT_SONARR_URL, DEFAULT_OMBI_URL, DEFAULT_SEERR_URL, DEFAULT_TAUTULLI_URL, DEFAULT_DROPPEDNEEDLE_URL
 from app.crypto import encrypt
 from app.db import db_connect
 from app.settings_store import get_settings
@@ -169,9 +169,9 @@ def setup_tautulli():
         if not token or token != session.get("csrf_token"):
             abort(400)
 
-        tautulli_url = request.form.get('tautulli_url', '').strip()
+        tautulli_url = request.form.get('tautulli_url', '').strip() or DEFAULT_TAUTULLI_URL
         tautulli_api = request.form.get('tautulli_api', '').strip()
-        if tautulli_url and tautulli_api:
+        if tautulli_api:
             conn = db_connect()
             conn.execute("INSERT OR IGNORE INTO settings (id) VALUES (1)")
             conn.execute("UPDATE settings SET tautulli_url = ?, tautulli_api = ? WHERE id = 1", (tautulli_url, encrypt(tautulli_api)))
@@ -216,9 +216,9 @@ def setup_droppedneedle():
         if not token or token != session.get("csrf_token"):
             abort(400)
 
-        droppedneedle_url = request.form.get('droppedneedle_url', '').strip()
+        droppedneedle_url = request.form.get('droppedneedle_url', '').strip() or DEFAULT_DROPPEDNEEDLE_URL
         droppedneedle_api_key = request.form.get('droppedneedle_api_key', '').strip()
-        if droppedneedle_url and droppedneedle_api_key:
+        if droppedneedle_api_key:
             conn = db_connect()
             conn.execute("INSERT OR IGNORE INTO settings (id) VALUES (1)")
             conn.execute("UPDATE settings SET droppedneedle_url = ?, droppedneedle_api_key = ? WHERE id = 1", (droppedneedle_url, encrypt(droppedneedle_api_key)))

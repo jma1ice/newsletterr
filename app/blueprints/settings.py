@@ -5,7 +5,7 @@ import os, time
 from flask import Blueprint, abort, current_app, jsonify, redirect, render_template, request, session, url_for
 from PIL import Image
 
-from app.config import DEFAULT_RADARR_URL, DEFAULT_SONARR_URL, DEFAULT_OMBI_URL, DEFAULT_SEERR_URL, DEFAULT_PLEX_WEB_URL
+from app.config import DEFAULT_RADARR_URL, DEFAULT_SONARR_URL, DEFAULT_OMBI_URL, DEFAULT_SEERR_URL, DEFAULT_PLEX_WEB_URL, DEFAULT_TAUTULLI_URL, DEFAULT_DROPPEDNEEDLE_URL
 from app.db import db_connect
 from app.settings_store import get_settings
 from app.crypto import encrypt, decrypt
@@ -115,6 +115,11 @@ def settings():
             seerr_api_key = _secret("seerr_api_key", existing_seerr_api_key)
             # A blank URL with an API key present (submitted or saved) falls back
             # to the default; clearing the API key is how you disable the integration.
+            # Conjurr is URL-only, so its blank URL simply means disabled.
+            if not (tautulli_url or "").strip() and tautulli_api:
+                tautulli_url = DEFAULT_TAUTULLI_URL
+            if not (droppedneedle_url or "").strip() and droppedneedle_api_key:
+                droppedneedle_url = DEFAULT_DROPPEDNEEDLE_URL
             if not (sonarr_url or "").strip() and sonarr_api_key:
                 sonarr_url = DEFAULT_SONARR_URL
             if not (radarr_url or "").strip() and radarr_api_key:

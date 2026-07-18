@@ -135,6 +135,7 @@
                     <div class="mb-3">
                         <label for="tautulli_url" class="form-label">Tautulli URL</label>
                         <input type="text" class="form-control" id="tautulli_url" name="tautulli_url" value="{{ settings.tautulli_url or '' }}" placeholder="http://localhost:8181">
+                        <small class="form-text text-muted">Leave blank to use http://localhost:8181. Clear the API key to disable.</small>
                     </div>
                     <div class="mb-3">
                         <label for="tautulli_api" class="form-label">Tautulli API Key</label>
@@ -156,7 +157,7 @@
                     <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
                     <div class="mb-3">
                         <label for="conjurr_url" class="form-label">Conjurr URL</label>
-                        <input type="text" class="form-control" id="conjurr_url" name="conjurr_url" value="{{ settings.conjurr_url or '' }}" placeholder="http://localhost:8282">
+                        <input type="text" class="form-control" id="conjurr_url" name="conjurr_url" value="{{ settings.conjurr_url or '' }}" placeholder="http://localhost:2665">
                         <button type="button" id="test_conjurr" class="btn btn-outline-secondary btn-sm mt-2">Test Connection</button>
                         <span id="conjurr_test_result" class="test-result"></span>
                     </div>
@@ -174,7 +175,8 @@
                     <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
                     <div class="mb-3">
                         <label for="droppedneedle_url" class="form-label">DroppedNeedle URL</label>
-                        <input type="text" class="form-control" id="droppedneedle_url" name="droppedneedle_url" value="{{ settings.droppedneedle_url or '' }}" placeholder="http://localhost:8383">
+                        <input type="text" class="form-control" id="droppedneedle_url" name="droppedneedle_url" value="{{ settings.droppedneedle_url or '' }}" placeholder="http://localhost:8688">
+                        <small class="form-text text-muted">Leave blank to use http://localhost:8688. Clear the API key to disable.</small>
                     </div>
                     <div class="mb-3">
                         <label for="droppedneedle_api_key" class="form-label">Wrapped API Key</label>
@@ -510,6 +512,7 @@
             }
 
             document.getElementById('test_tautulli')?.addEventListener('click', () => {
+                fillDefaultUrlIfKeyed('tautulli_url', 'tautulli_api', 'http://localhost:8181');
                 runConnectionTest('/api/test/tautulli', {
                     url: document.getElementById('tautulli_url').value.trim(),
                     api_key: document.getElementById('tautulli_api').value.trim()
@@ -523,6 +526,7 @@
             });
 
             document.getElementById('test_droppedneedle')?.addEventListener('click', () => {
+                fillDefaultUrlIfKeyed('droppedneedle_url', 'droppedneedle_api_key', 'http://localhost:8688');
                 runConnectionTest('/api/test/droppedneedle', {
                     url: document.getElementById('droppedneedle_url').value.trim(),
                     api_key: document.getElementById('droppedneedle_api_key').value.trim()
@@ -605,6 +609,14 @@
                 } else {
                     linkLine.classList.add('d-none');
                 }
+            });
+
+            document.getElementById('tautulli-form')?.addEventListener('submit', () => {
+                fillDefaultUrlIfKeyed('tautulli_url', 'tautulli_api', 'http://localhost:8181');
+            });
+
+            document.getElementById('droppedneedle-form')?.addEventListener('submit', () => {
+                fillDefaultUrlIfKeyed('droppedneedle_url', 'droppedneedle_api_key', 'http://localhost:8688');
             });
 
             document.getElementById('sonarr-form')?.addEventListener('submit', () => {

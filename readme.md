@@ -277,6 +277,8 @@ Released under the **MIT License** - see [LICENSE](LICENSE.txt) for details.
 
 #### Fixed:
 * Plex OAuth issue, thanks @bferd for the diagnostics and issue fixes
+* Export logs button text was same color as bg
+* Setup/settings wasn't autofilling some URLs
 
 ### v2026.2.1:
 

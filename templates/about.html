@@ -51,6 +51,10 @@
                 <span class="contrib-badge">GitHub</span>
                 <span class="contrib-name">@2wheelsdown</span>
             </div>
+            <div class="contrib-card">
+                <span class="contrib-badge">GitHub</span>
+                <span class="contrib-name">@s3ntin3l8</span>
+            </div>
         </div>
     </div>
 
@@ -93,10 +97,12 @@
 
     <h2>credits &amp; libraries</h2>
     <ul class="info-list">
+        <li>Tautulli API for 'Stats/Graphs'</li>
+        <li>conjurr API for 'Recommendations'</li>
         <li>DroppedNeedle 'Wrapped' API</li>
-        <li>Tautulli API</li>
+        <li>Sonarr/Radarr API for 'Coming Soon'</li>
+        <li>Ombi API for 'Recently Requested'</li>
         <li>Highcharts for interactive graphs</li>
-        <li>Tailwind CSS + Bootstrap utilities</li>
         <li>Python Flask 3.x</li>
     </ul>
 
@@ -105,65 +111,18 @@
     <h2>recent changes</h2>
     <p class="info-subhead">New Features:</p>
     <ul class="info-list">
-        <li>Added sections to settings page (email server | connections | data and stats | email content | security | hosted features | appearance)</li>
-        <li>Settings changes are now kept on error so user won't have to re-enter them</li>
-        <li>Added test api buttons for conjurr and tautulli</li>
-        <li>Added setting for custom intro/outro text</li>
-        <li>Added HSTS option in security settings</li>
-        <li>Added option to use or not use [SCHEDULED] in scheduled email subject</li>
-        <li>Added setting for logo positioning</li>
-        <li>Added setting to hide play counts in stats and graphs</li>
-        <li>Added setting to choose if duration or play counts is used for stats/graphs</li>
-        <li>Added an option to pull recently added by # of days. When this is used, "Recently Added" snap-in header now shows 'Added since X date'</li>
-        <li>Added option to sort recently added by rating</li>
-        <li>Added option for item width of recently added and recommendations grids</li>
-        <li>Added option for small cover art of each item in stats tables</li>
-        <li>Added To: vs BCC: option for email send</li>
-        <li>Added option for setting max image heights to reduce email size</li>
-        <li>Added API functionality to pull wrapped stats from DroppedNeedle</li>
-        <li>Complete codebase overhaul -&gt; app factory</li>
-        <li>SQLite hardened with WAL</li>
-        <li>Auth required and extra setup page added for first sign-in</li>
-        <li>Visibility for failed sends</li>
-        <li>Test send button</li>
-        <li>Email builder auto-save</li>
-        <li>Pagination in email history, history capped to 1000</li>
-        <li>RA by days implemented in 'new schedule creator'</li>
-        <li>Export logs button with send to discord</li>
-        <li>Stats for total items in library</li>
-        <li>Settings submit audits the external tools api test</li>
-        <li>Setup Wizard</li>
-        <li>Resend from history</li>
-        <li>Sonarr/Radarr calendar integration for 'coming soon' type email</li>
-        <li>Year in Plex (Plex Wrapped yearly stats)</li>
-        <li>Date range for stats (i.e. 1.1.25 - 1.1.26) (instead of 'last X days')</li>
-        <li>Made collections clickable</li>
-        <li>Added a hosted 'most recent newsletter' webpage</li>
-        <li>Added opt out support</li>
-        <li>Added hosted images to reduce email size</li>
-        <li>General UI update/modernization</li>
-        <li>More mobile CSS optimizations</li>
-        <li>Removed use of Tailwind Play CDN</li>
-        <li>Pride UI themes</li>
-        <li>Option to show or hide description on recently added posters</li>
-        <li>Setting for collection group grid width</li>
+        <li>Unsubscribed list</li>
+        <li>Hosted image retention moved into settings</li>
+        <li>Plex URL input moved to a dropdown</li>
+        <li>Thanks @s3ntin3l8 for the Plex Web URL option for where email links go</li>
+        <li>Thanks @bferd for the Ombi integration functionality and the Recently Requested snap-in</li>
     </ul>
     <p class="info-subhead">Fixes:</p>
     <ul class="info-list mb-4">
-        <li>Thanks @2wheelsdown for the blank emails fix</li>
-        <li>Fixed issue where fresh setup `migrate_email_templates_for_header_title()` calls for `server_name` failed creating a missing `email_header_title` column</li>
-        <li>Patched up some SSRF/secrete containment</li>
-        <li>CSRF fixes</li>
-        <li>Fixed possible double send on scheduled emails</li>
-        <li>Bimonthly cadence fix</li>
-        <li>Schedule fix for recommendation emails</li>
-        <li>API fields in settings are now a password field</li>
-        <li>Fixed ra/recs card differing width issues when &gt;5 columns used</li>
-        <li>Added a 'pop-up blocked' to index for `save_template()` and similar</li>
-        <li>Adjusted issue where some email clients show posters as small slivers</li>
-        <li>Fixed where contributor area would start clipping out on lower size screens</li>
-        <li>Removed plex-api-client as plexapi.plex was no longer supported</li>
-        <li>Fixed changing ra/recs grid width to maintain the correct poster ratio</li>
+        <li>Thanks @bferd for the `includes` to `==` to fix similar library name issue</li>
+        <li>Fixed whitespace issue that made emails bigger</li>
+        <li>Preview now shows unsubscribe and view in browser link</li>
+        <li>Plex OAuth issue, thanks @bferd for the diagnostics and issue fixes</li>
     </ul>
 </div>
 {% endblock %}

@@ -226,7 +226,6 @@ Released under the **MIT License** - see [LICENSE](LICENSE.txt) for details.
 * GitHub webhook to pull submitted issues to Discord channel
 * Ko-fi -> Discord integration for contributor role
  -- Other --
-* Ombi integration
 * Does this work with Emby/Jellyfin? - jellyfin doesn't use tautulli
 * Servarr PR
 * Clean up looks on DN stats, coming soon, and wrapped
@@ -237,7 +236,7 @@ Released under the **MIT License** - see [LICENSE](LICENSE.txt) for details.
 * Custom Theme
 
 --- Email ---
-* Possible default email layout/UI overhaul with pride theme
+* Possible default email layout/UI overhaul with pride theme options
 * SVG over emoji if possible in emails
 
 --- Misc. ---
@@ -253,9 +252,11 @@ Released under the **MIT License** - see [LICENSE](LICENSE.txt) for details.
 
 #### New Features:
 * Plex URL input moved to a dropdown
+* Thanks @s3ntin3l8 for the Plex Web URL option for where email links go
+* Thanks @bferd for the Ombi integration functionality and the Recently Requested snap-in
 
 #### Fixed:
-* Plex OAuth database issue, thanks @bferd for the diagnostics and iasue fins
+* Plex OAuth issue, thanks @bferd for the diagnostics and issue fixes
 
 ### v2026.2.1:
 
@@ -330,44 +331,15 @@ Released under the **MIT License** - see [LICENSE](LICENSE.txt) for details.
 * Removed plex-api-client as plexapi.plex was no longer supported
 * Fixed changing ra/recs grid width to maintain the correct poster ratio
 
-### v2026.1:
-
-#### New Features:
-* GitHub link is now a stylized logo
-* Page no longer reloads on stats/users pull
-* Added separator blocks to add lines between sections in emails
-* Made the header title into a text input (under subject) so that it is editable/removable
-* Made 'Title' Text Block drag-able and not pinned to top
-* Recently Added now filters out 0 length run time items
-* Added functionality for full custom HTML templates
-* Added an export email HTML button
-* Added an import email template button
-* Ratings (G, PG, etc) are now listed on recently added
-* Added IMDb ratings in stat tables - requires Tautulli PR approval and then update
-* Added snap-ins for images/gifs
-* Added emoji support to various Text Block Snap-ins
-* Pop out preview now updates with changes to the email
-
-#### Fixed:
-* Some CSS Optimizations for mobile - more still in the works
-* Timeout on safe_get() extended to 120s so that conjurr api call has enough time to generate the recommendations
-* Fixed authentication issue with /proxy-art that made art unavailble in the sent email if a login page was set up
-* Fixed a bug where libraries that share name similarities were causing both libraries to be pulled into the 'recently added' snap in
-* Fixed graph hanging bug by moving some variable declarations higher and packaging highcharts with the app instead of calls to the CDN
-* While we're at it, moved all CDN calls to local files
-* Fixed missing smtp_username variable from scheduled email send logic
-* Added consistent headers to avoid repeated 'New Device Connected' notifications on Plex API calls
-* Fixed bug where recommendations pull would hang for a short period if conjurr is not running
-* Fixed bug where missing theme_settings in an early return to index was causing an error updating the preview
-
 ---
 
 ## Acknowledgements
 
-* [Tautulli](https://tautulli.com/) for the Plex charts, users, and graphs  
-* [Highcharts](https://www.highcharts.com/) for charting  
-* [Tailwind CSS](https://tailwindcss.com/) & [Bootstrap](https://getbootstrap.com/) for styling
+* [Tautulli](https://github.com/Tautulli/Tautulli) for the Plex charts, users, and graphs  
 * [conjurr](https://github.com/yungsnuzzy/conjurr) for user watchlist based recommendations  
 * [DroppedNeedle](https://github.com/HabiRabbu/DroppedNeedle) for user yearly wrapped music  
+* [Sonarr](https://github.com/Sonarr/Sonarr) & [Radarr](https://github.com/Radarr/Radarr) for coming soon calendar  
+- [Ombi](https://github.com/Ombi-app/Ombi) for recently requested  
+* [Highcharts](https://www.highcharts.com/) for charting  
 
 Happy streaming!

@@ -15,6 +15,7 @@ from app.clients.conjurr import run_conjurr_command
 from app.clients.droppedneedle import run_droppedneedle_command, fetch_droppedneedle_server_stats
 from app.clients.sonarr import fetch_sonarr_calendar
 from app.clients.radarr import fetch_radarr_calendar
+from app.clients.ombi import fetch_ombi_movie_requests, fetch_ombi_tv_requests
 
 from datetime import datetime, timedelta
 from app.tokens import make_unsubscribe_placeholder
@@ -46,6 +47,7 @@ class ScheduleContext:
     yearly_wrapped_data: list = None
     sonarr_coming_soon_data: list = None
     radarr_coming_soon_data: list = None
+    ombi_requests_data: dict = None
     email_text: str = ""
 
 def send_scheduled_email(schedule_id, email_list_id, template_id):
@@ -178,6 +180,14 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
         radarr_api_key = s.get("radarr_api_key") or ""
         radarr_coming_soon_data, _ = fetch_radarr_calendar(radarr_url, radarr_api_key, coming_soon_start, coming_soon_end) if (radarr_url and radarr_api_key) else (None, None)
 
+        ombi_url = (s.get("ombi_url") or "").strip()
+        ombi_api_key = s.get("ombi_api_key") or ""
+        ombi_requests_data = None
+        if ombi_url and ombi_api_key:
+            ombi_movies, _ = fetch_ombi_movie_requests(ombi_url, ombi_api_key)
+            ombi_tv, _ = fetch_ombi_tv_requests(ombi_url, ombi_api_key)
+            ombi_requests_data = {'movies': ombi_movies or [], 'tv': ombi_tv or []}
+
         ctx = ScheduleContext(
             schedule_id=schedule_id,
             template_name=template_name,
@@ -194,6 +204,7 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
             yearly_wrapped_data=yearly_wrapped_data,
             sonarr_coming_soon_data=sonarr_coming_soon_data,
             radarr_coming_soon_data=radarr_coming_soon_data,
+            ombi_requests_data=ombi_requests_data,
         )
 
         if has_recs or has_wrapped:
@@ -332,6 +343,7 @@ def send_scheduled_user_email_with_cids(ctx, settings, recipients, user_key):
         yearly_wrapped_data = ctx.yearly_wrapped_data
         sonarr_coming_soon_data = ctx.sonarr_coming_soon_data
         radarr_coming_soon_data = ctx.radarr_coming_soon_data
+        ombi_requests_data = ctx.ombi_requests_data
         logger.info(f"SMTP Config: {smtp_server}:{smtp_port} using {smtp_protocol}")
 
         if smtp_port == 465 and smtp_protocol == 'TLS':
@@ -431,6 +443,7 @@ def send_scheduled_user_email_with_cids(ctx, settings, recipients, user_key):
             yearly_wrapped_data=yearly_wrapped_data,
             sonarr_coming_soon_data=sonarr_coming_soon_data,
             radarr_coming_soon_data=radarr_coming_soon_data,
+            ombi_requests_data=ombi_requests_data,
             unsubscribe_placeholder=unsub_placeholder,
             hosted_base_url=hosted_base_url,
             hosted_images_enabled=hosted_images_enabled,
@@ -554,6 +567,7 @@ def send_scheduled_single_email_with_cids(ctx, settings, to_emails_list):
         yearly_wrapped_data = ctx.yearly_wrapped_data
         sonarr_coming_soon_data = ctx.sonarr_coming_soon_data
         radarr_coming_soon_data = ctx.radarr_coming_soon_data
+        ombi_requests_data = ctx.ombi_requests_data
         email_text = ctx.email_text
         logger.info(f"SMTP Config: {smtp_server}:{smtp_port} using {smtp_protocol}")
 
@@ -648,6 +662,7 @@ def send_scheduled_single_email_with_cids(ctx, settings, to_emails_list):
             yearly_wrapped_data=yearly_wrapped_data,
             sonarr_coming_soon_data=sonarr_coming_soon_data,
             radarr_coming_soon_data=radarr_coming_soon_data,
+            ombi_requests_data=ombi_requests_data,
             unsubscribe_placeholder=unsub_placeholder,
             hosted_base_url=hosted_base_url,
             hosted_images_enabled=hosted_images_enabled,

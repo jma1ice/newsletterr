@@ -60,6 +60,9 @@
         <script id="radarr-coming-soon-json" type="application/json" nonce="{{ nonce }}">
             {{ (radarr_coming_soon_json or none) | tojson | safe }}
         </script>
+        <script id="ombi-requests-json" type="application/json" nonce="{{ nonce }}">
+            {{ (ombi_requests_json or none) | tojson | safe }}
+        </script>
         <script src="{{ url_for('static', filename='js/app/08-user-data.js') }}" nonce="{{ nonce }}"></script>
         <script src="{{ url_for('static', filename='js/app/09-recs-wrapped.js') }}" nonce="{{ nonce }}"></script>
         <script src="{{ url_for('static', filename='js/app/10-pull-recommendations.js') }}" nonce="{{ nonce }}"></script>
@@ -78,4 +81,6 @@
         <script src="{{ url_for('static', filename='js/app/23-coming-soon.js') }}" nonce="{{ nonce }}"></script>
         <script src="{{ url_for('static', filename='js/app/24-pull-coming-soon.js') }}" nonce="{{ nonce }}"></script>
         <script src="{{ url_for('static', filename='js/app/27-snapin-layout.js') }}" nonce="{{ nonce }}"></script>
+        <script src="{{ url_for('static', filename='js/app/28-ombi-requests.js') }}" nonce="{{ nonce }}"></script>
+        <script src="{{ url_for('static', filename='js/app/29-pull-ombi-requests.js') }}" nonce="{{ nonce }}"></script>
     </div>

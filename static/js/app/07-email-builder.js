@@ -1010,7 +1010,8 @@ document.addEventListener('click', async (e) => {
         btn.classList.contains('droppedneedle-server-add-btn') ||
         btn.classList.contains('yearly-wrapped-add-btn') ||
         btn.classList.contains('sonarr-coming-soon-add-btn') ||
-        btn.classList.contains('radarr-coming-soon-add-btn');
+        btn.classList.contains('radarr-coming-soon-add-btn') ||
+        btn.classList.contains('ombi-requests-add-btn');
 
     if (!isAdd) return;
 

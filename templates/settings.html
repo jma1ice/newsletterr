@@ -158,10 +158,15 @@
                                 {% if settings.server_name != "" %}value="{{ settings.server_name }}"{% endif %}
                                 placeholder="Paramount Plex" required><br><br>
 
-                            <label for="plex_url">Plex URL (Optional - for posters on recently added and stats):</label><br>
+                            <label for="plex_url_select">Plex URL (Optional - for posters on recently added and stats):</label><br>
+                            <select id="plex_url_select" class="w-field mb-2">
+                                {% if settings.plex_url != "" %}<option value="{{ settings.plex_url }}" selected>{{ settings.plex_url }} (current)</option>{% endif %}
+                                <option value="__manual__" {% if settings.plex_url == "" %}selected{% endif %}>Manual entry...</option>
+                            </select><br>
                             <input type="text" id="plex_url" name="plex_url"
                                 {% if settings.plex_url != "" %}value="{{ settings.plex_url }}"{% endif %}
-                                placeholder="http://localhost:32400"><br>
+                                placeholder="http://localhost:32400"
+                                {% if settings.plex_url != "" %}class="d-none"{% endif %}><br>
                         </div>
 
                         <div class="settings-field-grid">
@@ -240,6 +245,23 @@
                                 <div class="svc-test">
                                     <button type="button" id="test_radarr" class="nl-btn nl-btn--primary nl-btn--sm">Test Connection</button>
                                     <span id="radarr_test_result"></span>
+                                </div>
+                            </div>
+
+                            <div class="settings-field-group">
+                                <h6 class="text-uppercase">Ombi</h6>
+                                <label for="ombi_url">Ombi Base URL (Optional - for the recent requests snap-in):</label><br>
+                                <input type="text" id="ombi_url" name="ombi_url"
+                                    {% if settings.ombi_url != "" %}value="{{ settings.ombi_url }}"{% endif %}
+                                    placeholder="http://localhost:3579" class="w-field"><br>
+                                <small class="form-text text-muted">Leave blank to use http://localhost:3579 (linuxserver/ombi Docker default - native installs typically use port 5000). Clear the API key to disable.</small><br><br>
+
+                                <label for="ombi_api_key">Ombi API Key:</label><br>
+                                <input type="password" id="ombi_api_key" name="ombi_api_key" autocomplete="new-password" class="w-field"
+                                    placeholder="{% if settings.has_ombi_api_key %}Saved - leave blank to keep{% else %}Settings > Configuration > API Key in Ombi{% endif %}"><br>
+                                <div class="svc-test">
+                                    <button type="button" id="test_ombi" class="nl-btn nl-btn--primary nl-btn--sm">Test Connection</button>
+                                    <span id="ombi_test_result"></span>
                                 </div>
                             </div>
 
@@ -711,6 +733,7 @@
 
         window.fillDefaultUrlIfKeyed('sonarr_url', 'sonarr_api_key', HAS_SONARR_API_KEY, 'http://localhost:8989');
         window.fillDefaultUrlIfKeyed('radarr_url', 'radarr_api_key', HAS_RADARR_API_KEY, 'http://localhost:7878');
+        window.fillDefaultUrlIfKeyed('ombi_url', 'ombi_api_key', HAS_OMBI_API_KEY, 'http://localhost:3579');
         const requiredFields = e.target.querySelectorAll('[required]');
         for (const field of requiredFields) {
             if (!field.validity.valid) {
@@ -834,9 +857,8 @@
         statusEl.innerHTML = `
             <div style="color: #3498db; margin: 10px 0;">
                 <strong>Manual Authorization May Be Required</strong><br>
-                Enter this code into Plex: <strong style="background: #f8f9fa; padding: 2px 6px; border-radius: 3px;">${code}</strong><br>
                 <a href="${authUrl}" target="_blank" rel="noopener noreferrer" style="color: #007bff; text-decoration: underline;">
-                    Click here to open Plex authorization page if it did not pop up
+                    Click here to open the Plex sign-in page if it did not pop up
                 </a>
             </div>
         `;
@@ -858,8 +880,8 @@
             const data = await r.json();
 
             hideSpinner();
-            showSpinner(`Enter this code into Plex: ${data.code}`);
-            const authWin = openCenteredPopup(data.auth_url, 520, 480, 'plex-auth', 520);
+            showSpinner('Waiting for Plex sign-in...');
+            const authWin = openCenteredPopup(data.auth_url, 520, 680, 'plex-auth', 520);
 
             if (!authWin) {
                 hideSpinner();
@@ -926,13 +948,67 @@
             if (infod.connected) {
                 try { if (authWin && !authWin.closed) authWin.close(); } catch {}
                 hideSpinner();
-                statusEl.textContent = 'Plex information retrieved.';
-                setTimeout(() => location.replace(location.href), 2000);
+                const serverNameEl = document.getElementById('server_name');
+                if (serverNameEl && infod.server_name) serverNameEl.value = infod.server_name;
+                populatePlexUrlOptions(infod.connections, infod.recommended_url, infod.plex_url);
+                statusEl.innerHTML = '<p class="plex-connected">Connected</p>'
+                    + '<p class="mt-1">Plex information retrieved. Review the Plex URL below and click Save.</p>';
                 return;
             }
         }
 
         getPlexInfo(authWin);
+    }
+
+    const plexUrlSelect = document.getElementById('plex_url_select');
+    const plexUrlInput = document.getElementById('plex_url');
+
+    function syncPlexUrlFromSelect() {
+        if (!plexUrlSelect || !plexUrlInput) return;
+        if (plexUrlSelect.value === '__manual__') {
+            plexUrlInput.classList.remove('d-none');
+            plexUrlInput.focus();
+        } else {
+            plexUrlInput.value = plexUrlSelect.value;
+            plexUrlInput.classList.add('d-none');
+        }
+    }
+    plexUrlSelect?.addEventListener('change', syncPlexUrlFromSelect);
+
+    // Rebuild the Plex URL dropdown from the connections Plex reported, keeping
+    // any URL the user already saved (respect a manual LAN address). Falls back
+    // to the recommended direct connection only when nothing is set yet.
+    function populatePlexUrlOptions(connections, recommendedUrl, currentUrl) {
+        if (!plexUrlSelect || !plexUrlInput) return;
+        connections = Array.isArray(connections) ? connections : [];
+        const uris = connections.map(c => c.uri);
+        const selected = currentUrl || recommendedUrl || '';
+
+        plexUrlSelect.innerHTML = '';
+        // A saved custom URL that is not among the reported connections stays as
+        // its own selectable option so Force Reconnect never discards it.
+        if (currentUrl && !uris.includes(currentUrl)) {
+            const opt = document.createElement('option');
+            opt.value = currentUrl;
+            opt.textContent = `${currentUrl} (current)`;
+            plexUrlSelect.appendChild(opt);
+        }
+        for (const c of connections) {
+            const opt = document.createElement('option');
+            opt.value = c.uri;
+            const tags = [c.label];
+            if (c.uri === recommendedUrl) tags.push('recommended');
+            opt.textContent = `${c.uri} (${tags.join(', ')})`;
+            plexUrlSelect.appendChild(opt);
+        }
+        const manual = document.createElement('option');
+        manual.value = '__manual__';
+        manual.textContent = 'Manual entry...';
+        plexUrlSelect.appendChild(manual);
+
+        plexUrlSelect.value = selected;
+        plexUrlInput.value = selected;
+        plexUrlInput.classList.add('d-none');
     }
 
     document.addEventListener('keydown', function(event) {
@@ -1163,6 +1239,7 @@
 <script nonce="{{ nonce }}">
     const HAS_SONARR_API_KEY = {{ 'true' if settings.has_sonarr_api_key else 'false' }};
     const HAS_RADARR_API_KEY = {{ 'true' if settings.has_radarr_api_key else 'false' }};
+    const HAS_OMBI_API_KEY = {{ 'true' if settings.has_ombi_api_key else 'false' }};
     const HAS_TAUTULLI_API = {{ 'true' if settings.has_tautulli_api else 'false' }};
     const HAS_DROPPEDNEEDLE_API_KEY = {{ 'true' if settings.has_droppedneedle_api_key else 'false' }};
 
@@ -1236,6 +1313,14 @@
         }, 'radarr_test_result', 'test_radarr');
     });
 
+    document.getElementById('test_ombi')?.addEventListener('click', () => {
+        window.fillDefaultUrlIfKeyed('ombi_url', 'ombi_api_key', HAS_OMBI_API_KEY, 'http://localhost:3579');
+        runConnectionTest('/api/test/ombi', {
+            url: document.getElementById('ombi_url').value.trim(),
+            api_key: document.getElementById('ombi_api_key').value.trim()
+        }, 'ombi_test_result', 'test_ombi');
+    });
+
     // Test All: run each configured service in turn, reusing its inline result
     // display. Unconfigured services (no URL/key entered and no saved key) are
     // skipped. Plex has its own Reconnect flow and is not included.
@@ -1262,6 +1347,10 @@
               run: () => { window.fillDefaultUrlIfKeyed('radarr_url', 'radarr_api_key', HAS_RADARR_API_KEY, 'http://localhost:7878');
                   return runConnectionTest('/api/test/radarr',
                   { url: val('radarr_url'), api_key: val('radarr_api_key') }, 'radarr_test_result', 'test_radarr'); } },
+            { configured: () => !!val('ombi_url') || !!val('ombi_api_key') || HAS_OMBI_API_KEY,
+              run: () => { window.fillDefaultUrlIfKeyed('ombi_url', 'ombi_api_key', HAS_OMBI_API_KEY, 'http://localhost:3579');
+                  return runConnectionTest('/api/test/ombi',
+                  { url: val('ombi_url'), api_key: val('ombi_api_key') }, 'ombi_test_result', 'test_ombi'); } },
         ];
 
         btn.disabled = true;

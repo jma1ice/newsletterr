@@ -6,7 +6,7 @@ import html as _html_stdlib
 from app.cache import get_cache_info
 from app.emails.images import fetch_and_attach_image
 from app.emails.blocks import build_graph_html_with_frontend_image, build_text_block_html, build_separator_html, build_image_html_with_cid, build_emoji_html
-from app.emails.builders import build_stats_html_with_cid_background, build_recently_added_html_with_cids, build_recommendations_html_with_cids, build_droppedneedle_wrapped_html_with_cids, build_droppedneedle_server_stats_html_with_cids, build_collections_html_with_cids, build_yearly_wrapped_html_with_cids, build_sonarr_coming_soon_html_with_cids, build_radarr_coming_soon_html_with_cids
+from app.emails.builders import build_stats_html_with_cid_background, build_recently_added_html_with_cids, build_recommendations_html_with_cids, build_droppedneedle_wrapped_html_with_cids, build_droppedneedle_server_stats_html_with_cids, build_collections_html_with_cids, build_yearly_wrapped_html_with_cids, build_sonarr_coming_soon_html_with_cids, build_radarr_coming_soon_html_with_cids, build_ombi_requests_html_with_cids
 from app.theme import get_email_theme_colors, build_email_css_from_theme
 from app.security import escape_html_output as esc
 
@@ -115,7 +115,7 @@ def attach_logo_image(msg_root, logo_filename, custom_logo_filename, base_url=""
         logo_url = f"/static/img/{logo_filename}"
     return fetch_and_attach_image(logo_url, msg_root, "logo", base_url, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
 
-def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, display_preference, users_data, recommendations_data=None, user_dict=None, base_url="", target_user_key=None, is_scheduled=False, items_count=None, date_range="", expanded_collections=None, email_header_title=None, droppedneedle_wrapped_data=None, droppedneedle_server_data=None, yearly_wrapped_data=None, sonarr_coming_soon_data=None, radarr_coming_soon_data=None, unsubscribe_placeholder=None, hosted_base_url="", hosted_images_enabled=False, build_hosted_variant=False, hosted_enabled=False, links_base_url=""):
+def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, display_preference, users_data, recommendations_data=None, user_dict=None, base_url="", target_user_key=None, is_scheduled=False, items_count=None, date_range="", expanded_collections=None, email_header_title=None, droppedneedle_wrapped_data=None, droppedneedle_server_data=None, yearly_wrapped_data=None, sonarr_coming_soon_data=None, radarr_coming_soon_data=None, ombi_requests_data=None, unsubscribe_placeholder=None, hosted_base_url="", hosted_images_enabled=False, build_hosted_variant=False, hosted_enabled=False, links_base_url=""):
     """Returns (email_html, hosted_html). hosted_html is None unless
     build_hosted_variant=True, only the non-personalized 'single body for
     everyone' senders should ever pass that, since the hosted newsletter
@@ -260,6 +260,10 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, displ
         elif item_type == 'radarr_coming_soon':
             if radarr_coming_soon_data:
                 content_html += build_radarr_coming_soon_html_with_cids(radarr_coming_soon_data, msg_root, theme_colors, base_url, grid_columns=coming_soon_grid_columns, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
+
+        elif item_type == 'ombi_requests':
+            if ombi_requests_data:
+                content_html += build_ombi_requests_html_with_cids(ombi_requests_data, msg_root, theme_colors, base_url, grid_columns=coming_soon_grid_columns, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
 
         elif item_type == 'collection_group':
             group_title = item.get('title', 'Collections')

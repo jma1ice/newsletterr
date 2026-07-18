@@ -487,6 +487,7 @@ def fetch_collections(collection_type):
 
         plex_url = row[0].rstrip('/')
         plex_token = row[1]
+        plex_web_url = _s.get("plex_web_url") or "https://app.plex.tv/desktop"
         machine_id = get_plex_machine_id()
 
         sections_url = f"{plex_url}/library/sections"
@@ -534,7 +535,7 @@ def fetch_collections(collection_type):
                             "subtype": collection.get("subtype", target_type),
                             "sectionTitle": section_title,
                             "sectionId": section_id,
-                            "plex_url": build_plex_web_link(collection.get("ratingKey"), machine_id)
+                            "plex_url": build_plex_web_link(collection.get("ratingKey"), machine_id, plex_web_url)
                         })
 
         return jsonify({

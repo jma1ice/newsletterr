@@ -254,11 +254,12 @@ def build_recommendations_section_with_cids(available_items, unavailable_items, 
                     href = item['plex_url']
                     link_title = "Open in Plex"
                 elif item.get('rating_key') and item.get('machine_id'):
-                    href = build_plex_web_link(item['rating_key'], item['machine_id'])
+                    href = build_plex_web_link(item['rating_key'], item['machine_id'], item.get('plex_web_url'))
                     link_title = "Open in Plex"
                 else:
                     search_query = quote_plus(title_text)
-                    href = f"https://app.plex.tv/desktop#!/search?query={search_query}"
+                    search_base = (item.get('plex_web_url') or "https://app.plex.tv/desktop").rstrip('/')
+                    href = f"{search_base}#!/search?query={search_query}"
                     link_title = "Search in Plex"
             
             vote_text = f"★ {vote:.1f}" if isinstance(vote, (int, float)) and vote > 0 else ""

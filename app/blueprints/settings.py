@@ -97,6 +97,7 @@ def settings():
             smtp_protocol = request.form.get("smtp_protocol")
             server_name = request.form.get("server_name")
             plex_url = request.form.get("plex_url")
+            plex_web_url = request.form.get("plex_web_url", "https://app.plex.tv/desktop") or "https://app.plex.tv/desktop"
             tautulli_url = request.form.get("tautulli_url")
             tautulli_api = _secret("tautulli_api", existing_tautulli_api)
             conjurr_url = request.form.get("conjurr_url")
@@ -206,14 +207,14 @@ def settings():
 
             cursor.execute("""
                 INSERT INTO settings
-                (id, from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, plex_url, tautulli_url,
+                (id, from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, plex_url, plex_web_url, tautulli_url,
                     tautulli_api, conjurr_url, droppedneedle_url, droppedneedle_api_key, recipient_display_name, logo_filename, logo_width, email_theme, primary_color, secondary_color, accent_color, background_color,
                     text_color, from_name, custom_logo_filename, login_toggle, nl_username, nl_password, default_intro_text, default_outro_text, hsts_enabled, scheduled_subject_prefix, logo_position, hide_stat_play_counts, hide_graph_play_counts, stats_type, recently_added_mode, recently_added_sort, ra_grid_columns, recs_grid_columns, stat_cover_art, send_mode, poster_max_height, discord_webhook_url, sonarr_url, sonarr_api_key, radarr_url, radarr_api_key, ombi_url, ombi_api_key, coming_soon_days_ahead, coming_soon_grid_columns, hosted_enabled, hosted_base_url, hosted_images_enabled, hosted_image_retention_days, hosted_links_enabled, hosted_links_base_url, collections_grid_columns, ra_show_description, exclude_inactive_days, include_user_info, email_size_warn_mb, pride_flag, snapins_floating)
-                VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT (id) DO UPDATE
                 SET from_email = excluded.from_email, alias_email = excluded.alias_email, reply_to_email = excluded.reply_to_email, password = excluded.password,
                     smtp_username = excluded.smtp_username, smtp_server = excluded.smtp_server, smtp_port = excluded.smtp_port, smtp_protocol = excluded.smtp_protocol,
-                    server_name = excluded.server_name, plex_url = excluded.plex_url, tautulli_url = excluded.tautulli_url, tautulli_api = excluded.tautulli_api,
+                    server_name = excluded.server_name, plex_url = excluded.plex_url, plex_web_url = excluded.plex_web_url, tautulli_url = excluded.tautulli_url, tautulli_api = excluded.tautulli_api,
                     conjurr_url = excluded.conjurr_url, droppedneedle_url = excluded.droppedneedle_url, droppedneedle_api_key = excluded.droppedneedle_api_key, recipient_display_name = excluded.recipient_display_name, logo_filename = excluded.logo_filename, logo_width = excluded.logo_width,
                     email_theme = excluded.email_theme, primary_color = excluded.primary_color, secondary_color = excluded.secondary_color, accent_color = excluded.accent_color,
                     background_color = excluded.background_color, text_color = excluded.text_color, from_name = excluded.from_name, custom_logo_filename = excluded.custom_logo_filename,
@@ -248,7 +249,7 @@ def settings():
                     email_size_warn_mb = excluded.email_size_warn_mb,
                     pride_flag = excluded.pride_flag,
                     snapins_floating = excluded.snapins_floating
-            """, (from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, plex_url, tautulli_url, tautulli_api,
+            """, (from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, plex_url, plex_web_url, tautulli_url, tautulli_api,
                   conjurr_url, droppedneedle_url, droppedneedle_api_key, recipient_display_name, logo_filename, logo_width, email_theme, primary_color, secondary_color, accent_color, background_color, text_color, from_name,
                   custom_logo_filename, login_toggle, nl_username, nl_password, default_intro_text, default_outro_text, hsts_enabled, scheduled_subject_prefix, logo_position,
                   hide_stat_play_counts, hide_graph_play_counts, stats_type, recently_added_mode, recently_added_sort, ra_grid_columns, recs_grid_columns, stat_cover_art, send_mode, poster_max_height, discord_webhook_url,
@@ -270,6 +271,7 @@ def settings():
                 "smtp_protocol": smtp_protocol,
                 "server_name": server_name,
                 "plex_url": plex_url,
+                "plex_web_url": plex_web_url,
                 "plex_token": plex_token,
                 "tautulli_url": tautulli_url,
                 "tautulli_api": decrypt(tautulli_api),
@@ -383,6 +385,7 @@ def settings():
                 "smtp_protocol": request.form.get("smtp_protocol", "SSL"),
                 "server_name": request.form.get("server_name", ""),
                 "plex_url": request.form.get("plex_url", ""),
+                "plex_web_url": request.form.get("plex_web_url", "https://app.plex.tv/desktop"),
                 "plex_token": plex_token,
                 "tautulli_url": request.form.get("tautulli_url", ""),
                 "tautulli_api": request.form.get("tautulli_api", ""),
@@ -454,6 +457,7 @@ def settings():
     smtp_protocol = s.get("smtp_protocol")
     server_name = s.get("server_name")
     plex_url = s.get("plex_url")
+    plex_web_url = s.get("plex_web_url") or "https://app.plex.tv/desktop"
     plex_token = s.get("plex_token")
     tautulli_url = s.get("tautulli_url")
     tautulli_api = s.get("tautulli_api")
@@ -530,6 +534,7 @@ def settings():
         "smtp_protocol": smtp_protocol or "TLS",
         "server_name": server_name or "",
         "plex_url": plex_url or "",
+        "plex_web_url": plex_web_url or "https://app.plex.tv/desktop",
         "plex_token": plex_token or "",
         "tautulli_url": tautulli_url or "",
         "conjurr_url": conjurr_url or "",

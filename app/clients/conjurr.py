@@ -35,6 +35,7 @@ def run_conjurr_command(base_url, user_dict, error):
     
     plex_url = plex_settings[0].rstrip('/') if plex_settings and plex_settings[0] else None
     plex_token = plex_settings[1] if plex_settings and plex_settings[1] else None
+    plex_web_url = (_s.get("plex_web_url") if "id" in _s else None) or "https://app.plex.tv/desktop"
     machine_id = get_plex_machine_id() if plex_url and plex_token else None
 
     api_base_url = f"{base_url}/recommendations?user_id="
@@ -62,7 +63,8 @@ def run_conjurr_command(base_url, user_dict, error):
                         if rating_key:
                             item['rating_key'] = rating_key
                             item['machine_id'] = machine_id
-                            item['plex_url'] = build_plex_web_link(rating_key, machine_id)
+                            item['plex_web_url'] = plex_web_url
+                            item['plex_url'] = build_plex_web_link(rating_key, machine_id, plex_web_url)
                             logger.info(f"Linked movie: {title} (tmdb:{tmdb_id}) -> ratingKey:{rating_key}")
                         else:
                             logger.info(f"Could not find movie in Plex: {title} (tmdb:{tmdb_id})")
@@ -78,7 +80,8 @@ def run_conjurr_command(base_url, user_dict, error):
                         if rating_key:
                             item['rating_key'] = rating_key
                             item['machine_id'] = machine_id
-                            item['plex_url'] = build_plex_web_link(rating_key, machine_id)
+                            item['plex_web_url'] = plex_web_url
+                            item['plex_url'] = build_plex_web_link(rating_key, machine_id, plex_web_url)
                             logger.info(f"Linked show: {title} (tmdb:{tmdb_id}) -> ratingKey:{rating_key}")
                         else:
                             logger.info(f"Could not find show in Plex: {title} (tmdb:{tmdb_id})")

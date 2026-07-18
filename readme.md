@@ -244,11 +244,18 @@ Released under the **MIT License** - see [LICENSE](LICENSE.txt) for details.
 * Can Snap-Ins work with custom HTML?
 * CSP out of Report-Only after trial run
 * Searchable settings
-* bferd to GH contribs
 
 ---
 
 ## Recent Changes
+
+## v2026.2.2:
+
+#### New Features:
+* Plex URL input moved to a dropdown
+
+#### Fixed:
+* Plex OAuth database issue, thanks @bferd for the diagnostics and iasue fins
 
 ### v2026.2.1:
 

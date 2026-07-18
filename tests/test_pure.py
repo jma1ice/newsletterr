@@ -265,3 +265,71 @@ def test_arr_poster_src_routes_absolute_vs_local():
     # Already-prefixed path is left alone.
     assert _arr_poster_src("/proxy-sonarr-art/x.jpg", "/proxy-sonarr-art") == "/proxy-sonarr-art/x.jpg"
     assert _arr_poster_src(None, "/proxy-sonarr-art") is None
+
+def test_ombi_poster_src_builds_tmdb_url_or_passes_through():
+    from app.emails.builders.ombi_requests import _poster_src
+
+    # TMDB-relative fragment gets the CDN prefix.
+    assert _poster_src("/xyz.jpg") == "https://image.tmdb.org/t/p/w300/xyz.jpg"
+    # Already-absolute URLs are passed through untouched.
+    assert _poster_src("https://cdn/poster.jpg") == "https://cdn/poster.jpg"
+    assert _poster_src(None) is None
+    assert _poster_src("") is None
+
+def test_filter_ombi_pending_drops_available_and_denied_movies():
+    from app.emails.builders.ombi_requests import filter_ombi_pending
+
+    pending = {"title": "Pending Movie", "approved": False, "available": False, "denied": False, "requestedDate": "2026-07-10T00:00:00Z"}
+    approved = {"title": "Approved Movie", "approved": True, "available": False, "denied": False, "requestedDate": "2026-07-12T00:00:00Z"}
+    available = {"title": "Available Movie", "approved": True, "available": True, "denied": False, "requestedDate": "2026-07-01T00:00:00Z"}
+    denied = {"title": "Denied Movie", "approved": False, "available": False, "denied": True, "requestedDate": "2026-07-01T00:00:00Z"}
+
+    result = filter_ombi_pending({"movies": [pending, approved, available, denied], "tv": []})
+    titles = [e["title"] for e in result]
+    # available/denied dropped; remaining sorted most-recent-requested first
+    assert titles == ["Approved Movie", "Pending Movie"]
+    assert result[0]["approved"] is True
+    assert result[1]["approved"] is False
+
+def test_filter_ombi_pending_tv_uses_child_request_state():
+    from app.emails.builders.ombi_requests import filter_ombi_pending
+
+    # One season still pending, one already available -> show stays in the list
+    partially_available = {
+        "title": "Partial Show",
+        "releaseDate": "2025-01-01",
+        "childRequests": [
+            {"approved": True, "available": True, "denied": False, "requestedDate": "2026-07-01T00:00:00Z"},
+            {"approved": False, "available": False, "denied": False, "requestedDate": "2026-07-05T00:00:00Z"},
+        ],
+    }
+    # All seasons available -> dropped entirely
+    fully_available = {
+        "title": "Done Show",
+        "childRequests": [
+            {"approved": True, "available": True, "denied": False, "requestedDate": "2026-07-01T00:00:00Z"},
+        ],
+    }
+    # No child requests at all -> dropped
+    empty_show = {"title": "Empty Show", "childRequests": []}
+
+    result = filter_ombi_pending({"movies": [], "tv": [partially_available, fully_available, empty_show]})
+    titles = [e["title"] for e in result]
+    assert titles == ["Partial Show"]
+    assert result[0]["approved"] is False  # the still-pending season isn't approved
+
+def test_filter_ombi_pending_tv_drops_mixed_available_and_denied():
+    from app.emails.builders.ombi_requests import filter_ombi_pending
+
+    # One season available, one denied -> nothing left pending, so the show
+    # is fully resolved and must be dropped even though status isn't uniform.
+    mixed_resolved = {
+        "title": "Mixed Resolved Show",
+        "childRequests": [
+            {"approved": True, "available": True, "denied": False, "requestedDate": "2026-07-01T00:00:00Z"},
+            {"approved": False, "available": False, "denied": True, "requestedDate": "2026-07-05T00:00:00Z"},
+        ],
+    }
+
+    result = filter_ombi_pending({"movies": [], "tv": [mixed_resolved]})
+    assert result == []

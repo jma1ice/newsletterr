@@ -104,6 +104,24 @@ def test_radarr_connection(url, api_key):
     except Exception as e:
         return {'status': 'error', 'message': str(e)}
 
+def test_ombi_connection(url, api_key):
+    url = (url or '').rstrip('/')
+    api_key = (api_key or '').strip()
+    if not url:
+        return {'status': 'error', 'message': 'Ombi URL is required'}
+    if not api_key:
+        return {'status': 'error', 'message': 'Ombi API key is required'}
+    try:
+        r = safe_get(f"{url}/api/v1/Status", timeout=10, headers={'ApiKey': api_key})
+        if r.status_code == 401:
+            return {'status': 'error', 'message': 'Ombi rejected the API key'}
+        r.raise_for_status()
+        return {'status': 'ok', 'message': 'Connected to Ombi'}
+    except requests.exceptions.ConnectionError:
+        return {'status': 'error', 'message': 'Ombi is unreachable at that URL'}
+    except Exception as e:
+        return {'status': 'error', 'message': str(e)}
+
 def _fallback(posted, saved):
     posted = (posted or '').strip()
     return posted or (saved or '')
@@ -151,6 +169,15 @@ def test_radarr():
     url = _fallback(data.get('url'), s.get('radarr_url'))
     api_key = _fallback(data.get('api_key'), s.get('radarr_api_key'))
     return jsonify(test_radarr_connection(url, api_key))
+
+@bp.route('/api/test/ombi', methods=['POST'])
+@requires_auth
+def test_ombi():
+    data = request.get_json()
+    s = get_settings()
+    url = _fallback(data.get('url'), s.get('ombi_url'))
+    api_key = _fallback(data.get('api_key'), s.get('ombi_api_key'))
+    return jsonify(test_ombi_connection(url, api_key))
 
 PRIDE_FLAGS = frozenset({'off', 'rainbow', 'trans', 'bi', 'pan', 'nonbinary', 'lesbian', 'ace', 'progress'})
 
@@ -254,15 +281,30 @@ def gif_search():
 @bp.post('/api/plex/pin')
 @requires_auth
 def plex_create_pin():
-    response = requests.post("https://plex.tv/api/v2/pins", headers=state.plex_headers, timeout=10)
+    # strong=true yields a full account token via the canonical Plex OAuth flow
+    # (app.plex.tv/auth). The old plex.tv/link device flow produced a limited
+    # token that plex.tv honored but the Plex Media Server rejected with 401 on
+    # library endpoints (issue #159).
+    response = requests.post(
+        "https://plex.tv/api/v2/pins",
+        headers=state.plex_headers,
+        params={"strong": "true"},
+        timeout=10,
+    )
     response.raise_for_status()
     data = response.json()
 
+    client_id = state.plex_headers['X-Plex-Client-Identifier']
+    product = state.plex_headers.get('X-Plex-Product', 'Newsletterr')
+    device_name = state.plex_headers.get('X-Plex-Device-Name', 'Newsletterr')
     auth_url = (
-        "https://plex.tv/link?"
-        f"clientID={quote_plus(state.plex_headers['X-Plex-Client-Identifier'])}"
+        "https://app.plex.tv/auth#?"
+        f"clientID={quote_plus(client_id)}"
         f"&code={quote_plus(data['code'])}"
+        f"&context%5Bdevice%5D%5Bproduct%5D={quote_plus(product)}"
+        f"&context%5Bdevice%5D%5BdeviceName%5D={quote_plus(device_name)}"
     )
+    logger.info(f"Created Plex OAuth PIN {data["id"]} (strong)")
     return jsonify({"pin_id": data["id"], "code": data["code"], "auth_url": auth_url, "expires_in": data.get("expiresIn", 900)})
 
 @bp.get('/api/plex/pin/<int:pin_id>')
@@ -274,6 +316,7 @@ def plex_poll_pin(pin_id: int):
 
     token = data.get("authToken")
     if token:
+        logger.info(f"Plex PIN {pin_id} authorized; token length={len(token)}")
         conn = db_connect()
         cursor = conn.cursor()
         cursor.execute("""
@@ -290,12 +333,14 @@ def plex_poll_pin(pin_id: int):
 @bp.get('/api/plex/info')
 @requires_auth
 def plex_get_info():
-    token = get_settings(decrypt_secrets=False).get("plex_token")
+    settings = get_settings(decrypt_secrets=False)
+    token = settings.get("plex_token")
     if not token:
         return jsonify({"connected": False, "error": "Plex is not connected"}), 400
 
+    plain_token = decrypt(token)
     url = "https://plex.tv/api/v2/resources"
-    headers = get_plex_headers({"X-Plex-Token": decrypt(token)})
+    headers = get_plex_headers({"X-Plex-Token": plain_token})
     params = {
         "includeHttps": "1"
     }
@@ -307,34 +352,96 @@ def plex_get_info():
         logger.debug("plex info fetch/parse failed", exc_info=True)
         return jsonify({"connected": False, "error": "Could not reach Plex.tv"}), 502
 
+    def connection_label(connection):
+        if connection.get('relay'):
+            return 'Relay'
+        return 'Local' if connection.get('local') else 'Remote'
+
     def select_best_connection(connections):
-        https_connections = [connection for connection in connections if connection.get('protocol') == 'https']
-
-        if https_connections:
-            local_https = [connection for connection in https_connections if connection.get('local')]
-            if local_https:
-                return local_https[0]['uri']
-
-            return https_connections[0]['uri']
-
+        # Direct connections first (local https), then any direct https, then
+        # any non-relay, and only fall back to a relay if nothing else exists.
+        for predicate in (
+            lambda c: c['protocol'] == 'https' and c['local'] and not c['relay'],
+            lambda c: c['protocol'] == 'https' and not c['relay'],
+            lambda c: not c['relay'],
+        ):
+            match = [c for c in connections if predicate(c)]
+            if match:
+                return match[0]['uri']
         return connections[0]['uri'] if connections else None
 
     if not isinstance(data, list) or not data:
         return jsonify({"connected": False, "error": "No Plex servers found on this account"}), 400
 
-    server = data[0]
-    best_url = select_best_connection(server.get('connections') or [])
+    # Prefer an owned server; fall back to the first entry.
+    server = next((srv for srv in data if srv.get('owned')), data[0])
 
-    if not best_url:
+    # Root cause of #159: /resources returns a per-server accessToken. When the
+    # server comes back owned:true it equals the account OAuth token, but when it
+    # comes back owned:false (seen intermittently for the same server, Plex Home/
+    # session dependent) it is a distinct server-scoped token that the Plex Media
+    # Server requires for direct API calls. The account PIN token 401s on library
+    # endpoints in that case. Store the per-server accessToken for all PMS calls,
+    # falling back to the account token when the server did not provide one.
+    server_access_token = server.get('accessToken') or plain_token
+
+    connections = [
+        {
+            'uri': c.get('uri'),
+            'local': bool(c.get('local')),
+            'relay': bool(c.get('relay')),
+            'protocol': c.get('protocol'),
+            'label': connection_label(c),
+        }
+        for c in (server.get('connections') or [])
+        if c.get('uri')
+    ]
+
+    recommended_url = select_best_connection(connections)
+
+    if not recommended_url:
         return jsonify({"connected": False, "error": "No suitable connection found"})
+
+    # Respect a user-chosen URL: only auto-fill plex_url on first connect (when
+    # it is empty). Force Reconnect must not clobber a manual LAN address; the
+    # frontend offers the full connection list as a dropdown for switching.
+    existing_url = settings.get('plex_url') or ''
+    save_url = existing_url or recommended_url
+
+    logger.info(f"Plex resource {server.get('name')} owned={server.get('owned')} server_token_differs={server_access_token != plain_token}")
 
     conn = db_connect()
     conn.execute("""
-        INSERT INTO settings (id, server_name, plex_url)
-        VALUES (1, ?, ?)
-        ON CONFLICT(id) DO UPDATE SET server_name = excluded.server_name, plex_url = excluded.plex_url
-    """, (server.get('name'), best_url))
+        INSERT INTO settings (id, server_name, plex_url, plex_token)
+        VALUES (1, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET server_name = excluded.server_name, plex_url = excluded.plex_url, plex_token = excluded.plex_token
+    """, (server.get('name'), save_url, encrypt(server_access_token)))
     conn.commit()
     conn.close()
 
-    return jsonify({"connected": True})
+    # Diagnostic for #159: confirm the server-scoped token we just stored is
+    # actually accepted by the Plex Media Server. /identity is unauthenticated
+    # and cannot reveal a bad token; /library/sections requires a valid one.
+    probe_url = (save_url or recommended_url or '').rstrip('/')
+    if probe_url:
+        try:
+            probe = safe_get(
+                f"{probe_url}/library/sections",
+                headers=get_plex_headers({"X-Plex-Token": server_access_token}),
+                timeout=10,
+            )
+            logger.info(f"Plex library probe {probe_url} -> HTTP {probe.status_code} (server_token_differs={server_access_token != plain_token})")
+            if probe.status_code == 401:
+                logger.warning(
+                    f"Plex token rejected by the media server at {probe_url} (401) despite "
+                    "plex.tv accepting it. This is the #159 symptom.")
+        except Exception:
+            logger.debug("Plex library probe failed", exc_info=True)
+
+    return jsonify({
+        "connected": True,
+        "server_name": server.get('name'),
+        "connections": connections,
+        "recommended_url": recommended_url,
+        "plex_url": save_url,
+    })

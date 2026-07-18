@@ -33,6 +33,9 @@
 
                             <button id="pullComingSoonBtn" class="nl-btn nl-btn--ghost"{% if not service_flags.calendar %} disabled title="Configure Sonarr or Radarr in settings"{% endif %}>Get Coming Soon Calendar</button>
                             <p class="rail-note">Upcoming episode and movie calendar from Sonarr and Radarr, if configured in settings.</p>
+
+                            <button id="pullOmbiRequestsBtn" class="nl-btn nl-btn--ghost"{% if not service_flags.ombi %} disabled title="Configure Ombi in settings"{% endif %}>Get Ombi Requests</button>
+                            <p class="rail-note">Pending and approved movie/TV requests from Ombi, if configured in settings.</p>
                         </div>
 
                         <div class="builder-card rail-card">

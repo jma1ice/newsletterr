@@ -269,6 +269,7 @@ def manual_send_env(send_env, client, monkeypatch):
     monkeypatch.setattr(send_mod, "get_yearly_wrapped_cached", lambda *a, **k: None)
     monkeypatch.setattr(send_mod, "get_sonarr_coming_soon_cached", lambda *a, **k: None)
     monkeypatch.setattr(send_mod, "get_radarr_coming_soon_cached", lambda *a, **k: None)
+    monkeypatch.setattr(send_mod, "get_ombi_requests_cached", lambda *a, **k: None)
     monkeypatch.setattr(send_mod, "get_recommendations_for_users", lambda *a, **k: {"1": {}})
     monkeypatch.setattr(send_mod, "get_droppedneedle_wrapped_for_users", lambda *a, **k: {})
     monkeypatch.setattr(send_mod, "run_tautulli_command", lambda *a, **k: (USERS_FIXTURE, None))
@@ -531,7 +532,12 @@ class _FixedDatetime(datetime_module.datetime):
         return cls(2026, 7, 9, 12, 0, 0, tzinfo=tz)
 
 def _freeze_coming_soon_clock(monkeypatch, coming_soon_mod):
+    # format_relative_date lives in card_grid (shared by coming_soon.py and
+    # ombi_requests.py), so its 'now' must be frozen there too, not just in
+    # coming_soon_mod's own datetime (used by upcoming_release_date/_parse_release_date).
+    from app.emails.builders import card_grid as card_grid_mod
     monkeypatch.setattr(coming_soon_mod, "datetime", _FixedDatetime)
+    monkeypatch.setattr(card_grid_mod, "datetime", _FixedDatetime)
 
 def test_manual_sonarr_coming_soon_email_golden(manual_send_env, monkeypatch):
     from app.emails import send as send_mod
@@ -632,6 +638,58 @@ def test_manual_radarr_coming_soon_email_golden(manual_send_env, monkeypatch):
     assert "Released Movie" not in normalized["html"]
     assert "Owned Movie" not in normalized["html"]
     _assert_golden("manual_radarr_coming_soon", normalized)
+
+OMBI_REQUESTS_FIXTURE = {
+    "movies": [
+        {
+            "title": "Requested Movie", "releaseDate": "2026-01-01T00:00:00Z",
+            "posterPath": "/poster123.jpg",
+            "approved": False, "available": False, "denied": False,
+            "requestedDate": "2026-07-05T00:00:00Z",
+        },
+        # Already fulfilled -> filtered out before rendering.
+        {
+            "title": "Fulfilled Movie", "releaseDate": "2025-01-01T00:00:00Z",
+            "approved": True, "available": True, "denied": False,
+            "requestedDate": "2026-06-01T00:00:00Z",
+        },
+    ],
+    "tv": [],
+}
+
+def test_manual_ombi_requests_email_golden(manual_send_env, monkeypatch):
+    from app.emails import send as send_mod
+    from app.emails.builders import coming_soon as coming_soon_mod
+    from app.emails.builders import ombi_requests as ombi_requests_mod
+
+    monkeypatch.setattr(send_mod, "get_ombi_requests_cached", lambda *a, **k: OMBI_REQUESTS_FIXTURE)
+    monkeypatch.setattr(ombi_requests_mod, "fetch_and_attach_image", lambda *a, **k: None)
+    _freeze_coming_soon_clock(monkeypatch, coming_soon_mod)
+
+    client = manual_send_env
+    resp = _post_send(client, {
+        "to_emails": "a@b.c, d@e.f", "subject": "Manual Recent Requests", "email_header_title": "The Header",
+        "selected_items": [
+            {"type": "textblock", "content": "What people are asking for"},
+            {"type": "ombi_requests", "id": "ombi-requests"},
+        ],
+        "custom_html": "", "user_dict": {}, "expanded_collections": {},
+    })
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body.get("success") is True
+
+    sends = [s for inst in RecorderSMTP.instances for s in inst.sent]
+    assert len(sends) == 1
+    from_addr, to_addrs, content = sends[0]
+    normalized = _normalize(content)
+    normalized["envelope"] = {"from": from_addr, "to": to_addrs}
+    normalized["response"] = body
+    assert "Requested Movie" in normalized["html"]
+    assert "Pending Approval" in normalized["html"]
+    # Already-fulfilled requests are filtered out before rendering.
+    assert "Fulfilled Movie" not in normalized["html"]
+    _assert_golden("manual_ombi_requests", normalized)
 
 def test_manual_coming_soon_degrades_when_only_one_service_configured(manual_send_env, monkeypatch):
     from app.emails import send as send_mod

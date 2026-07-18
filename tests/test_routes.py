@@ -265,6 +265,180 @@ def test_connection_test_falls_back_to_saved_key(client, app, monkeypatch):
     assert captured["url"] == "http://tt.local"
     assert captured["api_key"] == "saved-tt-key"
 
+def test_plex_pin_uses_strong_oauth_flow(client, monkeypatch):
+    # #159: the limited plex.tv/link device flow produced a token the media
+    # server rejected. The PIN must be created with strong=true and link via
+    # the canonical app.plex.tv/auth OAuth endpoint.
+    from app.blueprints import api
+
+    captured = {}
+
+    class _Resp:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"id": 42, "code": "longstrongcode", "expiresIn": 900}
+
+    def fake_post(url, headers=None, params=None, timeout=None):
+        captured["url"] = url
+        captured["params"] = params
+        return _Resp()
+
+    monkeypatch.setattr(api.requests, "post", fake_post)
+
+    resp = client.post("/api/plex/pin")
+    assert resp.status_code == 200
+    d = resp.get_json()
+    assert captured["url"] == "https://plex.tv/api/v2/pins"
+    assert captured["params"] == {"strong": "true"}
+    assert d["pin_id"] == 42
+    assert d["auth_url"].startswith("https://app.plex.tv/auth#?")
+    assert "code=longstrongcode" in d["auth_url"]
+    assert "context%5Bdevice%5D%5Bproduct%5D=" in d["auth_url"]
+
+def _fake_plex_resources(owned=True, access_token=None):
+    class _Resp:
+        status_code = 200
+
+        def json(self):
+            server = {
+                "name": "MyServer",
+                "owned": owned,
+                "connections": [
+                    {"protocol": "https", "local": False, "relay": False, "uri": "https://remote.plex.direct:32400"},
+                    {"protocol": "https", "local": True, "relay": False, "uri": "https://local.plex.direct:32400"},
+                    {"protocol": "http", "local": True, "relay": False, "uri": "http://192.168.1.5:32400"},
+                    {"protocol": "https", "local": False, "relay": True, "uri": "https://relay.plex.direct:32400"},
+                ],
+            }
+            if access_token is not None:
+                server["accessToken"] = access_token
+            return [server]
+    return _Resp()
+
+def _stored_plex_url():
+    import sqlite3
+    from app import config
+    conn = sqlite3.connect(config.DB_PATH)
+    try:
+        return conn.execute("SELECT plex_url FROM settings WHERE id = 1").fetchone()[0]
+    finally:
+        conn.close()
+
+def test_plex_info_respects_existing_url(client, app, monkeypatch):
+    # Regression for #159: Force Reconnect must not clobber a manually-set LAN
+    # URL with the auto-detected plex.direct hostname.
+    import sqlite3
+    from app import config
+    from app.crypto import encrypt
+    conn = sqlite3.connect(config.DB_PATH)
+    conn.execute(
+        "UPDATE settings SET plex_token = ?, plex_url = ? WHERE id = 1",
+        (encrypt("tok"), "http://192.168.1.5:32400"),
+    )
+    conn.commit()
+    conn.close()
+
+    from app.blueprints import api
+    monkeypatch.setattr(api, "safe_get", lambda *a, **k: _fake_plex_resources())
+
+    resp = client.get("/api/plex/info")
+    assert resp.status_code == 200
+    d = resp.get_json()
+    assert d["connected"] is True
+    # user's manual URL preserved, both in the DB and echoed back
+    assert _stored_plex_url() == "http://192.168.1.5:32400"
+    assert d["plex_url"] == "http://192.168.1.5:32400"
+    # recommended is the direct local https connection, offered as a choice
+    assert d["recommended_url"] == "https://local.plex.direct:32400"
+    assert {c["uri"] for c in d["connections"]} == {
+        "https://remote.plex.direct:32400",
+        "https://local.plex.direct:32400",
+        "http://192.168.1.5:32400",
+        "https://relay.plex.direct:32400",
+    }
+
+def test_plex_info_autofills_when_empty(client, app, monkeypatch):
+    import sqlite3
+    from app import config
+    from app.crypto import encrypt
+    conn = sqlite3.connect(config.DB_PATH)
+    conn.execute(
+        "UPDATE settings SET plex_token = ?, plex_url = '' WHERE id = 1",
+        (encrypt("tok"),),
+    )
+    conn.commit()
+    conn.close()
+
+    from app.blueprints import api
+    monkeypatch.setattr(api, "safe_get", lambda *a, **k: _fake_plex_resources())
+
+    resp = client.get("/api/plex/info")
+    assert resp.status_code == 200
+    d = resp.get_json()
+    assert d["plex_url"] == "https://local.plex.direct:32400"
+    assert _stored_plex_url() == "https://local.plex.direct:32400"
+
+def test_plex_info_stores_server_access_token(client, app, monkeypatch):
+    # #159 root cause (per bferd): when /resources reports the server as
+    # owned:false it hands back a distinct server-scoped accessToken that the
+    # Plex Media Server requires for direct calls. The account PIN token 401s on
+    # library endpoints, so we must store the per-server token instead.
+    import sqlite3
+    from app import config
+    from app.crypto import encrypt, decrypt
+    conn = sqlite3.connect(config.DB_PATH)
+    conn.execute(
+        "UPDATE settings SET plex_token = ?, plex_url = '' WHERE id = 1",
+        (encrypt("account-token"),),
+    )
+    conn.commit()
+    conn.close()
+
+    from app.blueprints import api
+    monkeypatch.setattr(
+        api, "safe_get",
+        lambda *a, **k: _fake_plex_resources(owned=False, access_token="server-scoped-token"),
+    )
+
+    resp = client.get("/api/plex/info")
+    assert resp.status_code == 200
+
+    conn = sqlite3.connect(config.DB_PATH)
+    try:
+        stored = conn.execute("SELECT plex_token FROM settings WHERE id = 1").fetchone()[0]
+    finally:
+        conn.close()
+    assert decrypt(stored) == "server-scoped-token"
+
+def test_plex_info_keeps_account_token_when_owned(client, app, monkeypatch):
+    # owned:true servers return an accessToken equal to the account token; with
+    # no accessToken in the payload we fall back to the account token unchanged.
+    import sqlite3
+    from app import config
+    from app.crypto import encrypt, decrypt
+    conn = sqlite3.connect(config.DB_PATH)
+    conn.execute(
+        "UPDATE settings SET plex_token = ?, plex_url = '' WHERE id = 1",
+        (encrypt("account-token"),),
+    )
+    conn.commit()
+    conn.close()
+
+    from app.blueprints import api
+    monkeypatch.setattr(api, "safe_get", lambda *a, **k: _fake_plex_resources(owned=True))
+
+    resp = client.get("/api/plex/info")
+    assert resp.status_code == 200
+
+    conn = sqlite3.connect(config.DB_PATH)
+    try:
+        stored = conn.execute("SELECT plex_token FROM settings WHERE id = 1").fetchone()[0]
+    finally:
+        conn.close()
+    assert decrypt(stored) == "account-token"
+
 # --- auth gate (uses an unauthenticated client against the seeded admin)
 
 def test_auth_gate_blocks_and_login_flow_works(anon_client, login_enabled):

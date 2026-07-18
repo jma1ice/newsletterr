@@ -16,6 +16,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 if (response.ok) {
                     const result = await response.json();
+                    const freshFlags = window.APP?.pullCacheFresh || {};
+                    Object.keys(freshFlags).forEach(k => { freshFlags[k] = false; });
                     clearCacheBtn.textContent = 'Cleared!';
                     clearCacheBtn.style.backgroundColor = '#28a745';
                     setTimeout(() => {

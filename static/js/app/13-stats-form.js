@@ -29,6 +29,7 @@ function updateCacheBadge(cacheInfo, timeRange) {
 
 document.getElementById('stats_form').addEventListener('submit', async (e) => {
     e.preventDefault();
+    if (!confirmFreshRepull(e.target.querySelector('button[type="submit"]'), 'stats')) return;
     showSpinner('Getting stats and users...');
 
     const time_range = document.getElementById('days_to_pull').value;
@@ -89,6 +90,7 @@ document.getElementById('stats_form').addEventListener('submit', async (e) => {
         if (data.cache_info) {
             updateCacheBadge(data.cache_info, data.time_range);
         }
+        markPullCacheFresh('stats', true);
 
         const alertEl = document.getElementById('alert_p');
         if (alertEl) {

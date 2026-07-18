@@ -261,9 +261,13 @@
     .page-header,
     .app-main > main { padding: var(--space-4); }
 
-    /* Title + actions stack instead of overflowing on narrow screens. */
-    .page-header { flex-wrap: wrap; gap: var(--space-3); }
-    .page-actions { flex-wrap: wrap; }
+    /* Title + actions stack instead of overflowing on narrow screens. The
+       actions row itself must not wrap: buttons share one row at full width
+       and keep their labels on a single line (Pixel-width phones). */
+    .page-header { flex-wrap: wrap; gap: var(--space-3); max-height: none; }
+    .page-actions { flex: 1 1 auto; flex-wrap: nowrap; justify-content: flex-end; min-width: 0; }
+    .page-actions .nl-btn { white-space: nowrap; min-width: 0; }
+    .page-actions .nl-btn--lg { padding: 10px 16px; }
 
     /* Footer reverts to in-flow on mobile so it does not fight the builder
        mobile tab bar; the sidebar drawer stays full height (set above). */

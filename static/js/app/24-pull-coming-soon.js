@@ -1,4 +1,5 @@
-document.getElementById('pullComingSoonBtn').addEventListener('click', async () => {
+document.getElementById('pullComingSoonBtn').addEventListener('click', async (e) => {
+    if (!confirmFreshRepull(e.currentTarget, 'coming_soon')) return;
     showSpinner('Pulling coming soon calendar...');
 
     const payload = {
@@ -60,6 +61,7 @@ document.getElementById('pullComingSoonBtn').addEventListener('click', async () 
 
         buildSonarrComingSoonRow();
         buildRadarrComingSoonRow();
+        markPullCacheFresh('coming_soon', true);
     } catch (err) {
         console.error("Error pulling coming soon calendar:", err);
         const error_p = document.getElementById('error_p');

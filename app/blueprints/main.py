@@ -171,6 +171,18 @@ def index():
         'filtered_users': get_cache_info('filtered_users')
     }
 
+    # one is_fresh flag per pull button so the frontend can ask for a second
+    # click before re-pulling data that is already fresh in the cache
+    pull_cache_fresh = {
+        'stats': bool(get_cache_info('stats').get('is_fresh')),
+        'recommendations': bool(get_cache_info('recommendations_json').get('is_fresh')),
+        'droppedneedle': bool(get_cache_info('droppedneedle_wrapped_json').get('is_fresh')),
+        'coming_soon': bool(get_cache_info('sonarr_coming_soon_json').get('is_fresh')
+                            or get_cache_info('radarr_coming_soon_json').get('is_fresh')),
+        'ombi': bool(get_cache_info('ombi_requests_json').get('is_fresh')),
+        'seerr': bool(get_cache_info('seerr_requests_json').get('is_fresh')),
+    }
+
     if not cache_info['graph_data'] or 'params' not in cache_info['graph_data']:
         if not cache_info['graph_data']:
             cache_info['graph_data'] = {}
@@ -189,7 +201,8 @@ def index():
                            stats=stats, user_dict=user_dict, users_full_data=users_full_data,
                            graph_data=graph_data, graph_commands=graph_commands, recent_data=recent_data,
                            libs=libs, error=error, alert=alert, settings=settings, email_lists=email_lists,
-                           cache_info=cache_info, recommendations_json=recommendations_json,
+                           cache_info=cache_info, pull_cache_fresh=pull_cache_fresh,
+                           recommendations_json=recommendations_json,
                            filtered_users=filtered_users, theme_settings=theme_settings,
                            droppedneedle_wrapped_json=droppedneedle_wrapped_json, droppedneedle_server_json=droppedneedle_server_json,
                            yearly_wrapped_json=yearly_wrapped_json,

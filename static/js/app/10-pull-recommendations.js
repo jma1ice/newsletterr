@@ -35,7 +35,8 @@ function removeRecsCancelButton() {
     if (btn) btn.remove();
 }
 
-document.getElementById('pullRecsBtn').addEventListener('click', async () => {
+document.getElementById('pullRecsBtn').addEventListener('click', async (e) => {
+    if (!confirmFreshRepull(e.currentTarget, 'recommendations')) return;
     showSpinner('Pulling recommendations...');
     showRecsCancelButton();
 
@@ -122,6 +123,7 @@ document.getElementById('pullRecsBtn').addEventListener('click', async () => {
         }
 
         buildRecsUserRows();
+        markPullCacheFresh('recommendations', true);
     } catch (err) {
         console.error("Error pulling recommendations:", err);
         const error_p= document.getElementById('error_p');

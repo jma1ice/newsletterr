@@ -250,7 +250,6 @@ Released under the **MIT License** - see [LICENSE](LICENSE.txt) for details.
 
 --- UI ---
 * Email preview: desktop/tablet/phone views
-* Spinner board - filled and smaller
 * Custom Theme
 
 --- Email ---
@@ -274,11 +273,15 @@ Released under the **MIT License** - see [LICENSE](LICENSE.txt) for details.
 * Thanks @bferd for the Ombi integration functionality and the Recently Requested snap-in
 * Seerr integration (works with Overseerr and Jellyseerr) for the Recently Requested snap-in
 * Settings sections further moved into cards
+* Fresh cache repull and blank continue on setup confirmation
 
 #### Fixed:
 * Plex OAuth issue, thanks @bferd for the diagnostics and issue fixes
 * Export logs button text was same color as bg
 * Setup/settings wasn't autofilling some URLs
+* Spinner board - filled and smaller and fixed
+* Header buttons wrap fixed on small screens
+* Schedule search moved out of INFO logs
 
 ### v2026.2.1:
 

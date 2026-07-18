@@ -333,3 +333,35 @@ def test_filter_ombi_pending_tv_drops_mixed_available_and_denied():
 
     result = filter_ombi_pending({"movies": [], "tv": [mixed_resolved]})
     assert result == []
+
+def test_filter_seerr_pending_keeps_pending_and_approved_only():
+    from app.emails.builders.seerr_requests import filter_seerr_pending
+
+    pending = {"title": "Pending Movie", "releaseDate": "2026-01-01", "status": 1, "mediaStatus": 3, "requestedDate": "2026-07-10T00:00:00Z"}
+    approved = {"title": "Approved Movie", "releaseDate": "2026-02-01", "status": 2, "mediaStatus": 3, "requestedDate": "2026-07-12T00:00:00Z"}
+    declined = {"title": "Declined Movie", "status": 3, "mediaStatus": 3, "requestedDate": "2026-07-01T00:00:00Z"}
+    failed = {"title": "Failed Movie", "status": 4, "mediaStatus": 3, "requestedDate": "2026-07-02T00:00:00Z"}
+    available = {"title": "Available Movie", "status": 2, "mediaStatus": 5, "requestedDate": "2026-07-03T00:00:00Z"}
+
+    result = filter_seerr_pending({"requests": [pending, approved, declined, failed, available]})
+    titles = [e["title"] for e in result]
+    # declined/failed/available dropped; remaining sorted most-recent-requested first
+    assert titles == ["Approved Movie", "Pending Movie"]
+    assert result[0]["approved"] is True
+    assert result[1]["approved"] is False
+
+def test_filter_seerr_pending_partially_available_stays():
+    from app.emails.builders.seerr_requests import filter_seerr_pending
+
+    # Partially available TV (mediaStatus 4) still counts as pending, matching
+    # the Ombi rule that a show stays while any season is outstanding.
+    partial = {"title": "Partial Show", "status": 2, "mediaStatus": 4, "requestedDate": "2026-07-05T00:00:00Z"}
+    result = filter_seerr_pending({"requests": [partial]})
+    assert [e["title"] for e in result] == ["Partial Show"]
+
+def test_filter_seerr_pending_handles_empty_payloads():
+    from app.emails.builders.seerr_requests import filter_seerr_pending
+
+    assert filter_seerr_pending(None) == []
+    assert filter_seerr_pending({}) == []
+    assert filter_seerr_pending({"requests": []}) == []

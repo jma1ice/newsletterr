@@ -122,6 +122,25 @@ def test_ombi_connection(url, api_key):
     except Exception as e:
         return {'status': 'error', 'message': str(e)}
 
+def test_seerr_connection(url, api_key):
+    url = (url or '').rstrip('/')
+    api_key = (api_key or '').strip()
+    if not url:
+        return {'status': 'error', 'message': 'Seerr URL is required'}
+    if not api_key:
+        return {'status': 'error', 'message': 'Seerr API key is required'}
+    try:
+        # /auth/me requires a valid API key, unlike /status which is public
+        r = safe_get(f"{url}/api/v1/auth/me", timeout=10, headers={'X-Api-Key': api_key})
+        if r.status_code in (401, 403):
+            return {'status': 'error', 'message': 'Seerr rejected the API key'}
+        r.raise_for_status()
+        return {'status': 'ok', 'message': 'Connected to Seerr'}
+    except requests.exceptions.ConnectionError:
+        return {'status': 'error', 'message': 'Seerr is unreachable at that URL'}
+    except Exception as e:
+        return {'status': 'error', 'message': str(e)}
+
 def _fallback(posted, saved):
     posted = (posted or '').strip()
     return posted or (saved or '')
@@ -178,6 +197,15 @@ def test_ombi():
     url = _fallback(data.get('url'), s.get('ombi_url'))
     api_key = _fallback(data.get('api_key'), s.get('ombi_api_key'))
     return jsonify(test_ombi_connection(url, api_key))
+
+@bp.route('/api/test/seerr', methods=['POST'])
+@requires_auth
+def test_seerr():
+    data = request.get_json()
+    s = get_settings()
+    url = _fallback(data.get('url'), s.get('seerr_url'))
+    api_key = _fallback(data.get('api_key'), s.get('seerr_api_key'))
+    return jsonify(test_seerr_connection(url, api_key))
 
 PRIDE_FLAGS = frozenset({'off', 'rainbow', 'trans', 'bi', 'pan', 'nonbinary', 'lesbian', 'ace', 'progress'})
 

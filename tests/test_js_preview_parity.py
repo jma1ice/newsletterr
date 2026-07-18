@@ -16,14 +16,17 @@ from pathlib import Path
 import pytest
 
 from app.emails.builders.ombi_requests import filter_ombi_pending
+from app.emails.builders.seerr_requests import filter_seerr_pending
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 # Every source file that defines its own copy of the Ombi preview filter.
+# The Seerr mirror lives in the same two files.
 OMBI_FILTER_SOURCES = [
     "static/js/app/04-stats-graphs.js",
     "templates/schedule_preview.html",
 ]
+SEERR_FILTER_SOURCES = OMBI_FILTER_SOURCES
 
 def _extract_js_function(source, name):
     """Return the source text of `function <name>(...) { ... }`, brace-matched.
@@ -201,6 +204,77 @@ def test_ombi_filter_mirrors_are_identical():
     bodies = []
     for rel in OMBI_FILTER_SOURCES:
         src = _extract_js_function((REPO_ROOT / rel).read_text(encoding="utf-8"), "_filterOmbiPending")
+        bodies.append("\n".join(line.strip() for line in src.splitlines()))
+    assert bodies[0] == bodies[1]
+
+# Seerr entries are pre-enriched by app/clients/seerr.py, so the filter's
+# input is already flat: request status + media status decide survival.
+def _seerr_req(title, requested, status=1, media_status=3):
+    return {
+        "mediaType": "movie", "title": title, "releaseDate": "2025-06-01",
+        "posterPath": f"/{title}.jpg", "status": status,
+        "mediaStatus": media_status, "requestedDate": requested,
+    }
+
+SEERR_PAYLOAD_CASES = [
+    ("empty", {"requests": []}),
+    ("none_payload", None),
+    ("missing_keys", {}),
+    ("pending", {"requests": [_seerr_req("Pending", "2026-07-10T00:00:00Z")]}),
+    ("approved", {"requests": [_seerr_req("Approved", "2026-07-11T00:00:00Z", status=2)]}),
+    ("declined", {"requests": [_seerr_req("Declined", "2026-07-02T00:00:00Z", status=3)]}),
+    ("failed", {"requests": [_seerr_req("Failed", "2026-07-03T00:00:00Z", status=4)]}),
+    ("available", {"requests": [_seerr_req("Available", "2026-07-01T00:00:00Z", status=2, media_status=5)]}),
+    # Partially available TV still counts as pending, same as the Ombi rule.
+    ("partially_available", {"requests": [_seerr_req("Partial", "2026-07-05T00:00:00Z", status=2, media_status=4)]}),
+    ("missing_fields", {"requests": [{"title": "Bare", "status": 1}]}),
+    ("sorting", {"requests": [
+        _seerr_req("Old", "2026-01-01T00:00:00Z"),
+        _seerr_req("New", "2026-12-01T00:00:00Z", status=2),
+        _seerr_req("Mid", "2026-06-01T00:00:00Z"),
+    ]}),
+    ("undated", {"requests": [_seerr_req("NoDate", None)]}),
+]
+
+def _run_seerr_js_filter(func_src, payload):
+    driver = func_src + """
+const payload = JSON.parse(require('fs').readFileSync(0, 'utf8'));
+const out = _filterSeerrPending(payload).map(e => [
+    e.title ?? null,
+    e.year ?? null,
+    e.poster ?? null,
+    !!e.approved,
+    e.requestedDate ?? null,
+]);
+process.stdout.write(JSON.stringify(out));
+"""
+    result = subprocess.run(
+        ["node", "-e", driver], input=json.dumps(payload),
+        capture_output=True, text=True, timeout=30,
+    )
+    if result.returncode != 0:
+        raise AssertionError(f"node failed: {result.stderr.strip()}")
+    return [tuple(row) for row in json.loads(result.stdout)]
+
+def _python_seerr_filter(payload):
+    return [
+        (e["title"], e["year"], e["poster"], bool(e["approved"]), e["requested_date"])
+        for e in filter_seerr_pending(payload)
+    ]
+
+@pytest.fixture(scope="module", params=SEERR_FILTER_SOURCES)
+def seerr_filter_js(request):
+    path = REPO_ROOT / request.param
+    return _extract_js_function(path.read_text(encoding="utf-8"), "_filterSeerrPending")
+
+@pytest.mark.parametrize("name,payload", SEERR_PAYLOAD_CASES, ids=[c[0] for c in SEERR_PAYLOAD_CASES])
+def test_seerr_filter_js_matches_python(node, seerr_filter_js, name, payload):
+    assert _run_seerr_js_filter(seerr_filter_js, payload) == _python_seerr_filter(payload)
+
+def test_seerr_filter_mirrors_are_identical():
+    bodies = []
+    for rel in SEERR_FILTER_SOURCES:
+        src = _extract_js_function((REPO_ROOT / rel).read_text(encoding="utf-8"), "_filterSeerrPending")
         bodies.append("\n".join(line.strip() for line in src.splitlines()))
     assert bodies[0] == bodies[1]
 

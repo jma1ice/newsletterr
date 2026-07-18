@@ -75,6 +75,8 @@
                             <span class="field-hint">Guided presets for Gmail, Outlook, Yahoo, and iCloud.</span>
                         </p>
 
+                        <div class="settings-group-card">
+                        <h6 class="text-uppercase">Sender</h6>
                         <label for="from_email">From:</label><br>
                         <input type="email" id="from_email" name="from_email"
                             {% if settings.from_email != "" %}value="{{ settings.from_email }}"{% endif %}
@@ -93,8 +95,11 @@
                         <label for="reply_to_email">Reply-To (Optional):</label><br>
                         <input type="email" id="reply_to_email" name="reply_to_email"
                             {% if settings.reply_to_email != "" %}value="{{ settings.reply_to_email }}"{% endif %}
-                            placeholder="Optional reply-to email"><br><br>
+                            placeholder="Optional reply-to email"><br>
+                        </div>
 
+                        <div class="settings-group-card">
+                        <h6 class="text-uppercase">SMTP</h6>
                         <label for="password">Password:</label><br>
                         <input type="password" id="password" name="password" autocomplete="new-password"
                             placeholder="{% if settings.has_password %}Saved - leave blank to keep{% else %}Email Password or App Password{% endif %}"><br><br>
@@ -118,8 +123,11 @@
                         <select id="smtp_protocol" name="smtp_protocol">
                             <option value="SSL" {% if settings.smtp_protocol == "SSL" %}selected{% endif %}>SSL</option>
                             <option value="TLS" {% if settings.smtp_protocol == "TLS" %}selected{% endif %}>TLS</option>
-                        </select><br><br>
+                        </select><br>
+                        </div>
 
+                        <div class="settings-group-card">
+                        <h6 class="text-uppercase">Sending</h6>
                         <label for="send_mode">Send Mode:</label><br>
                         <select id="send_mode" name="send_mode">
                             <option value="bcc" {% if settings.get('send_mode', 'bcc') != 'to' %}selected{% endif %}>BCC: recipients hidden from each other (recommended)</option>
@@ -137,6 +145,7 @@
                         <p class="field-hint mt-2">Send Test Email uses your <em>saved</em> settings and delivers to
                             {% if settings.from_email %}<strong>{{ settings.from_email }}</strong>{% else %}your From address{% endif %}.
                             Apply Settings first if you just changed anything.</p>
+                        </div>
                     </div>
 
                     <div class="settings-section d-none" id="section-external-services">
@@ -148,7 +157,7 @@
                             </div>
                         </div>
 
-                        <div class="settings-field-group">
+                        <div class="settings-field-group settings-group-card">
                             <h6 class="text-uppercase">Plex</h6>
                             <button id="connect_plex" type="button" class="nl-btn nl-btn--primary mb-2">{% if settings.plex_token %}Force Reconnect{% else %}Connect Plex{% endif %}</button>
                             <div id="plex_status" class="mb-3">{% if settings.plex_token %}<p class="plex-connected">Connected</p>{% endif %}</div>
@@ -175,7 +184,7 @@
                         </div>
 
                         <div class="settings-field-grid">
-                            <div class="settings-field-group">
+                            <div class="settings-field-group settings-group-card">
                                 <h6 class="text-uppercase">Tautulli</h6>
                                 <label for="tautulli_url">Tautulli Base URL (Optional - for user emails, stats, graphs, recently added):</label><br>
                                 <input type="text" id="tautulli_url" name="tautulli_url"
@@ -191,7 +200,7 @@
                                 </div>
                             </div>
 
-                            <div class="settings-field-group">
+                            <div class="settings-field-group settings-group-card">
                                 <h6 class="text-uppercase">Conjurr</h6>
                                 <label for="conjurr_url">Conjurr Base URL (Optional - for recommendations):</label><br>
                                 <input type="text" id="conjurr_url" name="conjurr_url"
@@ -203,7 +212,7 @@
                                 </div>
                             </div>
 
-                            <div class="settings-field-group">
+                            <div class="settings-field-group settings-group-card">
                                 <h6 class="text-uppercase">DroppedNeedle</h6>
                                 <label for="droppedneedle_url">DroppedNeedle Base URL (Optional - for year-in-review stats):</label><br>
                                 <input type="text" id="droppedneedle_url" name="droppedneedle_url"
@@ -219,7 +228,7 @@
                                 </div>
                             </div>
 
-                            <div class="settings-field-group">
+                            <div class="settings-field-group settings-group-card">
                                 <h6 class="text-uppercase">Sonarr</h6>
                                 <label for="sonarr_url">Sonarr Base URL (Optional - for the coming soon calendar):</label><br>
                                 <input type="text" id="sonarr_url" name="sonarr_url"
@@ -236,7 +245,7 @@
                                 </div>
                             </div>
 
-                            <div class="settings-field-group">
+                            <div class="settings-field-group settings-group-card">
                                 <h6 class="text-uppercase">Radarr</h6>
                                 <label for="radarr_url">Radarr Base URL (Optional - for the coming soon calendar):</label><br>
                                 <input type="text" id="radarr_url" name="radarr_url"
@@ -253,7 +262,7 @@
                                 </div>
                             </div>
 
-                            <div class="settings-field-group">
+                            <div class="settings-field-group settings-group-card">
                                 <h6 class="text-uppercase">Ombi</h6>
                                 <label for="ombi_url">Ombi Base URL (Optional - for the recent requests snap-in):</label><br>
                                 <input type="text" id="ombi_url" name="ombi_url"
@@ -270,7 +279,24 @@
                                 </div>
                             </div>
 
-                            <div class="settings-field-group">
+                            <div class="settings-field-group settings-group-card">
+                                <h6 class="text-uppercase">Seerr</h6>
+                                <label for="seerr_url">Seerr Base URL (Optional - for the recent requests snap-in):</label><br>
+                                <input type="text" id="seerr_url" name="seerr_url"
+                                    {% if settings.seerr_url != "" %}value="{{ settings.seerr_url }}"{% endif %}
+                                    placeholder="http://localhost:5055" class="w-field"><br>
+                                <small class="form-text text-muted">Leave blank to use http://localhost:5055 (the Seerr default). Also works with Overseerr and Jellyseerr. Clear the API key to disable.</small><br><br>
+
+                                <label for="seerr_api_key">Seerr API Key:</label><br>
+                                <input type="password" id="seerr_api_key" name="seerr_api_key" autocomplete="new-password" class="w-field"
+                                    placeholder="{% if settings.has_seerr_api_key %}Saved - leave blank to keep{% else %}Settings > General > API Key in Seerr{% endif %}"><br>
+                                <div class="svc-test">
+                                    <button type="button" id="test_seerr" class="nl-btn nl-btn--primary nl-btn--sm">Test Connection</button>
+                                    <span id="seerr_test_result"></span>
+                                </div>
+                            </div>
+
+                            <div class="settings-field-group settings-group-card">
                                 <h6 class="text-uppercase">Discord</h6>
                                 <label for="discord_webhook_url">Discord Webhook URL (optional):</label><br>
                                 <input type="password" id="discord_webhook_url" name="discord_webhook_url" autocomplete="off" class="w-field"
@@ -285,6 +311,7 @@
                     <div class="settings-section d-none" id="section-data-settings">
                         <h4 class="mb-4">data and stats</h4>
 
+                        <div class="settings-group-card">
                         <h6 class="text-uppercase">Recently Added</h6>
                         <div class="settings-fields">
                             <div class="settings-field">
@@ -323,7 +350,9 @@
                                 <p class="text-info mt-2 field-hint">Show or hide the summary/description text under each Recently Added item in emails.</p>
                             </div>
                         </div>
+                        </div>
 
+                        <div class="settings-group-card">
                         <h6 class="text-uppercase">Recommendations</h6>
                         <div class="settings-fields">
                             <div class="settings-field">
@@ -333,7 +362,9 @@
                                 <p class="text-info mt-2 field-hint">Number of columns in the Recommendations grid (default: 5).</p>
                             </div>
                         </div>
+                        </div>
 
+                        <div class="settings-group-card">
                         <h6 class="text-uppercase">Stats and Graphs</h6>
                         <div class="settings-fields">
                             <div class="settings-field">
@@ -374,7 +405,9 @@
                                 <p class="text-info mt-2 field-hint">When set to Include, usernames and profile pictures of other users appear in the "Most Active Users" stat, the Wrapped "Most Active" highlight, and the top-users graphs. When set to Exclude, that content is removed from emails regardless of what a template selected. A recipient's own DroppedNeedle Wrapped is not affected.</p>
                             </div>
                         </div>
+                        </div>
 
+                        <div class="settings-group-card">
                         <h6 class="text-uppercase">Coming Soon</h6>
                         <div class="settings-fields">
                             <div class="settings-field">
@@ -388,7 +421,9 @@
                                     value="{{ settings.get('coming_soon_grid_columns', '5') }}" class="w-num">
                             </div>
                         </div>
+                        </div>
 
+                        <div class="settings-group-card">
                         <h6 class="text-uppercase">Collections</h6>
                         <div class="settings-fields">
                             <div class="settings-field">
@@ -398,7 +433,9 @@
                                 <p class="text-info mt-2 field-hint">Number of collection/item cards per row in Collections email blocks (default: 5).</p>
                             </div>
                         </div>
+                        </div>
 
+                        <div class="settings-group-card">
                         <h6 class="text-uppercase">Posters</h6>
                         <div class="settings-fields">
                             <div class="settings-field">
@@ -409,7 +446,9 @@
                                 <p class="text-info mt-2 field-hint">Caps the pixel height of posters embedded in emails (Recently Added, Recommendations, Collections). Width scales automatically to preserve aspect ratio. Leave blank to use original resolution.</p>
                             </div>
                         </div>
+                        </div>
 
+                        <div class="settings-group-card">
                         <h6 class="text-uppercase">Recipients</h6>
                         <div class="settings-fields">
                             <div class="settings-field">
@@ -427,11 +466,14 @@
                                 </select>
                             </div>
                         </div>
+                        </div>
                     </div>
 
                     <div class="settings-section d-none" id="section-email-styling">
                         <h4 class="mb-4">email content</h4>
 
+                        <div class="settings-group-card">
+                        <h6 class="text-uppercase">Logo</h6>
                         <label for="logo_filename">Logo (Optional - for custom logos in emails. Email Theme must be custom to change!):</label><br>
                         <select id="logo_filename" name="logo_filename">
                             <option value="newsletterr_blue_small" {% if settings.logo_filename == 'Asset_54x.png' %}selected{% endif %}>Newsletterr Square Blue</option>
@@ -476,8 +518,11 @@
                             <option value="left"   {% if settings.logo_position == 'left'   %}selected{% endif %}>Left</option>
                             <option value="center" {% if settings.logo_position == 'center' or not settings.logo_position %}selected{% endif %}>Center</option>
                             <option value="right"  {% if settings.logo_position == 'right'  %}selected{% endif %}>Right</option>
-                        </select><br><br>
+                        </select><br>
+                        </div>
 
+                        <div class="settings-group-card">
+                        <h6 class="text-uppercase">Theme</h6>
                         <label for="email_theme">Email Theme (must choose custom to change the logo file):</label><br>
                         <select id="email_theme" name="email_theme">
                             <option value="newsletterr_blue" {% if settings.email_theme == 'newsletterr_blue' %}selected{% endif %}>Newsletterr Blue</option>
@@ -517,7 +562,9 @@
                             </div><br>
                         </div>
 
-                        <hr>
+                        </div>
+
+                        <div class="settings-group-card">
                         <h6 class="text-uppercase">Body Defaults</h6>
                         <p class="text-info mb-4">These texts pre-fill when you click the intro/outro buttons in the email composer. Leave blank to use the built-in defaults.</p>
 
@@ -533,13 +580,15 @@
                         <select id="scheduled_subject_prefix" name="scheduled_subject_prefix">
                             <option value="enabled" {% if settings.scheduled_subject_prefix == 'enabled' %}selected{% endif %}>Enabled: subjects read "[SCHEDULED] Your Subject"</option>
                             <option value="disabled" {% if settings.scheduled_subject_prefix == 'disabled' %}selected{% endif %}>Disabled: subjects read "Your Subject"</option>
-                        </select><br><br>
+                        </select><br>
+                        </div>
                     </div>
 
                     <div class="settings-section d-none" id="section-security">
                         <h4 class="mb-4">security</h4>
 
-                        <label>Login Account:</label><br>
+                        <div class="settings-group-card">
+                        <h6 class="text-uppercase">Login Account</h6>
                         <p class="login-note">Login is required. Update your account credentials below.</p>
                         <div id="login_options">
                             <label for="nl_username">Username:</label><br>
@@ -556,7 +605,10 @@
                                 placeholder="Re-enter to confirm (leave blank to keep)"><br>
                             <span id="nl_password_error" class="test-result" style="color: #770010;"></span><br><br>
                         </div>
+                        </div>
 
+                        <div class="settings-group-card">
+                        <h6 class="text-uppercase">Transport Security</h6>
                         <label for="hsts_enabled">HTTP Strict Transport Security (HSTS):</label><br>
                         <select id="hsts_enabled" name="hsts_enabled">
                             <option value="disabled" {% if settings.hsts_enabled == 'disabled' %}selected{% endif %}>Disabled</option>
@@ -565,12 +617,15 @@
                         <p class="text-info mt-2 field-hint">
                             Only enable HSTS if this app is running behind HTTPS (e.g. a reverse proxy with a valid certificate).
                             Enabling it on plain HTTP will cause browsers to block access to the site until the max-age expires (2 years).
-                        </p><br>
+                        </p>
+                        </div>
                     </div>
 
                     <div class="settings-section d-none" id="section-hosted-features">
                         <h4 class="mb-4">hosted features</h4>
 
+                        <div class="settings-group-card">
+                        <h6 class="text-uppercase">Hosted Newsletter</h6>
                         <label for="hosted_enabled">Enable Hosted Features:</label><br>
                         <select id="hosted_enabled" name="hosted_enabled">
                             <option value="disabled" {% if settings.hosted_enabled == 'disabled' %}selected{% endif %}>Disabled</option>
@@ -631,8 +686,10 @@
                             How long hosted images are kept on disk before being deleted. Applies only when Hosted Images is enabled.
                         </p><br>
 
-                        <hr>
-                        <label>Unsubscribed Recipients:</label><br>
+                        </div>
+
+                        <div class="settings-group-card">
+                        <h6 class="text-uppercase">Unsubscribed Recipients</h6>
                         <p class="text-info mt-2 field-hint">
                             Recipients who used the hosted unsubscribe link. They are always excluded from future
                             sends, even if Hosted Features are later disabled. Remove someone here to let them
@@ -647,11 +704,14 @@
                             </table>
                             <p id="suppressed_emails_empty" class="text-info d-none">No unsubscribed recipients.</p>
                         </div>
+                        </div>
                     </div>
 
                     <div class="settings-section d-none" id="section-appearance">
                         <h4 class="mb-4">appearance</h4>
 
+                        <div class="settings-group-card">
+                        <h6 class="text-uppercase">Pride Theme</h6>
                         {% set _pride = settings.get('pride_flag', 'off') %}
                         <label for="pride_flag">Pride Theme:</label><br>
                         <select id="pride_flag" name="pride_flag">
@@ -671,7 +731,10 @@
                             light and dark mode. Saved to your account and applied wherever you sign in.
                         </p>
 
-                        <br>
+                        </div>
+
+                        <div class="settings-group-card">
+                        <h6 class="text-uppercase">Snap-ins Pane</h6>
                         <label for="snapins_floating">Floating Snap-ins Pane:</label><br>
                         <select id="snapins_floating" name="snapins_floating">
                             <option value="1" {% if settings.get('snapins_floating', '1') != '0' %}selected{% endif %}>On (pane floats alongside the builder)</option>
@@ -682,6 +745,7 @@
                             while the source cards scroll. Turn it off to let the pane flow inline instead.
                             The dark mode toggle and this setting all follow your sign-in.
                         </p>
+                        </div>
                     </div>
 
                     <div class="settings-actions-bar">
@@ -739,6 +803,7 @@
         window.fillDefaultUrlIfKeyed('sonarr_url', 'sonarr_api_key', HAS_SONARR_API_KEY, 'http://localhost:8989');
         window.fillDefaultUrlIfKeyed('radarr_url', 'radarr_api_key', HAS_RADARR_API_KEY, 'http://localhost:7878');
         window.fillDefaultUrlIfKeyed('ombi_url', 'ombi_api_key', HAS_OMBI_API_KEY, 'http://localhost:3579');
+        window.fillDefaultUrlIfKeyed('seerr_url', 'seerr_api_key', HAS_SEERR_API_KEY, 'http://localhost:5055');
         const requiredFields = e.target.querySelectorAll('[required]');
         for (const field of requiredFields) {
             if (!field.validity.valid) {
@@ -1245,6 +1310,7 @@
     const HAS_SONARR_API_KEY = {{ 'true' if settings.has_sonarr_api_key else 'false' }};
     const HAS_RADARR_API_KEY = {{ 'true' if settings.has_radarr_api_key else 'false' }};
     const HAS_OMBI_API_KEY = {{ 'true' if settings.has_ombi_api_key else 'false' }};
+    const HAS_SEERR_API_KEY = {{ 'true' if settings.has_seerr_api_key else 'false' }};
     const HAS_TAUTULLI_API = {{ 'true' if settings.has_tautulli_api else 'false' }};
     const HAS_DROPPEDNEEDLE_API_KEY = {{ 'true' if settings.has_droppedneedle_api_key else 'false' }};
 
@@ -1326,6 +1392,14 @@
         }, 'ombi_test_result', 'test_ombi');
     });
 
+    document.getElementById('test_seerr')?.addEventListener('click', () => {
+        window.fillDefaultUrlIfKeyed('seerr_url', 'seerr_api_key', HAS_SEERR_API_KEY, 'http://localhost:5055');
+        runConnectionTest('/api/test/seerr', {
+            url: document.getElementById('seerr_url').value.trim(),
+            api_key: document.getElementById('seerr_api_key').value.trim()
+        }, 'seerr_test_result', 'test_seerr');
+    });
+
     // Test All: run each configured service in turn, reusing its inline result
     // display. Unconfigured services (no URL/key entered and no saved key) are
     // skipped. Plex has its own Reconnect flow and is not included.
@@ -1356,6 +1430,10 @@
               run: () => { window.fillDefaultUrlIfKeyed('ombi_url', 'ombi_api_key', HAS_OMBI_API_KEY, 'http://localhost:3579');
                   return runConnectionTest('/api/test/ombi',
                   { url: val('ombi_url'), api_key: val('ombi_api_key') }, 'ombi_test_result', 'test_ombi'); } },
+            { configured: () => !!val('seerr_url') || !!val('seerr_api_key') || HAS_SEERR_API_KEY,
+              run: () => { window.fillDefaultUrlIfKeyed('seerr_url', 'seerr_api_key', HAS_SEERR_API_KEY, 'http://localhost:5055');
+                  return runConnectionTest('/api/test/seerr',
+                  { url: val('seerr_url'), api_key: val('seerr_api_key') }, 'seerr_test_result', 'test_seerr'); } },
         ];
 
         btn.disabled = true;

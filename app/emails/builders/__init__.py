@@ -7,6 +7,7 @@ from app.emails.builders.recommendations import build_recommendations_html_with_
 from app.emails.builders.collections import build_collections_html_with_cids
 from app.emails.builders.coming_soon import build_sonarr_coming_soon_html_with_cids, build_radarr_coming_soon_html_with_cids
 from app.emails.builders.ombi_requests import build_ombi_requests_html_with_cids
+from app.emails.builders.seerr_requests import build_seerr_requests_html_with_cids
 
 __all__ = [
     "get_user_display_name",
@@ -27,4 +28,5 @@ __all__ = [
     "build_sonarr_coming_soon_html_with_cids",
     "build_radarr_coming_soon_html_with_cids",
     "build_ombi_requests_html_with_cids",
+    "build_seerr_requests_html_with_cids",
 ]

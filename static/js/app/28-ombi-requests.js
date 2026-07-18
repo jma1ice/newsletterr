@@ -13,10 +13,10 @@ function buildOmbiRequestsRow() {
                 <button type="button"
                         class="nl-btn nl-btn--primary nl-btn--sm ombi-requests-add-btn"
                         data-type="ombi_requests" data-id="ombi-requests"
-                        data-name="Recent Requests"
+                        data-name="Recent Requests (Ombi)"
                         style="font-size: .8rem; padding: .25rem .5rem;">Add</button>
             </div>
-            <span class="snapin-row-label" title="Recent Requests">Recent Requests</span>
+            <span class="snapin-row-label" title="Recent Requests (Ombi)">Recent Requests (Ombi)</span>
         </div>`;
     host.appendChild(row);
 };

@@ -487,7 +487,7 @@ def fetch_collections(collection_type):
 
         plex_url = row[0].rstrip('/')
         plex_token = row[1]
-        plex_web_url = _s.get("plex_web_url") or "https://app.plex.tv/desktop"
+        plex_web_url = _s.get("plex_web_url")
         machine_id = get_plex_machine_id()
 
         sections_url = f"{plex_url}/library/sections"

@@ -5,7 +5,7 @@ import os, time
 from flask import Blueprint, abort, current_app, jsonify, redirect, render_template, request, session, url_for
 from PIL import Image
 
-from app.config import DEFAULT_RADARR_URL, DEFAULT_SONARR_URL, DEFAULT_OMBI_URL
+from app.config import DEFAULT_RADARR_URL, DEFAULT_SONARR_URL, DEFAULT_OMBI_URL, DEFAULT_PLEX_WEB_URL
 from app.db import db_connect
 from app.settings_store import get_settings
 from app.crypto import encrypt, decrypt
@@ -97,7 +97,7 @@ def settings():
             smtp_protocol = request.form.get("smtp_protocol")
             server_name = request.form.get("server_name")
             plex_url = request.form.get("plex_url")
-            plex_web_url = request.form.get("plex_web_url", "https://app.plex.tv/desktop") or "https://app.plex.tv/desktop"
+            plex_web_url = request.form.get("plex_web_url", "").strip() or DEFAULT_PLEX_WEB_URL
             tautulli_url = request.form.get("tautulli_url")
             tautulli_api = _secret("tautulli_api", existing_tautulli_api)
             conjurr_url = request.form.get("conjurr_url")
@@ -385,7 +385,7 @@ def settings():
                 "smtp_protocol": request.form.get("smtp_protocol", "SSL"),
                 "server_name": request.form.get("server_name", ""),
                 "plex_url": request.form.get("plex_url", ""),
-                "plex_web_url": request.form.get("plex_web_url", "https://app.plex.tv/desktop"),
+                "plex_web_url": request.form.get("plex_web_url", DEFAULT_PLEX_WEB_URL),
                 "plex_token": plex_token,
                 "tautulli_url": request.form.get("tautulli_url", ""),
                 "tautulli_api": request.form.get("tautulli_api", ""),
@@ -457,7 +457,7 @@ def settings():
     smtp_protocol = s.get("smtp_protocol")
     server_name = s.get("server_name")
     plex_url = s.get("plex_url")
-    plex_web_url = s.get("plex_web_url") or "https://app.plex.tv/desktop"
+    plex_web_url = s.get("plex_web_url")
     plex_token = s.get("plex_token")
     tautulli_url = s.get("tautulli_url")
     tautulli_api = s.get("tautulli_api")
@@ -534,7 +534,7 @@ def settings():
         "smtp_protocol": smtp_protocol or "TLS",
         "server_name": server_name or "",
         "plex_url": plex_url or "",
-        "plex_web_url": plex_web_url or "https://app.plex.tv/desktop",
+        "plex_web_url": plex_web_url,
         "plex_token": plex_token or "",
         "tautulli_url": tautulli_url or "",
         "conjurr_url": conjurr_url or "",

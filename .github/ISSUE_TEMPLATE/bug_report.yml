@@ -1,0 +1,104 @@
+name: Bug report
+description: Something is broken or behaving unexpectedly
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report! Please fill the version and "how you are running it" fields
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened
+      description: What went wrong, and what you expected instead.
+      placeholder: |
+        Scheduled sends fail with an authentication error, but sending manually
+        from the dashboard works fine with the same SMTP settings.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Go to Scheduling
+        2. Create a schedule using template X
+        3. Wait for it to fire, or click Send Now
+        4. See the error in the logs
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: newsletterr version
+      description: Shown on the About page, or line 1 of the VERSION file.
+      placeholder: v2026.2.2
+    validations:
+      required: true
+
+  - type: dropdown
+    id: install
+    attributes:
+      label: How are you running it
+      options:
+        - Docker, :latest tag
+        - Docker, :nightly tag
+        - Docker, :pre-release tag
+        - Docker, pinned version tag
+        - Linux binary
+        - Windows binary
+        - From source
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Where does it happen
+      description: Optional, but it helps narrow things down quickly.
+      options:
+        - Sent or scheduled email
+        - Web UI
+        - Setup wizard
+        - Settings or connections
+        - Stats, graphs, or recently added
+        - Scheduling
+        - Install, update, or startup
+        - Somewhere else, or not sure
+    validations:
+      required: false
+
+  - type: input
+    id: email_client
+    attributes:
+      label: Email client and device
+      description: >
+        Only if the issue is about how an email looks or behaves. Rendering
+        differs a lot between clients, so this is usually the first thing that
+        needs to be known.
+      placeholder: Gmail on Android, Outlook 365 on Windows, Apple Mail on iOS
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: >
+        From the Logs page, which has an export button. Setting LOG_LEVEL=DEBUG
+        gives per-item traces if the default output is not revealing much.
+        Please redact API keys, tokens, and email addresses.
+      render: text
+    validations:
+      required: false
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Screenshots or anything else
+      description: Screenshots are especially useful for layout and rendering issues.
+    validations:
+      required: false

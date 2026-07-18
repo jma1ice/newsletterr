@@ -1,0 +1,47 @@
+name: Feature request
+description: Suggest a new capability or an improvement to an existing one
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Check the Planned Changes section of the readme first, since the idea
+        may already be on the list for an upcoming sprint.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do
+      description: >
+        The situation that prompted this
+      placeholder: >
+        I want my newsletter to highlight titles nobody has watched yet, so the
+        recommendations are not always the same popular items.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would you like it to do
+      placeholder: >
+        A sort option on the Recommendations snap-in for least-watched, next to
+        the existing rating and date options.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Anything you have tried or considered
+      description: Existing settings or workarounds you attempted, and why they fell short.
+    validations:
+      required: false
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else
+      description: Mockups, screenshots, or examples from other tools.
+    validations:
+      required: false

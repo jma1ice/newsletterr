@@ -197,14 +197,32 @@ The Settings page is split into sections: **Email Server**, **Connections**, **D
 ```bash
 pip install -r requirements-dev.txt
 ruff check app/ newsletterr.py tests/   # lint
-pytest                                  # test suite, runs in seconds
+pytest                                  # test suite, about a minute
 ```
 
 The email pipeline is covered by golden-master tests: full MIME output is compared against fixtures in `tests/goldens/`. After an intentional change to email output, regenerate them with `UPDATE_GOLDENS=1 pytest tests/test_golden_sends.py` and review the diff.
 
-CI runs lint and tests on every pull request. Docker images publish automatically: pushes to the `nightly` branch build `:nightly`, pushes to `main` build `:pre-release`, and published releases build `:latest`, `:nightly`, `:pre-release`, and the version tag. Release binaries for Linux and Windows are built and attached to each release. The release tag must match the repo `VERSION` file or the build fails.
+CI runs lint, tests, and a JS syntax check on every pull request. Docker images publish automatically: pushes to the `nightly` branch build `:nightly`, pushes to `main` build `:pre-release`, and published releases build `:latest`, `:nightly`, `:pre-release`, and the version tag. Release binaries for Linux and Windows are built and attached to each release. The release tag must match the repo `VERSION` file or the build fails.
 
 To back up your data, stop the container (or app) and copy the `database/` and `env/` volumes/folders, or use `sqlite3 database/data.db ".backup backup.db"` while running.
+
+---
+
+## Contributing
+
+Pull requests are welcome. **Open them against the `nightly` branch, not `main`.** `nightly` is the integration branch, so changes get exercised in the `:nightly` image before they reach anyone running a release build. CI fails PRs opened against `main`, and retargeting one is a two-click fix with the "Edit" button next to the PR title.
+
+Before opening a PR, run the same checks CI runs:
+
+```bash
+ruff check app/ newsletterr.py tests/                     # lint
+pytest                                                    # tests
+for f in static/js/app/*.js; do node --check "$f"; done   # JS syntax
+```
+
+See **[CONTRIBUTING.md](CONTRIBUTING.md)** for the full pre-PR checklist, how to regenerate the golden email fixtures, and the project rules that are easy to break by accident: frozen URL paths, one-way import layering, the central settings store, and settings migrations.
+
+Bug reports are welcome too. Include your newsletterr version, how you are running it (Docker, binary, or from source), and the relevant logs, which the Logs page can export.
 
 ---
 

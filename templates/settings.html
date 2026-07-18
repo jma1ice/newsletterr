@@ -165,14 +165,13 @@
                             </select><br>
                             <input type="text" id="plex_url" name="plex_url"
                                 {% if settings.plex_url != "" %}value="{{ settings.plex_url }}"{% endif %}
-                                placeholder="http://localhost:32400"><br><br>
+                                placeholder="http://localhost:32400"
+                                {% if settings.plex_url != "" %}class="d-none"{% endif %}><br><br>
 
                             <label for="plex_web_url">Plex Web URL (Optional - base URL for 'Open in Plex' links in emails. Use <code>https://app.plex.tv/desktop</code> for the Plex cloud client, or <code>https://your-plex-domain/web</code> for a self-hosted instance):</label><br>
                             <input type="text" id="plex_web_url" name="plex_web_url"
                                 value="{{ settings.plex_web_url }}"
                                 placeholder="https://app.plex.tv/desktop"><br>
-                                placeholder="http://localhost:32400"
-                                {% if settings.plex_url != "" %}class="d-none"{% endif %}><br>
                         </div>
 
                         <div class="settings-field-grid">

@@ -2,7 +2,9 @@ import json
 import sqlite3
 
 from app import config
-from app.db import migrate_email_templates_for_header_title, migrate_musicseerr_to_droppedneedle
+from app.config import DEFAULT_PLEX_WEB_URL
+from app.db import init_db, migrate_email_templates_for_header_title, migrate_musicseerr_to_droppedneedle, migrate_schema
+from app.settings_store import get_settings
 
 def _make_pre_rebrand_db(path):
     conn = sqlite3.connect(path)
@@ -86,3 +88,34 @@ def test_migration_noop_on_fresh_schema(tmp_path, monkeypatch):
     cols = [r[1] for r in conn.execute("PRAGMA table_info(settings)")]
     assert cols == ["id", "droppedneedle_url"]
     conn.close()
+
+def test_plex_web_url_ddl_default_matches_constant(tmp_path, monkeypatch):
+    # The DDL default lives in two SQL string literals (db.init_db and the
+    # migrate_schema call in the app factory) that cannot reference the Python
+    # constant. A fresh install, a migrated install and get_settings() must all
+    # agree, so drift between them is a bug rather than a style nit.
+    db = str(tmp_path / "ddl.db")
+    monkeypatch.setattr(config, "DB_PATH", db)
+    init_db(db)
+
+    conn = sqlite3.connect(db)
+    ddl_default = next(
+        r[4] for r in conn.execute("PRAGMA table_info(settings)") if r[1] == "plex_web_url"
+    )
+    conn.close()
+    assert ddl_default.strip("'") == DEFAULT_PLEX_WEB_URL
+
+    # an old install gaining the column by ALTER TABLE lands on the same value
+    old = str(tmp_path / "old_install.db")
+    conn = sqlite3.connect(old)
+    conn.execute("CREATE TABLE settings (id INTEGER PRIMARY KEY, plex_url TEXT)")
+    conn.execute("INSERT INTO settings (id, plex_url) VALUES (1, 'http://pms:32400')")
+    conn.commit()
+    conn.close()
+    monkeypatch.setattr(config, "DB_PATH", old)
+    migrate_schema("plex_web_url TEXT DEFAULT 'https://app.plex.tv/desktop'")
+
+    conn = sqlite3.connect(old)
+    assert conn.execute("SELECT plex_web_url FROM settings WHERE id = 1").fetchone()[0] == DEFAULT_PLEX_WEB_URL
+    conn.close()
+    assert get_settings()["plex_web_url"] == DEFAULT_PLEX_WEB_URL

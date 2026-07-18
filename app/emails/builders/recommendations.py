@@ -1,5 +1,6 @@
 from urllib.parse import quote_plus
 
+from app.config import DEFAULT_PLEX_WEB_URL
 from app.clients.plex import build_plex_web_link
 from app.emails.images import fetch_and_attach_image
 from app.security import escape_html_output as esc
@@ -258,7 +259,7 @@ def build_recommendations_section_with_cids(available_items, unavailable_items, 
                     link_title = "Open in Plex"
                 else:
                     search_query = quote_plus(title_text)
-                    search_base = (item.get('plex_web_url') or "https://app.plex.tv/desktop").rstrip('/')
+                    search_base = (item.get('plex_web_url') or DEFAULT_PLEX_WEB_URL).rstrip('/')
                     href = f"{search_base}#!/search?query={search_query}"
                     link_title = "Search in Plex"
             

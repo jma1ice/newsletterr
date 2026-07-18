@@ -35,7 +35,7 @@ def run_conjurr_command(base_url, user_dict, error):
     
     plex_url = plex_settings[0].rstrip('/') if plex_settings and plex_settings[0] else None
     plex_token = plex_settings[1] if plex_settings and plex_settings[1] else None
-    plex_web_url = (_s.get("plex_web_url") if "id" in _s else None) or "https://app.plex.tv/desktop"
+    plex_web_url = _s.get("plex_web_url")
     machine_id = get_plex_machine_id() if plex_url and plex_token else None
 
     api_base_url = f"{base_url}/recommendations?user_id="

@@ -57,10 +57,12 @@ def background_scheduler():
             
             cursor.execute("SELECT id, name, next_send, is_active FROM email_schedules")
             all_schedules = cursor.fetchall()
-            logger.info(f"Scheduler check at {now.isoformat()}")
-            logger.info(f"Found {len(all_schedules)} total schedules:")
+            # per-tick chatter stays at debug so the INFO log file (and its
+            # exports) only carry actual sends and errors
+            logger.debug(f"Scheduler check at {now.isoformat()}")
+            logger.debug(f"Found {len(all_schedules)} total schedules:")
             for sched in all_schedules:
-                logger.info(f"  - ID {sched[0]}: {sched[1]}, next_send: {sched[2]}, active: {sched[3]}")
+                logger.debug(f"  - ID {sched[0]}: {sched[1]}, next_send: {sched[2]}, active: {sched[3]}")
             
             cursor.execute("""
                 SELECT id, name, email_list_id, template_id, frequency 
@@ -71,7 +73,8 @@ def background_scheduler():
             due_schedules = cursor.fetchall()
             conn.close()
             
-            logger.info(f"Found {len(due_schedules)} schedules due for sending")
+            if due_schedules:
+                logger.info(f"Found {len(due_schedules)} schedules due for sending")
             
             for schedule in due_schedules:
                 schedule_id, name, email_list_id, template_id, frequency = schedule

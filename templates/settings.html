@@ -189,7 +189,8 @@
                                 <label for="tautulli_url">Tautulli Base URL (Optional - for user emails, stats, graphs, recently added):</label><br>
                                 <input type="text" id="tautulli_url" name="tautulli_url"
                                     {% if settings.tautulli_url != "" %}value="{{ settings.tautulli_url }}"{% endif %}
-                                    placeholder="http://localhost:8181" class="w-field"><br><br>
+                                    placeholder="http://localhost:8181" class="w-field"><br>
+                                <small class="form-text text-muted">Leave blank to use http://localhost:8181. Clear the API key to disable.</small><br><br>
 
                                 <label for="tautulli_api">Tautulli API Key (Optional):</label><br>
                                 <input type="password" id="tautulli_api" name="tautulli_api" autocomplete="new-password" class="w-field"
@@ -217,7 +218,8 @@
                                 <label for="droppedneedle_url">DroppedNeedle Base URL (Optional - for year-in-review stats):</label><br>
                                 <input type="text" id="droppedneedle_url" name="droppedneedle_url"
                                     {% if settings.droppedneedle_url != "" %}value="{{ settings.droppedneedle_url }}"{% endif %}
-                                    placeholder="http://localhost:8688" class="w-field"><br><br>
+                                    placeholder="http://localhost:8688" class="w-field"><br>
+                                <small class="form-text text-muted">Leave blank to use http://localhost:8688. Clear the API key to disable.</small><br><br>
 
                                 <label for="droppedneedle_api_key">DroppedNeedle Wrapped API Key:</label><br>
                                 <input type="password" id="droppedneedle_api_key" name="droppedneedle_api_key" autocomplete="new-password" class="w-field"
@@ -800,6 +802,8 @@
         }
         if (pwError) pwError.textContent = '';
 
+        window.fillDefaultUrlIfKeyed('tautulli_url', 'tautulli_api', HAS_TAUTULLI_API, 'http://localhost:8181');
+        window.fillDefaultUrlIfKeyed('droppedneedle_url', 'droppedneedle_api_key', HAS_DROPPEDNEEDLE_API_KEY, 'http://localhost:8688');
         window.fillDefaultUrlIfKeyed('sonarr_url', 'sonarr_api_key', HAS_SONARR_API_KEY, 'http://localhost:8989');
         window.fillDefaultUrlIfKeyed('radarr_url', 'radarr_api_key', HAS_RADARR_API_KEY, 'http://localhost:7878');
         window.fillDefaultUrlIfKeyed('ombi_url', 'ombi_api_key', HAS_OMBI_API_KEY, 'http://localhost:3579');
@@ -1349,6 +1353,7 @@
     }
 
     document.getElementById('test_tautulli')?.addEventListener('click', () => {
+        window.fillDefaultUrlIfKeyed('tautulli_url', 'tautulli_api', HAS_TAUTULLI_API, 'http://localhost:8181');
         runConnectionTest('/api/test/tautulli', {
             url: document.getElementById('tautulli_url').value.trim(),
             api_key: document.getElementById('tautulli_api').value.trim()
@@ -1362,6 +1367,7 @@
     });
 
     document.getElementById('test_droppedneedle')?.addEventListener('click', () => {
+        window.fillDefaultUrlIfKeyed('droppedneedle_url', 'droppedneedle_api_key', HAS_DROPPEDNEEDLE_API_KEY, 'http://localhost:8688');
         runConnectionTest('/api/test/droppedneedle', {
             url: document.getElementById('droppedneedle_url').value.trim(),
             api_key: document.getElementById('droppedneedle_api_key').value.trim()
@@ -1410,14 +1416,16 @@
 
         const services = [
             { configured: () => !!val('tautulli_url') || !!val('tautulli_api') || HAS_TAUTULLI_API,
-              run: () => runConnectionTest('/api/test/tautulli',
-                  { url: val('tautulli_url'), api_key: val('tautulli_api') }, 'tautulli_test_result', 'test_tautulli') },
+              run: () => { window.fillDefaultUrlIfKeyed('tautulli_url', 'tautulli_api', HAS_TAUTULLI_API, 'http://localhost:8181');
+                  return runConnectionTest('/api/test/tautulli',
+                  { url: val('tautulli_url'), api_key: val('tautulli_api') }, 'tautulli_test_result', 'test_tautulli'); } },
             { configured: () => !!val('conjurr_url'),
               run: () => runConnectionTest('/api/test/conjurr',
                   { url: val('conjurr_url') }, 'conjurr_test_result', 'test_conjurr') },
             { configured: () => !!val('droppedneedle_url') || !!val('droppedneedle_api_key') || HAS_DROPPEDNEEDLE_API_KEY,
-              run: () => runConnectionTest('/api/test/droppedneedle',
-                  { url: val('droppedneedle_url'), api_key: val('droppedneedle_api_key') }, 'droppedneedle_test_result', 'test_droppedneedle') },
+              run: () => { window.fillDefaultUrlIfKeyed('droppedneedle_url', 'droppedneedle_api_key', HAS_DROPPEDNEEDLE_API_KEY, 'http://localhost:8688');
+                  return runConnectionTest('/api/test/droppedneedle',
+                  { url: val('droppedneedle_url'), api_key: val('droppedneedle_api_key') }, 'droppedneedle_test_result', 'test_droppedneedle'); } },
             { configured: () => !!val('sonarr_url') || !!val('sonarr_api_key') || HAS_SONARR_API_KEY,
               run: () => { window.fillDefaultUrlIfKeyed('sonarr_url', 'sonarr_api_key', HAS_SONARR_API_KEY, 'http://localhost:8989');
                   return runConnectionTest('/api/test/sonarr',

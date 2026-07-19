@@ -31,7 +31,9 @@
     color: var(--text);
     margin: 0 0 var(--space-2);
 }
-.info-page a {
+/* Prose links only: .nl-btn anchors must keep their button text color,
+   otherwise primary buttons render accent-on-accent. */
+.info-page a:not(.nl-btn) {
     color: var(--accent);
 }
 

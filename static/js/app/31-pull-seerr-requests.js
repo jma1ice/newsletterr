@@ -1,4 +1,5 @@
-document.getElementById('pullSeerrRequestsBtn').addEventListener('click', async () => {
+document.getElementById('pullSeerrRequestsBtn').addEventListener('click', async (e) => {
+    if (!confirmFreshRepull(e.currentTarget, 'seerr')) return;
     showSpinner('Pulling Seerr requests...');
 
     const payload = {
@@ -55,6 +56,7 @@ document.getElementById('pullSeerrRequestsBtn').addEventListener('click', async 
         if (newSeerrData && oldSeerrData) oldSeerrData.replaceWith(newSeerrData);
 
         buildSeerrRequestsRow();
+        markPullCacheFresh('seerr', true);
     } catch (err) {
         console.error("Error pulling Seerr requests:", err);
         const error_p = document.getElementById('error_p');

@@ -396,7 +396,7 @@ body.nl-modal-open { overflow: hidden; }
 
     padding: 16px 16px;
     min-width: 450px;
-    min-height: 320px;
+    min-height: 340px;
     justify-content: center;
     background: var(--surface-1);
     border: 3px solid var(--border);

@@ -244,6 +244,9 @@ def settings():
             ra_grid_columns = request.form.get("ra_grid_columns", "5")
             recs_grid_columns = request.form.get("recs_grid_columns", "5")
             recs_item_count = request.form.get("recs_item_count", "")
+            email_layout = request.form.get("email_layout", "classic")
+            if email_layout not in ("legacy", "classic", "editorial", "digest"):
+                email_layout = "classic"
             stat_cover_art = request.form.get("stat_cover_art", "disabled")
             send_mode = request.form.get("send_mode", "bcc")
             poster_max_height = request.form.get("poster_max_height", "")
@@ -296,8 +299,8 @@ def settings():
                 INSERT INTO settings
                 (id, from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, plex_url, plex_web_url, tautulli_url,
                     tautulli_api, conjurr_url, droppedneedle_url, droppedneedle_api_key, recipient_display_name, logo_filename, logo_width, email_theme, primary_color, secondary_color, accent_color, background_color,
-                    text_color, from_name, custom_logo_filename, login_toggle, nl_username, nl_password, default_intro_text, default_outro_text, hsts_enabled, scheduled_subject_prefix, logo_position, hide_stat_play_counts, hide_graph_play_counts, stats_type, recently_added_mode, recently_added_sort, ra_grid_columns, recs_grid_columns, recs_item_count, stat_cover_art, send_mode, poster_max_height, discord_webhook_url, sonarr_url, sonarr_api_key, radarr_url, radarr_api_key, ombi_url, ombi_api_key, seerr_url, seerr_api_key, coming_soon_days_ahead, coming_soon_grid_columns, hosted_enabled, hosted_base_url, hosted_images_enabled, hosted_image_retention_days, hosted_links_enabled, hosted_links_base_url, collections_grid_columns, ra_show_description, exclude_inactive_days, include_user_info, email_size_warn_mb, pride_flag, snapins_floating, ui_custom_light, ui_custom_dark)
-                VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    text_color, from_name, custom_logo_filename, login_toggle, nl_username, nl_password, default_intro_text, default_outro_text, hsts_enabled, scheduled_subject_prefix, logo_position, hide_stat_play_counts, hide_graph_play_counts, stats_type, recently_added_mode, recently_added_sort, ra_grid_columns, recs_grid_columns, recs_item_count, stat_cover_art, send_mode, poster_max_height, discord_webhook_url, sonarr_url, sonarr_api_key, radarr_url, radarr_api_key, ombi_url, ombi_api_key, seerr_url, seerr_api_key, coming_soon_days_ahead, coming_soon_grid_columns, hosted_enabled, hosted_base_url, hosted_images_enabled, hosted_image_retention_days, hosted_links_enabled, hosted_links_base_url, collections_grid_columns, ra_show_description, exclude_inactive_days, include_user_info, email_size_warn_mb, pride_flag, snapins_floating, ui_custom_light, ui_custom_dark, email_layout)
+                VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT (id) DO UPDATE
                 SET from_email = excluded.from_email, alias_email = excluded.alias_email, reply_to_email = excluded.reply_to_email, password = excluded.password,
                     smtp_username = excluded.smtp_username, smtp_server = excluded.smtp_server, smtp_port = excluded.smtp_port, smtp_protocol = excluded.smtp_protocol,
@@ -340,13 +343,14 @@ def settings():
                     pride_flag = excluded.pride_flag,
                     snapins_floating = excluded.snapins_floating,
                     ui_custom_light = excluded.ui_custom_light,
-                    ui_custom_dark = excluded.ui_custom_dark
+                    ui_custom_dark = excluded.ui_custom_dark,
+                    email_layout = excluded.email_layout
             """, (from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, plex_url, plex_web_url, tautulli_url, tautulli_api,
                   conjurr_url, droppedneedle_url, droppedneedle_api_key, recipient_display_name, logo_filename, logo_width, email_theme, primary_color, secondary_color, accent_color, background_color, text_color, from_name,
                   custom_logo_filename, login_toggle, nl_username, nl_password, default_intro_text, default_outro_text, hsts_enabled, scheduled_subject_prefix, logo_position,
                   hide_stat_play_counts, hide_graph_play_counts, stats_type, recently_added_mode, recently_added_sort, ra_grid_columns, recs_grid_columns, recs_item_count, stat_cover_art, send_mode, poster_max_height, discord_webhook_url,
                   sonarr_url, sonarr_api_key, radarr_url, radarr_api_key, ombi_url, ombi_api_key, seerr_url, seerr_api_key, coming_soon_days_ahead, coming_soon_grid_columns, hosted_enabled, hosted_base_url, hosted_images_enabled, hosted_image_retention_days, hosted_links_enabled, hosted_links_base_url,
-                  collections_grid_columns, ra_show_description, exclude_inactive_days, include_user_info, email_size_warn_mb, pride_flag, snapins_floating, ui_custom_light, ui_custom_dark))
+                  collections_grid_columns, ra_show_description, exclude_inactive_days, include_user_info, email_size_warn_mb, pride_flag, snapins_floating, ui_custom_light, ui_custom_dark, email_layout))
             conn.commit()
             cursor.execute("SELECT plex_token FROM settings WHERE id = 1")
             plex_token = cursor.fetchone()[0]
@@ -397,6 +401,7 @@ def settings():
                 "ra_grid_columns": ra_grid_columns,
                 "recs_grid_columns": recs_grid_columns,
                 "recs_item_count": recs_item_count,
+                "email_layout": email_layout,
                 "stat_cover_art": stat_cover_art,
                 "send_mode": send_mode,
                 "poster_max_height": poster_max_height,
@@ -591,6 +596,7 @@ def settings():
     ra_grid_columns = s.get("ra_grid_columns")
     recs_grid_columns = s.get("recs_grid_columns")
     recs_item_count = s.get("recs_item_count")
+    email_layout = s.get("email_layout")
     stat_cover_art = s.get("stat_cover_art")
     send_mode = s.get("send_mode")
     poster_max_height = s.get("poster_max_height")
@@ -667,6 +673,7 @@ def settings():
         "ra_grid_columns": ra_grid_columns or "5",
         "recs_grid_columns": recs_grid_columns or "5",
         "recs_item_count": recs_item_count or "",
+        "email_layout": email_layout or "classic",
         "stat_cover_art": stat_cover_art or "disabled",
         "send_mode": send_mode or "bcc",
         "poster_max_height": poster_max_height or "",
@@ -692,6 +699,9 @@ def settings():
     }
     # Effective custom UI theme colors for the appearance pickers (validated,
     # with per-key fallbacks, so the inputs always hold a usable value)
+    # whether custom colors were ever saved: first entry into Custom auto-seeds
+    # the pickers from the palette being switched away from
+    settings["ui_custom_configured"] = bool(s.get("ui_custom_light") or s.get("ui_custom_dark"))
     settings["ui_custom_light_colors"] = parse_custom_ui_colors(s.get("ui_custom_light"), 'light')
     settings["ui_custom_dark_colors"] = parse_custom_ui_colors(s.get("ui_custom_dark"), 'dark')
     # secrets are never sent to the browser; the form shows a placeholder and

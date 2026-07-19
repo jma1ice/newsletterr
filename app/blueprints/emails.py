@@ -8,12 +8,26 @@ from app.settings_store import get_settings
 from app.security import require_csrf_for_json, requires_auth, json_body
 from app.store import get_saved_email_lists, save_email_list, delete_email_list, get_suppressed_emails, remove_suppressed
 from app.emails.send import SendRequest, send_standard_email_with_cids, send_recommendations_email_with_cids, resend_email_from_history
+from app.emails.preview import render_preview_email
 
 import logging
 
 logger = logging.getLogger(__name__)
 
 bp = Blueprint('emails', __name__)
+
+@bp.route('/preview_email', methods=['POST'])
+@requires_auth
+def preview_email():
+    require_csrf_for_json()
+    data, err = json_body()
+    if err:
+        return err
+    try:
+        return jsonify({"html": render_preview_email(data)})
+    except Exception as e:
+        logger.exception("preview render failed")
+        return jsonify({"error": f"Preview render failed: {e}"}), 500
 
 @bp.route('/send_email', methods=['POST'])
 @requires_auth

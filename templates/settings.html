@@ -533,6 +533,24 @@
                         </div>
 
                         <div class="settings-group-card">
+                        <h6 class="text-uppercase">Layout</h6>
+                        <label for="email_layout">Email Layout:</label><br>
+                        <select id="email_layout" name="email_layout">
+                            <option value="classic" {% if settings.get('email_layout', 'classic') == 'classic' %}selected{% endif %}>Polished Classic</option>
+                            <option value="editorial" {% if settings.get('email_layout') == 'editorial' %}selected{% endif %}>Editorial</option>
+                            <option value="digest" {% if settings.get('email_layout') == 'digest' %}selected{% endif %}>Compact Digest</option>
+                            <option value="legacy" {% if settings.get('email_layout') == 'legacy' %}selected{% endif %}>Legacy</option>
+                        </select><br>
+                        <p class="text-info mt-2 field-hint">
+                            Overall email design. A tightens the classic look into one card system, B is
+                            a magazine treatment, C is a dense one-scroll digest, Legacy is the
+                            pre-v2026.4 look unchanged. Applies to previews and all sends; graphs,
+                            recommendations, and collections keep their standard look in every layout
+                            for now.
+                        </p>
+                        </div>
+
+                        <div class="settings-group-card">
                         <h6 class="text-uppercase">Theme</h6>
                         <label for="email_theme">Email Theme (must choose custom to change the logo file):</label><br>
                         <select id="email_theme" name="email_theme">
@@ -756,7 +774,7 @@
 
                         {% set _uicl = settings.get('ui_custom_light_colors') or {} %}
                         {% set _uicd = settings.get('ui_custom_dark_colors') or {} %}
-                        <div id="custom-theme-editor" class="mt-3 {% if _pride != 'custom' %}d-none{% endif %}">
+                        <div id="custom-theme-editor" class="mt-3 {% if _pride != 'custom' %}d-none{% endif %}" data-configured="{{ '1' if settings.get('ui_custom_configured') else '0' }}">
                             <div class="custom-theme-mode">
                                 <strong>Light mode</strong>
                                 <div class="custom-theme-pickers">
@@ -780,8 +798,8 @@
                                 </div>
                             </div>
                             <div class="mt-2">
-                                <button type="button" id="custom-theme-seed-btn" class="nl-btn nl-btn--ghost nl-btn--sm">Seed from current palette</button>
-                                <span class="field-hint">Fills the pickers for the mode you are viewing from the palette on screen. Changes apply live; Apply Settings saves them.</span>
+                                <button type="button" id="custom-theme-seed-btn" class="nl-btn nl-btn--ghost nl-btn--sm">Seed from previous palette</button>
+                                <span class="field-hint">Refills all pickers (light and dark) from the palette you switched away from. Your first visit to Custom starts from it automatically. Changes apply live; Apply Settings saves them.</span>
                             </div>
                         </div>
                         </div>
@@ -1002,14 +1020,76 @@
             localStorage.setItem('customThemeCss', css);
         }
 
+        // Resolve the palette actually on screen to hex (custom properties may
+        // hold color-mix() expressions, so resolve through a computed color).
+        // Chromium serializes computed color-mix results as "color(srgb r g b)"
+        // rather than "rgb(r, g, b)", so both forms are parsed.
+        function resolveTokenHex(varName) {
+            const probe = document.createElement('div');
+            probe.style.color = `var(${varName})`;
+            document.body.appendChild(probe);
+            const rgb = getComputedStyle(probe).color;
+            probe.remove();
+            let m = rgb.match(/rgba?\((\d+)[,\s]+(\d+)[,\s]+(\d+)/);
+            if (m) {
+                return '#' + [m[1], m[2], m[3]].map(n => parseInt(n, 10).toString(16).padStart(2, '0')).join('');
+            }
+            m = rgb.match(/color\(srgb\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)/);
+            if (m) {
+                return '#' + [m[1], m[2], m[3]].map(n => Math.round(parseFloat(n) * 255).toString(16).padStart(2, '0')).join('');
+            }
+            return null;
+        }
+
+        const TOKEN_FOR = { bg: '--bg', surface: '--surface-1', border: '--border', text: '--text', muted: '--text-muted', accent: '--accent' };
+
+        // Resolve both modes by toggling the dark class synchronously (no
+        // paint happens between the toggles, so nothing flashes on screen).
+        function resolvePaletteBothModes() {
+            const wasDark = root.classList.contains('dark');
+            const out = { ui_light: {}, ui_dark: {} };
+            for (const [prefix, dark] of [['ui_light', false], ['ui_dark', true]]) {
+                root.classList.toggle('dark', dark);
+                for (const [key, token] of Object.entries(TOKEN_FOR)) {
+                    out[prefix][key] = resolveTokenHex(token) || '#888888';
+                }
+            }
+            root.classList.toggle('dark', wasDark);
+            return out;
+        }
+
+        function fillPickers(snapshot) {
+            for (const prefix of ['ui_light', 'ui_dark']) {
+                for (const key of Object.keys(TOKEN_FOR)) {
+                    const inp = document.querySelector(`[name="${prefix}_${key}"]`);
+                    if (inp && snapshot[prefix][key]) inp.value = snapshot[prefix][key];
+                }
+            }
+        }
+
+        // The palette in effect when the user switches INTO Custom. Captured
+        // before the custom theme applies, because once it applies the palette
+        // on screen is the custom theme itself and reading it back would make
+        // seeding a no-op.
+        let previousPalette = null;
+
         // The select value comes from the server (settings.pride_flag). Apply
         // the choice instantly and keep the localStorage mirror in sync; the
         // form POST is what persists it to the account.
         sel.addEventListener('change', () => {
             const val = sel.value;
+            if (val === 'custom' && !root.classList.contains('theme-custom')) {
+                previousPalette = resolvePaletteBothModes();
+            }
             stripPride();
             if (editor) editor.classList.toggle('d-none', val !== 'custom');
             if (val === 'custom') {
+                // First-ever visit to Custom: start from the palette the user
+                // was just using instead of the stock defaults.
+                if (editor && editor.dataset.configured !== '1' && previousPalette) {
+                    fillPickers(previousPalette);
+                    editor.dataset.configured = '1';
+                }
                 root.classList.add('theme-custom');
                 localStorage.setItem('pride', 'custom');
                 applyCustomCss();
@@ -1031,29 +1111,13 @@
             });
         }
 
-        // Resolve the palette actually on screen to hex (custom properties may
-        // hold color-mix() expressions, so resolve through a computed color).
-        function resolveTokenHex(varName) {
-            const probe = document.createElement('div');
-            probe.style.color = `var(${varName})`;
-            document.body.appendChild(probe);
-            const rgb = getComputedStyle(probe).color;
-            probe.remove();
-            const m = rgb.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
-            if (!m) return null;
-            return '#' + [m[1], m[2], m[3]].map(n => parseInt(n, 10).toString(16).padStart(2, '0')).join('');
-        }
-
         const seedBtn = document.getElementById('custom-theme-seed-btn');
         if (seedBtn) {
             seedBtn.addEventListener('click', () => {
-                const prefix = root.classList.contains('dark') ? 'ui_dark' : 'ui_light';
-                const tokenFor = { bg: '--bg', surface: '--surface-1', border: '--border', text: '--text', muted: '--text-muted', accent: '--accent' };
-                Object.entries(tokenFor).forEach(([key, token]) => {
-                    const hex = resolveTokenHex(token);
-                    const inp = document.querySelector(`[name="${prefix}_${key}"]`);
-                    if (hex && inp) inp.value = hex;
-                });
+                // Prefer the palette captured when switching into Custom; if
+                // the page loaded already in Custom there is nothing older to
+                // read, so fall back to what is on screen.
+                fillPickers(previousPalette || resolvePaletteBothModes());
                 if (sel.value === 'custom') applyCustomCss();
             });
         }

@@ -33,7 +33,28 @@ def _center_crop_resize(img, target_w, target_h):
         img = img.crop((0, top, orig_w, top + new_h))
     return img.resize((target_w, target_h), Image.LANCZOS)
 
+# Preview mode (single-renderer previews): a msg_root carrying
+# preview_mode=True makes every attach helper return a browser-usable URL
+# instead of fetching and embedding, so /preview_email can run the real
+# builders with zero network work and no MIME parts.
+def _preview_url(image_url):
+    if not image_url:
+        return None
+    if image_url.startswith('/library/') or image_url.startswith('/photo/'):
+        return f"/proxy-art{image_url}"
+    if image_url.startswith('http'):
+        parsed = urlparse(image_url)
+        if '/library/' in parsed.path or '/photo/' in parsed.path or '/composite/' in parsed.path:
+            return f"/proxy-art{parsed.path}"
+        return image_url
+    return image_url
+
+def is_preview(msg_root):
+    return bool(getattr(msg_root, 'preview_mode', False))
+
 def fetch_and_attach_image(image_url, msg_root, cid_name, base_url="", max_height=None, hosted_images_enabled=False, hosted_base_url="", target=None):
+    if is_preview(msg_root):
+        return _preview_url(image_url)
     try:
         logger.debug(f"fetch_and_attach_image called with: {image_url}")
         
@@ -172,6 +193,9 @@ def fetch_and_attach_image(image_url, msg_root, cid_name, base_url="", max_heigh
         return None
 
 def fetch_and_attach_blurred_image(image_url, msg_root, cid_name, base_url="", hosted_images_enabled=False, hosted_base_url=""):
+    if is_preview(msg_root):
+        # preview shows the sharp source; the blur/darken pass is send-only
+        return _preview_url(image_url)
     if image_url.lower().endswith('.gif'):
         return fetch_and_attach_image(image_url, msg_root, cid_name, base_url, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
     try:
@@ -224,6 +248,8 @@ def fetch_and_attach_blurred_image(image_url, msg_root, cid_name, base_url="", h
         return fetch_and_attach_image(image_url, msg_root, cid_name, base_url, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
 
 def fetch_and_attach_small_thumbnail(image_url, msg_root, cid_name, base_url="", height=40, hosted_images_enabled=False, hosted_base_url=""):
+    if is_preview(msg_root):
+        return _preview_url(image_url)
     try:
         if image_url.startswith('/'):
             full_url = urljoin(base_url or "http://127.0.0.1:6397", image_url)

@@ -40,6 +40,7 @@ EXPECTED_RULES = [
     "/logs/export",
     "/logs/send-discord",
     "/newsletter",
+    "/preview_email",
     "/proxy-art/<path:art_path>",
     "/proxy-img",
     "/proxy-radarr-art/<path:art_path>",

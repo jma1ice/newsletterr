@@ -12,6 +12,31 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+def _graph_wrapper_html(chart_name, img_src):
+    container_style = """
+        border-radius: 8px;
+        text-align: center;
+        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
+    """
+
+    image_style = """
+        max-width: 100%;
+        height: auto;
+        border-radius: 4px;
+        border: 0;
+        line-height: 100%;
+        outline: none;
+        text-decoration: none;
+        display: block;
+        margin: 0 auto;
+    """
+
+    return f"""
+    <div style="{container_style}">
+        <img src="{img_src}" alt="{esc(chart_name)}" style="{image_style}">
+    </div>
+    """
+
 def build_graph_html_with_frontend_image(item, msg_root, hosted_images_enabled=False, hosted_base_url=""):
     chart_name = item.get('name', 'Chart')
     chart_image_data = item.get('chartImage', '')
@@ -19,6 +44,9 @@ def build_graph_html_with_frontend_image(item, msg_root, hosted_images_enabled=F
     logger.debug(f"Processing graph: {chart_name}")
 
     if chart_image_data and chart_image_data.startswith('data:image/png'):
+        # preview renders the captured chart data URL directly, no attach
+        if getattr(msg_root, 'preview_mode', False):
+            return _graph_wrapper_html(chart_name, chart_image_data)
         try:
             _, encoded = chart_image_data.split(',', 1)
             image_data = base64.b64decode(encoded)
@@ -43,30 +71,8 @@ def build_graph_html_with_frontend_image(item, msg_root, hosted_images_enabled=F
                 logger.debug(f"Successfully attached PNG chart with CID: {cid}")
                 img_src = f"cid:{cid}"
 
-            container_style = """
-                border-radius: 8px;
-                text-align: center;
-                font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
-            """
-            
-            image_style = """
-                max-width: 100%;
-                height: auto;
-                border-radius: 4px;
-                border: 0;
-                line-height: 100%;
-                outline: none;
-                text-decoration: none;
-                display: block;
-                margin: 0 auto;
-            """
-            
-            return f"""
-            <div style="{container_style}">
-                <img src="{img_src}" alt="{esc(chart_name)}" style="{image_style}">
-            </div>
-            """
-            
+            return _graph_wrapper_html(chart_name, img_src)
+
         except Exception as e:
             logger.error(f"Error processing chart image for {chart_name}: {e}")
     

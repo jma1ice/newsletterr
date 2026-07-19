@@ -31,11 +31,16 @@
                         <div class="row mt-3">
                             <div class="col-lg-12">
                                 <div class="card theme-card">
-                                    <div class="card-header theme-card-header">
+                                    <div class="card-header theme-card-header d-flex justify-content-between align-items-center">
                                         <h5 class="mb-0">Email Preview</h5>
+                                        <div class="preview-size-toggle" id="preview-size-toggle" role="group" aria-label="Preview device size">
+                                            <button type="button" class="nl-btn nl-btn--ghost nl-btn--sm preview-size-btn" data-size="desktop" title="Preview at desktop width (800px)">Desktop</button>
+                                            <button type="button" class="nl-btn nl-btn--ghost nl-btn--sm preview-size-btn" data-size="tablet" title="Preview at tablet width (600px)">Tablet</button>
+                                            <button type="button" class="nl-btn nl-btn--ghost nl-btn--sm preview-size-btn" data-size="phone" title="Preview at phone width (375px)">Phone</button>
+                                        </div>
                                     </div>
                                     <div class="card-body">
-                                        <iframe id="preview" style="width: 100%; height: 600px; border: 1px solid #dee2e6; border-radius: 4px; background: white;"></iframe>
+                                        <iframe id="preview" style="width: 100%; height: 600px; border: 1px solid #dee2e6; border-radius: 4px; background: white; display: block; margin: 0 auto; max-width: 100%;"></iframe>
                                     </div>
                                 </div>
                             </div>
@@ -69,6 +74,40 @@
     const collectionsGridColumns = parseInt("{{ settings.get('collections_grid_columns', '5') }}") || 5;
     const raShowDescription = "{{ settings.get('ra_show_description', 'enabled') }}" !== "disabled";
     const includeUserInfo = "{{ settings.get('include_user_info', 'enabled') }}" !== "disabled";
+
+    // Mirrors email_icon_img in app/emails/images.py: PNG icons for email-bound
+    // HTML because Gmail strips inline SVG. Previews use the static path directly.
+    function emailIconImg(name, tint = 'gray', size = 14) {
+        if (!name) return '';
+        return `<img src="/static/img/email-icons/${name}-${tint}.png" alt="" width="${size}" height="${size}" style="width: ${size}px; height: ${size}px; border: 0; vertical-align: -2px; display: inline-block;">`;
+    }
+
+    // Device-size preview (NEWS-27), same behavior and sessionStorage key as
+    // the index builder preview in 01-preview.js.
+    const PREVIEW_SIZES = { desktop: 800, tablet: 600, phone: 375 };
+
+    function currentPreviewSize() {
+        const saved = sessionStorage.getItem('preview_size');
+        return PREVIEW_SIZES[saved] ? saved : 'desktop';
+    }
+
+    function applyPreviewSize(name) {
+        if (!PREVIEW_SIZES[name]) name = 'desktop';
+        sessionStorage.setItem('preview_size', name);
+        const frame = document.getElementById('preview');
+        if (frame) {
+            frame.style.width = name === 'desktop' ? '100%' : PREVIEW_SIZES[name] + 'px';
+        }
+        document.querySelectorAll('.preview-size-btn').forEach(b =>
+            b.classList.toggle('active', b.dataset.size === name));
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        document.querySelectorAll('.preview-size-btn').forEach(btn => {
+            btn.addEventListener('click', () => applyPreviewSize(btn.dataset.size));
+        });
+        applyPreviewSize(currentPreviewSize());
+    });
     const comingSoonGridColumns = parseInt("{{ settings.get('coming_soon_grid_columns', '5') }}") || 5;
     const showStatCoverArt = "{{ settings.get('stat_cover_art', 'disabled') }}" === "enabled";
 
@@ -315,6 +354,54 @@
                 
                 .chart-placeholder h3, .chart-placeholder p {
                     color: var(--email-muted);
+                }
+
+                /* Hand-mirrored from build_email_css_from_theme (app/theme.py):
+                   the real email's responsive rules, so the phone/tablet preview
+                   widths trigger the same stacking recipients see. */
+                .email-container {
+                    max-width: 800px;
+                    width: 100%;
+                    margin: 0 auto;
+                }
+                @media only screen and (max-width: 600px) {
+                    .email-container {
+                        width: 100% !important;
+                        max-width: 100% !important;
+                        margin: 0 !important;
+                    }
+                    .email-logo {
+                        max-width: 60px !important;
+                        width: 60px !important;
+                    }
+                    .recently-added-table {
+                        display: block !important;
+                        width: 100% !important;
+                        text-align: center !important;
+                    }
+                    .recently-added-row {
+                        display: inline !important;
+                    }
+                    .recently-added-table td {
+                        width: 30% !important;
+                        padding: 6px !important;
+                        display: inline-block !important;
+                        vertical-align: top !important;
+                        box-sizing: border-box !important;
+                    }
+                    .recently-added-card {
+                        width: 100% !important;
+                        max-width: 150px !important;
+                        margin: 0 auto 10px auto !important;
+                        height: auto !important;
+                        overflow: hidden !important;
+                        border-radius: 10px !important;
+                    }
+                    .card-content {
+                        height: auto !important;
+                        min-height: 165px !important;
+                        text-align: left !important;
+                    }
                 }
             </style>
         `;
@@ -1418,11 +1505,11 @@
             return path.startsWith('/proxy-art') ? path : `/proxy-art${path}`;
         };
         const highlights = [];
-        if (topMovie) highlights.push(['🎬 Top Movie', topMovie.title || '', thumbSrc(topMovie), false]);
-        if (topShow) highlights.push(['📺 Top Show', topShow.title || '', thumbSrc(topShow), false]);
-        if (topArtist) highlights.push(['🎵 Top Artist', topArtist.title || '', thumbSrc(topArtist), false]);
+        if (topMovie) highlights.push([`${emailIconImg('film', 'white', 12)} Top Movie`, topMovie.title || '', thumbSrc(topMovie), false]);
+        if (topShow) highlights.push([`${emailIconImg('tv', 'white', 12)} Top Show`, topShow.title || '', thumbSrc(topShow), false]);
+        if (topArtist) highlights.push([`${emailIconImg('music', 'white', 12)} Top Artist`, topArtist.title || '', thumbSrc(topArtist), false]);
         if (topUser && includeUserInfo) {
-            highlights.push(['👤 Most Active', topUser.user || '', topUser.user_thumb || null, true]);
+            highlights.push([`${emailIconImg('users', 'white', 12)} Most Active`, topUser.user || '', topUser.user_thumb || null, true]);
         }
         if (!highlights.length && !totalPlays) return '';
         const highlightCells = highlights.map(([label, value, thumb, isRound]) => `
@@ -1726,7 +1813,7 @@
         const collectionTitle = collection.title || 'Unknown Collection';
         const count = collection.childCount || 0;
         const subtype = collection.subtype || 'unknown';
-        const typeIcon = subtype === 'movie' ? '📽️' : subtype === 'show' ? '📺' : '🎧';
+        const typeIcon = emailIconImg(subtype === 'movie' ? 'film' : subtype === 'show' ? 'tv' : 'music', 'gray', 12);
         
         let posterURL = null;
         const thumbUrl = collection.thumb;
@@ -1849,13 +1936,13 @@
         }
         
         const typeIcons = {
-            'movie': '🎬',
-            'show': '📺', 
-            'album': '💿',
-            'track': '🎵',
-            'artist': '🎤'
+            'movie': 'film',
+            'show': 'tv',
+            'album': 'music',
+            'track': 'music',
+            'artist': 'music'
         };
-        const typeIcon = typeIcons[itemType] || '📄';
+        const typeIcon = emailIconImg(typeIcons[itemType] || '');
         
         let subtitle = "";
         if (item.artist && itemType !== 'show') {

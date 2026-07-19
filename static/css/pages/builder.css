@@ -711,8 +711,18 @@
     .builder-page #export-html-btn,
     .builder-page #import-html-btn,
     .builder-page #popout-preview-btn,
+    .builder-page #preview-size-toggle,
     .builder-page #popout-status { display: none !important; }
 }
+/* device-size preview: the iframe narrows to the chosen width, centered; the
+   selected chip gets the accent edge */
+.builder-page .preview-size-toggle { display: inline-flex; gap: var(--space-1); }
+.builder-page .preview-size-btn.active {
+    border-color: var(--accent);
+    color: var(--accent-strong);
+    background: var(--accent-soft);
+}
+.builder-page #preview { display: block; margin: 0 auto; max-width: 100%; }
 /* let the toolbar and its export/import/pop-out group wrap instead of
    overflowing the (narrower at mid widths) preview column */
 .builder-page .preview-toolbar { flex-wrap: wrap; gap: var(--space-2); }

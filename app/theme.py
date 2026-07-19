@@ -1,8 +1,78 @@
+import json
+import re
+
 from app.settings_store import DEFAULTS, get_settings
 
 import logging
 
 logger = logging.getLogger(__name__)
+
+# Custom app UI theme (NEWS-29): a user-built palette applied via the
+# .theme-custom html class (deliberately not the pride class, so the pride
+# brand flourish and logo swap never trigger). Users pick six base colors per
+# mode; the remaining tokens of the 13-token set derive here, mirroring the
+# relationships tokens.css/pride.css use. Values are injected into a <style>
+# block, so only strict #rrggbb hex ever passes through.
+
+_HEX_RE = re.compile(r'^#[0-9a-fA-F]{6}$')
+
+CUSTOM_UI_KEYS = ('bg', 'surface', 'border', 'text', 'muted', 'accent')
+
+_CUSTOM_UI_FALLBACK = {
+    'light': {'bg': '#eef1f2', 'surface': '#fbfcfc', 'border': '#c3ced1', 'text': '#16272b', 'muted': '#51666c', 'accent': '#3e8d94'},
+    'dark': {'bg': '#1d2426', 'surface': '#252d30', 'border': '#3a464a', 'text': '#e9f1f2', 'muted': '#a5b6ba', 'accent': '#62a1a4'},
+}
+
+def _safe_hex(value, fallback):
+    return value if isinstance(value, str) and _HEX_RE.match(value or '') else fallback
+
+def parse_custom_ui_colors(raw_json, mode):
+    """Returns the six validated base colors for a mode from the stored JSON,
+    falling back per-key so a bad or missing value never breaks the page."""
+    fallback = _CUSTOM_UI_FALLBACK[mode]
+    try:
+        data = json.loads(raw_json) if raw_json else {}
+    except (ValueError, TypeError):
+        data = {}
+    if not isinstance(data, dict):
+        data = {}
+    return {k: _safe_hex(data.get(k), fallback[k]) for k in CUSTOM_UI_KEYS}
+
+def _on_accent(accent_hex):
+    r, g, b = (int(accent_hex[i:i + 2], 16) for i in (1, 3, 5))
+    luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255
+    return '#111417' if luminance > 0.55 else '#ffffff'
+
+def _custom_token_block(c, mode):
+    # accent-strong pushes toward black in light mode and white in dark mode,
+    # matching how the pride palettes step their accents per mode
+    strong_mix = '#000000' if mode == 'light' else '#ffffff'
+    return (
+        f"--bg: {c['bg']};"
+        f" --surface-1: {c['surface']};"
+        f" --surface-2: color-mix(in srgb, {c['surface']} 88%, {c['bg']});"
+        f" --surface-3: color-mix(in srgb, {c['surface']} 76%, {c['bg']});"
+        f" --border: {c['border']};"
+        f" --border-soft: color-mix(in srgb, {c['border']} 55%, {c['surface']});"
+        f" --text: {c['text']};"
+        f" --text-muted: {c['muted']};"
+        f" --text-faint: color-mix(in srgb, {c['muted']} 65%, {c['surface']});"
+        f" --accent: {c['accent']};"
+        f" --accent-strong: color-mix(in srgb, {c['accent']} 78%, {strong_mix});"
+        f" --accent-soft: color-mix(in srgb, {c['accent']} 14%, {c['surface']});"
+        f" --on-accent: {_on_accent(c['accent'])};"
+    )
+
+def build_custom_ui_theme_css(light_json, dark_json):
+    """CSS text for the custom UI theme: a .theme-custom block and a
+    token-for-token symmetric .theme-custom.dark block (same invariant the
+    pride.css blocks keep, so the result is order-independent)."""
+    light = parse_custom_ui_colors(light_json, 'light')
+    dark = parse_custom_ui_colors(dark_json, 'dark')
+    return (
+        f".theme-custom {{ {_custom_token_block(light, 'light')} }}\n"
+        f".theme-custom.dark {{ {_custom_token_block(dark, 'dark')} }}"
+    )
 
 THEME_KEYS = ('primary_color', 'secondary_color', 'accent_color', 'background_color', 'text_color', 'email_theme')
 

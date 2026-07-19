@@ -236,15 +236,6 @@ Released under the **MIT License** - see [LICENSE](LICENSE.txt) for details.
 
 Work is organized into version sprints. Items may shift between sprints as priorities change.
 
-### v2026.4 - email look and feel
-* Default email layout/UI overhaul with pride theme options
-* SVG over emoji where possible in emails
-* Clean up looks on DN stats, coming soon, and wrapped
-* Email preview: desktop/tablet/phone views
-* Custom theme settings
-* Email BG color not respected by mac mail app
-* Searchable settings
-
 ### v2026.5 - builder features
 * More snap-ins: random pick, most watched
 * Snap-ins working with custom HTML
@@ -253,12 +244,12 @@ Work is organized into version sprints. Items may shift between sprints as prior
 ### v2026.6 - platform and reach
 * Emby/Jellyfin support - jellyfin uses jellywatch over tautulli
 * Rootless Docker image with UID/GID support
-* Demo on the website
-* Servarr PR
 
 ### Community
 * GitHub webhook to pull submitted issues to Discord channel
 * Ko-fi -> Discord integration for contributor role
+* Demo on the website
+* Servarr PR
 
 ### Blocked on upstream
 * Email click for recently added/available recommendations is going to browser on mobile instead of Plex app - this is an issue with the new Plex client, have not seen a fix yet and no info released by Plex at this time
@@ -266,6 +257,20 @@ Work is organized into version sprints. Items may shift between sprints as prior
 ---
 
 ## Recent Changes
+
+## v2026.4:
+
+#### New Features:
+* Default email layout/UI overhaul with pride theme options
+* SVG over emoji where possible in emails
+* Clean up looks on DN stats, coming soon, and wrapped
+* Email preview: desktop/tablet/phone views
+* Custom theme settings
+* Searchable settings
+
+#### Fixed:
+* UI adjustment to better organize snap-ins sections
+* Email BG color not respected by mac mail app
 
 ## v2026.3:
 
@@ -276,35 +281,6 @@ Work is organized into version sprints. Items may shift between sprints as prior
 * Per library item counts for the Recently Added snap-in
 * Show which user requested each item in the Recently Requested snap-in
 * Progress bar on the loading spinner where possible
-
-## v2026.2.2:
-
-#### New Features:
-* Plex URL input moved to a dropdown
-* Thanks @s3ntin3l8 for the Plex Web URL option for where email links go
-* Thanks @bferd for the Ombi integration functionality and the Recently Requested snap-in
-* Seerr integration (works with Overseerr and Jellyseerr) for the Recently Requested snap-in
-* Settings sections further moved into cards
-* Fresh cache repull and blank continue on setup confirmation
-
-#### Fixed:
-* Plex OAuth issue, thanks @bferd for the diagnostics and issue fixes
-* Export logs button text was same color as bg
-* Setup/settings wasn't autofilling some URLs
-* Spinner board - filled and smaller and fixed
-* Header buttons wrap fixed on small screens
-* Schedule search moved out of INFO logs
-
-### v2026.2.1:
-
-#### New Features:
-* Unsubscribed list
-* Hosted image retention moved into settings
-
-#### Fixed:
-* Thanks @bferd for the `includes` to `==` to fix similar library name issue
-* Fixed whitespace issue that made emails bigger
-* Preview now shows unsubscribe and view in browser link
 
 ---
 

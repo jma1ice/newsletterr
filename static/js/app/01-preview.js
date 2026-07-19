@@ -195,9 +195,93 @@ function getThemedEmailCSS() {
             .chart-placeholder h3, .chart-placeholder p {
                 color: var(--email-muted);
             }
+
+            /* Hand-mirrored from build_email_css_from_theme (app/theme.py):
+               the real email's responsive rules, so the phone/tablet preview
+               widths trigger the same stacking recipients see. */
+            .email-container {
+                max-width: 800px;
+                width: 100%;
+                margin: 0 auto;
+            }
+            @media only screen and (max-width: 600px) {
+                .email-container {
+                    width: 100% !important;
+                    max-width: 100% !important;
+                    margin: 0 !important;
+                }
+                .email-logo {
+                    max-width: 60px !important;
+                    width: 60px !important;
+                }
+                .recently-added-table {
+                    display: block !important;
+                    width: 100% !important;
+                    text-align: center !important;
+                }
+                .recently-added-row {
+                    display: inline !important;
+                }
+                .recently-added-table td {
+                    width: 30% !important;
+                    padding: 6px !important;
+                    display: inline-block !important;
+                    vertical-align: top !important;
+                    box-sizing: border-box !important;
+                }
+                .recently-added-card {
+                    width: 100% !important;
+                    max-width: 150px !important;
+                    margin: 0 auto 10px auto !important;
+                    height: auto !important;
+                    overflow: hidden !important;
+                    border-radius: 10px !important;
+                }
+                .card-content {
+                    height: auto !important;
+                    min-height: 165px !important;
+                    text-align: left !important;
+                }
+            }
         </style>
     `;
 }
+
+// Device-size preview (NEWS-27): the chips narrow the preview iframe to real
+// device widths so the email's own media queries apply. Shared by the pane
+// and the pop-out window; the choice persists per session.
+const PREVIEW_SIZES = { desktop: 800, tablet: 600, phone: 375 };
+
+function currentPreviewSize() {
+    const saved = sessionStorage.getItem('preview_size');
+    return PREVIEW_SIZES[saved] ? saved : 'desktop';
+}
+
+function applyPreviewSize(name) {
+    if (!PREVIEW_SIZES[name]) name = 'desktop';
+    sessionStorage.setItem('preview_size', name);
+    const frame = document.getElementById('preview');
+    if (frame) {
+        if (name === 'desktop') {
+            frame.style.width = '100%';
+        } else {
+            frame.style.width = PREVIEW_SIZES[name] + 'px';
+        }
+        resizePreviewFrame(frame);
+    }
+    document.querySelectorAll('.preview-size-btn').forEach(b =>
+        b.classList.toggle('active', b.dataset.size === name));
+    if (typeof popoutWindow !== 'undefined' && popoutWindow && !popoutWindow.closed) {
+        try {
+            popoutWindow.resizeTo(PREVIEW_SIZES[name] + 60, popoutWindow.outerHeight);
+        } catch (_) {}
+    }
+}
+
+document.querySelectorAll('.preview-size-btn').forEach(btn => {
+    btn.addEventListener('click', () => applyPreviewSize(btn.dataset.size));
+});
+document.addEventListener('DOMContentLoaded', () => applyPreviewSize(currentPreviewSize()));
 
 function resizePreviewFrame(frame) {
     try {

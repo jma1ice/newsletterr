@@ -38,6 +38,9 @@
         <div class="settings-layout">
 
             <div class="settings-nav">
+                <div class="settings-search">
+                    <input type="search" id="settings-search-input" class="nl-input" placeholder="Search settings..." autocomplete="off" aria-label="Search settings">
+                </div>
                 <nav>
                     <button type="button" class="settings-nav-btn active" data-section="email-server">
                         email server
@@ -535,6 +538,16 @@
                         <select id="email_theme" name="email_theme">
                             <option value="newsletterr_blue" {% if settings.email_theme == 'newsletterr_blue' %}selected{% endif %}>Newsletterr Blue</option>
                             <option value="plex_orange" {% if settings.email_theme == 'plex_orange' %}selected{% endif %}>Plex Orange</option>
+                            <optgroup label="Pride">
+                                <option value="pride_rainbow" {% if settings.email_theme == 'pride_rainbow' %}selected{% endif %}>Rainbow</option>
+                                <option value="pride_trans" {% if settings.email_theme == 'pride_trans' %}selected{% endif %}>Trans</option>
+                                <option value="pride_bi" {% if settings.email_theme == 'pride_bi' %}selected{% endif %}>Bi</option>
+                                <option value="pride_pan" {% if settings.email_theme == 'pride_pan' %}selected{% endif %}>Pan</option>
+                                <option value="pride_lesbian" {% if settings.email_theme == 'pride_lesbian' %}selected{% endif %}>Lesbian</option>
+                                <option value="pride_nonbinary" {% if settings.email_theme == 'pride_nonbinary' %}selected{% endif %}>Nonbinary</option>
+                                <option value="pride_ace" {% if settings.email_theme == 'pride_ace' %}selected{% endif %}>Ace</option>
+                                <option value="pride_progress" {% if settings.email_theme == 'pride_progress' %}selected{% endif %}>Progress</option>
+                            </optgroup>
                             <option value="custom" {% if settings.email_theme == 'custom' %}selected{% endif %}>Custom</option>
                         </select><br><br>
 
@@ -719,9 +732,9 @@
                         <h4 class="mb-4">appearance</h4>
 
                         <div class="settings-group-card">
-                        <h6 class="text-uppercase">Pride Theme</h6>
+                        <h6 class="text-uppercase">UI Theme</h6>
                         {% set _pride = settings.get('pride_flag', 'off') %}
-                        <label for="pride_flag">Pride Theme:</label><br>
+                        <label for="pride_flag">UI Theme:</label><br>
                         <select id="pride_flag" name="pride_flag">
                             <option value="off" {% if _pride == 'off' %}selected{% endif %}>Off</option>
                             <option value="rainbow" {% if _pride == 'rainbow' %}selected{% endif %}>Rainbow</option>
@@ -732,13 +745,45 @@
                             <option value="lesbian" {% if _pride == 'lesbian' %}selected{% endif %}>Lesbian</option>
                             <option value="ace" {% if _pride == 'ace' %}selected{% endif %}>Asexual</option>
                             <option value="progress" {% if _pride == 'progress' %}selected{% endif %}>Progress</option>
+                            <option value="custom" {% if _pride == 'custom' %}selected{% endif %}>Custom</option>
                         </select><br>
                         <div class="pride-preview" aria-hidden="true"></div>
                         <p class="text-info mt-2 field-hint">
                             Recolors the whole interface with your chosen pride flag palette, in both
-                            light and dark mode. Saved to your account and applied wherever you sign in.
+                            light and dark mode. Custom builds your own palette instead. Saved to your
+                            account and applied wherever you sign in.
                         </p>
 
+                        {% set _uicl = settings.get('ui_custom_light_colors') or {} %}
+                        {% set _uicd = settings.get('ui_custom_dark_colors') or {} %}
+                        <div id="custom-theme-editor" class="mt-3 {% if _pride != 'custom' %}d-none{% endif %}">
+                            <div class="custom-theme-mode">
+                                <strong>Light mode</strong>
+                                <div class="custom-theme-pickers">
+                                    <label>Background <input type="color" name="ui_light_bg" value="{{ _uicl.get('bg', '#eef1f2') }}"></label>
+                                    <label>Surface <input type="color" name="ui_light_surface" value="{{ _uicl.get('surface', '#fbfcfc') }}"></label>
+                                    <label>Border <input type="color" name="ui_light_border" value="{{ _uicl.get('border', '#c3ced1') }}"></label>
+                                    <label>Text <input type="color" name="ui_light_text" value="{{ _uicl.get('text', '#16272b') }}"></label>
+                                    <label>Muted Text <input type="color" name="ui_light_muted" value="{{ _uicl.get('muted', '#51666c') }}"></label>
+                                    <label>Accent <input type="color" name="ui_light_accent" value="{{ _uicl.get('accent', '#3e8d94') }}"></label>
+                                </div>
+                            </div>
+                            <div class="custom-theme-mode mt-2">
+                                <strong>Dark mode</strong>
+                                <div class="custom-theme-pickers">
+                                    <label>Background <input type="color" name="ui_dark_bg" value="{{ _uicd.get('bg', '#1d2426') }}"></label>
+                                    <label>Surface <input type="color" name="ui_dark_surface" value="{{ _uicd.get('surface', '#252d30') }}"></label>
+                                    <label>Border <input type="color" name="ui_dark_border" value="{{ _uicd.get('border', '#3a464a') }}"></label>
+                                    <label>Text <input type="color" name="ui_dark_text" value="{{ _uicd.get('text', '#e9f1f2') }}"></label>
+                                    <label>Muted Text <input type="color" name="ui_dark_muted" value="{{ _uicd.get('muted', '#a5b6ba') }}"></label>
+                                    <label>Accent <input type="color" name="ui_dark_accent" value="{{ _uicd.get('accent', '#62a1a4') }}"></label>
+                                </div>
+                            </div>
+                            <div class="mt-2">
+                                <button type="button" id="custom-theme-seed-btn" class="nl-btn nl-btn--ghost nl-btn--sm">Seed from current palette</button>
+                                <span class="field-hint">Fills the pickers for the mode you are viewing from the palette on screen. Changes apply live; Apply Settings saves them.</span>
+                            </div>
+                        </div>
                         </div>
 
                         <div class="settings-group-card">
@@ -778,8 +823,73 @@
     }
 
     document.querySelectorAll('.settings-nav-btn').forEach(btn => {
-        btn.addEventListener('click', () => switchSection(btn.dataset.section));
+        btn.addEventListener('click', () => {
+            // A nav click always leaves search mode and shows that one section.
+            clearSettingsSearch();
+            switchSection(btn.dataset.section);
+        });
     });
+
+    // Settings search: while a term is entered, every section is shown at once
+    // and only matching units stay visible. Matching is done per .settings-field
+    // / .settings-field-group where the section has them, else per group card,
+    // so the mixed markup across sections all behaves. Highlighting is a class
+    // (accent edge), not text rewriting, so field listeners survive.
+    function _searchUnits() {
+        const units = [];
+        document.querySelectorAll('.settings-section .settings-group-card').forEach(card => {
+            const fields = card.querySelectorAll('.settings-field, .settings-field-group');
+            if (fields.length) {
+                fields.forEach(f => units.push({ el: f, card }));
+            } else {
+                units.push({ el: card, card });
+            }
+        });
+        return units;
+    }
+
+    function clearSettingsSearch() {
+        const input = document.getElementById('settings-search-input');
+        if (input) input.value = '';
+        document.querySelectorAll('.settings-section .d-none-search, .settings-section.d-none-search').forEach(el => el.classList.remove('d-none-search'));
+        document.querySelectorAll('.search-match').forEach(el => el.classList.remove('search-match'));
+        document.body.classList.remove('settings-searching');
+        const active = document.querySelector('.settings-nav-btn.active');
+        if (active) switchSection(active.dataset.section);
+    }
+
+    function applySettingsSearch(term) {
+        term = term.trim().toLowerCase();
+        if (!term) {
+            clearSettingsSearch();
+            return;
+        }
+        document.body.classList.add('settings-searching');
+        document.querySelectorAll('.settings-section').forEach(s => s.classList.remove('d-none'));
+
+        const matchedCards = new Set();
+        _searchUnits().forEach(({ el, card }) => {
+            const hit = el.textContent.toLowerCase().includes(term);
+            el.classList.toggle('d-none-search', !hit);
+            el.classList.toggle('search-match', hit);
+            if (hit) matchedCards.add(card);
+        });
+        document.querySelectorAll('.settings-section .settings-group-card').forEach(card => {
+            card.classList.toggle('d-none-search', !matchedCards.has(card));
+        });
+        document.querySelectorAll('.settings-section').forEach(section => {
+            const any = section.querySelector('.settings-group-card:not(.d-none-search)');
+            section.classList.toggle('d-none-search', !any);
+        });
+    }
+
+    const searchInput = document.getElementById('settings-search-input');
+    if (searchInput) {
+        searchInput.addEventListener('input', () => applySettingsSearch(searchInput.value));
+        searchInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') clearSettingsSearch();
+        });
+    }
 
     document.addEventListener('DOMContentLoaded', () => {
         const saved = sessionStorage.getItem('settings_section');
@@ -839,8 +949,57 @@
         const root = document.documentElement;
 
         function stripPride() {
-            root.classList.remove('pride');
+            root.classList.remove('pride', 'theme-custom');
             [...root.classList].forEach(c => { if (c.indexOf('pride-') === 0) root.classList.remove(c); });
+        }
+
+        // custom UI theme (NEWS-29) live apply
+        const editor = document.getElementById('custom-theme-editor');
+
+        function readMode(prefix) {
+            const colors = {};
+            ['bg', 'surface', 'border', 'text', 'muted', 'accent'].forEach(k => {
+                colors[k] = document.querySelector(`[name="${prefix}_${k}"]`)?.value || '#888888';
+            });
+            return colors;
+        }
+
+        // Mirrors build_custom_ui_theme_css / _custom_token_block in
+        // app/theme.py; keep the two derivations identical.
+        function tokenBlock(c, mode) {
+            const strongMix = mode === 'light' ? '#000000' : '#ffffff';
+            const r = parseInt(c.accent.slice(1, 3), 16), g = parseInt(c.accent.slice(3, 5), 16), b = parseInt(c.accent.slice(5, 7), 16);
+            const onAccent = ((0.2126 * r + 0.7152 * g + 0.0722 * b) / 255) > 0.55 ? '#111417' : '#ffffff';
+            return `--bg: ${c.bg};` +
+                ` --surface-1: ${c.surface};` +
+                ` --surface-2: color-mix(in srgb, ${c.surface} 88%, ${c.bg});` +
+                ` --surface-3: color-mix(in srgb, ${c.surface} 76%, ${c.bg});` +
+                ` --border: ${c.border};` +
+                ` --border-soft: color-mix(in srgb, ${c.border} 55%, ${c.surface});` +
+                ` --text: ${c.text};` +
+                ` --text-muted: ${c.muted};` +
+                ` --text-faint: color-mix(in srgb, ${c.muted} 65%, ${c.surface});` +
+                ` --accent: ${c.accent};` +
+                ` --accent-strong: color-mix(in srgb, ${c.accent} 78%, ${strongMix});` +
+                ` --accent-soft: color-mix(in srgb, ${c.accent} 14%, ${c.surface});` +
+                ` --on-accent: ${onAccent};`;
+        }
+
+        function buildCustomCss() {
+            return `.theme-custom { ${tokenBlock(readMode('ui_light'), 'light')} }\n` +
+                   `.theme-custom.dark { ${tokenBlock(readMode('ui_dark'), 'dark')} }`;
+        }
+
+        function applyCustomCss() {
+            let styleEl = document.getElementById('custom-theme-style');
+            if (!styleEl) {
+                styleEl = document.createElement('style');
+                styleEl.id = 'custom-theme-style';
+                document.head.appendChild(styleEl);
+            }
+            const css = buildCustomCss();
+            styleEl.textContent = css;
+            localStorage.setItem('customThemeCss', css);
         }
 
         // The select value comes from the server (settings.pride_flag). Apply
@@ -849,13 +1008,55 @@
         sel.addEventListener('change', () => {
             const val = sel.value;
             stripPride();
-            if (val === 'off' || FLAGS.indexOf(val) === -1) {
+            if (editor) editor.classList.toggle('d-none', val !== 'custom');
+            if (val === 'custom') {
+                root.classList.add('theme-custom');
+                localStorage.setItem('pride', 'custom');
+                applyCustomCss();
+            } else if (val === 'off' || FLAGS.indexOf(val) === -1) {
                 localStorage.removeItem('pride');
+                localStorage.removeItem('customThemeCss');
             } else {
                 root.classList.add('pride', 'pride-' + val);
                 localStorage.setItem('pride', val);
+                localStorage.removeItem('customThemeCss');
             }
         });
+
+        if (editor) {
+            editor.querySelectorAll('input[type="color"]').forEach(inp => {
+                inp.addEventListener('input', () => {
+                    if (sel.value === 'custom') applyCustomCss();
+                });
+            });
+        }
+
+        // Resolve the palette actually on screen to hex (custom properties may
+        // hold color-mix() expressions, so resolve through a computed color).
+        function resolveTokenHex(varName) {
+            const probe = document.createElement('div');
+            probe.style.color = `var(${varName})`;
+            document.body.appendChild(probe);
+            const rgb = getComputedStyle(probe).color;
+            probe.remove();
+            const m = rgb.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+            if (!m) return null;
+            return '#' + [m[1], m[2], m[3]].map(n => parseInt(n, 10).toString(16).padStart(2, '0')).join('');
+        }
+
+        const seedBtn = document.getElementById('custom-theme-seed-btn');
+        if (seedBtn) {
+            seedBtn.addEventListener('click', () => {
+                const prefix = root.classList.contains('dark') ? 'ui_dark' : 'ui_light';
+                const tokenFor = { bg: '--bg', surface: '--surface-1', border: '--border', text: '--text', muted: '--text-muted', accent: '--accent' };
+                Object.entries(tokenFor).forEach(([key, token]) => {
+                    const hex = resolveTokenHex(token);
+                    const inp = document.querySelector(`[name="${prefix}_${key}"]`);
+                    if (hex && inp) inp.value = hex;
+                });
+                if (sel.value === 'custom') applyCustomCss();
+            });
+        }
 
         // Floating snap-ins: flip the <html> class instantly; the form POST
         // persists snapins_floating alongside the pride flag.
@@ -873,6 +1074,7 @@
 <script nonce="{{ nonce }}">
     document.querySelectorAll('input[type="color"]').forEach(colorInput => {
         const textInput = colorInput.parentElement.querySelector('input[type="text"]');
+        if (!textInput) return; // custom theme pickers have no paired hex field
         colorInput.addEventListener('change', function() {
             textInput.value = this.value;
         });

@@ -489,8 +489,10 @@
                         <select id="logo_filename" name="logo_filename">
                             <option value="newsletterr_blue_small" {% if settings.logo_filename == 'Asset_54x.png' %}selected{% endif %}>Newsletterr Square Blue</option>
                             <option value="newsletterr_orange_small" {% if settings.logo_filename == 'Asset_46x.png' %}selected{% endif %}>Newsletterr Square Orange</option>
+                            <option value="newsletterr_pride_small" {% if settings.logo_filename == 'Asset_50.png' %}selected{% endif %}>Newsletterr Square Pride</option>
                             <option value="newsletterr_blue_banner" {% if settings.email_theme == 'newsletterr_blue' or settings.logo_filename == 'Asset_94x.png' %}selected{% endif %}>Newsletterr Banner Blue</option>
                             <option value="newsletterr_orange_banner" {% if settings.email_theme == 'plex_orange' or settings.logo_filename == 'Asset_45x.png' %}selected{% endif %}>Newsletterr Banner Orange</option>
+                            <option value="newsletterr_pride_banner" {% if (settings.email_theme or '').startswith('pride_') or settings.logo_filename == 'Asset_51.png' %}selected{% endif %}>Newsletterr Banner Pride</option>
                             <option value="custom" {% if settings.logo_filename == 'custom' %}selected{% endif %}>Custom</option>
                             <option value="none" {% if settings.logo_filename == '' %}selected{% endif %}>No Logo</option>
                         </select><br>
@@ -1382,8 +1384,10 @@
     const preset_logo_name_to_file = {
         "newsletterr_blue_small": "Asset_54x.png",
         "newsletterr_orange_small": "Asset_46x.png",
+        "newsletterr_pride_small": "Asset_50.png",
         "newsletterr_blue_banner": "Asset_94x.png",
-        "newsletterr_orange_banner": "Asset_45x.png"
+        "newsletterr_orange_banner": "Asset_45x.png",
+        "newsletterr_pride_banner": "Asset_51.png"
     }
 
     const serverCustomLogoFilename = "{{ settings.custom_logo_filename if settings.custom_logo_filename else '' }}";

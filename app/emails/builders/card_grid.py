@@ -86,8 +86,9 @@ def build_calendar_grid_html(cards, msg_root, theme_colors, title, base_url, gri
         </div>
     """
 
-def build_card_html(theme_colors, title, subtitle, meta_text, poster_src):
+def build_card_html(theme_colors, title, subtitle, meta_text, poster_src, extra_line=None):
     title, subtitle, meta_text = esc(title), esc(subtitle), esc(meta_text)
+    extra_line = esc(extra_line) if extra_line else None
     if poster_src:
         poster_html = f'<img class="card-poster-img" src="{poster_src}" alt="{title}" width="100%" style="width: 100%; height: auto; display: block; object-fit: cover; border-radius: 10px 10px 0 0; background-color: #f8f9fa;">'
     else:
@@ -134,6 +135,13 @@ def build_card_html(theme_colors, title, subtitle, meta_text, poster_src):
                     color: {theme_colors['muted_text']};
                     font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
                 ">{meta_text}</div>
+                {f'''
+                <div style="
+                    font-size: 10px;
+                    color: {theme_colors['muted_text']};
+                    font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
+                ">{extra_line}</div>
+                ''' if extra_line else ''}
             </div>
         </div>
     """

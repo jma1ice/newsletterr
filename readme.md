@@ -236,14 +236,6 @@ Released under the **MIT License** - see [LICENSE](LICENSE.txt) for details.
 
 Work is organized into version sprints. Items may shift between sprints as priorities change.
 
-### v2026.3 - bugs and quick wins
-* CSP out of Report-Only after trial run
-* Clickable titles in stats tables, going to the item in Plex like recommendations do
-* Setting to control how many recommended items appear
-* Per library item counts for the Recently Added snap-in
-* Show which user requested each item in the Recently Requested snap-in
-* Progress bar on the loading spinner where possible
-
 ### v2026.4 - email look and feel
 * Default email layout/UI overhaul with pride theme options
 * SVG over emoji where possible in emails
@@ -275,6 +267,16 @@ Work is organized into version sprints. Items may shift between sprints as prior
 
 ## Recent Changes
 
+## v2026.3:
+
+#### New Features:
+* CSP out of Report-Only after trial run
+* Clickable titles in stats tables, going to the item in Plex like recommendations do
+* Setting to control how many recommended items appear
+* Per library item counts for the Recently Added snap-in
+* Show which user requested each item in the Recently Requested snap-in
+* Progress bar on the loading spinner where possible
+
 ## v2026.2.2:
 
 #### New Features:
@@ -303,68 +305,6 @@ Work is organized into version sprints. Items may shift between sprints as prior
 * Thanks @bferd for the `includes` to `==` to fix similar library name issue
 * Fixed whitespace issue that made emails bigger
 * Preview now shows unsubscribe and view in browser link
-
-### v2026.2:
-
-#### New Features:
-* Added sections to settings page (email server | connections | data and stats | email content | security | hosted features | appearance)
-* Settings changes are now kept on error so user won't have to re-enter them
-* Added test api buttons for conjurr and tautulli
-* Added setting for custom intro/outro text
-* Added HSTS option in security settings
-* Added option to use or not use [SCHEDULED] in scheduled email subject
-* Added setting for logo positioning
-* Added setting to hide play counts in stats and graphs
-* Added setting to choose if duration or play counts is used for stats/graphs
-* Added an option to pull recently added by # of days. When this is used, "Recently Added" snap-in header now shows 'Added since X date'
-* Added option to sort recently added by rating
-* Added option for item width of recently added and recommendations grids
-* Added option for small cover art of each item in stats tables
-* Added To: vs BCC: option for email send
-* Added option for setting max image heights to reduce email size
-* Added API functionality to pull wrapped stats from DroppedNeedle
-* Complete codebase overhaul -> app factory
-* SQLite hardened with WAL
-* Auth required and extra setup page added for first sign-in
-* Visibility for failed sends
-* Test send button
-* Email builder auto-save
-* Pagination in email history, history capped to 1000
-* RA by days implemented in 'new schedule creator'
-* Export logs button with send to discord
-* Stats for total items in library
-* Settings submit audits the external tools api test
-* Setup Wizard
-* Resend from history
-* Sonarr/Radarr calendar integration for 'coming soon' type email
-* Plex Wrapped Yearly Review
-* Date range for stats (i.e. 1.1.25 - 1.1.26) (instead of 'last X days')
-* Made collections clickable
-* Added a hosted 'most recent newsletter' webpage
-* Added opt out support
-* Added hosted images to reduce email size
-* General UI update/modernization
-* More mobile CSS optimizations
-* Removed use of Tailwind Play CDN
-* Pride UI themes
-* Option to show or hide description on recently added posters
-* Setting for collection group grid width
-
-#### Fixed:
-* Thanks @2wheelsdown for the blank emails fix
-* Fixed issue where fresh setup `migrate_email_templates_for_header_title()` calls for `server_name` failed creating a missing `email_header_title` column
-* Patched up some SSRF/secrete containment
-* CSRF fixes
-* Fixed possible double send on scheduled emails
-* Bimonthly cadence fix
-* Schedule fix for recommendation emails
-* API fields in settings are now a password field
-* Fixed ra/recs card differing width issues when >5 columns used
-* Added a 'pop-up blocked' to index for `save_template()` and similar
-* Adjusted issue where some email clients show posters as small slivers
-* Fixed where contributor area would start clipping out on lower size screens
-* Removed plex-api-client as plexapi.plex was no longer supported
-* Fixed changing ra/recs grid width to maintain the correct poster ratio
 
 ---
 

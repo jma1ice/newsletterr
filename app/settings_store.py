@@ -51,6 +51,7 @@ DEFAULTS = {
     "hosted_links_base_url": "",
     "ra_show_description": "enabled",
     "include_user_info": "enabled",
+    "recs_item_count": "",
     "appearance_theme": "dark",
     "pride_flag": "off",
     "snapins_floating": "1",

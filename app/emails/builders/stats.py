@@ -45,7 +45,10 @@ def get_stat_cells(title, row, hide_play_counts=False):
     elif title == "Most Active Platforms":
         cells.append(esc(row.get('platform', '')))
     else:
-        cells.append(esc(row.get('title', '')))
+        title_cell = esc(row.get('title', ''))
+        if row.get('plex_url'):
+            title_cell = f'<a href="{esc(row["plex_url"])}" style="color: inherit; text-decoration: underline;" target="_blank" title="Open in Plex">{title_cell}</a>'
+        cells.append(title_cell)
 
     skip_year_stats = ["Most Active Libraries", "Library Item Counts", "Most Active Users", "Most Active Platforms", "Most Concurrent Streams"]
     if title not in skip_year_stats:

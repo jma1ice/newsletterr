@@ -135,6 +135,9 @@ function buildRALibraryRows() {
                     </button>
                 </div>
                 <span class="snapin-row-label" title="${escapeHtml(lib)}">${escapeHtml(lib)}</span>
+                <input type="number" class="ra-count-input" min="1" max="99" placeholder="all"
+                       title="Max items shown for ${escapeHtml(lib)} (blank = the pulled item count). Set before clicking Add."
+                       style="width: 4em; margin-left: auto; flex-shrink: 0; font-size: .8rem; padding: .15rem .3rem;">
             </div>`;
         host.appendChild(row);
     });

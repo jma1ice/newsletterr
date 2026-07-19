@@ -8,6 +8,7 @@ import re
 from app import state
 from app.db import db_connect
 from app.cache import is_cache_valid, get_cached_data, get_cache_info, clear_cache
+from app.progress import progress_get
 from app.crypto import decrypt
 from app.net import is_safe_fetch_url, configured_media_hosts
 from app.settings_store import get_service_flags, get_settings
@@ -362,6 +363,11 @@ def cache_status():
             'age_seconds': int(time.time() - state.cache_storage[key]['timestamp']) if state.cache_storage[key]['timestamp'] > 0 else 0
         }
     return jsonify(status)
+
+@bp.route('/pull_progress', methods=['GET'])
+@requires_auth
+def pull_progress():
+    return jsonify(progress_get(request.args.get('op', '')))
 
 @bp.route('/csp-report', methods=['POST'])
 def csp_report():

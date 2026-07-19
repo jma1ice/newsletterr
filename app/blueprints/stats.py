@@ -11,6 +11,7 @@ from app.security import require_csrf_for_json, requires_auth, safe_get, json_bo
 from app.theme import get_theme_settings
 from app.clients.plex import get_plex_headers, get_plex_machine_id, build_plex_web_link, reset_plex_health, plex_call_failed
 from app.clients.tautulli import run_tautulli_command, days_since_year_start
+from app.progress import progress_start, progress_step, progress_done
 from app.clients.conjurr import run_conjurr_command
 from app.clients.droppedneedle import run_droppedneedle_command, fetch_droppedneedle_server_stats
 from app.clients.sonarr import fetch_sonarr_calendar
@@ -56,9 +57,26 @@ def pull_stats():
         'timestamp': time.time()
     }
 
+    # 18 units: home stats, library counts, wrapped, users, 12 graphs,
+    # library names, recently added (the per-library loop reports as one)
+    progress_start('pull_stats', 18, 'Pulling home stats...')
+
     stats, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_home_stats', 'Stats', None, time_range, stats_type=stats_type)
     stats = stats or []
 
+    # Plex deep links are attached at pull time (like recs and recently added)
+    # so the email builder and previews never need a network call.
+    plex_configured = bool(_s.get("plex_url") and _s.get("plex_token"))
+    machine_id = get_plex_machine_id() if plex_configured else None
+    if machine_id:
+        plex_web_url = _s.get("plex_web_url")
+        for stat in stats:
+            for stat_row in stat.get('rows', []):
+                stat_rating_key = stat_row.get('grandparent_rating_key') or stat_row.get('rating_key')
+                if stat_rating_key:
+                    stat_row['plex_url'] = build_plex_web_link(stat_rating_key, machine_id, plex_web_url)
+
+    progress_step('pull_stats', 'Pulling library counts...')
     libraries_with_counts, _ = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_libraries', None, None)
     if libraries_with_counts:
         stats.append({
@@ -72,10 +90,12 @@ def pull_stats():
 
     set_cached_data('stats', stats, cache_params)
 
+    progress_step('pull_stats', 'Pulling year in plex stats...')
     yearly_wrapped_data, _ = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_home_stats', 'Stats', None, days_since_year_start(), stats_type=stats_type)
     if yearly_wrapped_data:
         set_cached_data('yearly_wrapped_json', yearly_wrapped_data, cache_params)
 
+    progress_step('pull_stats', 'Pulling users...')
     users, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_users', 'Users', error)
     set_cached_data('users', users, cache_params)
 
@@ -94,7 +114,8 @@ def pull_stats():
         {'command': 'get_stream_type_by_top_10_platforms', 'name': 'Stream Type by Top Platforms'},
         {'command': 'get_stream_type_by_top_10_users', 'name': 'Stream Type by Top Users'}
     ]
-    for command in graph_commands:
+    for graph_index, command in enumerate(graph_commands, 1):
+        progress_step('pull_stats', f'Pulling graphs ({graph_index}/{len(graph_commands)})...')
         try:
             gd, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, command["command"], command["name"], error, time_range, y_axis=stats_type)
             graph_data.append(gd if gd is not None else {})
@@ -106,6 +127,7 @@ def pull_stats():
                 error += f", Graph Error: {str(e)}"
     set_cached_data('graph_data', graph_data, cache_params)
 
+    progress_step('pull_stats', 'Pulling library names...')
     libraries, _ = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_library_names', None, None, "10")
     library_section_ids = {}
     for library in (libraries or []):
@@ -114,7 +136,7 @@ def pull_stats():
 
     # Track whether Plex silently degraded to Tautulli/cached data during the
     # recently-added pull, so the UI can warn instead of showing partial data.
-    plex_configured = bool(_s.get("plex_url") and _s.get("plex_token"))
+    progress_step('pull_stats', 'Pulling recently added...')
     reset_plex_health()
     recent_data = fetch_recent_data_for_index(tautulli_base_url, tautulli_api_key, count, recently_added_mode=recently_added_mode, recently_added_sort=recently_added_sort)
     plex_unavailable = plex_configured and plex_call_failed()
@@ -127,6 +149,8 @@ def pull_stats():
         for user in users:
             if user['email'] != None and user['is_active']:
                 user_dict[user['user_id']] = user['email']
+
+    progress_done('pull_stats')
 
     return jsonify({
         "success": True,
@@ -200,7 +224,13 @@ def pull_recommendations():
                                     csrf_token=session.get("csrf_token", ""))
         else:
             conjurr_base_url = conjurr_settings['conjurr_url']
-            recommendations_json, error = run_conjurr_command(conjurr_base_url, filtered_users, error)
+            progress_start('pull_recommendations', max(len(filtered_users), 1), 'Pulling recommendations...')
+
+            def _recs_progress(user_id):
+                progress_step('pull_recommendations', f'Pulled recommendations for {filtered_users.get(user_id, user_id)}')
+
+            recommendations_json, error = run_conjurr_command(conjurr_base_url, filtered_users, error, progress_cb=_recs_progress)
+            progress_done('pull_recommendations')
             if state.recommendations_cancel.is_set():
                 state.recommendations_cancel.clear()
                 alert = "Recommendations pull canceled. Partial results kept."
@@ -358,15 +388,18 @@ def pull_coming_soon():
     start_date = datetime.now().strftime('%Y-%m-%d')
     end_date = (datetime.now() + timedelta(days=days_ahead)).strftime('%Y-%m-%d')
 
+    progress_start('coming_soon', 2, 'Pulling Sonarr calendar...')
     if sonarr_url and sonarr_api_key:
         sonarr_coming_soon_json, sonarr_error = fetch_sonarr_calendar(sonarr_url, sonarr_api_key, start_date, end_date)
         if sonarr_error:
             error = (error + ", " if error else "") + sonarr_error
 
+    progress_step('coming_soon', 'Pulling Radarr calendar...')
     if radarr_url and radarr_api_key:
         radarr_coming_soon_json, radarr_error = fetch_radarr_calendar(radarr_url, radarr_api_key, start_date, end_date)
         if radarr_error:
             error = (error + ", " if error else "") + radarr_error
+    progress_done('coming_soon')
 
     if error:
         alert = None
@@ -434,13 +467,16 @@ def pull_ombi_requests():
                                 service_flags=get_service_flags(_s),
                                 csrf_token=session.get("csrf_token", ""))
 
+    progress_start('ombi_requests', 2, 'Pulling movie requests...')
     movies, movies_error = fetch_ombi_movie_requests(ombi_url, ombi_api_key)
     if movies_error:
         error = (error + ", " if error else "") + movies_error
 
+    progress_step('ombi_requests', 'Pulling TV requests...')
     tv, tv_error = fetch_ombi_tv_requests(ombi_url, ombi_api_key)
     if tv_error:
         error = (error + ", " if error else "") + tv_error
+    progress_done('ombi_requests')
 
     ombi_requests_json = {'movies': movies or [], 'tv': tv or []}
 
@@ -509,7 +545,16 @@ def pull_seerr_requests():
                                 service_flags=get_service_flags(_s),
                                 csrf_token=session.get("csrf_token", ""))
 
-    entries, error = fetch_seerr_requests(seerr_url, seerr_api_key)
+    progress_start('seerr_requests', 1, 'Pulling requests...')
+
+    def _seerr_progress(done, total):
+        if done == 0:
+            progress_start('seerr_requests', max(total, 1), 'Fetching request details...')
+        else:
+            progress_step('seerr_requests', f'Fetching request details ({done}/{total})...')
+
+    entries, error = fetch_seerr_requests(seerr_url, seerr_api_key, progress_cb=_seerr_progress)
+    progress_done('seerr_requests')
 
     seerr_requests_json = {'requests': entries or []}
 

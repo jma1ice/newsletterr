@@ -89,6 +89,9 @@ function buildStatPreviewHTML(statId) {
             cells.push(escapeHtml(row.platform || ''));
         } else {
             let titleCell = escapeHtml(row.title || '');
+            if (row.plex_url) {
+                titleCell = `<a href="${escapeHtml(row.plex_url)}" style="color: inherit; text-decoration: underline;" target="_blank" title="Open in Plex">${titleCell}</a>`;
+            }
             if (showStatCoverArt && coverArtTypes.includes(title) && (row.thumb || row.grandparent_thumb)) {
                 const thumbPath = row.thumb || row.grandparent_thumb;
                 titleCell = `<img src="/proxy-art${escapeHtml(thumbPath)}" style="height:38px;width:auto;border-radius:3px;margin-right:7px;vertical-align:middle;">${titleCell}`;
@@ -284,7 +287,7 @@ function buildGraphPreviewHTML(graphId) {
     `;
 }
 
-function buildRecentlyAddedPreviewHTML(libraryFilter) {
+function buildRecentlyAddedPreviewHTML(libraryFilter, libraryItemCap) {
     if (!recentPayload || recentPayload.length === 0) {
         return `<div class="recently-added"><p style="text-align: center; color: var(--email-muted); padding: 20px;">No recently added items available</p></div>`;
     }
@@ -324,7 +327,14 @@ function buildRecentlyAddedPreviewHTML(libraryFilter) {
     }
     
     allItems = deduplicated;
-    
+
+    // Per-library override from the builder item; mirrors library_item_cap in
+    // app/emails/builders/recently_added.py (caps days mode too)
+    const itemCap = parseInt(libraryItemCap, 10);
+    if (itemCap > 0) {
+        allItems = allItems.slice(0, itemCap);
+    }
+
     if (allItems.length === 0) {
         return `<div class="recently-added"><p style="text-align: center; color: var(--email-muted); padding: 20px;">No recently added items found${libraryFilter ? ` for ${escapeHtml(libraryFilter)}` : ''}</p></div>`;
     }
@@ -667,8 +677,9 @@ function _comingSoonPosterSrc(posterPath, arrPrefix) {
     return `${arrPrefix}${posterPath.startsWith('/') ? posterPath : '/' + posterPath}`;
 }
 
-function _comingSoonCardHTML(title, subtitle, metaText, posterSrc) {
+function _comingSoonCardHTML(title, subtitle, metaText, posterSrc, extraLine) {
     title = escapeHtml(title); subtitle = escapeHtml(subtitle); metaText = escapeHtml(metaText);
+    extraLine = extraLine ? escapeHtml(extraLine) : '';
     const posterHTML = posterSrc
         ? `<div style="position: relative; aspect-ratio: 2/3; background: #f8f9fa;"><img src="${escapeHtml(posterSrc)}" style="width: 100%; height: 100%; object-fit: cover; display: block;" alt="${title}"></div>`
         : '';
@@ -687,6 +698,7 @@ function _comingSoonCardHTML(title, subtitle, metaText, posterSrc) {
                 <div style="font-weight: bold; font-size: 14px; color: var(--email-text); margin-bottom: 1px; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${title}</div>
                 ${subtitle ? `<div style="font-size: 11px; color: var(--email-text); opacity: 0.85; margin-bottom: 2px;">${subtitle}</div>` : ''}
                 <div style="font-size: 10px; color: var(--email-muted);">${metaText}</div>
+                ${extraLine ? `<div style="font-size: 10px; color: var(--email-muted);">${extraLine}</div>` : ''}
             </div>
         </div>
     `;
@@ -826,6 +838,12 @@ function _filterOmbiPending(payload) {
     const data = payload || {};
     const entries = [];
 
+    // Mirrors _requester_name in app/emails/builders/ombi_requests.py
+    const requesterName = (req) => {
+        const user = req.requestedUser || {};
+        return user.userAlias || user.alias || user.userName || '';
+    };
+
     (data.movies || []).forEach(req => {
         if (req.available || req.denied) return;
         entries.push({
@@ -834,6 +852,7 @@ function _filterOmbiPending(payload) {
             poster: req.posterPath,
             approved: !!req.approved,
             requestedDate: req.requestedDate || null,
+            requestedBy: requesterName(req),
         });
     });
 
@@ -847,12 +866,14 @@ function _filterOmbiPending(payload) {
         if (!pendingChildren.length) return;
         const relevant = pendingChildren;
         const requestedDates = children.map(c => c.requestedDate).filter(Boolean);
+        const newestChild = relevant.reduce((a, b) => ((a.requestedDate || '') >= (b.requestedDate || '') ? a : b));
         entries.push({
             title: req.title || 'Unknown',
             year: (req.releaseDate || '').slice(0, 4),
             poster: req.posterPath,
             approved: relevant.some(c => c.approved),
             requestedDate: requestedDates.length ? requestedDates.sort().slice(-1)[0] : null,
+            requestedBy: requesterName(newestChild),
         });
     });
 
@@ -874,7 +895,8 @@ function buildOmbiRequestsPreviewHTML() {
         const relative = _comingSoonRelativeDate(entry.requestedDate);
         const metaText = [status, relative ? `Requested ${relative}` : ''].filter(Boolean).join(' • ');
         const posterSrc = _ombiPosterSrc(entry.poster);
-        return _comingSoonCardHTML(entry.title, entry.year, metaText, posterSrc);
+        const extraLine = (window.APP?.includeUserInfo !== 'disabled' && entry.requestedBy) ? `Requested by ${entry.requestedBy}` : '';
+        return _comingSoonCardHTML(entry.title, entry.year, metaText, posterSrc, extraLine);
     });
 
     return _comingSoonGridHTML(cardsHTML, 'Recent Requests', gridColumns);
@@ -896,6 +918,7 @@ function _filterSeerrPending(payload) {
             poster: req.posterPath,
             approved: req.status === 2,
             requestedDate: req.requestedDate || null,
+            requestedBy: req.requestedBy || '',
         });
     });
 
@@ -918,7 +941,8 @@ function buildSeerrRequestsPreviewHTML() {
         const relative = _comingSoonRelativeDate(entry.requestedDate);
         const metaText = [status, relative ? `Requested ${relative}` : ''].filter(Boolean).join(' • ');
         const posterSrc = _ombiPosterSrc(entry.poster);
-        return _comingSoonCardHTML(entry.title, entry.year, metaText, posterSrc);
+        const extraLine = (window.APP?.includeUserInfo !== 'disabled' && entry.requestedBy) ? `Requested by ${entry.requestedBy}` : '';
+        return _comingSoonCardHTML(entry.title, entry.year, metaText, posterSrc, extraLine);
     });
 
     return _comingSoonGridHTML(cardsHTML, 'Recent Requests', gridColumns);

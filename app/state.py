@@ -34,3 +34,7 @@ plex_headers = None
 # recommendations pull between users. run_conjurr_command clears it at the
 # start of a run and checks it between users, returning partial results.
 recommendations_cancel = threading.Event()
+
+# Per-operation pull progress, managed exclusively through app/progress.py
+# and read by GET /pull_progress for the spinner progress bar.
+progress_registry = {}

@@ -65,8 +65,9 @@ def set_security_headers(resp: Response):
         resp.headers.setdefault('X-Frame-Options', 'DENY')
         resp.headers.setdefault('X-Content-Type-Options', 'nosniff')
         resp.headers.setdefault('Referrer-Policy', 'no-referrer')
-        # Report-Only while the policy soaks; flip to enforcing once
-        # /csp-report stays quiet through normal use.
+        # Enforcing since v2026.3 after a clean Report-Only soak (no
+        # violations logged 2026-07-10 through 2026-07-18). report-uri stays
+        # so any future regression still lands in the logs via /csp-report.
         csp = (
             "default-src 'self'; "
             f"script-src 'self' 'nonce-{g.csp_nonce}'; "
@@ -77,7 +78,7 @@ def set_security_headers(resp: Response):
             "connect-src 'self'; "
             "report-uri /csp-report"
         )
-        resp.headers.setdefault('Content-Security-Policy-Report-Only', csp)
+        resp.headers.setdefault('Content-Security-Policy', csp)
         if state._hsts_enabled:
             resp.headers.setdefault('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload')
         return resp

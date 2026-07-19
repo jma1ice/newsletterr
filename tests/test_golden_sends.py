@@ -647,6 +647,7 @@ OMBI_REQUESTS_FIXTURE = {
             "posterPath": "/poster123.jpg",
             "approved": False, "available": False, "denied": False,
             "requestedDate": "2026-07-05T00:00:00Z",
+            "requestedUser": {"userAlias": "ombi-requester"},
         },
         # Already fulfilled -> filtered out before rendering.
         {
@@ -688,6 +689,7 @@ def test_manual_ombi_requests_email_golden(manual_send_env, monkeypatch):
     normalized["response"] = body
     assert "Requested Movie" in normalized["html"]
     assert "Pending Approval" in normalized["html"]
+    assert "Requested by ombi-requester" in normalized["html"]
     # Already-fulfilled requests are filtered out before rendering.
     assert "Fulfilled Movie" not in normalized["html"]
     _assert_golden("manual_ombi_requests", normalized)
@@ -699,6 +701,7 @@ SEERR_REQUESTS_FIXTURE = {
             "releaseDate": "2026-01-01", "posterPath": "/seerr123.jpg",
             "status": 1, "mediaStatus": 3,
             "requestedDate": "2026-07-05T00:00:00Z",
+            "requestedBy": "seerr-requester",
         },
         # Already fully available -> filtered out before rendering.
         {
@@ -740,6 +743,7 @@ def test_manual_seerr_requests_email_golden(manual_send_env, monkeypatch):
     normalized["response"] = body
     assert "Seerr Requested Movie" in normalized["html"]
     assert "Pending Approval" in normalized["html"]
+    assert "Requested by seerr-requester" in normalized["html"]
     # Already-available requests are filtered out before rendering.
     assert "Seerr Fulfilled Show" not in normalized["html"]
     _assert_golden("manual_seerr_requests", normalized)

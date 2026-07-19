@@ -48,6 +48,7 @@ EXPECTED_RULES = [
     "/pull_droppedneedle_stats",
     "/pull_ombi_requests",
     "/pull_seerr_requests",
+    "/pull_progress",
     "/pull_recommendations",
     "/pull_recommendations/cancel",
     "/pull_stats",
@@ -119,10 +120,31 @@ def test_cache_status_json(client, seeded_settings):
     assert resp.status_code == 200
     assert resp.is_json
 
+def test_pull_progress_json(client, seeded_settings):
+    from app.progress import progress_start, progress_step, progress_done
+
+    resp = client.get("/pull_progress?op=nothing_running")
+    assert resp.status_code == 200
+    assert resp.get_json() == {"active": False, "step": 0, "total": 0, "label": ""}
+
+    progress_start("testop", 4, "step one")
+    progress_step("testop", "step two")
+    data = client.get("/pull_progress?op=testop").get_json()
+    assert data == {"active": True, "step": 1, "total": 4, "label": "step two"}
+
+    progress_done("testop")
+    data = client.get("/pull_progress?op=testop").get_json()
+    assert data["active"] is False
+    assert data["step"] == data["total"] == 4
+
 def test_security_headers(client, seeded_settings):
     resp = client.get("/about")
     assert resp.headers.get("X-Frame-Options") == "DENY"
     assert resp.headers.get("X-Content-Type-Options") == "nosniff"
+    csp = resp.headers.get("Content-Security-Policy")
+    assert csp and "script-src 'self' 'nonce-" in csp
+    assert "report-uri /csp-report" in csp
+    assert resp.headers.get("Content-Security-Policy-Report-Only") is None
 
 def test_login_page_renders_when_admin_configured(client, seeded_settings):
     resp = client.get("/login")

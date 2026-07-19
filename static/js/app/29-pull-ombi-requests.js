@@ -1,6 +1,6 @@
 document.getElementById('pullOmbiRequestsBtn').addEventListener('click', async (e) => {
     if (!confirmFreshRepull(e.currentTarget, 'ombi')) return;
-    showSpinner('Pulling Ombi requests...');
+    showSpinner('Pulling Ombi requests...', 'ombi_requests');
 
     const payload = {
         stats: statsList,

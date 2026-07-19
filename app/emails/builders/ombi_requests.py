@@ -29,6 +29,11 @@ def _parse_ombi_date(date_str):
         logger.debug("suppressed exception; using fallback", exc_info=True)
         return None
 
+def _requester_name(req):
+    # Ombi's alias field is optional; userAlias is its computed alias-or-username
+    user = req.get('requestedUser') or {}
+    return user.get('userAlias') or user.get('alias') or user.get('userName') or ''
+
 def _normalize_movie_request(req):
     return {
         'title': req.get('title', 'Unknown'),
@@ -38,6 +43,7 @@ def _normalize_movie_request(req):
         'available': bool(req.get('available')),
         'denied': bool(req.get('denied')),
         'requested_date': req.get('requestedDate'),
+        'requested_by': _requester_name(req),
     }
 
 def _normalize_tv_request(req):
@@ -53,6 +59,8 @@ def _normalize_tv_request(req):
     # any mix) with nothing actionable left, so treat the whole entry as
     # resolved and let 'available' alone drive the drop in filter_ombi_pending.
     resolved = not pending_children
+    # The card's date is the newest child's; credit that requester too
+    newest_child = max(relevant, key=lambda c: c.get('requestedDate') or '')
     return {
         'title': req.get('title', 'Unknown'),
         'year': (req.get('releaseDate') or '')[:4],
@@ -61,6 +69,7 @@ def _normalize_tv_request(req):
         'available': resolved,
         'denied': False,
         'requested_date': max(requested_dates) if requested_dates else None,
+        'requested_by': _requester_name(newest_child),
     }
 
 def filter_ombi_pending(data):
@@ -84,7 +93,7 @@ def filter_ombi_pending(data):
     entries.sort(key=lambda e: _parse_ombi_date(e['requested_date']) or epoch, reverse=True)
     return entries
 
-def build_ombi_requests_html_with_cids(data, msg_root, theme_colors, base_url="", grid_columns=5, hosted_images_enabled=False, hosted_base_url=""):
+def build_ombi_requests_html_with_cids(data, msg_root, theme_colors, base_url="", grid_columns=5, hosted_images_enabled=False, hosted_base_url="", include_user_info=True):
     entries = filter_ombi_pending(data)
     if not entries:
         return _empty_state_html(theme_colors, "No pending or approved requests found.")
@@ -94,12 +103,13 @@ def build_ombi_requests_html_with_cids(data, msg_root, theme_colors, base_url=""
         status = "Approved" if entry['approved'] else "Pending Approval"
         relative = _format_relative_date(entry['requested_date'])
         meta_text = truncate_text(' • '.join(filter(None, [status, f'Requested {relative}' if relative else ''])), 46)
+        extra_line = truncate_text(f"Requested by {entry['requested_by']}", 46) if include_user_info and entry.get('requested_by') else None
 
         poster_src = None
         poster_url = _poster_src(entry['poster'])
         if poster_url:
             poster_src = fetch_and_attach_image(poster_url, msg_root, f"ombi-{i}", base_url, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
 
-        cards.append(_build_card_html(theme_colors, truncate_text(entry['title'], 23), entry['year'], meta_text, poster_src))
+        cards.append(_build_card_html(theme_colors, truncate_text(entry['title'], 23), entry['year'], meta_text, poster_src, extra_line=extra_line))
 
     return _build_calendar_grid_html(cards, msg_root, theme_colors, "Recent Requests", base_url, grid_columns)

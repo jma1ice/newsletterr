@@ -122,8 +122,10 @@ def settings():
     preset_logo_name_to_file = {
         "newsletterr_blue_small": "Asset_54x.png",
         "newsletterr_orange_small": "Asset_46x.png",
+        "newsletterr_pride_small": "Asset_50.png",
         "newsletterr_blue_banner": "Asset_94x.png",
-        "newsletterr_orange_banner": "Asset_45x.png"
+        "newsletterr_orange_banner": "Asset_45x.png",
+        "newsletterr_pride_banner": "Asset_51.png"
     }
 
     if request.method == "POST":

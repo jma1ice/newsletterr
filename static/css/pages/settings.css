@@ -106,8 +106,10 @@
 .settings-page .settings-field-grid {
     display: grid;
     grid-template-columns: 1fr;
-    gap: var(--space-4) var(--space-5);
-    align-items: start;
+    gap: var(--space-4);
+    /* stretch: group cards in the same row share a height so the card
+       edges line up instead of leaving ragged gaps */
+    align-items: stretch;
     /* clear the block above (Plex block / section heading) so the first grouped
        heading (e.g. Tautulli) isn't jammed against it */
     margin-top: var(--space-5);
@@ -117,6 +119,22 @@
 }
 .settings-page .settings-field-group { min-width: 0; }
 .settings-page .settings-field-group > h6:first-child { margin-top: 0; }
+
+/* Group cards: each labeled cluster of fields sits in its own nested card
+   (one surface step above the section) so long sections read as discrete
+   blocks instead of one continuous column. Inputs keep their surface-1
+   background, which now reads as a recessed field against the card. */
+.settings-page .settings-group-card {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: var(--space-4);
+    min-width: 0;
+}
+.settings-page .settings-section > .settings-group-card + .settings-group-card {
+    margin-top: var(--space-4);
+}
+.settings-page .settings-group-card > h6:first-child { margin-top: 0; }
 
 /* Data & Stats packs its individual fields two-per-row under full-width section
    headings, so related controls sit side by side instead of a tall single

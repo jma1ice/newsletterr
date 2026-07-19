@@ -5,14 +5,14 @@ import os, time
 from flask import Blueprint, abort, current_app, jsonify, redirect, render_template, request, session, url_for
 from PIL import Image
 
-from app.config import DEFAULT_RADARR_URL, DEFAULT_SONARR_URL, DEFAULT_OMBI_URL, DEFAULT_PLEX_WEB_URL
+from app.config import DEFAULT_RADARR_URL, DEFAULT_SONARR_URL, DEFAULT_OMBI_URL, DEFAULT_SEERR_URL, DEFAULT_PLEX_WEB_URL, DEFAULT_TAUTULLI_URL, DEFAULT_DROPPEDNEEDLE_URL
 from app.db import db_connect
 from app.settings_store import get_settings
 from app.crypto import encrypt, decrypt
 from werkzeug.security import generate_password_hash
 from app.hooks import refresh_hsts_setting
 from app.security import require_csrf_for_json, requires_auth
-from app.blueprints.api import test_tautulli_connection, test_conjurr_connection, test_droppedneedle_connection, test_sonarr_connection, test_radarr_connection, test_ombi_connection
+from app.blueprints.api import test_tautulli_connection, test_conjurr_connection, test_droppedneedle_connection, test_sonarr_connection, test_radarr_connection, test_ombi_connection, test_seerr_connection
 
 import logging
 
@@ -68,7 +68,7 @@ def settings():
             db_custom_logo = cursor.fetchone()
             existing_custom_logo = db_custom_logo[0] if db_custom_logo and db_custom_logo[0] else ""
 
-            cursor.execute("SELECT login_toggle, nl_username, nl_password, password, tautulli_api, droppedneedle_api_key, discord_webhook_url, sonarr_api_key, radarr_api_key, ombi_api_key FROM settings WHERE id = 1")
+            cursor.execute("SELECT login_toggle, nl_username, nl_password, password, tautulli_api, droppedneedle_api_key, discord_webhook_url, sonarr_api_key, radarr_api_key, ombi_api_key, seerr_api_key FROM settings WHERE id = 1")
             db_login_info = cursor.fetchone()
             existing_login_toggle = db_login_info[0] if db_login_info and db_login_info[0] else ""
             existing_nl_username = db_login_info[1] if db_login_info and db_login_info[1] else ""
@@ -80,6 +80,7 @@ def settings():
             existing_sonarr_api_key = db_login_info[7] if db_login_info and db_login_info[7] else ""
             existing_radarr_api_key = db_login_info[8] if db_login_info and db_login_info[8] else ""
             existing_ombi_api_key = db_login_info[9] if db_login_info and db_login_info[9] else ""
+            existing_seerr_api_key = db_login_info[10] if db_login_info and db_login_info[10] else ""
 
             # secret fields are write-only: a blank submission keeps the stored
             # value rather than overwriting it with an empty string
@@ -110,14 +111,23 @@ def settings():
             radarr_api_key = _secret("radarr_api_key", existing_radarr_api_key)
             ombi_url = request.form.get("ombi_url")
             ombi_api_key = _secret("ombi_api_key", existing_ombi_api_key)
+            seerr_url = request.form.get("seerr_url")
+            seerr_api_key = _secret("seerr_api_key", existing_seerr_api_key)
             # A blank URL with an API key present (submitted or saved) falls back
             # to the default; clearing the API key is how you disable the integration.
+            # Conjurr is URL-only, so its blank URL simply means disabled.
+            if not (tautulli_url or "").strip() and tautulli_api:
+                tautulli_url = DEFAULT_TAUTULLI_URL
+            if not (droppedneedle_url or "").strip() and droppedneedle_api_key:
+                droppedneedle_url = DEFAULT_DROPPEDNEEDLE_URL
             if not (sonarr_url or "").strip() and sonarr_api_key:
                 sonarr_url = DEFAULT_SONARR_URL
             if not (radarr_url or "").strip() and radarr_api_key:
                 radarr_url = DEFAULT_RADARR_URL
             if not (ombi_url or "").strip() and ombi_api_key:
                 ombi_url = DEFAULT_OMBI_URL
+            if not (seerr_url or "").strip() and seerr_api_key:
+                seerr_url = DEFAULT_SEERR_URL
             coming_soon_days_ahead = request.form.get("coming_soon_days_ahead", "14")
             coming_soon_grid_columns = request.form.get("coming_soon_grid_columns", "5")
             collections_grid_columns = request.form.get("collections_grid_columns", "5")
@@ -209,8 +219,8 @@ def settings():
                 INSERT INTO settings
                 (id, from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, plex_url, plex_web_url, tautulli_url,
                     tautulli_api, conjurr_url, droppedneedle_url, droppedneedle_api_key, recipient_display_name, logo_filename, logo_width, email_theme, primary_color, secondary_color, accent_color, background_color,
-                    text_color, from_name, custom_logo_filename, login_toggle, nl_username, nl_password, default_intro_text, default_outro_text, hsts_enabled, scheduled_subject_prefix, logo_position, hide_stat_play_counts, hide_graph_play_counts, stats_type, recently_added_mode, recently_added_sort, ra_grid_columns, recs_grid_columns, stat_cover_art, send_mode, poster_max_height, discord_webhook_url, sonarr_url, sonarr_api_key, radarr_url, radarr_api_key, ombi_url, ombi_api_key, coming_soon_days_ahead, coming_soon_grid_columns, hosted_enabled, hosted_base_url, hosted_images_enabled, hosted_image_retention_days, hosted_links_enabled, hosted_links_base_url, collections_grid_columns, ra_show_description, exclude_inactive_days, include_user_info, email_size_warn_mb, pride_flag, snapins_floating)
-                VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    text_color, from_name, custom_logo_filename, login_toggle, nl_username, nl_password, default_intro_text, default_outro_text, hsts_enabled, scheduled_subject_prefix, logo_position, hide_stat_play_counts, hide_graph_play_counts, stats_type, recently_added_mode, recently_added_sort, ra_grid_columns, recs_grid_columns, stat_cover_art, send_mode, poster_max_height, discord_webhook_url, sonarr_url, sonarr_api_key, radarr_url, radarr_api_key, ombi_url, ombi_api_key, seerr_url, seerr_api_key, coming_soon_days_ahead, coming_soon_grid_columns, hosted_enabled, hosted_base_url, hosted_images_enabled, hosted_image_retention_days, hosted_links_enabled, hosted_links_base_url, collections_grid_columns, ra_show_description, exclude_inactive_days, include_user_info, email_size_warn_mb, pride_flag, snapins_floating)
+                VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT (id) DO UPDATE
                 SET from_email = excluded.from_email, alias_email = excluded.alias_email, reply_to_email = excluded.reply_to_email, password = excluded.password,
                     smtp_username = excluded.smtp_username, smtp_server = excluded.smtp_server, smtp_port = excluded.smtp_port, smtp_protocol = excluded.smtp_protocol,
@@ -234,6 +244,8 @@ def settings():
                     radarr_api_key = excluded.radarr_api_key,
                     ombi_url = excluded.ombi_url,
                     ombi_api_key = excluded.ombi_api_key,
+                    seerr_url = excluded.seerr_url,
+                    seerr_api_key = excluded.seerr_api_key,
                     coming_soon_days_ahead = excluded.coming_soon_days_ahead,
                     coming_soon_grid_columns = excluded.coming_soon_grid_columns,
                     hosted_enabled = excluded.hosted_enabled,
@@ -253,7 +265,7 @@ def settings():
                   conjurr_url, droppedneedle_url, droppedneedle_api_key, recipient_display_name, logo_filename, logo_width, email_theme, primary_color, secondary_color, accent_color, background_color, text_color, from_name,
                   custom_logo_filename, login_toggle, nl_username, nl_password, default_intro_text, default_outro_text, hsts_enabled, scheduled_subject_prefix, logo_position,
                   hide_stat_play_counts, hide_graph_play_counts, stats_type, recently_added_mode, recently_added_sort, ra_grid_columns, recs_grid_columns, stat_cover_art, send_mode, poster_max_height, discord_webhook_url,
-                  sonarr_url, sonarr_api_key, radarr_url, radarr_api_key, ombi_url, ombi_api_key, coming_soon_days_ahead, coming_soon_grid_columns, hosted_enabled, hosted_base_url, hosted_images_enabled, hosted_image_retention_days, hosted_links_enabled, hosted_links_base_url,
+                  sonarr_url, sonarr_api_key, radarr_url, radarr_api_key, ombi_url, ombi_api_key, seerr_url, seerr_api_key, coming_soon_days_ahead, coming_soon_grid_columns, hosted_enabled, hosted_base_url, hosted_images_enabled, hosted_image_retention_days, hosted_links_enabled, hosted_links_base_url,
                   collections_grid_columns, ra_show_description, exclude_inactive_days, include_user_info, email_size_warn_mb, pride_flag, snapins_floating))
             conn.commit()
             cursor.execute("SELECT plex_token FROM settings WHERE id = 1")
@@ -314,6 +326,8 @@ def settings():
                 "radarr_api_key": decrypt(radarr_api_key),
                 "ombi_url": ombi_url,
                 "ombi_api_key": decrypt(ombi_api_key),
+                "seerr_url": seerr_url,
+                "seerr_api_key": decrypt(seerr_api_key),
                 "coming_soon_days_ahead": coming_soon_days_ahead,
                 "coming_soon_grid_columns": coming_soon_grid_columns,
                 "collections_grid_columns": collections_grid_columns,
@@ -342,6 +356,8 @@ def settings():
                 audit_results.append({"service": "Radarr", **test_radarr_connection(settings["radarr_url"], settings["radarr_api_key"])})
             if settings["ombi_url"]:
                 audit_results.append({"service": "Ombi", **test_ombi_connection(settings["ombi_url"], settings["ombi_api_key"])})
+            if settings["seerr_url"]:
+                audit_results.append({"service": "Seerr", **test_seerr_connection(settings["seerr_url"], settings["seerr_api_key"])})
             audit_json = json.dumps(audit_results) if audit_results else None
 
             refresh_hsts_setting()
@@ -399,6 +415,8 @@ def settings():
                 "radarr_api_key": request.form.get("radarr_api_key", ""),
                 "ombi_url": request.form.get("ombi_url", ""),
                 "ombi_api_key": request.form.get("ombi_api_key", ""),
+                "seerr_url": request.form.get("seerr_url", ""),
+                "seerr_api_key": request.form.get("seerr_api_key", ""),
                 "coming_soon_days_ahead": request.form.get("coming_soon_days_ahead", "14"),
                 "coming_soon_grid_columns": request.form.get("coming_soon_grid_columns", "5"),
                 "collections_grid_columns": request.form.get("collections_grid_columns", "5"),
@@ -500,6 +518,8 @@ def settings():
     radarr_api_key = s.get("radarr_api_key")
     ombi_url = s.get("ombi_url")
     ombi_api_key = s.get("ombi_api_key")
+    seerr_url = s.get("seerr_url")
+    seerr_api_key = s.get("seerr_api_key")
     coming_soon_days_ahead = s.get("coming_soon_days_ahead")
     coming_soon_grid_columns = s.get("coming_soon_grid_columns")
     collections_grid_columns = s.get("collections_grid_columns")
@@ -569,6 +589,7 @@ def settings():
         "sonarr_url": sonarr_url or "",
         "radarr_url": radarr_url or "",
         "ombi_url": ombi_url or "",
+        "seerr_url": seerr_url or "",
         "coming_soon_days_ahead": coming_soon_days_ahead or "14",
         "coming_soon_grid_columns": coming_soon_grid_columns or "5",
         "collections_grid_columns": collections_grid_columns or "5",
@@ -603,6 +624,8 @@ def settings():
     settings["has_radarr_api_key"] = bool(radarr_api_key)
     settings["ombi_api_key"] = ""
     settings["has_ombi_api_key"] = bool(ombi_api_key)
+    settings["seerr_api_key"] = ""
+    settings["has_seerr_api_key"] = bool(seerr_api_key)
     if smtp_port == '' or smtp_port is None:
         settings["smtp_port"] = 587
         cursor.execute("""

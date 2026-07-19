@@ -31,7 +31,8 @@
                 usersFullData: {{ (users_full_data if users_full_data else []) | tojson }},
                 displayPreference: {{ settings.recipient_display_name | string | tojson }},
                 allUserEmails: {{ (user_dict.values() | list) | tojson }},
-                serviceFlags: {{ service_flags | tojson }}
+                serviceFlags: {{ service_flags | tojson }},
+                pullCacheFresh: {{ pull_cache_fresh | default({}) | tojson }}
             };
         </script>
         <script src="{{ url_for('static', filename='js/app/00-alerts.js') }}" nonce="{{ nonce }}"></script>
@@ -63,6 +64,9 @@
         <script id="ombi-requests-json" type="application/json" nonce="{{ nonce }}">
             {{ (ombi_requests_json or none) | tojson | safe }}
         </script>
+        <script id="seerr-requests-json" type="application/json" nonce="{{ nonce }}">
+            {{ (seerr_requests_json or none) | tojson | safe }}
+        </script>
         <script src="{{ url_for('static', filename='js/app/08-user-data.js') }}" nonce="{{ nonce }}"></script>
         <script src="{{ url_for('static', filename='js/app/09-recs-wrapped.js') }}" nonce="{{ nonce }}"></script>
         <script src="{{ url_for('static', filename='js/app/10-pull-recommendations.js') }}" nonce="{{ nonce }}"></script>
@@ -83,4 +87,6 @@
         <script src="{{ url_for('static', filename='js/app/27-snapin-layout.js') }}" nonce="{{ nonce }}"></script>
         <script src="{{ url_for('static', filename='js/app/28-ombi-requests.js') }}" nonce="{{ nonce }}"></script>
         <script src="{{ url_for('static', filename='js/app/29-pull-ombi-requests.js') }}" nonce="{{ nonce }}"></script>
+        <script src="{{ url_for('static', filename='js/app/30-seerr-requests.js') }}" nonce="{{ nonce }}"></script>
+        <script src="{{ url_for('static', filename='js/app/31-pull-seerr-requests.js') }}" nonce="{{ nonce }}"></script>
     </div>

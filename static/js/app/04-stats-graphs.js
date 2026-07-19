@@ -880,6 +880,50 @@ function buildOmbiRequestsPreviewHTML() {
     return _comingSoonGridHTML(cardsHTML, 'Recent Requests', gridColumns);
 }
 
+// Mirrors filter_seerr_pending in app/emails/builders/seerr_requests.py.
+// Entries arrive pre-enriched by the seerr client (title/year/poster resolved
+// at pull time), so this only drops declined/failed/available and sorts.
+function _filterSeerrPending(payload) {
+    const data = payload || {};
+    const entries = [];
+
+    (data.requests || []).forEach(req => {
+        if (req.status !== 1 && req.status !== 2) return;
+        if ((req.mediaStatus || 0) >= 5) return;
+        entries.push({
+            title: req.title || 'Unknown',
+            year: (req.releaseDate || '').slice(0, 4),
+            poster: req.posterPath,
+            approved: req.status === 2,
+            requestedDate: req.requestedDate || null,
+        });
+    });
+
+    entries.sort((a, b) => new Date(b.requestedDate || 0) - new Date(a.requestedDate || 0));
+    return entries;
+}
+
+// Kept in sync by hand with app/emails/builders/seerr_requests.py:build_seerr_requests_html_with_cids.
+// Seerr posters are the same TMDB CDN fragments as Ombi's, so _ombiPosterSrc is reused.
+function buildSeerrRequestsPreviewHTML() {
+    const entries = _filterSeerrPending(seerrRequestsPayload);
+    if (!entries.length) {
+        return `<div><p style="text-align: center; color: var(--email-muted); padding: 20px;">No pending or approved requests found.</p></div>`;
+    }
+
+    const gridColumns = parseInt(APP.comingSoonGridColumns) || 5;
+
+    const cardsHTML = entries.map(entry => {
+        const status = entry.approved ? 'Approved' : 'Pending Approval';
+        const relative = _comingSoonRelativeDate(entry.requestedDate);
+        const metaText = [status, relative ? `Requested ${relative}` : ''].filter(Boolean).join(' • ');
+        const posterSrc = _ombiPosterSrc(entry.poster);
+        return _comingSoonCardHTML(entry.title, entry.year, metaText, posterSrc);
+    });
+
+    return _comingSoonGridHTML(cardsHTML, 'Recent Requests', gridColumns);
+}
+
 function buildRecommendationsSectionHTML(availableItems, unavailableItems, title) {
     const allItems = [...availableItems, ...unavailableItems];
     

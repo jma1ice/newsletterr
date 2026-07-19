@@ -1,4 +1,5 @@
-document.getElementById('pullDroppedNeedleBtn').addEventListener('click', async () => {
+document.getElementById('pullDroppedNeedleBtn').addEventListener('click', async (e) => {
+    if (!confirmFreshRepull(e.currentTarget, 'droppedneedle')) return;
     showSpinner('Pulling DroppedNeedle stats...');
 
     function collectEmailsFromChips() {
@@ -84,6 +85,7 @@ document.getElementById('pullDroppedNeedleBtn').addEventListener('click', async 
 
         buildWrappedUserRows();
         buildDroppedNeedleServerRow();
+        markPullCacheFresh('droppedneedle', true);
     } catch (err) {
         console.error("Error pulling DroppedNeedle stats:", err);
         const error_p = document.getElementById('error_p');

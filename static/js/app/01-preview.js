@@ -315,6 +315,8 @@ async function updatePreview() {
                 contentHTML += buildRadarrComingSoonPreviewHTML();
             } else if (item.type === 'ombi_requests') {
                 contentHTML += buildOmbiRequestsPreviewHTML();
+            } else if (item.type === 'seerr_requests') {
+                contentHTML += buildSeerrRequestsPreviewHTML();
             } else if (item.type === 'collection_group') {
                 if (item.collections && item.collections.length > 0) {
                     const stableGroupId = item.id || `group-${itemIndex}`;

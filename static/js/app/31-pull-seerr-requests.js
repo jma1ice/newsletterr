@@ -1,6 +1,6 @@
-document.getElementById('pullComingSoonBtn').addEventListener('click', async (e) => {
-    if (!confirmFreshRepull(e.currentTarget, 'coming_soon')) return;
-    showSpinner('Pulling coming soon calendar...');
+document.getElementById('pullSeerrRequestsBtn').addEventListener('click', async (e) => {
+    if (!confirmFreshRepull(e.currentTarget, 'seerr')) return;
+    showSpinner('Pulling Seerr requests...');
 
     const payload = {
         stats: statsList,
@@ -13,7 +13,7 @@ document.getElementById('pullComingSoonBtn').addEventListener('click', async (e)
     };
 
     try {
-        const resp = await fetch('/pull_coming_soon', {
+        const resp = await fetch('/pull_seerr_requests', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -24,7 +24,7 @@ document.getElementById('pullComingSoonBtn').addEventListener('click', async (e)
             credentials: 'same-origin'
         });
 
-        if (!resp.ok) throw new Error('Error pulling coming soon calendar.');
+        if (!resp.ok) throw new Error('Error pulling Seerr requests.');
 
         const html = await resp.text();
         const doc = new DOMParser().parseFromString(html, 'text/html');
@@ -33,9 +33,9 @@ document.getElementById('pullComingSoonBtn').addEventListener('click', async (e)
         const newCacheCard = doc.getElementById('cache-card');
         if (oldCacheCard && newCacheCard) oldCacheCard.replaceWith(newCacheCard);
 
-        const oldComingSoonCol = document.getElementById('coming-soon-col');
-        const newComingSoonCol = doc.getElementById('coming-soon-col');
-        if (oldComingSoonCol && newComingSoonCol) oldComingSoonCol.replaceWith(newComingSoonCol);
+        const oldSeerrRequestsCol = document.getElementById('seerr-requests-col');
+        const newSeerrRequestsCol = doc.getElementById('seerr-requests-col');
+        if (oldSeerrRequestsCol && newSeerrRequestsCol) oldSeerrRequestsCol.replaceWith(newSeerrRequestsCol);
 
         const oldAlertP = document.getElementById('alert_p');
         const newAlertP = doc.getElementById('alert_p');
@@ -51,22 +51,17 @@ document.getElementById('pullComingSoonBtn').addEventListener('click', async (e)
             oldErrorP.replaceWith(newErrorP);
         }
 
-        const oldSonarrData = document.getElementById('sonarr-coming-soon-json');
-        const newSonarrData = doc.getElementById('sonarr-coming-soon-json');
-        if (newSonarrData && oldSonarrData) oldSonarrData.replaceWith(newSonarrData);
+        const oldSeerrData = document.getElementById('seerr-requests-json');
+        const newSeerrData = doc.getElementById('seerr-requests-json');
+        if (newSeerrData && oldSeerrData) oldSeerrData.replaceWith(newSeerrData);
 
-        const oldRadarrData = document.getElementById('radarr-coming-soon-json');
-        const newRadarrData = doc.getElementById('radarr-coming-soon-json');
-        if (newRadarrData && oldRadarrData) oldRadarrData.replaceWith(newRadarrData);
-
-        buildSonarrComingSoonRow();
-        buildRadarrComingSoonRow();
-        markPullCacheFresh('coming_soon', true);
+        buildSeerrRequestsRow();
+        markPullCacheFresh('seerr', true);
     } catch (err) {
-        console.error("Error pulling coming soon calendar:", err);
+        console.error("Error pulling Seerr requests:", err);
         const error_p = document.getElementById('error_p');
         if (error_p) error_p.textContent = err;
-        alert("Something went wrong while pulling the coming soon calendar.");
+        alert("Something went wrong while pulling Seerr requests.");
     } finally {
         try { hideSpinner(); } catch(_) {}
     }

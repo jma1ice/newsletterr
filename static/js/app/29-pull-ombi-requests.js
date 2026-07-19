@@ -1,4 +1,5 @@
-document.getElementById('pullOmbiRequestsBtn').addEventListener('click', async () => {
+document.getElementById('pullOmbiRequestsBtn').addEventListener('click', async (e) => {
+    if (!confirmFreshRepull(e.currentTarget, 'ombi')) return;
     showSpinner('Pulling Ombi requests...');
 
     const payload = {
@@ -55,6 +56,7 @@ document.getElementById('pullOmbiRequestsBtn').addEventListener('click', async (
         if (newOmbiData && oldOmbiData) oldOmbiData.replaceWith(newOmbiData);
 
         buildOmbiRequestsRow();
+        markPullCacheFresh('ombi', true);
     } catch (err) {
         console.error("Error pulling Ombi requests:", err);
         const error_p = document.getElementById('error_p');

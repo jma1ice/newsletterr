@@ -36,6 +36,9 @@
 
                             <button id="pullOmbiRequestsBtn" class="nl-btn nl-btn--ghost"{% if not service_flags.ombi %} disabled title="Configure Ombi in settings"{% endif %}>Get Ombi Requests</button>
                             <p class="rail-note">Pending and approved movie/TV requests from Ombi, if configured in settings.</p>
+
+                            <button id="pullSeerrRequestsBtn" class="nl-btn nl-btn--ghost"{% if not service_flags.seerr %} disabled title="Configure Seerr in settings"{% endif %}>Get Seerr Requests</button>
+                            <p class="rail-note">Pending and approved movie/TV requests from Seerr (or Overseerr/Jellyseerr), if configured in settings.</p>
                         </div>
 
                         <div class="builder-card rail-card">

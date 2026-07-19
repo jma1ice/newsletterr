@@ -38,11 +38,15 @@ INTERNAL_BASE_URL = f"http://127.0.0.1:{os.environ.get('PORT', 6397)}"
 
 k2 = "754c514b50483558474a5935514b7a45494165796866"
 
-# Default *arr URLs used when the API key is supplied but the URL is left blank.
-# These match the placeholder text shown in the setup/settings forms.
+# Default service URLs used when the API key is supplied but the URL is left
+# blank. These match the placeholder text shown in the setup/settings forms.
+# Conjurr has no entry: it is URL-only, so a blank URL means disabled.
+DEFAULT_TAUTULLI_URL = "http://localhost:8181"
+DEFAULT_DROPPEDNEEDLE_URL = "http://localhost:8688"
 DEFAULT_SONARR_URL = "http://localhost:8989"
 DEFAULT_RADARR_URL = "http://localhost:7878"
 DEFAULT_OMBI_URL = "http://localhost:3579"
+DEFAULT_SEERR_URL = "http://localhost:5055"
 
 # Base URL for "Open in Plex" deep links in emails. Overridable per install so
 # self-hosters can point at their own Plex web client instead of the cloud one.

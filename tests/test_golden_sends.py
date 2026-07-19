@@ -270,6 +270,7 @@ def manual_send_env(send_env, client, monkeypatch):
     monkeypatch.setattr(send_mod, "get_sonarr_coming_soon_cached", lambda *a, **k: None)
     monkeypatch.setattr(send_mod, "get_radarr_coming_soon_cached", lambda *a, **k: None)
     monkeypatch.setattr(send_mod, "get_ombi_requests_cached", lambda *a, **k: None)
+    monkeypatch.setattr(send_mod, "get_seerr_requests_cached", lambda *a, **k: None)
     monkeypatch.setattr(send_mod, "get_recommendations_for_users", lambda *a, **k: {"1": {}})
     monkeypatch.setattr(send_mod, "get_droppedneedle_wrapped_for_users", lambda *a, **k: {})
     monkeypatch.setattr(send_mod, "run_tautulli_command", lambda *a, **k: (USERS_FIXTURE, None))
@@ -690,6 +691,58 @@ def test_manual_ombi_requests_email_golden(manual_send_env, monkeypatch):
     # Already-fulfilled requests are filtered out before rendering.
     assert "Fulfilled Movie" not in normalized["html"]
     _assert_golden("manual_ombi_requests", normalized)
+
+SEERR_REQUESTS_FIXTURE = {
+    "requests": [
+        {
+            "mediaType": "movie", "title": "Seerr Requested Movie",
+            "releaseDate": "2026-01-01", "posterPath": "/seerr123.jpg",
+            "status": 1, "mediaStatus": 3,
+            "requestedDate": "2026-07-05T00:00:00Z",
+        },
+        # Already fully available -> filtered out before rendering.
+        {
+            "mediaType": "tv", "title": "Seerr Fulfilled Show",
+            "releaseDate": "2025-01-01", "posterPath": "/seerr456.jpg",
+            "status": 2, "mediaStatus": 5,
+            "requestedDate": "2026-06-01T00:00:00Z",
+        },
+    ],
+}
+
+def test_manual_seerr_requests_email_golden(manual_send_env, monkeypatch):
+    from app.emails import send as send_mod
+    from app.emails.builders import coming_soon as coming_soon_mod
+    from app.emails.builders import seerr_requests as seerr_requests_mod
+
+    monkeypatch.setattr(send_mod, "get_seerr_requests_cached", lambda *a, **k: SEERR_REQUESTS_FIXTURE)
+    monkeypatch.setattr(seerr_requests_mod, "fetch_and_attach_image", lambda *a, **k: None)
+    _freeze_coming_soon_clock(monkeypatch, coming_soon_mod)
+
+    client = manual_send_env
+    resp = _post_send(client, {
+        "to_emails": "a@b.c, d@e.f", "subject": "Manual Recent Requests", "email_header_title": "The Header",
+        "selected_items": [
+            {"type": "textblock", "content": "What people are asking for"},
+            {"type": "seerr_requests", "id": "seerr-requests"},
+        ],
+        "custom_html": "", "user_dict": {}, "expanded_collections": {},
+    })
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body.get("success") is True
+
+    sends = [s for inst in RecorderSMTP.instances for s in inst.sent]
+    assert len(sends) == 1
+    from_addr, to_addrs, content = sends[0]
+    normalized = _normalize(content)
+    normalized["envelope"] = {"from": from_addr, "to": to_addrs}
+    normalized["response"] = body
+    assert "Seerr Requested Movie" in normalized["html"]
+    assert "Pending Approval" in normalized["html"]
+    # Already-available requests are filtered out before rendering.
+    assert "Seerr Fulfilled Show" not in normalized["html"]
+    _assert_golden("manual_seerr_requests", normalized)
 
 def test_manual_coming_soon_degrades_when_only_one_service_configured(manual_send_env, monkeypatch):
     from app.emails import send as send_mod

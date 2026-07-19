@@ -101,6 +101,72 @@ def test_setup_email_step_saves_and_advances_to_plex(anon_client, seeded_setting
         conn.commit()
         conn.close()
 
+def test_setup_tautulli_blank_url_falls_back_to_default(anon_client, seeded_settings):
+    client = anon_client
+    with client.session_transaction() as sess:
+        sess["authenticated"] = True
+        sess["username"] = "admin"
+        sess["csrf_token"] = "wizard-token"
+    try:
+        resp = client.post("/setup/tautulli", data={
+            "csrf_token": "wizard-token",
+            "tautulli_url": "",
+            "tautulli_api": "tautulli-key-1",
+        })
+        assert resp.status_code == 302 and "/setup/conjurr" in resp.headers["Location"]
+
+        conn = sqlite3.connect(config.DB_PATH)
+        tautulli_url = conn.execute("SELECT tautulli_url FROM settings WHERE id = 1").fetchone()[0]
+        conn.close()
+        assert tautulli_url == config.DEFAULT_TAUTULLI_URL
+    finally:
+        conn = sqlite3.connect(config.DB_PATH)
+        conn.execute("UPDATE settings SET tautulli_url = '', tautulli_api = '' WHERE id = 1")
+        conn.commit()
+        conn.close()
+
+def test_setup_droppedneedle_blank_url_falls_back_to_default(anon_client, seeded_settings):
+    client = anon_client
+    with client.session_transaction() as sess:
+        sess["authenticated"] = True
+        sess["username"] = "admin"
+        sess["csrf_token"] = "wizard-token"
+    try:
+        resp = client.post("/setup/droppedneedle", data={
+            "csrf_token": "wizard-token",
+            "droppedneedle_url": "",
+            "droppedneedle_api_key": "droppedneedle-key-1",
+        })
+        assert resp.status_code == 302 and "/setup/sonarr" in resp.headers["Location"]
+
+        conn = sqlite3.connect(config.DB_PATH)
+        droppedneedle_url = conn.execute("SELECT droppedneedle_url FROM settings WHERE id = 1").fetchone()[0]
+        conn.close()
+        assert droppedneedle_url == config.DEFAULT_DROPPEDNEEDLE_URL
+    finally:
+        conn = sqlite3.connect(config.DB_PATH)
+        conn.execute("UPDATE settings SET droppedneedle_url = '', droppedneedle_api_key = '' WHERE id = 1")
+        conn.commit()
+        conn.close()
+
+def test_setup_tautulli_no_key_does_not_persist(anon_client, seeded_settings):
+    client = anon_client
+    with client.session_transaction() as sess:
+        sess["authenticated"] = True
+        sess["username"] = "admin"
+        sess["csrf_token"] = "wizard-token"
+    resp = client.post("/setup/tautulli", data={
+        "csrf_token": "wizard-token",
+        "tautulli_url": "",
+        "tautulli_api": "",
+    })
+    assert resp.status_code == 302
+
+    conn = sqlite3.connect(config.DB_PATH)
+    tautulli_url = conn.execute("SELECT tautulli_url FROM settings WHERE id = 1").fetchone()[0]
+    conn.close()
+    assert not tautulli_url
+
 def test_setup_sonarr_blank_url_falls_back_to_default(anon_client, seeded_settings):
     client = anon_client
     with client.session_transaction() as sess:
@@ -209,9 +275,7 @@ def test_setup_ombi_no_key_does_not_persist(anon_client, seeded_settings):
     conn.close()
     assert not ombi_url
 
-def test_setup_completes_with_ombi_step_blank(anon_client, seeded_settings):
-    # Ombi is the terminal wizard step; leaving it blank (same as skipping
-    # Sonarr/Radarr) must still finish the wizard rather than get stuck.
+def test_setup_ombi_advances_to_seerr(anon_client, seeded_settings):
     client = anon_client
     with client.session_transaction() as sess:
         sess["authenticated"] = True
@@ -221,6 +285,64 @@ def test_setup_completes_with_ombi_step_blank(anon_client, seeded_settings):
         "csrf_token": "wizard-token",
         "ombi_url": "",
         "ombi_api_key": "",
+    })
+    assert resp.status_code == 302
+    assert "/setup/seerr" in resp.headers["Location"]
+
+def test_setup_seerr_blank_url_falls_back_to_default(anon_client, seeded_settings):
+    client = anon_client
+    with client.session_transaction() as sess:
+        sess["authenticated"] = True
+        sess["username"] = "admin"
+        sess["csrf_token"] = "wizard-token"
+    try:
+        resp = client.post("/setup/seerr", data={
+            "csrf_token": "wizard-token",
+            "seerr_url": "",
+            "seerr_api_key": "seerr-key-1",
+        })
+        assert resp.status_code == 302
+
+        conn = sqlite3.connect(config.DB_PATH)
+        seerr_url = conn.execute("SELECT seerr_url FROM settings WHERE id = 1").fetchone()[0]
+        conn.close()
+        assert seerr_url == config.DEFAULT_SEERR_URL
+    finally:
+        conn = sqlite3.connect(config.DB_PATH)
+        conn.execute("UPDATE settings SET seerr_url = '', seerr_api_key = '' WHERE id = 1")
+        conn.commit()
+        conn.close()
+
+def test_setup_seerr_no_key_does_not_persist(anon_client, seeded_settings):
+    client = anon_client
+    with client.session_transaction() as sess:
+        sess["authenticated"] = True
+        sess["username"] = "admin"
+        sess["csrf_token"] = "wizard-token"
+    resp = client.post("/setup/seerr", data={
+        "csrf_token": "wizard-token",
+        "seerr_url": "",
+        "seerr_api_key": "",
+    })
+    assert resp.status_code == 302
+
+    conn = sqlite3.connect(config.DB_PATH)
+    seerr_url = conn.execute("SELECT seerr_url FROM settings WHERE id = 1").fetchone()[0]
+    conn.close()
+    assert not seerr_url
+
+def test_setup_completes_with_seerr_step_blank(anon_client, seeded_settings):
+    # Seerr is the terminal wizard step; leaving it blank (same as skipping
+    # Sonarr/Radarr/Ombi) must still finish the wizard rather than get stuck.
+    client = anon_client
+    with client.session_transaction() as sess:
+        sess["authenticated"] = True
+        sess["username"] = "admin"
+        sess["csrf_token"] = "wizard-token"
+    resp = client.post("/setup/seerr", data={
+        "csrf_token": "wizard-token",
+        "seerr_url": "",
+        "seerr_api_key": "",
     })
     assert resp.status_code == 302
     assert resp.headers["Location"] == "/"  # -> main.index, wizard complete

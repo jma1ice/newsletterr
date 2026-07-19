@@ -110,7 +110,7 @@
                     <div id="plex_status" class="mt-2">{% if settings.plex_token %}<p class="plex-connected">Connected</p>{% endif %}</div>
                 </div>
 
-                <form method="POST">
+                <form method="POST" id="plex-form">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
                     <div class="mb-3">
                         <label for="plex_url_select" class="form-label">Plex Server URL {% if settings.plex_token %}(auto-detected, override if needed){% else %}(optional, auto-filled after connecting){% endif %}</label>
@@ -135,6 +135,7 @@
                     <div class="mb-3">
                         <label for="tautulli_url" class="form-label">Tautulli URL</label>
                         <input type="text" class="form-control" id="tautulli_url" name="tautulli_url" value="{{ settings.tautulli_url or '' }}" placeholder="http://localhost:8181">
+                        <small class="form-text text-muted">Leave blank to use http://localhost:8181. Clear the API key to disable.</small>
                     </div>
                     <div class="mb-3">
                         <label for="tautulli_api" class="form-label">Tautulli API Key</label>
@@ -156,7 +157,7 @@
                     <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
                     <div class="mb-3">
                         <label for="conjurr_url" class="form-label">Conjurr URL</label>
-                        <input type="text" class="form-control" id="conjurr_url" name="conjurr_url" value="{{ settings.conjurr_url or '' }}" placeholder="http://localhost:8282">
+                        <input type="text" class="form-control" id="conjurr_url" name="conjurr_url" value="{{ settings.conjurr_url or '' }}" placeholder="http://localhost:2665">
                         <button type="button" id="test_conjurr" class="btn btn-outline-secondary btn-sm mt-2">Test Connection</button>
                         <span id="conjurr_test_result" class="test-result"></span>
                     </div>
@@ -174,7 +175,8 @@
                     <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
                     <div class="mb-3">
                         <label for="droppedneedle_url" class="form-label">DroppedNeedle URL</label>
-                        <input type="text" class="form-control" id="droppedneedle_url" name="droppedneedle_url" value="{{ settings.droppedneedle_url or '' }}" placeholder="http://localhost:8383">
+                        <input type="text" class="form-control" id="droppedneedle_url" name="droppedneedle_url" value="{{ settings.droppedneedle_url or '' }}" placeholder="http://localhost:8688">
+                        <small class="form-text text-muted">Leave blank to use http://localhost:8688. Clear the API key to disable.</small>
                     </div>
                     <div class="mb-3">
                         <label for="droppedneedle_api_key" class="form-label">Wrapped API Key</label>
@@ -252,11 +254,34 @@
                         <span id="ombi_test_result" class="test-result"></span>
                     </div>
                     <div class="d-flex gap-2 mt-4">
+                        <a href="{{ url_for('auth.setup_seerr') }}" class="btn btn-outline-secondary w-100">Skip</a>
+                        <button type="submit" class="btn btn-primary btn-login w-100">Continue</button>
+                    </div>
+                </form>
+                <p class="text-center mt-3"><a href="{{ url_for('auth.setup_radarr') }}">&larr; Back</a></p>
+
+            {% elif step == 'seerr' %}
+                <h5 class="step-title">Seerr (optional)</h5>
+                <p class="step-subtitle">Powers the "recent requests" snap-in in emails.</p>
+                <form method="POST" id="seerr-form">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+                    <div class="mb-3">
+                        <label for="seerr_url" class="form-label">Seerr URL</label>
+                        <input type="text" class="form-control" id="seerr_url" name="seerr_url" value="{{ settings.seerr_url or '' }}" placeholder="http://localhost:5055">
+                        <small class="form-text text-muted">Leave blank to use http://localhost:5055 (the Seerr default). Also works with Overseerr and Jellyseerr. Clear the API key to disable.</small>
+                    </div>
+                    <div class="mb-3">
+                        <label for="seerr_api_key" class="form-label">Seerr API Key</label>
+                        <input type="password" class="form-control" id="seerr_api_key" name="seerr_api_key" autocomplete="off">
+                        <button type="button" id="test_seerr" class="btn btn-outline-secondary btn-sm mt-2">Test Connection</button>
+                        <span id="seerr_test_result" class="test-result"></span>
+                    </div>
+                    <div class="d-flex gap-2 mt-4">
                         <a href="{{ url_for('main.index') }}" class="btn btn-outline-secondary w-100">Skip &amp; Finish</a>
                         <button type="submit" class="btn btn-primary btn-login w-100">Finish</button>
                     </div>
                 </form>
-                <p class="text-center mt-3"><a href="{{ url_for('auth.setup_radarr') }}">&larr; Back</a></p>
+                <p class="text-center mt-3"><a href="{{ url_for('auth.setup_ombi') }}">&larr; Back</a></p>
             {% endif %}
 
             <div class="step-dots">
@@ -487,6 +512,7 @@
             }
 
             document.getElementById('test_tautulli')?.addEventListener('click', () => {
+                fillDefaultUrlIfKeyed('tautulli_url', 'tautulli_api', 'http://localhost:8181');
                 runConnectionTest('/api/test/tautulli', {
                     url: document.getElementById('tautulli_url').value.trim(),
                     api_key: document.getElementById('tautulli_api').value.trim()
@@ -500,6 +526,7 @@
             });
 
             document.getElementById('test_droppedneedle')?.addEventListener('click', () => {
+                fillDefaultUrlIfKeyed('droppedneedle_url', 'droppedneedle_api_key', 'http://localhost:8688');
                 runConnectionTest('/api/test/droppedneedle', {
                     url: document.getElementById('droppedneedle_url').value.trim(),
                     api_key: document.getElementById('droppedneedle_api_key').value.trim()
@@ -541,6 +568,14 @@
                 }, 'ombi_test_result', 'test_ombi');
             });
 
+            document.getElementById('test_seerr')?.addEventListener('click', () => {
+                fillDefaultUrlIfKeyed('seerr_url', 'seerr_api_key', 'http://localhost:5055');
+                runConnectionTest('/api/test/seerr', {
+                    url: document.getElementById('seerr_url').value.trim(),
+                    api_key: document.getElementById('seerr_api_key').value.trim()
+                }, 'seerr_test_result', 'test_seerr');
+            });
+
             // First-run email step: provider dropdown autofills SMTP fields and
             // shows app-password guidance. Non-modal counterpart of the settings wizard.
             document.getElementById('email_provider')?.addEventListener('change', (e) => {
@@ -576,6 +611,14 @@
                 }
             });
 
+            document.getElementById('tautulli-form')?.addEventListener('submit', () => {
+                fillDefaultUrlIfKeyed('tautulli_url', 'tautulli_api', 'http://localhost:8181');
+            });
+
+            document.getElementById('droppedneedle-form')?.addEventListener('submit', () => {
+                fillDefaultUrlIfKeyed('droppedneedle_url', 'droppedneedle_api_key', 'http://localhost:8688');
+            });
+
             document.getElementById('sonarr-form')?.addEventListener('submit', () => {
                 fillDefaultUrlIfKeyed('sonarr_url', 'sonarr_api_key', 'http://localhost:8989');
             });
@@ -586,6 +629,40 @@
 
             document.getElementById('ombi-form')?.addEventListener('submit', () => {
                 fillDefaultUrlIfKeyed('ombi_url', 'ombi_api_key', 'http://localhost:3579');
+            });
+
+            document.getElementById('seerr-form')?.addEventListener('submit', () => {
+                fillDefaultUrlIfKeyed('seerr_url', 'seerr_api_key', 'http://localhost:5055');
+            });
+
+            // Optional steps: submitting with every field blank is a silent
+            // skip, so ask for a second click before moving on. The label
+            // reverts after a few seconds if the user does not confirm.
+            ['plex-form', 'tautulli-form', 'conjurr-form', 'droppedneedle-form',
+             'sonarr-form', 'radarr-form', 'ombi-form', 'seerr-form'].forEach(id => {
+                const form = document.getElementById(id);
+                if (!form) return;
+                form.addEventListener('submit', (e) => {
+                    const filled = Array.from(
+                        form.querySelectorAll('input[type="text"], input[type="password"], input[type="number"], input[type="email"]')
+                    ).some(inp => inp.value.trim());
+                    if (filled) return;
+
+                    const btn = form.querySelector('button[type="submit"]');
+                    if (!btn) return;
+                    if (btn.dataset.skipArmed === '1') {
+                        clearTimeout(Number(btn.dataset.skipTimer));
+                        return;
+                    }
+                    e.preventDefault();
+                    btn.dataset.skipArmed = '1';
+                    btn.dataset.skipLabel = btn.textContent;
+                    btn.textContent = 'Nothing entered, click again to skip';
+                    btn.dataset.skipTimer = String(setTimeout(() => {
+                        btn.textContent = btn.dataset.skipLabel;
+                        delete btn.dataset.skipArmed;
+                    }, 4000));
+                });
             });
         </script>
     </body>

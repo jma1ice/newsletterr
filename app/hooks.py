@@ -4,6 +4,7 @@ from flask import Response, g, session
 
 from app import config, state
 from app.settings_store import get_settings
+from app.theme import build_custom_ui_theme_css
 from app.clients.github import _ensure_recent_check
 
 import logging
@@ -29,17 +30,27 @@ def inject_appearance():
     # requests so the pre-auth login/setup pages fall back to the localStorage
     # mirror (or defaults) instead of surfacing a configured user's preferences.
     if not session.get('authenticated'):
-        return {"appearance_boot": None}
+        return {"appearance_boot": None, "custom_theme_css": None}
     try:
         s = get_settings(decrypt_secrets=False)
-        return {"appearance_boot": {
-            "theme": s.get("appearance_theme", "dark"),
-            "pride": s.get("pride_flag", "off"),
-            "snapins_floating": str(s.get("snapins_floating", "1")),
-        }}
+        pride = s.get("pride_flag", "off")
+        # Custom UI theme (NEWS-29): the generated token CSS rides both as a
+        # server-rendered style block (no flash on authed pages) and inside
+        # appearance_boot so base.html mirrors it to localStorage for the
+        # pre-auth login page.
+        custom_css = build_custom_ui_theme_css(s.get("ui_custom_light"), s.get("ui_custom_dark")) if pride == 'custom' else None
+        return {
+            "appearance_boot": {
+                "theme": s.get("appearance_theme", "dark"),
+                "pride": pride,
+                "snapins_floating": str(s.get("snapins_floating", "1")),
+                "custom_css": custom_css,
+            },
+            "custom_theme_css": custom_css,
+        }
     except Exception:
         logger.debug("suppressed exception; using fallback", exc_info=True)
-        return {"appearance_boot": None}
+        return {"appearance_boot": None, "custom_theme_css": None}
 
 def inject_update_info():
     _ensure_recent_check()

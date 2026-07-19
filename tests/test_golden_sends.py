@@ -419,6 +419,49 @@ def test_manual_standard_email_golden(manual_send_env):
     assert "Manual hello" in normalized["html"]
     _assert_golden("manual_standard", normalized)
 
+def test_manual_pride_theme_email_golden(manual_send_env):
+    # Pride email presets (NEWS-30): resolved preset colors flow through the
+    # same pipeline as the base presets; this pins one of them. The theme
+    # columns outlive send_env (it never resets them), so snapshot + restore.
+    from app import config
+    _THEME_COLS = ("email_theme", "primary_color", "secondary_color", "accent_color", "background_color", "text_color", "logo_filename")
+    conn = sqlite3.connect(config.DB_PATH)
+    saved = conn.execute(f"SELECT {', '.join(_THEME_COLS)} FROM settings WHERE id = 1").fetchone()
+    conn.execute(
+        "UPDATE settings SET email_theme='pride_trans', primary_color='#5bcefa', "
+        "secondary_color='#222222', accent_color='#f5a9b8', background_color='#333333', "
+        "text_color='#9bd7f2', logo_filename='Asset_51.png' WHERE id = 1"
+    )
+    conn.commit()
+    conn.close()
+
+    try:
+        client = manual_send_env
+        resp = _post_send(client, {
+            "to_emails": "a@b.c", "subject": "Pride News", "email_header_title": "The Header",
+            "selected_items": [{"type": "textblock", "content": "Pride hello"}],
+            "custom_html": "", "user_dict": {}, "expanded_collections": {},
+        })
+        assert resp.status_code == 200
+        assert resp.get_json().get("success") is True
+
+        sends = [s for inst in RecorderSMTP.instances for s in inst.sent]
+        assert len(sends) == 1
+        from_addr, to_addrs, content = sends[0]
+        normalized = _normalize(content)
+        normalized["envelope"] = {"from": from_addr, "to": to_addrs}
+        assert "#5bcefa" in normalized["html"]
+        assert "#f5a9b8" in normalized["html"]
+        _assert_golden("manual_pride_theme", normalized)
+    finally:
+        conn = sqlite3.connect(config.DB_PATH)
+        conn.execute(
+            f"UPDATE settings SET {', '.join(f'{c} = ?' for c in _THEME_COLS)} WHERE id = 1",
+            saved,
+        )
+        conn.commit()
+        conn.close()
+
 def test_manual_recommendations_email_golden(manual_send_env):
     client = manual_send_env
     resp = _post_send(client, {

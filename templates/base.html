@@ -12,6 +12,8 @@
             localStorage.setItem('theme', _ab.theme);
             if (_ab.pride && _ab.pride !== 'off') localStorage.setItem('pride', _ab.pride);
             else localStorage.removeItem('pride');
+            if (_ab.custom_css) localStorage.setItem('customThemeCss', _ab.custom_css);
+            else localStorage.removeItem('customThemeCss');
             localStorage.setItem('snapinsFloating', _ab.snapins_floating);
             {% endif %}
             const pref = localStorage.getItem('theme');
@@ -22,7 +24,10 @@
                 document.documentElement.classList.add('sidebar-collapsed');
             }
             const pride = localStorage.getItem('pride');
-            if (pride) document.documentElement.classList.add('pride', 'pride-' + pride);
+            // 'custom' is the user-built UI theme (NEWS-29): its own class, not
+            // the pride class, so the pride flourish and logo swap stay off.
+            if (pride === 'custom') document.documentElement.classList.add('theme-custom');
+            else if (pride) document.documentElement.classList.add('pride', 'pride-' + pride);
             if (localStorage.getItem('snapinsFloating') === '0') {
                 document.documentElement.classList.add('snapins-static');
             }
@@ -32,6 +37,11 @@
     <link rel="icon" type="image/x-icon" href="/static/img/favicon.ico">
     <link href="{{ url_for('static', filename='css/ui/tokens.css') }}" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/ui/pride.css') }}" rel="stylesheet">
+    {% if custom_theme_css %}
+    {# Custom UI theme tokens (NEWS-29); generated server-side from validated
+       hex only, loaded after tokens/pride so .theme-custom wins. #}
+    <style nonce="{{ nonce }}" id="custom-theme-style">{{ custom_theme_css | safe }}</style>
+    {% endif %}
     <link href="{{ url_for('static', filename='css/ui/compat.css') }}" rel="stylesheet">
     <script src="{{ url_for('static', filename='js/vendor/html2canvas.min.js') }}" nonce="{{ nonce }}"></script>
     <script src="{{ url_for('static', filename='js/vendor/highcharts.js') }}" nonce="{{ nonce }}"></script>

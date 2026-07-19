@@ -281,3 +281,17 @@ def truncate_text(text, max_chars=28):
     if len(text) <= max_chars:
         return text
     return text[:max_chars-3] + '...'
+
+# Static PNG icons for email output, rendered from the app SVG icon set
+# (Gmail strips inline SVG, so emails get raster). Tint 'gray' reads on card
+# backgrounds in both light and dark themes; 'white' is for the gradient
+# chrome (wrapped card). Assets live in static/img/email-icons/.
+EMAIL_ICON_NAMES = {'film', 'tv', 'music', 'users'}
+
+def email_icon_img(icon, msg_root, base_url="", tint="gray", size=14, hosted_images_enabled=False, hosted_base_url=""):
+    if icon not in EMAIL_ICON_NAMES:
+        return ""
+    path = f"/static/img/email-icons/{icon}-{tint}.png"
+    cid_name = f"emailicon-{icon}-{tint}-{len(msg_root.get_payload())}"
+    src = fetch_and_attach_image(path, msg_root, cid_name, base_url, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url) or path
+    return f'<img src="{src}" alt="" width="{size}" height="{size}" style="width: {size}px; height: {size}px; border: 0; vertical-align: -2px; display: inline-block;">'

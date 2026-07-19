@@ -11,6 +11,7 @@ from app.settings_store import get_settings
 from app.crypto import encrypt, decrypt
 from werkzeug.security import generate_password_hash
 from app.hooks import refresh_hsts_setting
+from app.theme import CUSTOM_UI_KEYS, parse_custom_ui_colors
 from app.security import require_csrf_for_json, requires_auth
 from app.blueprints.api import test_tautulli_connection, test_conjurr_connection, test_droppedneedle_connection, test_sonarr_connection, test_radarr_connection, test_ombi_connection, test_seerr_connection
 
@@ -48,6 +49,73 @@ def settings():
             "background_color": "#333333",
             "text_color": "#cc7b19",
             "logo_filename": "Asset_45x.png"
+        },
+        # Pride presets (NEWS-30): flag signature colors on the same dark
+        # chassis as the base presets so card text contrast holds. The header
+        # gradient runs accent -> primary; all use the pride banner logo.
+        "pride_rainbow": {
+            "primary_color": "#ff8c00",
+            "secondary_color": "#222222",
+            "accent_color": "#e40303",
+            "background_color": "#333333",
+            "text_color": "#ffb163",
+            "logo_filename": "Asset_51.png"
+        },
+        "pride_trans": {
+            "primary_color": "#5bcefa",
+            "secondary_color": "#222222",
+            "accent_color": "#f5a9b8",
+            "background_color": "#333333",
+            "text_color": "#9bd7f2",
+            "logo_filename": "Asset_51.png"
+        },
+        "pride_bi": {
+            "primary_color": "#d60270",
+            "secondary_color": "#222222",
+            "accent_color": "#9b4f96",
+            "background_color": "#333333",
+            "text_color": "#e07db4",
+            "logo_filename": "Asset_51.png"
+        },
+        "pride_pan": {
+            "primary_color": "#ff218c",
+            "secondary_color": "#222222",
+            "accent_color": "#21b1ff",
+            "background_color": "#333333",
+            "text_color": "#6ec8ff",
+            "logo_filename": "Asset_51.png"
+        },
+        "pride_lesbian": {
+            "primary_color": "#ff9a56",
+            "secondary_color": "#222222",
+            "accent_color": "#d52d00",
+            "background_color": "#333333",
+            "text_color": "#ffb185",
+            "logo_filename": "Asset_51.png"
+        },
+        "pride_nonbinary": {
+            "primary_color": "#9c59d1",
+            "secondary_color": "#222222",
+            "accent_color": "#7a3fb0",
+            "background_color": "#333333",
+            "text_color": "#c9a2e8",
+            "logo_filename": "Asset_51.png"
+        },
+        "pride_ace": {
+            "primary_color": "#800080",
+            "secondary_color": "#222222",
+            "accent_color": "#a3a3a3",
+            "background_color": "#333333",
+            "text_color": "#c79fc7",
+            "logo_filename": "Asset_51.png"
+        },
+        "pride_progress": {
+            "primary_color": "#ff8c00",
+            "secondary_color": "#222222",
+            "accent_color": "#5bcefa",
+            "background_color": "#333333",
+            "text_color": "#ffb163",
+            "logo_filename": "Asset_51.png"
         }
     }
 
@@ -184,6 +252,14 @@ def settings():
             # /api/appearance; pride and floating round-trip through this form.
             pride_flag = request.form.get("pride_flag", "off")
             snapins_floating = "0" if request.form.get("snapins_floating") == "0" else "1"
+            # Custom UI theme colors: stored as JSON per mode; blank when the
+            # pickers were never touched. Values are validated (hex-only) at
+            # render time in app/theme.py, so raw form input is safe to store.
+            def _custom_ui_json(prefix):
+                colors = {k: (request.form.get(f"{prefix}_{k}") or "").strip() for k in CUSTOM_UI_KEYS}
+                return json.dumps(colors) if any(colors.values()) else ""
+            ui_custom_light = _custom_ui_json("ui_light")
+            ui_custom_dark = _custom_ui_json("ui_dark")
 
             if not custom_logo_filename and existing_custom_logo:
                 custom_logo_filename = existing_custom_logo
@@ -220,8 +296,8 @@ def settings():
                 INSERT INTO settings
                 (id, from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, plex_url, plex_web_url, tautulli_url,
                     tautulli_api, conjurr_url, droppedneedle_url, droppedneedle_api_key, recipient_display_name, logo_filename, logo_width, email_theme, primary_color, secondary_color, accent_color, background_color,
-                    text_color, from_name, custom_logo_filename, login_toggle, nl_username, nl_password, default_intro_text, default_outro_text, hsts_enabled, scheduled_subject_prefix, logo_position, hide_stat_play_counts, hide_graph_play_counts, stats_type, recently_added_mode, recently_added_sort, ra_grid_columns, recs_grid_columns, recs_item_count, stat_cover_art, send_mode, poster_max_height, discord_webhook_url, sonarr_url, sonarr_api_key, radarr_url, radarr_api_key, ombi_url, ombi_api_key, seerr_url, seerr_api_key, coming_soon_days_ahead, coming_soon_grid_columns, hosted_enabled, hosted_base_url, hosted_images_enabled, hosted_image_retention_days, hosted_links_enabled, hosted_links_base_url, collections_grid_columns, ra_show_description, exclude_inactive_days, include_user_info, email_size_warn_mb, pride_flag, snapins_floating)
-                VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    text_color, from_name, custom_logo_filename, login_toggle, nl_username, nl_password, default_intro_text, default_outro_text, hsts_enabled, scheduled_subject_prefix, logo_position, hide_stat_play_counts, hide_graph_play_counts, stats_type, recently_added_mode, recently_added_sort, ra_grid_columns, recs_grid_columns, recs_item_count, stat_cover_art, send_mode, poster_max_height, discord_webhook_url, sonarr_url, sonarr_api_key, radarr_url, radarr_api_key, ombi_url, ombi_api_key, seerr_url, seerr_api_key, coming_soon_days_ahead, coming_soon_grid_columns, hosted_enabled, hosted_base_url, hosted_images_enabled, hosted_image_retention_days, hosted_links_enabled, hosted_links_base_url, collections_grid_columns, ra_show_description, exclude_inactive_days, include_user_info, email_size_warn_mb, pride_flag, snapins_floating, ui_custom_light, ui_custom_dark)
+                VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT (id) DO UPDATE
                 SET from_email = excluded.from_email, alias_email = excluded.alias_email, reply_to_email = excluded.reply_to_email, password = excluded.password,
                     smtp_username = excluded.smtp_username, smtp_server = excluded.smtp_server, smtp_port = excluded.smtp_port, smtp_protocol = excluded.smtp_protocol,
@@ -262,13 +338,15 @@ def settings():
                     include_user_info = excluded.include_user_info,
                     email_size_warn_mb = excluded.email_size_warn_mb,
                     pride_flag = excluded.pride_flag,
-                    snapins_floating = excluded.snapins_floating
+                    snapins_floating = excluded.snapins_floating,
+                    ui_custom_light = excluded.ui_custom_light,
+                    ui_custom_dark = excluded.ui_custom_dark
             """, (from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, plex_url, plex_web_url, tautulli_url, tautulli_api,
                   conjurr_url, droppedneedle_url, droppedneedle_api_key, recipient_display_name, logo_filename, logo_width, email_theme, primary_color, secondary_color, accent_color, background_color, text_color, from_name,
                   custom_logo_filename, login_toggle, nl_username, nl_password, default_intro_text, default_outro_text, hsts_enabled, scheduled_subject_prefix, logo_position,
                   hide_stat_play_counts, hide_graph_play_counts, stats_type, recently_added_mode, recently_added_sort, ra_grid_columns, recs_grid_columns, recs_item_count, stat_cover_art, send_mode, poster_max_height, discord_webhook_url,
                   sonarr_url, sonarr_api_key, radarr_url, radarr_api_key, ombi_url, ombi_api_key, seerr_url, seerr_api_key, coming_soon_days_ahead, coming_soon_grid_columns, hosted_enabled, hosted_base_url, hosted_images_enabled, hosted_image_retention_days, hosted_links_enabled, hosted_links_base_url,
-                  collections_grid_columns, ra_show_description, exclude_inactive_days, include_user_info, email_size_warn_mb, pride_flag, snapins_floating))
+                  collections_grid_columns, ra_show_description, exclude_inactive_days, include_user_info, email_size_warn_mb, pride_flag, snapins_floating, ui_custom_light, ui_custom_dark))
             conn.commit()
             cursor.execute("SELECT plex_token FROM settings WHERE id = 1")
             plex_token = cursor.fetchone()[0]
@@ -612,6 +690,10 @@ def settings():
         "pride_flag": pride_flag or "off",
         "snapins_floating": snapins_floating if snapins_floating not in (None, "") else "1",
     }
+    # Effective custom UI theme colors for the appearance pickers (validated,
+    # with per-key fallbacks, so the inputs always hold a usable value)
+    settings["ui_custom_light_colors"] = parse_custom_ui_colors(s.get("ui_custom_light"), 'light')
+    settings["ui_custom_dark_colors"] = parse_custom_ui_colors(s.get("ui_custom_dark"), 'dark')
     # secrets are never sent to the browser; the form shows a placeholder and
     # a blank submission keeps the stored value (write-only fields)
     settings["password"] = ""

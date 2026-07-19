@@ -491,7 +491,9 @@ document.getElementById('popout-preview-btn').addEventListener('click', function
         return;
     }
 
-    popoutWindow = window.open('', 'EmailPreview', 'width=800,height=600,scrollbars=yes,resizable=yes');
+    // Open at the selected device-size width so the email media queries match
+    const popoutWidth = (typeof PREVIEW_SIZES !== 'undefined' ? (PREVIEW_SIZES[currentPreviewSize()] || 800) : 800) + 60;
+    popoutWindow = window.open('', 'EmailPreview', `width=${popoutWidth},height=600,scrollbars=yes,resizable=yes`);
 
     if (popoutWindow) {
         showPopoutStatus('');

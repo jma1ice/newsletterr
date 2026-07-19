@@ -52,6 +52,8 @@ DEFAULTS = {
     "ra_show_description": "enabled",
     "include_user_info": "enabled",
     "recs_item_count": "",
+    "ui_custom_light": "",
+    "ui_custom_dark": "",
     "appearance_theme": "dark",
     "pride_flag": "off",
     "snapins_floating": "1",

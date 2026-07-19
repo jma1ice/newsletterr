@@ -1,5 +1,5 @@
 
-from app.emails.images import fetch_and_attach_image
+from app.emails.images import fetch_and_attach_image, email_icon_img
 from app.security import escape_html_output as esc
 
 import logging
@@ -19,13 +19,13 @@ def build_individual_item_card_html(item, theme_colors, msg_root, base_url="", p
         display_title += f" ({year})"
     
     type_icons = {
-        'movie': '🎬',
-        'show': '📺', 
-        'album': '💿',
-        'track': '🎵',
-        'artist': '🎤'
+        'movie': 'film',
+        'show': 'tv',
+        'album': 'music',
+        'track': 'music',
+        'artist': 'music'
     }
-    type_icon = type_icons.get(item_type, '📄')
+    type_icon = email_icon_img(type_icons.get(item_type, ''), msg_root, base_url, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
     
     subtitle = ""
     if item.get('parentTitle') and item_type in ['album', 'track']:
@@ -180,7 +180,7 @@ def build_collection_card_html(collection, theme_colors, msg_root, base_url="", 
     count = collection.get('childCount', 0)
     subtype = collection.get('subtype', 'unknown')
     summary = collection.get('summary', '')
-    type_icon = '📽️' if subtype == 'movie' else '📺' if subtype == 'show' else '🎧'
+    type_icon = email_icon_img('film' if subtype == 'movie' else 'tv' if subtype == 'show' else 'music', msg_root, base_url, size=12, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
 
     if poster_src:
         logger.debug(f"Final poster src for {collection_title}: {poster_src}")

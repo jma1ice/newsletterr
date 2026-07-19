@@ -26,6 +26,42 @@
     min-height: 480px;
 }
 
+/* settings search: d-none-search hides non-matching units/cards/sections
+   without touching the section switcher's d-none; search-match paints the
+   accent edge on hits (class-based so no label text is rewritten) */
+.settings-page .settings-search { padding: 0 var(--space-2) var(--space-3) 0; }
+.settings-page .settings-search .nl-input { font-size: var(--text-sm); padding: 7px 10px; }
+.settings-page .d-none-search { display: none !important; }
+.settings-page .search-match {
+    border-left: 3px solid var(--accent);
+    padding-left: var(--space-3);
+    border-radius: 2px;
+}
+
+/* custom UI theme editor (NEWS-29): compact picker grid per mode */
+.settings-page .custom-theme-pickers {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2) var(--space-4);
+    margin-top: var(--space-2);
+}
+.settings-page .custom-theme-pickers label {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: var(--text-sm);
+    color: var(--text-muted);
+}
+.settings-page .custom-theme-pickers input[type="color"] {
+    width: 34px;
+    height: 24px;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface-1);
+    cursor: pointer;
+}
+
 .settings-page .settings-nav {
     width: 210px;
     flex-shrink: 0;

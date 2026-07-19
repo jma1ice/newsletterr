@@ -411,6 +411,8 @@ def build_complete_email_html_with_cid_logo(content_html, server_name, subject, 
                 <meta http-equiv="X-UA-Compatible" content="IE=edge">
                 <meta name="x-apple-disable-message-reformatting">
                 <meta name="format-detection" content="telephone=no">
+                <meta name="color-scheme" content="light only">
+                <meta name="supported-color-schemes" content="light only">
                 <title>{esc(subject)}</title>
                 <!--[if mso]>
                 <noscript>
@@ -423,7 +425,10 @@ def build_complete_email_html_with_cid_logo(content_html, server_name, subject, 
                 <![endif]-->
                 {css}
             </head>
-            <body style="{body_style}">
+            <body style="{body_style}" bgcolor="{theme_colors['background']}">
+                <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" bgcolor="{theme_colors['background']}" style="width: 100%; border-collapse: collapse; background-color: {theme_colors['background']};">
+                <tr>
+                <td>
                 <div style="width: 100%; background-color: {theme_colors['background']}; padding: 20px 0;">
                     <!--[if mso | IE]>
                     <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="600" align="center" style="width:8;">
@@ -456,5 +461,8 @@ def build_complete_email_html_with_cid_logo(content_html, server_name, subject, 
                     </table>
                     <![endif]-->
                 </div>
+                </td>
+                </tr>
+                </table>
             </body>
         </html>""")

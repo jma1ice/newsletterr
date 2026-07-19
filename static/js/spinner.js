@@ -1,11 +1,15 @@
-/* Shared loading spinner: showSpinner(text) / hideSpinner(). Used by the app
-   shell (base.html) and the standalone setup page (setup.html).
+/* Shared loading spinner: showSpinner(text, opName) / hideSpinner(). Used by
+   the app shell (base.html) and the standalone setup page (setup.html).
 
    - Each show picks a random loader gif. When a pride theme is active on <html>
      it picks from the pride set, otherwise the default set.
    - The caller's text is pinned on #loading-text (so must-see values like a Plex
      pairing code never scroll away). A second line, #loading-tip, rotates a mix
-     of tips, status flavor, contributor shout-outs, and quips every 5 seconds. */
+     of tips, status flavor, contributor shout-outs, and quips every 5 seconds.
+   - When opName is passed, /pull_progress?op=<name> is polled while visible and
+     #loading-progress fills as the backend reports steps; the reported label
+     replaces the pinned text. Without opName (or on pages without the bar, like
+     setup.html) behavior is unchanged. */
 (function () {
     const NORMAL_GIFS = ['Asset_45752', 'Asset_75200', 'Asset_79466'];
     const PRIDE_GIFS = ['Asset_10465', 'Asset_24165', 'Asset_37112', 'Asset_87388', 'Asset_90828'];
@@ -44,6 +48,37 @@
 
     let tipTimer = null;
     let lastTip = -1;
+    let progressTimer = null;
+
+    function stopProgressPolling() {
+        clearInterval(progressTimer);
+        progressTimer = null;
+        const bar = document.getElementById('loading-progress');
+        if (bar) bar.style.display = 'none';
+        const fill = document.getElementById('loading-progress-fill');
+        if (fill) fill.style.width = '0%';
+    }
+
+    function startProgressPolling(opName) {
+        const bar = document.getElementById('loading-progress');
+        const fill = document.getElementById('loading-progress-fill');
+        if (!bar || !fill) return;
+        progressTimer = setInterval(async () => {
+            let p;
+            try {
+                const resp = await fetch(`/pull_progress?op=${encodeURIComponent(opName)}`);
+                if (!resp.ok) return;
+                p = await resp.json();
+            } catch (_) {
+                return;
+            }
+            if (!p || !p.total) return;
+            bar.style.display = 'block';
+            fill.style.width = `${Math.min(100, Math.round((p.step / p.total) * 100))}%`;
+            const textEl = document.getElementById('loading-text');
+            if (textEl && p.label) textEl.textContent = p.label;
+        }, 500);
+    }
 
     function pickIndex(len, exclude) {
         if (len <= 1) return 0;
@@ -68,7 +103,7 @@
         el.classList.toggle('spinner-tip--green', tier === 'green');
     }
 
-    window.showSpinner = function (passedText) {
+    window.showSpinner = function (passedText, opName) {
         const spinner = document.getElementById('spinner');
         if (!spinner) return;
         // Reveal the overlay before swapping the mascot: Safari sometimes never
@@ -89,6 +124,8 @@
         rotateTip();
         clearInterval(tipTimer);
         tipTimer = setInterval(rotateTip, 5000);
+        stopProgressPolling();
+        if (opName) startProgressPolling(opName);
     };
 
     window.hideSpinner = function () {
@@ -96,6 +133,7 @@
         if (spinner) spinner.style.display = 'none';
         clearInterval(tipTimer);
         tipTimer = null;
+        stopProgressPolling();
         const tipEl = document.getElementById('loading-tip');
         if (tipEl) tipEl.textContent = '';
     };

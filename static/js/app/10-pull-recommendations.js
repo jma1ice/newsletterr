@@ -37,7 +37,7 @@ function removeRecsCancelButton() {
 
 document.getElementById('pullRecsBtn').addEventListener('click', async (e) => {
     if (!confirmFreshRepull(e.currentTarget, 'recommendations')) return;
-    showSpinner('Pulling recommendations...');
+    showSpinner('Pulling recommendations...', 'pull_recommendations');
     showRecsCancelButton();
 
     function collectEmailsFromChips() {

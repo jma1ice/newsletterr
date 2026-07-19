@@ -30,7 +30,7 @@ function updateCacheBadge(cacheInfo, timeRange) {
 document.getElementById('stats_form').addEventListener('submit', async (e) => {
     e.preventDefault();
     if (!confirmFreshRepull(e.target.querySelector('button[type="submit"]'), 'stats')) return;
-    showSpinner('Getting stats and users...');
+    showSpinner('Getting stats and users...', 'pull_stats');
 
     const time_range = document.getElementById('days_to_pull').value;
     const count = document.getElementById('items_to_pull').value;

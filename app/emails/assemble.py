@@ -223,7 +223,14 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, displ
                     except (TypeError, ValueError):
                         max_items = 10
 
-            content_html += build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, library_filter, base_url, max_items, recently_added_mode=recently_added_mode, ra_grid_columns=ra_grid_columns, poster_max_height=poster_max_height, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url, show_description=ra_show_description)
+            # Per-library override saved on the builder item (blank = global).
+            # It cannot exceed what the pull fetched for the library.
+            try:
+                library_item_cap = int(item.get('raCount') or 0)
+            except (TypeError, ValueError):
+                library_item_cap = 0
+
+            content_html += build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, library_filter, base_url, max_items, recently_added_mode=recently_added_mode, ra_grid_columns=ra_grid_columns, poster_max_height=poster_max_height, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url, show_description=ra_show_description, library_item_cap=library_item_cap)
         
         elif item_type == 'recommendations':
             if recommendations_data:
@@ -263,11 +270,11 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, displ
 
         elif item_type == 'ombi_requests':
             if ombi_requests_data:
-                content_html += build_ombi_requests_html_with_cids(ombi_requests_data, msg_root, theme_colors, base_url, grid_columns=coming_soon_grid_columns, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
+                content_html += build_ombi_requests_html_with_cids(ombi_requests_data, msg_root, theme_colors, base_url, grid_columns=coming_soon_grid_columns, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url, include_user_info=include_user_info)
 
         elif item_type == 'seerr_requests':
             if seerr_requests_data:
-                content_html += build_seerr_requests_html_with_cids(seerr_requests_data, msg_root, theme_colors, base_url, grid_columns=coming_soon_grid_columns, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
+                content_html += build_seerr_requests_html_with_cids(seerr_requests_data, msg_root, theme_colors, base_url, grid_columns=coming_soon_grid_columns, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url, include_user_info=include_user_info)
 
         elif item_type == 'collection_group':
             group_title = item.get('title', 'Collections')

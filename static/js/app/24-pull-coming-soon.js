@@ -1,6 +1,6 @@
 document.getElementById('pullComingSoonBtn').addEventListener('click', async (e) => {
     if (!confirmFreshRepull(e.currentTarget, 'coming_soon')) return;
-    showSpinner('Pulling coming soon calendar...');
+    showSpinner('Pulling coming soon calendar...', 'coming_soon');
 
     const payload = {
         stats: statsList,

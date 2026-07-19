@@ -363,6 +363,12 @@
                                        value="{{ settings.get('recs_grid_columns', '5') }}" class="w-num">
                                 <p class="text-info mt-2 field-hint">Number of columns in the Recommendations grid (default: 5).</p>
                             </div>
+                            <div class="settings-field">
+                                <label for="recs_item_count">Recommended Items Shown:</label><br>
+                                <input type="number" id="recs_item_count" name="recs_item_count" min="1" max="20"
+                                       value="{{ settings.get('recs_item_count', '') }}" class="w-num" placeholder="all">
+                                <p class="text-info mt-2 field-hint">Max recommended movies and shows per user (1-20). Blank shows everything conjurr returns. Applies on the next pull.</p>
+                            </div>
                         </div>
                         </div>
 

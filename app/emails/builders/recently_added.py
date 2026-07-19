@@ -7,7 +7,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, library_filter=None, base_url="", max_items=None, recently_added_mode="items", ra_grid_columns=5, poster_max_height=0, hosted_images_enabled=False, hosted_base_url="", show_description=True):
+def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, library_filter=None, base_url="", max_items=None, recently_added_mode="items", ra_grid_columns=5, poster_max_height=0, hosted_images_enabled=False, hosted_base_url="", show_description=True, library_item_cap=0):
     if not recent_data:
         return f"""
         <div style="background-color: {theme_colors['card_bg']}; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid {theme_colors['border']}; font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;">
@@ -26,7 +26,11 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
     if library_filter:
         items = [item for item in items if library_filter.lower() == item.get('library_name', '').lower()]
 
-    if recently_added_mode != "days" and max_items and len(items) > max_items:
+    # library_item_cap is this item's per-library override; unlike max_items
+    # it also caps days mode, where max_items carries the day window instead
+    if library_item_cap and len(items) > library_item_cap:
+        items = items[:library_item_cap]
+    elif recently_added_mode != "days" and max_items and len(items) > max_items:
         items = items[:max_items]
 
     if not items:

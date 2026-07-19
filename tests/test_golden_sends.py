@@ -71,7 +71,8 @@ def send_env(app, monkeypatch):
             droppedneedle_url='', droppedneedle_api_key='', from_name='Newsletterr',
             logo_filename='Asset_94x.png', logo_width=80, custom_logo_filename='',
             scheduled_subject_prefix='enabled', send_mode='bcc', recipient_display_name='email',
-            login_toggle='disabled', hosted_enabled='disabled', hosted_base_url=''
+            login_toggle='disabled', hosted_enabled='disabled', hosted_base_url='',
+            email_layout='legacy'
         WHERE id = 1""",
         (encrypt("smtp-pw"), encrypt("tt-key")),
     )
@@ -251,14 +252,25 @@ def test_scheduled_user_email_hosted_gives_each_recipient_a_distinct_token(hoste
 # --- standard (manual) send paths, driven through the HTTP route
 
 def _fixed_tautulli_data(*args, **kwargs):
+    # email_layout is pinned explicitly: the manual goldens below guard the
+    # legacy renderer regardless of what the product default becomes. The
+    # layout goldens override this via _fixed_tautulli_data_for_layout.
     return {
         "settings": {"server_name": "TestPlex", "logo_filename": "Asset_94x.png",
-                     "logo_width": 80, "custom_logo_filename": "", "logo_position": "center"},
+                     "logo_width": 80, "custom_logo_filename": "", "logo_position": "center",
+                     "email_layout": "legacy"},
         "stats": [],
         "graph_data": [],
         "recent_data": [],
         "graph_commands": [],
     }
+
+def _fixed_tautulli_data_for_layout(layout):
+    def _data(*args, **kwargs):
+        data = _fixed_tautulli_data()
+        data["settings"]["email_layout"] = layout
+        return data
+    return _data
 
 @pytest.fixture()
 def manual_send_env(send_env, client, monkeypatch):
@@ -790,6 +802,74 @@ def test_manual_seerr_requests_email_golden(manual_send_env, monkeypatch):
     # Already-available requests are filtered out before rendering.
     assert "Seerr Fulfilled Show" not in normalized["html"]
     _assert_golden("manual_seerr_requests", normalized)
+
+@pytest.mark.parametrize("layout", ["classic", "editorial", "digest"])
+def test_manual_layout_email_golden(manual_send_env, monkeypatch, layout):
+    # Email layouts (NEWS-30): one golden per variant over a representative
+    # item mix. Legacy is pinned by every other golden in this file. The
+    # email_layout column outlives send_env, so snapshot + restore.
+    from app import config
+    from app.emails import send as send_mod
+    from app.emails.builders import coming_soon as coming_soon_mod
+    from app.emails.builders import layouts as layouts_mod
+
+    yearly_wrapped_fixture = [
+        {"stat_title": "Most Watched Movies", "rows": [{"title": "Dune", "total_plays": 42}]},
+        {"stat_title": "Most Watched TV Shows", "rows": [{"title": "Severance", "total_plays": 30}]},
+    ]
+    monkeypatch.setattr(send_mod, "get_yearly_wrapped_cached", lambda *a, **k: yearly_wrapped_fixture)
+    monkeypatch.setattr(send_mod, "get_ombi_requests_cached", lambda *a, **k: OMBI_REQUESTS_FIXTURE)
+    monkeypatch.setattr(send_mod, "get_sonarr_coming_soon_cached", lambda *a, **k: SONARR_EPISODES_FIXTURE)
+    monkeypatch.setattr(layouts_mod, "fetch_and_attach_image", lambda *a, **k: None)
+    _freeze_coming_soon_clock(monkeypatch, coming_soon_mod)
+    # the manual send path reads its settings from the fixed tautulli dict
+    # (monkeypatched in manual_send_env), not the DB row, so the layout under
+    # test is injected there
+    monkeypatch.setattr(send_mod, "get_current_tautulli_data_for_email", _fixed_tautulli_data_for_layout(layout))
+
+    conn = sqlite3.connect(config.DB_PATH)
+    saved = conn.execute("SELECT email_layout FROM settings WHERE id = 1").fetchone()
+    conn.execute("UPDATE settings SET email_layout = ? WHERE id = 1", (layout,))
+    conn.commit()
+    conn.close()
+
+    try:
+        client = manual_send_env
+        resp = _post_send(client, {
+            "to_emails": "a@b.c", "subject": f"Layout {layout}", "email_header_title": "The Header",
+            "selected_items": [
+                {"type": "textblock", "content": "Layout sampler"},
+                {"type": "yearly_wrapped", "id": "yearly-wrapped"},
+                {"type": "sonarr_coming_soon", "id": "sonarr-coming-soon"},
+                {"type": "ombi_requests", "id": "ombi-requests"},
+            ],
+            "custom_html": "", "user_dict": {}, "expanded_collections": {},
+        })
+        assert resp.status_code == 200
+        assert resp.get_json().get("success") is True
+
+        sends = [s for inst in RecorderSMTP.instances for s in inst.sent]
+        assert len(sends) == 1
+        from_addr, to_addrs, content = sends[0]
+        normalized = _normalize(content)
+        normalized["envelope"] = {"from": from_addr, "to": to_addrs}
+        assert "Dune" in normalized["html"]
+        assert "Requested Movie" in normalized["html"]
+        assert "ombi-requester" in normalized["html"]
+        # layout-distinct chrome markers, so a silent fallback to another
+        # layout can never masquerade as a pass
+        chrome_markers = {
+            "classic": "letter-spacing: .06em",
+            "editorial": "3px double",
+            "digest": "border-bottom: 2px solid",
+        }
+        assert chrome_markers[layout] in normalized["html"]
+        _assert_golden(f"manual_layout_{layout}", normalized)
+    finally:
+        conn = sqlite3.connect(config.DB_PATH)
+        conn.execute("UPDATE settings SET email_layout = ? WHERE id = 1", (saved[0],))
+        conn.commit()
+        conn.close()
 
 def test_manual_coming_soon_degrades_when_only_one_service_configured(manual_send_env, monkeypatch):
     from app.emails import send as send_mod

@@ -306,6 +306,11 @@ function resizePreviewFrame(frame) {
     }
 }
 
+// Server-rendered preview: one POST to /preview_email runs the real email
+// builders in preview mode, so the pane, pop-out, and sends share a single
+// renderer (layouts included). Custom HTML mode stays client-side.
+let _previewSeq = 0;
+
 async function updatePreview() {
     try {
         if (document.getElementById('custom-html-toggle')?.checked) {
@@ -315,140 +320,64 @@ async function updatePreview() {
             return;
         }
 
-        console.log('updatePreview called with selectedItems:', selectedItems);
-        
         if (typeof selectedItems === 'undefined') {
             console.error('selectedItems is undefined in updatePreview');
             return;
         }
-        
-        const serverName = APP.serverName;
-        const subject = document.getElementById('subject').value;
-        const emailHeaderTitle = document.getElementById('email_header_title').value;
-        const logoFilename = APP.logoFilename;
-        const logoWidth = APP.logoWidthStr;
-        const customLogoFilename = APP.customLogoFilename
-        const logoPosition = APP.logoPosition;
-        const themedCSS = getThemedEmailCSS();
 
-        let contentHTML = "";
-        
-        for (let itemIndex = 0; itemIndex < selectedItems.length; itemIndex++) {
-            const item = selectedItems[itemIndex];
-
-            if (item.type === 'textblock') {
-                const content = getTextBlockContent(item.id);
-                if (content && content.trim().length > 0) {
-                    const formattedContent = content.trim().replace(/\n/g, "<br>");
-                    contentHTML += `<div style="margin-bottom: 15px; line-height: 1.6; text-align: center; color: var(--email-text);">${formattedContent}</div>`;
-                }
-            } else if (item.type === 'headerblock') {
-                const content = getTextBlockContent(item.id);
-                if (content && content.trim().length > 0) {
-                    const formattedContent = content.trim().replace(/\n/g, "<br>");
-                    contentHTML += `<div style="margin-bottom: 20px; font-size: 1.5em; font-weight: bold; text-align: center; color: var(--email-text);">${formattedContent}</div>`;
-                }
-            } else if (item.type === 'titleblock') {
-                const content = getTextBlockContent(item.id);
-                if (content && content.trim().length > 0) {
-                    const formattedContent = content.trim().replace(/\n/g, "<br>");
-                    contentHTML += `<div style="margin-bottom: 20px; font-size: 2em; font-weight: bold; text-align: center; color: var(--email-text);">${formattedContent}</div>`;
-                }
-            } else if (item.type === 'separator') {
-                contentHTML += `<hr style="border: none; border-top: 1px solid var(--email-text); margin: 20px auto; width: 80%;">`;
-            } else if (item.type === 'image' || item.type === 'gif') {
-                if (item.src) {
-                    const alignStyle = item.align === 'left' ? 'margin-right: auto;' 
-                                    : item.align === 'right' ? 'margin-left: auto;' 
-                                    : 'margin-left: auto; margin-right: auto;';
-                    contentHTML += `
-                        <div style="text-align: ${item.align || 'center'}; margin: 10px 0;">
-                            <img src="${item.src}" 
-                                width="${item.width || 400}"
-                                style="display: block; max-width: 100%; height: auto; ${alignStyle}"
-                                alt="">
-                        </div>`;
-                }
-            } else if (item.type === 'emoji') {
-                if (item.content) {
-                    contentHTML += `
-                        <div style="
-                            text-align: ${item.align || 'center'};
-                            font-size: ${item.size || '2em'};
-                            line-height: 1.4;
-                            margin: 10px 0;
-                        ">${item.content}</div>`;
-                }
-            } else if (item.type === 'stat') {
-                contentHTML += buildStatPreviewHTML(item.id);
-            } else if (item.type === 'graph') {
-                contentHTML += buildGraphPreviewHTML(item.id);
-            } else if (item.type === 'recently added') {
-                contentHTML += buildRecentlyAddedPreviewHTML(item.raLibrary, item.raCount);
-            } else if (item.type === 'recommendations') {
-                contentHTML += buildRecommendationsPreviewHTML(item.userKey);
-            } else if (item.type === 'droppedneedle_wrapped') {
-                contentHTML += buildDroppedNeedleWrappedPreviewHTML(item.userKey);
-            } else if (item.type === 'droppedneedle_server_stats') {
-                contentHTML += buildDroppedNeedleServerStatsPreviewHTML();
-            } else if (item.type === 'yearly_wrapped') {
-                contentHTML += buildYearlyWrappedPreviewHTML();
-            } else if (item.type === 'sonarr_coming_soon') {
-                contentHTML += buildSonarrComingSoonPreviewHTML();
-            } else if (item.type === 'radarr_coming_soon') {
-                contentHTML += buildRadarrComingSoonPreviewHTML();
-            } else if (item.type === 'ombi_requests') {
-                contentHTML += buildOmbiRequestsPreviewHTML();
-            } else if (item.type === 'seerr_requests') {
-                contentHTML += buildSeerrRequestsPreviewHTML();
-            } else if (item.type === 'collection_group') {
-                if (item.collections && item.collections.length > 0) {
-                    const stableGroupId = item.id || `group-${itemIndex}`;
-                    contentHTML += buildCollectionPreviewHTMLForEmail(
-                        item.title || 'Collections',
-                        item.collections,
-                        stableGroupId
-                    );
-                }
+        for (const item of selectedItems) {
+            if (item.type === 'graph' && !item.chartImage) {
+                const chartImage = await captureChartAsBase64(item.id);
+                if (chartImage) item.chartImage = chartImage;
             }
         }
+        selectedItems.forEach(item => {
+            if (['textblock', 'titleblock', 'headerblock'].includes(item.type)) {
+                item.content = getTextBlockContent(item.id);
+            }
+        });
 
-        const hostedEnabled = APP.settings.hosted_enabled === 'enabled';
-        const hostedLinksEnabled = APP.settings.hosted_links_enabled === 'enabled' && APP.settings.hosted_links_base_url;
-        const linksBaseUrl = hostedLinksEnabled ? APP.settings.hosted_links_base_url : (APP.settings.hosted_base_url || '');
-        const completeHTML = buildPreviewEmailHTML(contentHTML, serverName, subject, emailHeaderTitle, logoFilename, logoWidth, customLogoFilename, themedCSS, logoPosition, hostedEnabled, linksBaseUrl);
-        
+        const payload = {
+            subject: document.getElementById('subject').value,
+            email_header_title: document.getElementById('email_header_title').value,
+            selected_items: selectedItems,
+            expanded_collections: (typeof convertExpandedCollectionsForBackend === 'function') ? convertExpandedCollectionsForBackend() : {},
+            items_count: parseInt(document.getElementById('items_to_pull')?.value, 10) || null,
+            custom_html: ''
+        };
+
+        const seq = ++_previewSeq;
+        const resp = await fetch('/preview_email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': APP.csrfToken },
+            body: JSON.stringify(payload)
+        });
+        const data = await resp.json();
+        if (seq !== _previewSeq) return; // a newer render is already in flight
+        if (!resp.ok) throw new Error(data.error || resp.statusText);
+
         const frame = document.getElementById('preview');
-        if (!frame) {
-            console.error('Preview iframe not found!');
-            return;
-        }
-        
-        frame.srcdoc = completeHTML;
+        if (!frame) return;
+        frame.srcdoc = data.html;
 
         if (typeof popoutWindow !== 'undefined' && popoutWindow && !popoutWindow.closed) {
             try {
                 popoutWindow.document.open();
-                popoutWindow.document.write(completeHTML);
+                popoutWindow.document.write(data.html);
                 popoutWindow.document.close();
                 popoutWindow.document.title = 'Email Preview';
-            } catch(e) {
+            } catch (e) {
                 popoutWindow = null;
             }
         }
-        
-        frame.onload = function() {
+
+        frame.onload = function () {
             try {
-                const doc = frame.contentDocument || frame.contentWindow.document;
-                if (doc && doc.documentElement) {
-                    resizePreviewFrame(frame);
-                }
+                if (frame.contentDocument && frame.contentDocument.documentElement) resizePreviewFrame(frame);
             } catch (e) {
                 console.log('Could not resize iframe:', e);
             }
         };
-        
-        console.log('Preview updated successfully');
     } catch (error) {
         console.error('Error in updatePreview:', error);
         const frame = document.getElementById('preview');

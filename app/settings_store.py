@@ -54,6 +54,7 @@ DEFAULTS = {
     "recs_item_count": "",
     "ui_custom_light": "",
     "ui_custom_dark": "",
+    "email_layout": "classic",
     "appearance_theme": "dark",
     "pride_flag": "off",
     "snapins_floating": "1",

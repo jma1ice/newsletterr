@@ -245,6 +245,10 @@ Work is organized into version sprints. Items may shift between sprints as prior
 * Emby/Jellyfin support - jellyfin uses jellywatch over tautulli
 * Rootless Docker image with UID/GID support
 
+### v2026.7
+* Items pulls episodes in even if it was just a one off, Days only pulls shows in if all the available for that season were added
+* Add button to get all available from the 'Get' section
+
 ### Community
 * GitHub webhook to pull submitted issues to Discord channel
 * Ko-fi -> Discord integration for contributor role

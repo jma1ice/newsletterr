@@ -266,6 +266,7 @@ def preview_schedule(schedule_id):
                 "collections_grid_columns": settings_row[18] or '5',
                 "ra_show_description": settings_row[19] or 'enabled',
                 "include_user_info": settings_row[20] or 'enabled',
+                "email_layout": _s.get("email_layout") or 'classic',
             }
         else:
             settings = {"server_name": ""}
@@ -318,6 +319,7 @@ def preview_schedule(schedule_id):
         tautulli_data["settings"]["collections_grid_columns"] = int(settings.get("collections_grid_columns") or 5)
         tautulli_data["settings"]["ra_show_description"] = settings.get("ra_show_description", "enabled")
         tautulli_data["settings"]["include_user_info"] = settings.get("include_user_info", "enabled")
+        tautulli_data["settings"]["email_layout"] = settings.get("email_layout", "classic")
 
         recommendations_data = None
         has_recs = any(item.get('type') == 'recommendations' for item in selected_items)
@@ -435,6 +437,7 @@ def preview_schedule_page(schedule_id):
         "collections_grid_columns": collections_grid_columns or '5',
         "ra_show_description": ra_show_description or 'enabled',
         "include_user_info": include_user_info or 'enabled',
+        "email_layout": _s.get("email_layout") or 'classic',
         "hosted_enabled": hosted_enabled or 'disabled',
         "hosted_base_url": hosted_base_url or '',
         "hosted_links_enabled": hosted_links_enabled or 'disabled',

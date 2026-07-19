@@ -6,18 +6,25 @@
 // once at load with matchMedia: collapsed at <=768px, open above. No
 // persistence; the user toggles freely per page load.
 //
-// Grid: the lighter source cards live in #snapin-grid (two columns at >=992px).
-// Some cards sit inside wrapper divs (#droppedneedle-col, #yearly-wrapped-col,
+// Grid: the lighter source cards live in #snapin-grid (two columns once the
+// source column is wide enough, via a container query in builder.css). Some
+// cards sit inside wrapper divs (#droppedneedle-col, #yearly-wrapped-col,
 // #coming-soon-col) that the pull scripts swap wholesale, and several wrappers
 // render empty until their data is pulled. A pure :nth-child scheme cannot cope
-// with that, so a small helper recounts the visible cards, hides empty
-// wrappers, spans the last card across both columns when the count is odd, and
-// stacks the internal halves of a card that is only half a column wide.
+// with that, so a small helper recounts the visible cards and hides empty
+// wrappers.
+//
+// Masonry: in two-column mode the grid uses tiny fixed implicit rows
+// (grid-auto-rows in builder.css) and this helper gives every visible card a
+// grid-row span covering its measured height plus one visual gap. Cards then
+// pack up under the shorter column instead of aligning to the tallest card in
+// their row, which is what left a large hole under a short card. A
+// ResizeObserver re-runs the layout when any card's height changes (collapse
+// toggles, posters loading, column resizes).
 (function () {
     'use strict';
 
     var MOBILE = window.matchMedia('(max-width: 768px)');
-    var TWO_COL = window.matchMedia('(min-width: 992px)');
 
     function isDisplayed(el) {
         return !!el && window.getComputedStyle(el).display !== 'none';
@@ -32,6 +39,12 @@
         return isDisplayed(card);
     }
 
+    // Style writes are guarded with a changed-check so the MutationObserver
+    // watching style attributes settles after one echo instead of looping.
+    function setRowSpan(el, value) {
+        if (el.style.gridRowEnd !== value) el.style.gridRowEnd = value;
+    }
+
     function relayoutGrid() {
         var grid = document.getElementById('snapin-grid');
         if (!grid) return;
@@ -42,7 +55,6 @@
 
         var visible = [];
         items.forEach(function (el) {
-            el.classList.remove('span-2');
             var vis = itemVisible(el);
             // Only the -col wrappers get force-hidden; builder-card items manage
             // their own display so we never fight #ra-card's inline style.
@@ -50,12 +62,52 @@
                 el.classList.toggle('snapin-grid-hidden', !vis);
             }
             if (vis) visible.push(el);
+            observeItem(el);
         });
 
-        var twoCol = TWO_COL.matches;
-        if (twoCol && visible.length % 2 === 1) {
-            visible[visible.length - 1].classList.add('span-2');
-        }
+        // The column count is decided by a container query, so read it off the
+        // grid's computed style instead of a viewport breakpoint.
+        var style = window.getComputedStyle(grid);
+        var twoCol = style.gridTemplateColumns.trim().indexOf(' ') !== -1;
+
+        // Masonry spans. An odd trailing card simply packs into the shorter
+        // column like everything else; spanning it across both columns (the
+        // old odd-count rule) would push it below the taller column and
+        // reopen the very hole the spans exist to close. In single-column
+        // mode grid-auto-rows computes to auto (NaN here) and all spans are
+        // cleared so normal flow and the grid gap take over.
+        var rowH = parseFloat(style.gridAutoRows);
+        var vgap = parseFloat(style.columnGap) || 0;
+        items.forEach(function (el) {
+            if (twoCol && rowH > 0 && visible.indexOf(el) !== -1) {
+                var h = el.getBoundingClientRect().height;
+                setRowSpan(el, 'span ' + Math.max(1, Math.ceil((h + vgap) / rowH)));
+            } else {
+                setRowSpan(el, '');
+            }
+        });
+    }
+
+    var relayoutPending = false;
+    function scheduleRelayout() {
+        if (relayoutPending) return;
+        relayoutPending = true;
+        window.requestAnimationFrame(function () {
+            relayoutPending = false;
+            relayoutGrid();
+        });
+    }
+
+    // Card heights change outside our sight (collapse toggles, posters
+    // loading, the source column resizing), and every change needs fresh row
+    // spans. Each grid item is observed once; replaced items fall away with
+    // the WeakSet. The observe() initial callback just echoes one relayout.
+    var itemObserver = window.ResizeObserver ? new ResizeObserver(scheduleRelayout) : null;
+    var observedItems = itemObserver ? new WeakSet() : null;
+    function observeItem(el) {
+        if (!itemObserver || observedItems.has(el)) return;
+        observedItems.add(el);
+        itemObserver.observe(el);
     }
 
     function setCollapsed(header, collapsed) {
@@ -89,24 +141,17 @@
         // display; re-run the grid layout whenever the grid subtree changes.
         var grid = document.getElementById('snapin-grid');
         if (grid && window.MutationObserver) {
-            var pending = false;
-            var obs = new MutationObserver(function () {
-                if (pending) return;
-                pending = true;
-                window.requestAnimationFrame(function () {
-                    pending = false;
-                    relayoutGrid();
-                });
-            });
+            var obs = new MutationObserver(scheduleRelayout);
             // Watch childList (pull scripts replaceWith wrappers) and inline
-            // style only (#ra-card display flips). relayoutGrid mutates classes,
-            // not style, so this filter cannot retrigger itself into a loop.
+            // style (#ra-card display flips, our own grid-row spans). The
+            // changed-check in setRowSpan keeps our writes from retriggering
+            // this into a loop.
             obs.observe(grid, { childList: true, subtree: true, attributes: true, attributeFilter: ['style'] });
         }
 
-        var onBreakpoint = function () { relayoutGrid(); };
-        if (TWO_COL.addEventListener) TWO_COL.addEventListener('change', onBreakpoint);
-        else if (TWO_COL.addListener) TWO_COL.addListener(onBreakpoint);
+        // Fallback for browsers without ResizeObserver; otherwise the per-item
+        // observer already covers width-driven height changes.
+        if (!itemObserver) window.addEventListener('resize', scheduleRelayout);
     }
 
     if (document.readyState === 'loading') {

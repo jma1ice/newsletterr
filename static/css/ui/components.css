@@ -408,6 +408,23 @@ body.nl-modal-open { overflow: hidden; }
    wraps the spinner, text and cancel together */
 .spinner-card #recs-cancel-btn { margin-top: var(--space-2); }
 .spinner-card p { margin-top: var(--space-3); }
+/* Determinate progress bar fed by /pull_progress polling; spinner.js shows it
+   only for operations that report progress. Fixed colors match the tip line
+   because the scrim is always dark regardless of theme. */
+.spinner-progress {
+    width: 300px;
+    height: 6px;
+    border-radius: 3px;
+    background: rgba(233, 241, 242, .18);
+    overflow: hidden;
+}
+.spinner-progress-fill {
+    width: 0%;
+    height: 100%;
+    border-radius: 3px;
+    background: var(--accent, #62a1a4);
+    transition: width .3s ease;
+}
 /* Rotating flavor line under the pinned action text. The scrim is always dark
    (theme-independent), so this uses a fixed light-muted color, not a token. */
 .spinner-tip {

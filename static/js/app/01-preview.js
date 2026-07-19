@@ -300,7 +300,7 @@ async function updatePreview() {
             } else if (item.type === 'graph') {
                 contentHTML += buildGraphPreviewHTML(item.id);
             } else if (item.type === 'recently added') {
-                contentHTML += buildRecentlyAddedPreviewHTML(item.raLibrary);
+                contentHTML += buildRecentlyAddedPreviewHTML(item.raLibrary, item.raCount);
             } else if (item.type === 'recommendations') {
                 contentHTML += buildRecommendationsPreviewHTML(item.userKey);
             } else if (item.type === 'droppedneedle_wrapped') {

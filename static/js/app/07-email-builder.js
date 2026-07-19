@@ -1025,6 +1025,8 @@ document.addEventListener('click', async (e) => {
     const extra = {};
     if (type === 'recently added' && btn.dataset.lib) {
         extra.raLibrary = btn.dataset.lib;
+        const raCount = parseInt(btn.closest('.snapin-row')?.querySelector('.ra-count-input')?.value, 10);
+        if (raCount > 0) extra.raCount = raCount;
     }
     if (type === 'recommendations' || type === 'droppedneedle_wrapped') {
         if (btn.dataset.userKey) extra.userKey = btn.dataset.userKey;

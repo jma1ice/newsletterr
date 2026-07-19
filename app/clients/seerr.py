@@ -41,11 +41,13 @@ def _fetch_details(base_url, api_key, media_type, tmdb_id):
         'posterPath': details.get('posterPath'),
     }
 
-def fetch_seerr_requests(base_url, api_key):
+def fetch_seerr_requests(base_url, api_key, progress_cb=None):
     """Returns (entries, error). entries is a list of normalized seerr request
     dicts (title/year/poster already resolved via detail lookups), or [] on
     any failure. Declined/failed/fully-available requests are skipped before
-    enrichment so they never cost a detail lookup."""
+    enrichment so they never cost a detail lookup. progress_cb, when given,
+    is called with (processed, total) as the result list is walked; the
+    caller owns any progress state (clients stay agnostic)."""
     if not base_url or not api_key:
         return [], "Seerr Error: URL and API key are required"
     base_url = base_url.rstrip('/')
@@ -62,7 +64,17 @@ def fetch_seerr_requests(base_url, api_key):
 
     entries = []
     details_cache = {}
-    for req in results:
+    if progress_cb and results:
+        try:
+            progress_cb(0, len(results))
+        except Exception:
+            logger.debug("suppressed progress callback error", exc_info=True)
+    for req_index, req in enumerate(results, 1):
+        if progress_cb:
+            try:
+                progress_cb(req_index, len(results))
+            except Exception:
+                logger.debug("suppressed progress callback error", exc_info=True)
         media = req.get('media') or {}
         media_type = media.get('mediaType')
         tmdb_id = media.get('tmdbId')
@@ -76,6 +88,7 @@ def fetch_seerr_requests(base_url, api_key):
         if key not in details_cache:
             details_cache[key] = _fetch_details(base_url, api_key, media_type, tmdb_id)
         details = details_cache[key] or {}
+        requester = req.get('requestedBy') or {}
         entries.append({
             'mediaType': media_type,
             'title': details.get('title') or 'Unknown',
@@ -84,5 +97,6 @@ def fetch_seerr_requests(base_url, api_key):
             'status': req.get('status'),
             'mediaStatus': media.get('status'),
             'requestedDate': req.get('createdAt'),
+            'requestedBy': requester.get('displayName') or requester.get('plexUsername') or requester.get('username') or '',
         })
     return entries, None

@@ -1,6 +1,6 @@
 document.getElementById('pullSeerrRequestsBtn').addEventListener('click', async (e) => {
     if (!confirmFreshRepull(e.currentTarget, 'seerr')) return;
-    showSpinner('Pulling Seerr requests...');
+    showSpinner('Pulling Seerr requests...', 'seerr_requests');
 
     const payload = {
         stats: statsList,

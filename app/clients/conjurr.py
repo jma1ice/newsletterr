@@ -10,7 +10,9 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-def run_conjurr_command(base_url, user_dict, error):
+def run_conjurr_command(base_url, user_dict, error, progress_cb=None):
+    # progress_cb, when given, is called with the user id after each user is
+    # processed; the caller owns any progress state (clients stay agnostic)
     # A fresh run starts uncancelled; the cancel route sets this event while we
     # loop, and we bail out between users with whatever we have so far. The
     # caller reads state.recommendations_cancel.is_set() afterwards to tell a
@@ -38,6 +40,13 @@ def run_conjurr_command(base_url, user_dict, error):
     plex_web_url = _s.get("plex_web_url")
     machine_id = get_plex_machine_id() if plex_url and plex_token else None
 
+    # Optional per-section cap (settings recs_item_count, blank = show all).
+    # Applied here so the route pull and scheduled sends stay consistent.
+    try:
+        recs_cap = int(_s.get("recs_item_count") or 0)
+    except (TypeError, ValueError):
+        recs_cap = 0
+
     api_base_url = f"{base_url}/recommendations?user_id="
     recommendations_dict = {}
 
@@ -50,6 +59,15 @@ def run_conjurr_command(base_url, user_dict, error):
             response = safe_get(api_url)
             response.raise_for_status()
             data = response.json()
+
+            # Cap before Plex enrichment so dropped items never cost a search.
+            # Available items fill first; unavailable only pad the remainder.
+            if recs_cap > 0:
+                for kind in ('movie_posters', 'show_posters'):
+                    available = data.get(kind) or []
+                    unavailable = data.get(f'{kind}_unavailable') or []
+                    data[kind] = available[:recs_cap]
+                    data[f'{kind}_unavailable'] = unavailable[:max(0, recs_cap - len(data[kind]))]
 
             if plex_url and plex_token and machine_id:
                 if 'movie_posters' in data:
@@ -92,5 +110,10 @@ def run_conjurr_command(base_url, user_dict, error):
                 error = str(f"Conjurr Error: {e}")
             else:
                 error += str(f", Conjurr Error: {e}")
+        if progress_cb:
+            try:
+                progress_cb(user)
+            except Exception:
+                logger.debug("suppressed progress callback error", exc_info=True)
 
     return [recommendations_dict, error]

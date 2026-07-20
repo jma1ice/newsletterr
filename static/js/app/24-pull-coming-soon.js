@@ -1,5 +1,5 @@
-document.getElementById('pullComingSoonBtn').addEventListener('click', async (e) => {
-    if (!confirmFreshRepull(e.currentTarget, 'coming_soon')) return;
+window.pullRunners = window.pullRunners || {};
+window.pullRunners.coming_soon = async function ({ chained = false } = {}) {
     showSpinner('Pulling coming soon calendar...', 'coming_soon');
 
     const payload = {
@@ -62,12 +62,19 @@ document.getElementById('pullComingSoonBtn').addEventListener('click', async (e)
         buildSonarrComingSoonRow();
         buildRadarrComingSoonRow();
         markPullCacheFresh('coming_soon', true);
+        return { ok: true };
     } catch (err) {
         console.error("Error pulling coming soon calendar:", err);
         const error_p = document.getElementById('error_p');
         if (error_p) error_p.textContent = err;
-        alert("Something went wrong while pulling the coming soon calendar.");
+        if (!chained) alert("Something went wrong while pulling the coming soon calendar.");
+        return { ok: false, error: String((err && err.message) || err) };
     } finally {
         try { hideSpinner(); } catch(_) {}
     }
+};
+
+document.getElementById('pullComingSoonBtn').addEventListener('click', (e) => {
+    if (!confirmFreshRepull(e.currentTarget, 'coming_soon')) return;
+    window.pullRunners.coming_soon({ chained: false });
 });

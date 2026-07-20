@@ -61,6 +61,7 @@ def create_schedule():
         send_time = data.get('send_time', '09:00')
         date_range = int(data.get('date_range', 7))
         items_count = int(data.get('items_count', 10))
+        skip_if_no_new = 1 if data.get('skip_if_no_new') else 0
 
         if email_list_id == 'ALL':
             list_id = 'ALL'
@@ -70,7 +71,7 @@ def create_schedule():
             except (ValueError, TypeError):
                 return jsonify({"status": "error", "message": "Invalid email list ID"}), 400
 
-        success = create_email_schedule(name, list_id, template_id, frequency, start_date, send_time, date_range, items_count)
+        success = create_email_schedule(name, list_id, template_id, frequency, start_date, send_time, date_range, items_count, skip_if_no_new)
         if success:
             return jsonify({"status": "success", "message": f"Schedule '{name}' created successfully"})
         else:
@@ -94,6 +95,7 @@ def update_schedule(schedule_id):
         send_time = data.get('send_time', '09:00')
         date_range = int(data.get('date_range', 7))
         items_count = int(data.get('items_count', 10))
+        skip_if_no_new = 1 if data.get('skip_if_no_new') else 0
 
         if email_list_id == 'ALL':
             list_id = 'ALL'
@@ -102,8 +104,8 @@ def update_schedule(schedule_id):
                 list_id = int(email_list_id)
             except (ValueError, TypeError):
                 return jsonify({"status": "error", "message": "Invalid email list ID"}), 400
-        
-        success = update_email_schedule(schedule_id, name, list_id, template_id, frequency, start_date, send_time, date_range, items_count)
+
+        success = update_email_schedule(schedule_id, name, list_id, template_id, frequency, start_date, send_time, date_range, items_count, skip_if_no_new)
         if success:
             return jsonify({"status": "success", "message": f"Schedule '{name}' updated successfully"})
         else:

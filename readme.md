@@ -273,12 +273,6 @@ Released under the **MIT License** - see [LICENSE](LICENSE.txt) for details.
 
 ## Planned Changes
 
-Work is organized into version sprints. Items may shift between sprints as priorities change.
-
-### v2026.7
-* Items pulls episodes in even if it was just a one off, Days only pulls shows in if all the available for that season were added
-* Add button to get all available from the 'Get' section
-
 ### Community
 * GitHub webhook to pull submitted issues to Discord channel
 * Ko-fi -> Discord integration for contributor role
@@ -289,9 +283,13 @@ Work is organized into version sprints. Items may shift between sprints as prior
 * Finish jellyfin/emby integration
 * New layouts need images
 * Pull more/different info on dn/wrapped
+* Appearance options: default landing page after login, calendar week-start day (Sun/Mon), date/time format (12/24h, MDY/DMY)
+* Layout coverage: classic/editorial/digest treatments for the sections that still render legacy inside the variant layouts (recommendations, collections, graph chrome, per-user DroppedNeedle wrapped)
+* Single-renderer cleanup: remove the legacy client-side email preview builders in static/js/app/04-stats-graphs.js and their hand-mirrored copies in templates/schedule_preview.html now that /preview_email renders previews server-side (needs a browser pass over every snap-in preview first)
 
 ### Blocked on upstream
 * Email click for recently added/available recommendations is going to browser on mobile instead of Plex app - this is an issue with the new Plex client, have not seen a fix yet and no info released by Plex at this time
+* Ask Conjurr for N recommendations over the API instead of slicing after enrichment - needs a Conjurr-side count parameter; falls back to the current slice until that exists
 
 ---
 
@@ -312,11 +310,14 @@ Work is organized into version sprints. Items may shift between sprints as prior
 * Jellyfin support
 * Rootless Docker image
 * Demo mode (DEMO_MODE) for a public, read-only showcase deployment
+* Get All button on builder left pane
+* Option to skip scheduled send if nothing is new
 
 #### Fixed:
 * UI adjustment to better organize snap-ins sections
 * Email BG color not respected by mac mail app
 * Text block titles update again while typing (inline handler blocked by CSP)
+* Recently Added by Days now pulls at an episode level
 
 ## v2026.3:
 
@@ -333,11 +334,12 @@ Work is organized into version sprints. Items may shift between sprints as prior
 ## Acknowledgements
 
 * [Tautulli](https://github.com/Tautulli/Tautulli) for the Plex charts, users, and graphs  
+* [Jellyfin](https://github.com/jellyfin/jellyfin) & [Jellywatch](https://github.com/JellyWatchteam/JellyWatch) APIs for Jellyfin 'Stats/Graphs' and recently added
 * [conjurr](https://github.com/yungsnuzzy/conjurr) for user watchlist based recommendations  
 * [DroppedNeedle](https://github.com/HabiRabbu/DroppedNeedle) for user yearly wrapped music  
 * [Sonarr](https://github.com/Sonarr/Sonarr) & [Radarr](https://github.com/Radarr/Radarr) for coming soon calendar  
-- [Ombi](https://github.com/Ombi-app/Ombi) for recently requested  
-- [Seerr](https://github.com/seerr-team/seerr) (works with Overseerr and Jellyseerr) for recently requested  
+* [Ombi](https://github.com/Ombi-app/Ombi) for recently requested  
+* [Seerr](https://github.com/seerr-team/seerr) (works with Overseerr and Jellyseerr) for recently requested  
 * [Highcharts](https://www.highcharts.com/) for charting  
 
 Happy streaming!

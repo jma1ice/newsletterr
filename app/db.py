@@ -74,6 +74,11 @@ def init_db(db_path):
             selected_items TEXT NOT NULL,
             email_text TEXT,
             subject TEXT,
+            -- Legacy per-template column, kept only so the old-DB migration below
+            -- (INSERT ... layout ...) still lines up positionally. It is NOT the
+            -- NEWS-30 email layout: that is the settings-level `email_layout`
+            -- (legacy/classic/editorial/digest) read in app/emails/assemble.py.
+            -- Nothing reads this column; do not wire new behavior to it.
             layout TEXT DEFAULT 'standard',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -135,6 +140,7 @@ def init_db(db_path):
             send_time TEXT DEFAULT '09:00', -- Time of day to send (HH:MM format)
             date_range INTEGER DEFAULT 7, -- Number of days of data to include
             items_count INTEGER DEFAULT 10,
+            skip_if_no_new INTEGER DEFAULT 0, -- skip the send when no new recently-added/most-watched items landed
             last_sent TIMESTAMP,
             next_send TIMESTAMP NOT NULL,
             is_active BOOLEAN DEFAULT 1,
@@ -162,7 +168,12 @@ def init_db(db_path):
         logger.info("Adding items_count column to email_schedules table...")
         cursor.execute("ALTER TABLE email_schedules ADD COLUMN items_count INTEGER DEFAULT 10")
         conn.commit()
-    
+
+    if 'skip_if_no_new' not in columns:
+        logger.info("Adding skip_if_no_new column to email_schedules table...")
+        cursor.execute("ALTER TABLE email_schedules ADD COLUMN skip_if_no_new INTEGER DEFAULT 0")
+        conn.commit()
+
     cursor.execute("PRAGMA table_info(settings)")
     settings_columns = [column[1] for column in cursor.fetchall()]
     if 'smtp_username' not in settings_columns:

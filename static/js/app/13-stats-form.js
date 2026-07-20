@@ -27,9 +27,10 @@ function updateCacheBadge(cacheInfo, timeRange) {
     }).join('');
 }
 
-document.getElementById('stats_form').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    if (!confirmFreshRepull(e.target.querySelector('button[type="submit"]'), 'stats')) return;
+// Exposed as an awaitable runner so the Get All orchestrator (35-get-all.js)
+// can chain it; the standalone form submit below still drives it directly.
+window.pullRunners = window.pullRunners || {};
+window.pullRunners.stats = async function ({ chained = false } = {}) {
     showSpinner('Getting stats and users...', 'pull_stats');
 
     const time_range = document.getElementById('days_to_pull').value;
@@ -161,11 +162,22 @@ document.getElementById('stats_form').addEventListener('submit', async (e) => {
                 }
             }
         }
+        return { ok: true };
     } catch (err) {
         console.error('Error pulling stats:', err);
         const errorEl = document.getElementById('error_p');
-        if (errorEl) errorEl.textContent = 'Something went wrong pulling stats.';
+        if (errorEl) {
+            errorEl.textContent = 'Something went wrong pulling stats.';
+            errorEl.style.display = '';
+        }
+        return { ok: false, error: String((err && err.message) || err) };
     } finally {
         hideSpinner();
     }
+};
+
+document.getElementById('stats_form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (!confirmFreshRepull(e.target.querySelector('button[type="submit"]'), 'stats')) return;
+    window.pullRunners.stats({ chained: false });
 });

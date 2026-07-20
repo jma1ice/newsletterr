@@ -164,7 +164,7 @@ def get_email_schedules():
         SELECT 
             es.id, es.name, es.email_list_id, es.template_id, es.frequency, es.start_date, 
             es.send_time, es.last_sent, es.next_send, es.is_active, es.created_at, es.date_range,
-            es.items_count,
+            es.items_count, es.skip_if_no_new,
             el.name as email_list_name,
             et.name as template_name
         FROM email_schedules es
@@ -209,7 +209,7 @@ def get_email_schedules():
             pass
 
         email_list_id = schedule[2]
-        email_list_name = schedule[13]
+        email_list_name = schedule[14]
         
         if email_list_id == 0:
             email_list_id = 'ALL'
@@ -232,8 +232,9 @@ def get_email_schedules():
             'created_at': schedule[10],
             'date_range': schedule[11] or 7,
             'items_count': schedule[12] or 10,
+            'skip_if_no_new': bool(schedule[13]),
             'email_list_name': email_list_name,
-            'template_name': schedule[14]
+            'template_name': schedule[15]
         })
     return result
 
@@ -362,19 +363,19 @@ def next_future_send(frequency, start_date, send_time='09:00'):
         guard += 1
     return nxt
 
-def create_email_schedule(name, email_list_id, template_id, frequency, start_date, send_time='09:00', date_range=7, items_count=10):
+def create_email_schedule(name, email_list_id, template_id, frequency, start_date, send_time='09:00', date_range=7, items_count=10, skip_if_no_new=0):
     conn = db_connect()
     cursor = conn.cursor()
-    
+
     next_send = next_future_send(frequency, start_date, send_time)
-    
+
     try:
         list_id_value = 0 if email_list_id == 'ALL' else int(email_list_id)
 
         cursor.execute("""
-            INSERT INTO email_schedules (name, email_list_id, template_id, frequency, start_date, send_time, next_send, date_range, items_count)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (name, list_id_value, template_id, frequency, start_date, send_time, next_send.isoformat(), date_range, items_count))
+            INSERT INTO email_schedules (name, email_list_id, template_id, frequency, start_date, send_time, next_send, date_range, items_count, skip_if_no_new)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (name, list_id_value, template_id, frequency, start_date, send_time, next_send.isoformat(), date_range, items_count, int(bool(skip_if_no_new))))
         conn.commit()
         return True
     except sqlite3.Error as e:
@@ -383,22 +384,22 @@ def create_email_schedule(name, email_list_id, template_id, frequency, start_dat
     finally:
         conn.close()
 
-def update_email_schedule(schedule_id, name, email_list_id, template_id, frequency, start_date, send_time='09:00', date_range=7, items_count=10):
+def update_email_schedule(schedule_id, name, email_list_id, template_id, frequency, start_date, send_time='09:00', date_range=7, items_count=10, skip_if_no_new=0):
     conn = db_connect()
     cursor = conn.cursor()
-    
+
     next_send = next_future_send(frequency, start_date, send_time)
 
     try:
         list_id_value = 0 if email_list_id == 'ALL' else int(email_list_id)
 
         cursor.execute("""
-            UPDATE email_schedules 
-            SET name = ?, email_list_id = ?, template_id = ?, frequency = ?, 
+            UPDATE email_schedules
+            SET name = ?, email_list_id = ?, template_id = ?, frequency = ?,
                 start_date = ?, send_time = ?, next_send = ?, date_range = ?,
-                items_count = ?
+                items_count = ?, skip_if_no_new = ?
             WHERE id = ?
-        """, (name, list_id_value, template_id, frequency, start_date, send_time, next_send.isoformat(), date_range, items_count, schedule_id))
+        """, (name, list_id_value, template_id, frequency, start_date, send_time, next_send.isoformat(), date_range, items_count, int(bool(skip_if_no_new)), schedule_id))
         conn.commit()
         return True
     except sqlite3.Error as e:

@@ -119,3 +119,35 @@ def test_plex_web_url_ddl_default_matches_constant(tmp_path, monkeypatch):
     assert conn.execute("SELECT plex_web_url FROM settings WHERE id = 1").fetchone()[0] == DEFAULT_PLEX_WEB_URL
     conn.close()
     assert get_settings()["plex_web_url"] == DEFAULT_PLEX_WEB_URL
+
+def test_email_schedules_gains_skip_if_no_new_column(tmp_path, monkeypatch):
+    # A pre-v2026.7 email_schedules table without skip_if_no_new must gain the
+    # column (default 0) when init_db runs, without disturbing existing rows.
+    db = str(tmp_path / "sched.db")
+    conn = sqlite3.connect(db)
+    conn.execute("""
+        CREATE TABLE email_schedules (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            email_list_id INTEGER NOT NULL,
+            template_id INTEGER NOT NULL,
+            frequency TEXT NOT NULL,
+            start_date TEXT NOT NULL,
+            next_send TIMESTAMP NOT NULL
+        )
+    """)
+    conn.execute(
+        "INSERT INTO email_schedules (id, name, email_list_id, template_id, frequency, start_date, next_send) "
+        "VALUES (1, 'legacy', 5, 7, 'weekly', '2026-07-01T09:00:00', '2026-07-08T09:00:00')"
+    )
+    conn.commit()
+    conn.close()
+    monkeypatch.setattr(config, "DB_PATH", db)
+
+    init_db(db)
+
+    conn = sqlite3.connect(db)
+    cols = [r[1] for r in conn.execute("PRAGMA table_info(email_schedules)")]
+    assert "skip_if_no_new" in cols
+    assert conn.execute("SELECT skip_if_no_new FROM email_schedules WHERE id = 1").fetchone()[0] == 0
+    conn.close()

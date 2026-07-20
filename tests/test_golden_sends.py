@@ -178,6 +178,65 @@ def test_scheduled_user_email_golden(send_env):
     assert "Personal intro" in normalized["html"]
     _assert_golden("scheduled_user", normalized)
 
+def test_scheduled_skip_when_no_new_content(send_env):
+    # skip_if_no_new (GH 105): a template with a recently-added section and an
+    # empty pull is skipped, not sent; the schedule still counts as fired.
+    from app import config
+    conn = sqlite3.connect(config.DB_PATH)
+    conn.execute(
+        "INSERT OR REPLACE INTO email_templates (id, name, selected_items, subject, email_header_title) "
+        "VALUES (9010, 'golden-ra-skip', ?, 'Weekly RA', 'The Header')",
+        (json.dumps([{"type": "recently added", "raLibrary": ""}]),),
+    )
+    conn.execute(
+        "INSERT OR REPLACE INTO email_schedules (id, name, email_list_id, template_id, frequency, start_date, next_send, date_range, items_count, skip_if_no_new) "
+        "VALUES (9010, 'ra-skip', 9001, 9010, 'weekly', '2026-07-01T09:00:00', '2026-07-08T09:00:00', 7, 10, 1)"
+    )
+    conn.commit()
+    conn.close()
+
+    ok = send_env.send_scheduled_email_with_cids(9010, 9001, 9010)
+    assert ok is True  # a skip is a fired schedule, not a failure
+
+    sends = [s for inst in RecorderSMTP.instances for s in inst.sent]
+    assert sends == []  # nothing was emailed
+
+    conn = sqlite3.connect(config.DB_PATH)
+    row = conn.execute("SELECT status, error FROM email_history ORDER BY id DESC LIMIT 1").fetchone()
+    conn.close()
+    assert row[0] == "skipped"
+    assert "new" in (row[1] or "").lower()
+
+def test_scheduled_sends_when_new_content_present(send_env, monkeypatch):
+    # Same opted-in schedule, but the pull has an item this week -> it sends.
+    from app import config
+    from app.emails import scheduled
+
+    def _data_with_ra(*a, **k):
+        data = _tautulli_data_stub()
+        data["recent_data"] = [{"recently_added": [{"title": "Fresh Show", "media_type": "show", "library_name": "TV"}]}]
+        return data
+    monkeypatch.setattr(scheduled, "fetch_tautulli_data_for_email", _data_with_ra)
+
+    conn = sqlite3.connect(config.DB_PATH)
+    conn.execute(
+        "INSERT OR REPLACE INTO email_templates (id, name, selected_items, subject, email_header_title) "
+        "VALUES (9011, 'golden-ra-send', ?, 'Weekly RA', 'The Header')",
+        (json.dumps([{"type": "recently added", "raLibrary": ""}]),),
+    )
+    conn.execute(
+        "INSERT OR REPLACE INTO email_schedules (id, name, email_list_id, template_id, frequency, start_date, next_send, date_range, items_count, skip_if_no_new) "
+        "VALUES (9011, 'ra-send', 9001, 9011, 'weekly', '2026-07-01T09:00:00', '2026-07-08T09:00:00', 7, 10, 1)"
+    )
+    conn.commit()
+    conn.close()
+
+    ok = send_env.send_scheduled_email_with_cids(9011, 9001, 9011)
+    assert ok is True
+
+    sends = [s for inst in RecorderSMTP.instances for s in inst.sent]
+    assert len(sends) == 1  # content present, so the send proceeds normally
+
 @pytest.fixture()
 def hosted_scheduled_env(send_env):
     from app import config
@@ -985,6 +1044,9 @@ def test_manual_layout_email_golden(manual_send_env, monkeypatch, layout):
     monkeypatch.setattr(assemble_mod, "fetch_random_library_item", lambda *a, **k: dict(RANDOM_PICK_FIXTURE))
     monkeypatch.setattr(most_watched_mod, "fetch_and_attach_image", lambda *a, **k: None)
     monkeypatch.setattr(random_pick_mod, "fetch_and_attach_image", lambda *a, **k: None)
+    # the editorial/digest mastheads stamp datetime.now() (month, and day for
+    # digest), so freeze assemble's clock or the goldens drift with the calendar
+    monkeypatch.setattr(assemble_mod, "datetime", _FixedDatetime)
     _freeze_coming_soon_clock(monkeypatch, coming_soon_mod)
     # the manual send path reads its settings from the fixed tautulli dict
     # (monkeypatched in manual_send_env), not the DB row, so the layout under

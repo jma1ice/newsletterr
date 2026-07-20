@@ -1,5 +1,5 @@
-document.getElementById('pullDroppedNeedleBtn').addEventListener('click', async (e) => {
-    if (!confirmFreshRepull(e.currentTarget, 'droppedneedle')) return;
+window.pullRunners = window.pullRunners || {};
+window.pullRunners.droppedneedle = async function ({ chained = false } = {}) {
     showSpinner('Pulling DroppedNeedle stats...');
 
     function collectEmailsFromChips() {
@@ -15,8 +15,9 @@ document.getElementById('pullDroppedNeedleBtn').addEventListener('click', async 
 
     const toList = collectEmailsFromChips();
         if (!toList.length) {
-            alert('Please add at least one recipient.');
-            return;
+            try { hideSpinner(); } catch(_) {}
+            if (!chained) alert('Please add at least one recipient.');
+            return { ok: false, error: 'No recipients' };
     }
 
     const to_emails = toList.join(', ');
@@ -86,12 +87,19 @@ document.getElementById('pullDroppedNeedleBtn').addEventListener('click', async 
         buildWrappedUserRows();
         buildDroppedNeedleServerRow();
         markPullCacheFresh('droppedneedle', true);
+        return { ok: true };
     } catch (err) {
         console.error("Error pulling DroppedNeedle stats:", err);
         const error_p = document.getElementById('error_p');
         error_p.textContent = err;
-        alert("Something went wrong while pulling DroppedNeedle stats.");
+        if (!chained) alert("Something went wrong while pulling DroppedNeedle stats.");
+        return { ok: false, error: String((err && err.message) || err) };
     } finally {
         try { hideSpinner(); } catch(_) {}
     }
+};
+
+document.getElementById('pullDroppedNeedleBtn').addEventListener('click', (e) => {
+    if (!confirmFreshRepull(e.currentTarget, 'droppedneedle')) return;
+    window.pullRunners.droppedneedle({ chained: false });
 });

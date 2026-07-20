@@ -25,7 +25,9 @@ Regenerate email golden fixtures after intentional output changes:
 - The email subpackage is named `emails/` (plural) to avoid colliding with the stdlib `email` module.
 - `VERSION` file at the repo root is the single source of release metadata: line 1 is the version, line 2 the publish date. The version format must stay `vYYYY.N` because the update checker compares numerically. Release tags must equal line 1 (CI enforces this).
 - Send functions return plain values, never Flask responses. Routes wrap results in `jsonify`.
-- CSP is currently Report-Only (`app/hooks.py`). All script tags need `nonce="{{ nonce }}"`; the nonce comes from a context processor backed by `g.csp_nonce`. No inline `onclick=` handlers in templates.
+- Email HTML has a single renderer. Sends assemble through `app/emails/assemble.py`; the live previews (index builder and schedule preview) POST the same builder payload to `/preview_email` (`app/emails/preview.py:render_preview_email`). Since the v2026.4 single-renderer refactor the frontend just displays the returned HTML. Do not reintroduce client-side email-HTML construction. The remaining `build*PreviewHTML` functions in `static/js/app/04-stats-graphs.js` and the hand-mirrored copies in `templates/schedule_preview.html` are legacy and slated for removal (v2026.5); the `_filter*`/`_comingSoon*` mirrors are still parity-tested in `tests/test_js_preview_parity.py`.
+- Email layouts (`legacy`/`classic`/`editorial`/`digest`) live in `app/emails/builders/layouts.py`, dispatched from `assemble.py`; the settings-level `email_layout` column selects one. The `email_templates.layout` column is an unrelated legacy no-op, not the layout selector.
+- CSP is enforcing since v2026.3 (`app/hooks.py`). All script tags need `nonce="{{ nonce }}"`; the nonce comes from a context processor backed by `g.csp_nonce`. No inline `onclick=`/`oninput=` handlers in templates.
 - Committed text style: no emojis, no em or en dashes in docs, comments, or notes.
 
 ## Testing safely on this machine

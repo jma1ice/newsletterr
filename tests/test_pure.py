@@ -165,6 +165,104 @@ def test_recently_added_days_mode_title_shows_date_range():
     assert f"{since_date} - {end_date}" in html
     assert "since" not in html.split("Recently Added")[1].split("</h2>")[0].lower()
 
+def test_group_recent_episodes_rolls_up_and_counts_only_in_window():
+    from app.clients.plex import group_recent_episodes_into_shows
+    cutoff = 1000
+    meta = [
+        # Show A: one new episode in window, two old back-catalogue -> count 1
+        {"grandparentRatingKey": "A", "grandparentTitle": "Show A", "addedAt": 1500},
+        {"grandparentRatingKey": "A", "grandparentTitle": "Show A", "addedAt": 200},
+        {"grandparentRatingKey": "A", "grandparentTitle": "Show A", "addedAt": 500},
+        # Show B: three of five episodes landed in the window -> count 3
+        {"grandparentRatingKey": "B", "grandparentTitle": "Show B", "addedAt": 1100},
+        {"grandparentRatingKey": "B", "grandparentTitle": "Show B", "addedAt": 1200},
+        {"grandparentRatingKey": "B", "grandparentTitle": "Show B", "addedAt": 1300},
+        {"grandparentRatingKey": "B", "grandparentTitle": "Show B", "addedAt": 900},
+        {"grandparentRatingKey": "B", "grandparentTitle": "Show B", "addedAt": 800},
+        # Show C: nothing in window -> excluded entirely
+        {"grandparentRatingKey": "C", "grandparentTitle": "Show C", "addedAt": 100},
+    ]
+    shows = group_recent_episodes_into_shows(meta, cutoff)
+    by_key = {s["rating_key"]: s for s in shows}
+    assert set(by_key) == {"A", "B"}
+    assert by_key["A"]["new_episode_count"] == 1
+    assert by_key["B"]["new_episode_count"] == 3
+    assert by_key["A"]["media_type"] == by_key["A"]["type"] == "show"
+    # added_at reflects the newest in-window episode, not the old back catalogue
+    assert by_key["A"]["added_at"] == "1500"
+    assert by_key["B"]["added_at"] == "1300"
+    # the scratch sort field never leaks into the rendered card
+    assert "_latest" not in by_key["A"]
+
+def test_group_recent_episodes_orders_newest_show_first_and_respects_boundary():
+    from app.clients.plex import group_recent_episodes_into_shows
+    cutoff = 1000
+    meta = [
+        {"grandparentRatingKey": "old", "grandparentTitle": "Older", "addedAt": 1000},    # == cutoff, included
+        {"grandparentRatingKey": "new", "grandparentTitle": "Newer", "addedAt": 2000},
+        {"grandparentRatingKey": "before", "grandparentTitle": "Before", "addedAt": 999},  # < cutoff, excluded
+    ]
+    shows = group_recent_episodes_into_shows(meta, cutoff)
+    assert [s["rating_key"] for s in shows] == ["new", "old"]
+    assert all(s["rating_key"] != "before" for s in shows)
+
+def test_group_recent_episodes_full_season_counts_every_in_window_episode():
+    from app.clients.plex import group_recent_episodes_into_shows
+    full = [{"grandparentRatingKey": "S", "grandparentTitle": "S", "addedAt": i + 1} for i in range(8)]
+    shows = group_recent_episodes_into_shows(full, cutoff_ts=0)
+    assert len(shows) == 1
+    assert shows[0]["new_episode_count"] == 8
+
+def test_recently_added_show_rollup_renders_new_episode_count():
+    from email.mime.multipart import MIMEMultipart
+    from app.emails.builders.recently_added import build_recently_added_html_with_cids
+
+    theme_colors = {'card_bg': '#2d2d2d', 'border': '#404040', 'text': '#fff', 'muted_text': '#ccc'}
+    msg_root = MIMEMultipart()
+    # no thumb/art -> no poster fetch, no network call
+    recent_data = [{'recently_added': [
+        {'title': 'Rollup Show', 'media_type': 'show', 'new_episode_count': 3},
+        {'title': 'One Off', 'media_type': 'show', 'new_episode_count': 1},
+    ]}]
+
+    html = build_recently_added_html_with_cids(
+        recent_data, msg_root, theme_colors,
+        max_items=7, recently_added_mode="days"
+    )
+    assert "3 new episodes" in html
+    assert "1 new episode" in html
+    assert "1 new episodes" not in html  # singular, not pluralized
+
+def test_scheduled_send_has_new_content_true_when_ra_items_present():
+    from app.emails.scheduled import scheduled_send_has_new_content
+    selected = [{"type": "recently added", "raLibrary": ""}]
+    data = {"recent_data": [{"recently_added": [{"title": "New", "library_name": "TV"}]}]}
+    assert scheduled_send_has_new_content(selected, data) is True
+
+def test_scheduled_send_has_new_content_false_when_ra_empty():
+    from app.emails.scheduled import scheduled_send_has_new_content
+    selected = [{"type": "recently added", "raLibrary": ""}]
+    assert scheduled_send_has_new_content(selected, {"recent_data": []}) is False
+    assert scheduled_send_has_new_content(selected, {"recent_data": [{"recently_added": []}]}) is False
+
+def test_scheduled_send_has_new_content_honors_library_filter():
+    from app.emails.scheduled import scheduled_send_has_new_content
+    data = {"recent_data": [{"recently_added": [{"title": "New", "library_name": "Movies"}]}]}
+    # section pinned to a library with no in-window items -> nothing new
+    assert scheduled_send_has_new_content([{"type": "recently added", "raLibrary": "TV"}], data) is False
+    # section pinned to the library that does have an item -> new content
+    assert scheduled_send_has_new_content([{"type": "recently added", "raLibrary": "Movies"}], data) is True
+
+def test_scheduled_send_has_new_content_most_watched_scopes():
+    from app.emails.scheduled import scheduled_send_has_new_content
+    data = {
+        "most_watched_data": [{"most_watched": [{"title": "All Time", "library_name": "Movies"}]}],
+        "most_watched_recent_data": [],
+    }
+    # lifetime scope has an item; recent scope is empty
+    assert scheduled_send_has_new_content([{"type": "most_watched", "mwLibrary": ""}], data) is True
+    assert scheduled_send_has_new_content([{"type": "most_watched", "mwScope": "recent"}], data) is False
+
 def test_radarr_upcoming_release_date_picks_earliest_today_or_later():
     from datetime import date
     from app.emails.builders.coming_soon import upcoming_release_date

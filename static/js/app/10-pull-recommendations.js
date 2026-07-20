@@ -35,8 +35,8 @@ function removeRecsCancelButton() {
     if (btn) btn.remove();
 }
 
-document.getElementById('pullRecsBtn').addEventListener('click', async (e) => {
-    if (!confirmFreshRepull(e.currentTarget, 'recommendations')) return;
+window.pullRunners = window.pullRunners || {};
+window.pullRunners.recommendations = async function ({ chained = false } = {}) {
     showSpinner('Pulling recommendations...', 'pull_recommendations');
     showRecsCancelButton();
 
@@ -55,8 +55,8 @@ document.getElementById('pullRecsBtn').addEventListener('click', async (e) => {
         if (!toList.length) {
             removeRecsCancelButton();
             try { hideSpinner(); } catch(_) {}
-            alert('Please add at least one recipient.');
-            return;
+            if (!chained) alert('Please add at least one recipient.');
+            return { ok: false, error: 'No recipients' };
     }
 
     const to_emails = toList.join(', ');
@@ -124,13 +124,20 @@ document.getElementById('pullRecsBtn').addEventListener('click', async (e) => {
 
         buildRecsUserRows();
         markPullCacheFresh('recommendations', true);
+        return { ok: true };
     } catch (err) {
         console.error("Error pulling recommendations:", err);
         const error_p= document.getElementById('error_p');
         error_p.textContent = err;
-        alert("Something went wrong while pulling recommendations.");
+        if (!chained) alert("Something went wrong while pulling recommendations.");
+        return { ok: false, error: String((err && err.message) || err) };
     } finally {
         removeRecsCancelButton();
         try { hideSpinner(); } catch(_) {}
     }
+};
+
+document.getElementById('pullRecsBtn').addEventListener('click', (e) => {
+    if (!confirmFreshRepull(e.currentTarget, 'recommendations')) return;
+    window.pullRunners.recommendations({ chained: false });
 });

@@ -1,5 +1,5 @@
-document.getElementById('pullOmbiRequestsBtn').addEventListener('click', async (e) => {
-    if (!confirmFreshRepull(e.currentTarget, 'ombi')) return;
+window.pullRunners = window.pullRunners || {};
+window.pullRunners.ombi = async function ({ chained = false } = {}) {
     showSpinner('Pulling Ombi requests...', 'ombi_requests');
 
     const payload = {
@@ -57,12 +57,19 @@ document.getElementById('pullOmbiRequestsBtn').addEventListener('click', async (
 
         buildOmbiRequestsRow();
         markPullCacheFresh('ombi', true);
+        return { ok: true };
     } catch (err) {
         console.error("Error pulling Ombi requests:", err);
         const error_p = document.getElementById('error_p');
         if (error_p) error_p.textContent = err;
-        alert("Something went wrong while pulling Ombi requests.");
+        if (!chained) alert("Something went wrong while pulling Ombi requests.");
+        return { ok: false, error: String((err && err.message) || err) };
     } finally {
         try { hideSpinner(); } catch(_) {}
     }
+};
+
+document.getElementById('pullOmbiRequestsBtn').addEventListener('click', (e) => {
+    if (!confirmFreshRepull(e.currentTarget, 'ombi')) return;
+    window.pullRunners.ombi({ chained: false });
 });

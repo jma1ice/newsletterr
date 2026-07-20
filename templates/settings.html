@@ -161,6 +161,16 @@
                         </div>
 
                         <div class="settings-field-group settings-group-card">
+                            <h6 class="text-uppercase">Media Server</h6>
+                            <label for="media_server_type">Active media server (drives stats, recently added, artwork, and deep links):</label><br>
+                            <select id="media_server_type" name="media_server_type" class="w-field">
+                                <option value="plex" {% if settings.media_server_type != 'jellyfin' %}selected{% endif %}>Plex</option>
+                                <option value="jellyfin" {% if settings.media_server_type == 'jellyfin' %}selected{% endif %}>Jellyfin</option>
+                            </select><br>
+                            <small class="form-text text-muted">Plex pairs with Tautulli for stats; Jellyfin pairs with Jellywatch. Requests via Jellyseerr work through the Seerr connection below.</small>
+                        </div>
+
+                        <div class="settings-field-group settings-group-card">
                             <h6 class="text-uppercase">Plex</h6>
                             <button id="connect_plex" type="button" class="nl-btn nl-btn--primary mb-2">{% if settings.plex_token %}Force Reconnect{% else %}Connect Plex{% endif %}</button>
                             <div id="plex_status" class="mb-3">{% if settings.plex_token %}<p class="plex-connected">Connected</p>{% endif %}</div>
@@ -186,7 +196,47 @@
                                 placeholder="https://app.plex.tv/desktop"><br>
                         </div>
 
+                        <div class="settings-field-group settings-group-card">
+                            <h6 class="text-uppercase">Jellyfin</h6>
+                            <label for="jellyfin_url">Jellyfin Base URL (for stats, recently added, artwork when Jellyfin is the media server):</label><br>
+                            <input type="text" id="jellyfin_url" name="jellyfin_url"
+                                {% if settings.jellyfin_url != "" %}value="{{ settings.jellyfin_url }}"{% endif %}
+                                placeholder="http://localhost:8096" class="w-field"><br>
+                            <small class="form-text text-muted">Leave blank to use http://localhost:8096. Clear the API key to disable.</small><br><br>
+
+                            <label for="jellyfin_api_key">Jellyfin API Key:</label><br>
+                            <input type="password" id="jellyfin_api_key" name="jellyfin_api_key" autocomplete="new-password" class="w-field"
+                                placeholder="{% if settings.has_jellyfin_api_key %}Saved - leave blank to keep{% else %}Dashboard > API Keys in Jellyfin{% endif %}"><br><br>
+
+                            <label for="jellyfin_web_url">Jellyfin Web URL (Optional - base URL for 'Open in Jellyfin' links in emails; defaults to the Jellyfin Base URL):</label><br>
+                            <input type="text" id="jellyfin_web_url" name="jellyfin_web_url"
+                                {% if settings.jellyfin_web_url != "" %}value="{{ settings.jellyfin_web_url }}"{% endif %}
+                                placeholder="https://your-jellyfin-domain" class="w-field"><br>
+                            <p class="text-info mt-2 field-hint">Jellyfin does not store user email addresses, so per-user sends and recommendations stay Plex-only; manage Jellyfin recipient lists manually under Email Lists. Requests are handled through Jellyseerr in the Seerr card below.</p>
+                            <div class="svc-test">
+                                <button type="button" id="test_jellyfin" class="nl-btn nl-btn--primary nl-btn--sm">Test Connection</button>
+                                <span id="jellyfin_test_result"></span>
+                            </div>
+                        </div>
+
                         <div class="settings-field-grid">
+                            <div class="settings-field-group settings-group-card">
+                                <h6 class="text-uppercase">Jellywatch</h6>
+                                <label for="jellywatch_url">Jellywatch Base URL (Optional - stats and graphs for Jellyfin, the role Tautulli plays for Plex):</label><br>
+                                <input type="text" id="jellywatch_url" name="jellywatch_url"
+                                    {% if settings.jellywatch_url != "" %}value="{{ settings.jellywatch_url }}"{% endif %}
+                                    placeholder="http://your-jellywatch-host" class="w-field"><br>
+                                <small class="form-text text-muted">Clear the API key to disable.</small><br><br>
+
+                                <label for="jellywatch_api_key">Jellywatch API Key:</label><br>
+                                <input type="password" id="jellywatch_api_key" name="jellywatch_api_key" autocomplete="new-password" class="w-field"
+                                    placeholder="{% if settings.has_jellywatch_api_key %}Saved - leave blank to keep{% else %}Jellywatch API Key{% endif %}"><br>
+                                <div class="svc-test">
+                                    <button type="button" id="test_jellywatch" class="nl-btn nl-btn--primary nl-btn--sm">Test Connection</button>
+                                    <span id="jellywatch_test_result"></span>
+                                </div>
+                            </div>
+
                             <div class="settings-field-group settings-group-card">
                                 <h6 class="text-uppercase">Tautulli</h6>
                                 <label for="tautulli_url">Tautulli Base URL (Optional - for user emails, stats, graphs, recently added):</label><br>
@@ -290,7 +340,7 @@
                                 <input type="text" id="seerr_url" name="seerr_url"
                                     {% if settings.seerr_url != "" %}value="{{ settings.seerr_url }}"{% endif %}
                                     placeholder="http://localhost:5055" class="w-field"><br>
-                                <small class="form-text text-muted">Leave blank to use http://localhost:5055 (the Seerr default). Also works with Overseerr and Jellyseerr. Clear the API key to disable.</small><br><br>
+                                <small class="form-text text-muted">Leave blank to use http://localhost:5055 (the Seerr default). Works with Overseerr and Jellyseerr alike (same /api/v1 surface), so this covers requests for both Plex and Jellyfin setups. Clear the API key to disable.</small><br><br>
 
                                 <label for="seerr_api_key">Seerr API Key:</label><br>
                                 <input type="password" id="seerr_api_key" name="seerr_api_key" autocomplete="new-password" class="w-field"
@@ -944,6 +994,7 @@
         window.fillDefaultUrlIfKeyed('radarr_url', 'radarr_api_key', HAS_RADARR_API_KEY, 'http://localhost:7878');
         window.fillDefaultUrlIfKeyed('ombi_url', 'ombi_api_key', HAS_OMBI_API_KEY, 'http://localhost:3579');
         window.fillDefaultUrlIfKeyed('seerr_url', 'seerr_api_key', HAS_SEERR_API_KEY, 'http://localhost:5055');
+        window.fillDefaultUrlIfKeyed('jellyfin_url', 'jellyfin_api_key', HAS_JELLYFIN_API_KEY, 'http://localhost:8096');
         const requiredFields = e.target.querySelectorAll('[required]');
         for (const field of requiredFields) {
             if (!field.validity.valid) {
@@ -1593,6 +1644,8 @@
     const HAS_SEERR_API_KEY = {{ 'true' if settings.has_seerr_api_key else 'false' }};
     const HAS_TAUTULLI_API = {{ 'true' if settings.has_tautulli_api else 'false' }};
     const HAS_DROPPEDNEEDLE_API_KEY = {{ 'true' if settings.has_droppedneedle_api_key else 'false' }};
+    const HAS_JELLYFIN_API_KEY = {{ 'true' if settings.has_jellyfin_api_key else 'false' }};
+    const HAS_JELLYWATCH_API_KEY = {{ 'true' if settings.has_jellywatch_api_key else 'false' }};
 
     // When an API key is present (typed now or already saved) but the URL is
     // blank, fill in the default so the user sees what will be tested and saved.
@@ -1682,6 +1735,21 @@
         }, 'seerr_test_result', 'test_seerr');
     });
 
+    document.getElementById('test_jellyfin')?.addEventListener('click', () => {
+        window.fillDefaultUrlIfKeyed('jellyfin_url', 'jellyfin_api_key', HAS_JELLYFIN_API_KEY, 'http://localhost:8096');
+        runConnectionTest('/api/test/jellyfin', {
+            url: document.getElementById('jellyfin_url').value.trim(),
+            api_key: document.getElementById('jellyfin_api_key').value.trim()
+        }, 'jellyfin_test_result', 'test_jellyfin');
+    });
+
+    document.getElementById('test_jellywatch')?.addEventListener('click', () => {
+        runConnectionTest('/api/test/jellywatch', {
+            url: document.getElementById('jellywatch_url').value.trim(),
+            api_key: document.getElementById('jellywatch_api_key').value.trim()
+        }, 'jellywatch_test_result', 'test_jellywatch');
+    });
+
     // Test All: run each configured service in turn, reusing its inline result
     // display. Unconfigured services (no URL/key entered and no saved key) are
     // skipped. Plex has its own Reconnect flow and is not included.
@@ -1718,6 +1786,13 @@
               run: () => { window.fillDefaultUrlIfKeyed('seerr_url', 'seerr_api_key', HAS_SEERR_API_KEY, 'http://localhost:5055');
                   return runConnectionTest('/api/test/seerr',
                   { url: val('seerr_url'), api_key: val('seerr_api_key') }, 'seerr_test_result', 'test_seerr'); } },
+            { configured: () => !!val('jellyfin_url') || !!val('jellyfin_api_key') || HAS_JELLYFIN_API_KEY,
+              run: () => { window.fillDefaultUrlIfKeyed('jellyfin_url', 'jellyfin_api_key', HAS_JELLYFIN_API_KEY, 'http://localhost:8096');
+                  return runConnectionTest('/api/test/jellyfin',
+                  { url: val('jellyfin_url'), api_key: val('jellyfin_api_key') }, 'jellyfin_test_result', 'test_jellyfin'); } },
+            { configured: () => !!val('jellywatch_url') || !!val('jellywatch_api_key') || HAS_JELLYWATCH_API_KEY,
+              run: () => runConnectionTest('/api/test/jellywatch',
+                  { url: val('jellywatch_url'), api_key: val('jellywatch_api_key') }, 'jellywatch_test_result', 'test_jellywatch') },
         ];
 
         btn.disabled = true;

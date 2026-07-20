@@ -21,6 +21,10 @@
 
                         <div class="builder-card rail-card">
                             <h3 class="rail-heading">get</h3>
+                            <button id="getAllBtn" class="nl-btn nl-btn--primary"
+                                    {%- if not (service_flags.tautulli or service_flags.conjurr or service_flags.droppedneedle or service_flags.calendar or service_flags.ombi or service_flags.seerr) %} disabled title="Configure a service in settings"{% endif %}>Get All</button>
+                            <p class="rail-note">Runs every configured pull below (and Get Stats\Users) in sequence. Disabled services are skipped.</p>
+
                             <button id="pullRecsBtn" class="nl-btn nl-btn--ghost"
                                     {%- if not service_flags.conjurr %} disabled title="Configure Conjurr in settings"
                                     {%- elif not user_dict %} disabled title="Run Get Stats\Users first to load recipients"{% endif %}>Get Recommendations</button>

@@ -10,6 +10,9 @@ from app.crypto import decrypt
 from app.security import require_csrf_for_json, requires_auth, safe_get, json_body
 from app.theme import get_theme_settings
 from app.clients.plex import get_plex_headers, get_plex_machine_id, build_plex_web_link, reset_plex_health, plex_call_failed, fetch_library_sections_with_genres
+from app.clients.jellyfin import reset_jellyfin_health, jellyfin_call_failed, fetch_recently_added_using_jellyfin, fetch_jellyfin_library_counts, get_jellyfin_server_id, build_jellyfin_web_link
+from app.clients.jellywatch import fetch_jellywatch_home_stats
+from app.clients.mediaserver import get_media_server_type
 from app.clients.tautulli import run_tautulli_command, days_since_year_start
 from app.progress import progress_start, progress_step, progress_done
 from app.clients.conjurr import run_conjurr_command
@@ -39,6 +42,10 @@ def pull_stats():
     count = str(data.get('count', 10))
 
     _s = get_settings(decrypt_secrets=False)
+
+    if get_media_server_type(_s) == 'jellyfin':
+        return _pull_stats_jellyfin(_s, time_range, count)
+
     row = (_s.get("tautulli_url"), _s.get("tautulli_api"), _s.get("server_name"), _s.get("stats_type"), _s.get("recently_added_mode"), _s.get("recently_added_sort")) if "id" in _s else None
 
     if not row or not row[0]:
@@ -183,6 +190,113 @@ def pull_stats():
         "time_range": time_range,
         "count": count,
         "plex_unavailable": plex_unavailable,
+        "error": error
+    })
+
+def _pull_stats_jellyfin(_s, time_range, count):
+    """The /pull_stats flow when Jellyfin is the media server. Recently added
+    and library counts come from Jellyfin directly; home stats and graphs
+    come from Jellywatch when configured (empty otherwise, which every
+    consumer already handles). Response shape matches the Plex path exactly;
+    the plex_unavailable key doubles as the degraded-to-cache warning for
+    whichever server is active."""
+    if not (_s.get('jellyfin_url') and _s.get('jellyfin_api_key')):
+        return jsonify({"error": "Please enter Jellyfin info on settings page"}), 400
+
+    recently_added_mode = _s.get('recently_added_mode') or 'items'
+    recently_added_sort = _s.get('recently_added_sort') or 'date'
+
+    cache_params = {
+        'time_range': time_range,
+        'count': count,
+        'url': _s.get('jellyfin_url'),
+        'timestamp': time.time()
+    }
+
+    progress_start('pull_stats', 3, 'Pulling library counts...')
+    reset_jellyfin_health()
+    error = None
+
+    include_user_info = (_s.get('include_user_info') or 'enabled') != 'disabled'
+
+    # Home stats come from Jellywatch when configured; each stat is offered
+    # only if it has rows (absence handled everywhere downstream).
+    stats = fetch_jellywatch_home_stats(days=time_range, include_user_info=include_user_info)
+
+    # Deep links attached at pull time (the Plex NEWS-5 pattern) so the email
+    # builder and previews never need a network call. Jellywatch item thumbs
+    # carry /Items/{id}/... paths; recover the id for the web link.
+    server_id = get_jellyfin_server_id()
+    if server_id:
+        jellyfin_web_url = _s.get('jellyfin_web_url')
+        jellyfin_url = _s.get('jellyfin_url')
+        for stat in stats:
+            for stat_row in stat.get('rows', []):
+                thumb = stat_row.get('thumb') or ''
+                if '/Items/' in thumb:
+                    item_id = thumb.split('/Items/', 1)[1].split('/', 1)[0]
+                    if item_id:
+                        stat_row['plex_url'] = build_jellyfin_web_link(item_id, server_id, jellyfin_web_url, jellyfin_url)
+
+    library_counts = fetch_jellyfin_library_counts()
+    if library_counts:
+        stats.append({
+            'stat_id': 'library_item_counts',
+            'stat_title': 'Library Item Counts',
+            'rows': library_counts
+        })
+    set_cached_data('stats', stats, cache_params)
+
+    # Jellywatch has no graph endpoints in this cycle; the graph list stays
+    # empty and no graph snap-ins are offered (server-type aware, per plan).
+    graph_data = []
+    graph_commands = []
+    set_cached_data('graph_data', graph_data, cache_params)
+
+    # Year-in-review off the same Jellywatch stats over a full-year window;
+    # hides itself (empty) when Jellywatch cannot answer.
+    from app.clients.tautulli import days_since_year_start
+    yearly_wrapped_data = fetch_jellywatch_home_stats(days=days_since_year_start(), include_user_info=include_user_info)
+    if yearly_wrapped_data:
+        set_cached_data('yearly_wrapped_json', yearly_wrapped_data, cache_params)
+
+    progress_step('pull_stats', 'Pulling users...')
+    users = None
+    set_cached_data('users', users, cache_params)
+
+    progress_step('pull_stats', 'Pulling recently added...')
+    recent_data = fetch_recently_added_using_jellyfin(count, recently_added_mode=recently_added_mode, recently_added_sort=recently_added_sort)
+    set_cached_data('recent_data', recent_data, cache_params)
+
+    most_watched_data = []
+    set_cached_data('most_watched_data', most_watched_data, cache_params)
+    set_cached_data('most_watched_recent_data', [], cache_params)
+
+    jellyfin_unavailable = jellyfin_call_failed()
+    progress_done('pull_stats')
+
+    return jsonify({
+        "success": True,
+        "alert": f"Fresh data loaded! Recently added {'within last ' + count + ' days' if recently_added_mode == 'days' else count + ' items'} from Jellyfin.",
+        "stats": stats,
+        "yearly_wrapped_json": yearly_wrapped_data or [],
+        "graph_data": graph_data,
+        "graph_commands": graph_commands,
+        "recent_data": recent_data,
+        "most_watched_data": most_watched_data,
+        "user_dict": {},
+        "users_full_data": None,
+        "cache_info": {
+            "stats": get_cache_info('stats'),
+            "users": get_cache_info('users'),
+            "graph_data": get_cache_info('graph_data'),
+            "recent_data": get_cache_info('recent_data'),
+            "recommendations_json": get_cache_info('recommendations_json'),
+            "filtered_users": get_cache_info('filtered_users'),
+        },
+        "time_range": time_range,
+        "count": count,
+        "plex_unavailable": jellyfin_unavailable,
         "error": error
     })
 

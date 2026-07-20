@@ -54,6 +54,12 @@ def requires_auth(f):
         if token and hmac.compare_digest(token, config.INTERNAL_TOKEN):
             return f(*args, **kwargs)
 
+        # Demo mode is a public showcase: skip the login/setup gate entirely.
+        # The demo before_request has already seeded a demo session and blocks
+        # every mutating request, so read-only pages are safe to serve.
+        if config.DEMO_MODE:
+            return f(*args, **kwargs)
+
         if not admin_configured():
             return redirect(url_for('auth.setup'))
 

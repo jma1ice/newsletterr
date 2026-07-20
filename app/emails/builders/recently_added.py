@@ -186,6 +186,17 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
                     except:
                         logger.debug("suppressed exception; using fallback", exc_info=True)
                         pass
+
+            # days-mode show rollups carry an in-window episode count; surface it
+            # in place of a per-episode runtime that no longer applies to the card
+            new_ep_count = item.get('new_episode_count')
+            if new_ep_count:
+                try:
+                    n = int(new_ep_count)
+                except (TypeError, ValueError):
+                    n = 0
+                if n > 0:
+                    duration = f"{n} new episode" + ("s" if n != 1 else "")
             
             cell_style = f"""
                 width: {cell_width_pct};

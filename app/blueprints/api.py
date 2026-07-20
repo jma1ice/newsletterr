@@ -10,6 +10,8 @@ from app.cache import gkak
 from app.crypto import encrypt, decrypt
 from app.security import requires_auth, safe_get, require_csrf_for_json
 from app.clients.plex import get_plex_client_identifier, get_plex_headers
+from app.clients.jellyfin import get_jellyfin_headers
+from app.clients.jellywatch import ping_jellywatch
 
 import logging
 
@@ -141,6 +143,43 @@ def test_seerr_connection(url, api_key):
     except Exception as e:
         return {'status': 'error', 'message': str(e)}
 
+def test_jellyfin_connection(url, api_key):
+    url = (url or '').rstrip('/')
+    api_key = (api_key or '').strip()
+    if not url:
+        return {'status': 'error', 'message': 'Jellyfin URL is required'}
+    if not api_key:
+        return {'status': 'error', 'message': 'Jellyfin API key is required'}
+    try:
+        r = safe_get(f"{url}/System/Info", timeout=10, headers=get_jellyfin_headers(api_key))
+        if r.status_code in (401, 403):
+            return {'status': 'error', 'message': 'Jellyfin rejected the API key'}
+        r.raise_for_status()
+        server_name = r.json().get('ServerName') or 'Jellyfin'
+        return {'status': 'ok', 'message': f'Connected to {server_name}'}
+    except requests.exceptions.ConnectionError:
+        return {'status': 'error', 'message': 'Jellyfin is unreachable at that URL'}
+    except Exception as e:
+        return {'status': 'error', 'message': str(e)}
+
+def test_jellywatch_connection(url, api_key):
+    url = (url or '').rstrip('/')
+    api_key = (api_key or '').strip()
+    if not url:
+        return {'status': 'error', 'message': 'Jellywatch URL is required'}
+    if not api_key:
+        return {'status': 'error', 'message': 'Jellywatch API key is required'}
+    try:
+        r = ping_jellywatch(url, api_key)
+        if r.status_code in (401, 403):
+            return {'status': 'error', 'message': 'Jellywatch rejected the API key'}
+        r.raise_for_status()
+        return {'status': 'ok', 'message': 'Connected to Jellywatch'}
+    except requests.exceptions.ConnectionError:
+        return {'status': 'error', 'message': 'Jellywatch is unreachable at that URL'}
+    except Exception as e:
+        return {'status': 'error', 'message': str(e)}
+
 def _fallback(posted, saved):
     posted = (posted or '').strip()
     return posted or (saved or '')
@@ -206,6 +245,24 @@ def test_seerr():
     url = _fallback(data.get('url'), s.get('seerr_url'))
     api_key = _fallback(data.get('api_key'), s.get('seerr_api_key'))
     return jsonify(test_seerr_connection(url, api_key))
+
+@bp.route('/api/test/jellyfin', methods=['POST'])
+@requires_auth
+def test_jellyfin():
+    data = request.get_json()
+    s = get_settings()
+    url = _fallback(data.get('url'), s.get('jellyfin_url'))
+    api_key = _fallback(data.get('api_key'), s.get('jellyfin_api_key'))
+    return jsonify(test_jellyfin_connection(url, api_key))
+
+@bp.route('/api/test/jellywatch', methods=['POST'])
+@requires_auth
+def test_jellywatch():
+    data = request.get_json()
+    s = get_settings()
+    url = _fallback(data.get('url'), s.get('jellywatch_url'))
+    api_key = _fallback(data.get('api_key'), s.get('jellywatch_api_key'))
+    return jsonify(test_jellywatch_connection(url, api_key))
 
 PRIDE_FLAGS = frozenset({'off', 'rainbow', 'trans', 'bi', 'pan', 'nonbinary', 'lesbian', 'ace', 'progress'})
 

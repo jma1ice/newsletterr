@@ -74,6 +74,11 @@ def init_db(db_path):
             selected_items TEXT NOT NULL,
             email_text TEXT,
             subject TEXT,
+            -- Legacy per-template column, kept only so the old-DB migration below
+            -- (INSERT ... layout ...) still lines up positionally. It is NOT the
+            -- NEWS-30 email layout: that is the settings-level `email_layout`
+            -- (legacy/classic/editorial/digest) read in app/emails/assemble.py.
+            -- Nothing reads this column; do not wire new behavior to it.
             layout TEXT DEFAULT 'standard',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -135,6 +140,7 @@ def init_db(db_path):
             send_time TEXT DEFAULT '09:00', -- Time of day to send (HH:MM format)
             date_range INTEGER DEFAULT 7, -- Number of days of data to include
             items_count INTEGER DEFAULT 10,
+            skip_if_no_new INTEGER DEFAULT 0, -- skip the send when no new recently-added/most-watched items landed
             last_sent TIMESTAMP,
             next_send TIMESTAMP NOT NULL,
             is_active BOOLEAN DEFAULT 1,
@@ -162,7 +168,12 @@ def init_db(db_path):
         logger.info("Adding items_count column to email_schedules table...")
         cursor.execute("ALTER TABLE email_schedules ADD COLUMN items_count INTEGER DEFAULT 10")
         conn.commit()
-    
+
+    if 'skip_if_no_new' not in columns:
+        logger.info("Adding skip_if_no_new column to email_schedules table...")
+        cursor.execute("ALTER TABLE email_schedules ADD COLUMN skip_if_no_new INTEGER DEFAULT 0")
+        conn.commit()
+
     cursor.execute("PRAGMA table_info(settings)")
     settings_columns = [column[1] for column in cursor.fetchall()]
     if 'smtp_username' not in settings_columns:
@@ -221,7 +232,7 @@ def init_db(db_path):
 
     cursor.execute("PRAGMA table_info(settings)")
     columns = [column[1] for column in cursor.fetchall()]
-    for col_name, col_def in [('default_intro_text', 'TEXT DEFAULT ""'), ('default_outro_text', 'TEXT DEFAULT ""'), ('hsts_enabled', 'TEXT DEFAULT "disabled"'), ('scheduled_subject_prefix', 'TEXT DEFAULT "enabled"'), ('logo_position', 'TEXT DEFAULT "center"'), ('hide_stat_play_counts', 'TEXT DEFAULT "disabled"'), ('hide_graph_play_counts', 'TEXT DEFAULT "disabled"'), ('stats_type', 'TEXT DEFAULT "plays"'), ('recently_added_mode', 'TEXT DEFAULT "items"'), ('recently_added_sort', 'TEXT DEFAULT "date"'), ('ra_grid_columns', 'TEXT DEFAULT "5"'), ('recs_grid_columns', 'TEXT DEFAULT "5"'), ('stat_cover_art', 'TEXT DEFAULT "disabled"'), ('send_mode', 'TEXT DEFAULT "bcc"'), ('poster_max_height', 'TEXT DEFAULT ""'), ('droppedneedle_url', 'TEXT DEFAULT ""'), ('droppedneedle_api_key', 'TEXT DEFAULT ""'), ('discord_webhook_url', 'TEXT DEFAULT ""'), ('sonarr_url', 'TEXT DEFAULT ""'), ('sonarr_api_key', 'TEXT DEFAULT ""'), ('radarr_url', 'TEXT DEFAULT ""'), ('radarr_api_key', 'TEXT DEFAULT ""'), ('ombi_url', 'TEXT DEFAULT ""'), ('ombi_api_key', 'TEXT DEFAULT ""'), ('seerr_url', 'TEXT DEFAULT ""'), ('seerr_api_key', 'TEXT DEFAULT ""'), ('coming_soon_days_ahead', 'TEXT DEFAULT "14"'), ('coming_soon_grid_columns', 'TEXT DEFAULT "5"'), ('hosted_enabled', 'TEXT DEFAULT "disabled"'), ('hosted_base_url', 'TEXT DEFAULT ""'), ('hosted_images_enabled', 'TEXT DEFAULT "disabled"'), ('ra_show_description', 'TEXT DEFAULT "enabled"'), ('collections_grid_columns', 'TEXT DEFAULT "5"'), ('exclude_inactive_days', 'TEXT DEFAULT "0"'), ('include_user_info', 'TEXT DEFAULT "enabled"'), ('email_size_warn_mb', 'TEXT DEFAULT "10"'), ('appearance_theme', 'TEXT DEFAULT "dark"'), ('pride_flag', 'TEXT DEFAULT "off"'), ('snapins_floating', 'TEXT DEFAULT "1"'), ('hosted_image_retention_days', 'TEXT DEFAULT "90"'), ('hosted_links_enabled', 'TEXT DEFAULT "disabled"'), ('hosted_links_base_url', 'TEXT DEFAULT ""'), ('recs_item_count', 'TEXT DEFAULT ""'), ('ui_custom_light', 'TEXT DEFAULT ""'), ('ui_custom_dark', 'TEXT DEFAULT ""'), ('email_layout', 'TEXT DEFAULT "classic"')]:
+    for col_name, col_def in [('default_intro_text', 'TEXT DEFAULT ""'), ('default_outro_text', 'TEXT DEFAULT ""'), ('hsts_enabled', 'TEXT DEFAULT "disabled"'), ('scheduled_subject_prefix', 'TEXT DEFAULT "enabled"'), ('logo_position', 'TEXT DEFAULT "center"'), ('hide_stat_play_counts', 'TEXT DEFAULT "disabled"'), ('hide_graph_play_counts', 'TEXT DEFAULT "disabled"'), ('stats_type', 'TEXT DEFAULT "plays"'), ('recently_added_mode', 'TEXT DEFAULT "items"'), ('recently_added_sort', 'TEXT DEFAULT "date"'), ('ra_grid_columns', 'TEXT DEFAULT "5"'), ('recs_grid_columns', 'TEXT DEFAULT "5"'), ('stat_cover_art', 'TEXT DEFAULT "disabled"'), ('send_mode', 'TEXT DEFAULT "bcc"'), ('poster_max_height', 'TEXT DEFAULT ""'), ('droppedneedle_url', 'TEXT DEFAULT ""'), ('droppedneedle_api_key', 'TEXT DEFAULT ""'), ('discord_webhook_url', 'TEXT DEFAULT ""'), ('sonarr_url', 'TEXT DEFAULT ""'), ('sonarr_api_key', 'TEXT DEFAULT ""'), ('radarr_url', 'TEXT DEFAULT ""'), ('radarr_api_key', 'TEXT DEFAULT ""'), ('ombi_url', 'TEXT DEFAULT ""'), ('ombi_api_key', 'TEXT DEFAULT ""'), ('seerr_url', 'TEXT DEFAULT ""'), ('seerr_api_key', 'TEXT DEFAULT ""'), ('coming_soon_days_ahead', 'TEXT DEFAULT "14"'), ('coming_soon_grid_columns', 'TEXT DEFAULT "5"'), ('hosted_enabled', 'TEXT DEFAULT "disabled"'), ('hosted_base_url', 'TEXT DEFAULT ""'), ('hosted_images_enabled', 'TEXT DEFAULT "disabled"'), ('ra_show_description', 'TEXT DEFAULT "enabled"'), ('collections_grid_columns', 'TEXT DEFAULT "5"'), ('exclude_inactive_days', 'TEXT DEFAULT "0"'), ('include_user_info', 'TEXT DEFAULT "enabled"'), ('email_size_warn_mb', 'TEXT DEFAULT "10"'), ('appearance_theme', 'TEXT DEFAULT "dark"'), ('pride_flag', 'TEXT DEFAULT "off"'), ('snapins_floating', 'TEXT DEFAULT "1"'), ('hosted_image_retention_days', 'TEXT DEFAULT "90"'), ('hosted_links_enabled', 'TEXT DEFAULT "disabled"'), ('hosted_links_base_url', 'TEXT DEFAULT ""'), ('recs_item_count', 'TEXT DEFAULT ""'), ('ui_custom_light', 'TEXT DEFAULT ""'), ('ui_custom_dark', 'TEXT DEFAULT ""'), ('email_layout', 'TEXT DEFAULT "classic"'), ('media_server_type', 'TEXT DEFAULT "plex"'), ('jellyfin_url', 'TEXT DEFAULT ""'), ('jellyfin_api_key', 'TEXT DEFAULT ""'), ('jellyfin_web_url', 'TEXT DEFAULT ""'), ('jellywatch_url', 'TEXT DEFAULT ""'), ('jellywatch_api_key', 'TEXT DEFAULT ""')]:
         if col_name not in columns:
             logger.info(f"Adding {col_name} column to settings table...")
             cursor.execute(f'ALTER TABLE settings ADD COLUMN {col_name} {col_def}')

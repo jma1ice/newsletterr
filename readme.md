@@ -9,6 +9,7 @@ Newsletterr is a lightweight Flask application that talks to **[Tautulli](https:
 ## Features
 
 ### Data & Content
+* **Plex or Jellyfin** - choose your media server in Settings; Jellyfin uses Jellywatch for stats (the role Tautulli fills for Plex) and Seerr or Ombi for requests, with recently added, library counts, and deep links working the same either way.
 * **One‑click stats pull** - pick a time range (quick buttons: 7 / 30 / 90 / … days) and "recently added" count; Newsletterr queries Tautulli for most watched movies/shows, active users, platforms, libraries, artists and more.
 * **User Recommendations** - integrate with **conjurr** to show personalized watch suggestions (per BCC list at fetch time).
 * **Snap‑ins (drag/add workflow)** - add Stats, Graphs, Recently Added (library selection supported), Recommendations, Collections, and Text Blocks (Title, Header, Intro, Body, Outro) in any order (Title sticks to the top) to compose a tailored newsletter body.
@@ -126,6 +127,20 @@ volumes:
   newsletterr-uploads:
 ```
 
+The image runs as a non-root user (uid 1000) by default. To use linuxserver.io-style
+ownership instead, start the container as root with `PUID`/`PGID` set and the
+entrypoint will chown the volumes to that user before dropping privileges:
+```
+docker run -d --name newsletterr \
+  -p 6397:6397 \
+  --user 0:0 \
+  -e PUID=1000 -e PGID=1000 \
+  -v newsletterr-db:/app/database \
+  -v newsletterr-env:/app/env \
+  -v newsletterr-uploads:/app/static/uploads \
+  jma1ice/newsletterr:latest
+```
+
 ### 3. Run
 
 For development:
@@ -152,6 +167,8 @@ On first visit you will be asked to create a login (username and password), then
 | `DATA_ENC_KEY` | Fernet key encrypting stored credentials; auto-generated into `env/.env` on first run | generated |
 | `NEWSLETTERR_SECRET_KEY` | Session signing key; auto-generated into `env/.env` so sessions survive restarts | generated |
 | `INTERNAL_TOKEN` | Token for the app's internal self-requests | generated per boot |
+| `PUID` / `PGID` | When the Docker container is started as root, the uid/gid to chown volumes to and drop privileges into (linuxserver.io convention) | container's built-in `app` user |
+| `DEMO_MODE` | Set to `1` for a public read-only showcase: auth is bypassed, changes are blocked with a banner, and the caches are seeded with sample data | `0` |
 
 ---
 
@@ -256,24 +273,23 @@ Released under the **MIT License** - see [LICENSE](LICENSE.txt) for details.
 
 ## Planned Changes
 
-Work is organized into version sprints. Items may shift between sprints as priorities change.
-
-### v2026.6 - platform and reach
-* Emby/Jellyfin support - jellyfin uses jellywatch over tautulli
-* Rootless Docker image with UID/GID support
-* Demo on the website
-
-### v2026.7
-* Items pulls episodes in even if it was just a one off, Days only pulls shows in if all the available for that season were added
-* Add button to get all available from the 'Get' section
-
 ### Community
 * GitHub webhook to pull submitted issues to Discord channel
 * Ko-fi -> Discord integration for contributor role
 * Servarr PR
+* Embed the demo on the website (the app-side DEMO_MODE flag ships in v2026.4)
+
+### Misc.
+* Finish jellyfin/emby integration
+* New layouts need images
+* Pull more/different info on dn/wrapped
+* Appearance options: default landing page after login, calendar week-start day (Sun/Mon), date/time format (12/24h, MDY/DMY)
+* Layout coverage: classic/editorial/digest treatments for the sections that still render legacy inside the variant layouts (recommendations, collections, graph chrome, per-user DroppedNeedle wrapped)
+* Single-renderer cleanup: remove the legacy client-side email preview builders in static/js/app/04-stats-graphs.js and their hand-mirrored copies in templates/schedule_preview.html now that /preview_email renders previews server-side (needs a browser pass over every snap-in preview first)
 
 ### Blocked on upstream
 * Email click for recently added/available recommendations is going to browser on mobile instead of Plex app - this is an issue with the new Plex client, have not seen a fix yet and no info released by Plex at this time
+* Ask Conjurr for N recommendations over the API instead of slicing after enrichment - needs a Conjurr-side count parameter; falls back to the current slice until that exists
 
 ---
 
@@ -291,11 +307,17 @@ Work is organized into version sprints. Items may shift between sprints as prior
 * More snap-ins: random pick, most watched
 * Snap-ins working with custom HTML
 * PDF export
+* Jellyfin support
+* Rootless Docker image
+* Demo mode (DEMO_MODE) for a public, read-only showcase deployment
+* Get All button on builder left pane
+* Option to skip scheduled send if nothing is new
 
 #### Fixed:
 * UI adjustment to better organize snap-ins sections
 * Email BG color not respected by mac mail app
 * Text block titles update again while typing (inline handler blocked by CSP)
+* Recently Added by Days now pulls at an episode level
 
 ## v2026.3:
 
@@ -312,11 +334,12 @@ Work is organized into version sprints. Items may shift between sprints as prior
 ## Acknowledgements
 
 * [Tautulli](https://github.com/Tautulli/Tautulli) for the Plex charts, users, and graphs  
+* [Jellyfin](https://github.com/jellyfin/jellyfin) & [Jellywatch](https://github.com/JellyWatchteam/JellyWatch) APIs for Jellyfin 'Stats/Graphs' and recently added
 * [conjurr](https://github.com/yungsnuzzy/conjurr) for user watchlist based recommendations  
 * [DroppedNeedle](https://github.com/HabiRabbu/DroppedNeedle) for user yearly wrapped music  
 * [Sonarr](https://github.com/Sonarr/Sonarr) & [Radarr](https://github.com/Radarr/Radarr) for coming soon calendar  
-- [Ombi](https://github.com/Ombi-app/Ombi) for recently requested  
-- [Seerr](https://github.com/seerr-team/seerr) (works with Overseerr and Jellyseerr) for recently requested  
+* [Ombi](https://github.com/Ombi-app/Ombi) for recently requested  
+* [Seerr](https://github.com/seerr-team/seerr) (works with Overseerr and Jellyseerr) for recently requested  
 * [Highcharts](https://www.highcharts.com/) for charting  
 
 Happy streaming!

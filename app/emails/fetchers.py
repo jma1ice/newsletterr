@@ -4,7 +4,10 @@ from app.settings_store import get_settings
 from app.cache import get_cached_data, set_cached_data
 from app.crypto import decrypt
 from app.clients.tautulli import run_tautulli_command, days_since_year_start
-from app.clients.plex import fetch_recently_added_using_plex_sdk, get_plex_machine_id, build_plex_web_link
+from app.clients.plex import get_plex_machine_id, build_plex_web_link
+from app.clients.mediaserver import fetch_recently_added, get_media_server_type
+from app.clients.jellyfin import fetch_jellyfin_library_counts
+from app.clients.jellywatch import fetch_jellywatch_home_stats
 from app.clients.conjurr import run_conjurr_command
 from app.clients.droppedneedle import run_droppedneedle_command, fetch_droppedneedle_server_stats
 from app.clients.sonarr import fetch_sonarr_calendar
@@ -44,50 +47,68 @@ def fetch_tautulli_data_for_email(tautulli_base_url, tautulli_api_key, date_rang
         {'command': 'get_stream_type_by_top_10_users', 'name': 'Stream Type by Top Users'}
     ]
     
+    jellyfin_active = get_media_server_type() == 'jellyfin'
+
     try:
-        stats, _ = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_home_stats', 'Stats', None, str(date_range), stats_type=stats_type)
-        if stats:
-            data['stats'] = stats
+        if jellyfin_active:
+            # Stats come from Jellywatch when configured; library counts come
+            # straight from Jellyfin. Tautulli is never called. No graphs this
+            # cycle (Jellywatch has no graph endpoints), so the list stays empty.
+            data['stats'] = fetch_jellywatch_home_stats(days=date_range)
+            counts = fetch_jellyfin_library_counts()
+            if counts:
+                data['stats'].append({
+                    'stat_id': 'library_item_counts',
+                    'stat_title': 'Library Item Counts',
+                    'rows': counts
+                })
+            data['graph_data'] = []
+            data['graph_commands'] = []
+        else:
+            stats, _ = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_home_stats', 'Stats', None, str(date_range), stats_type=stats_type)
+            if stats:
+                data['stats'] = stats
 
-        libraries, _ = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_libraries', None, None)
-        if libraries:
-            data['stats'].append({
-                'stat_id': 'library_item_counts',
-                'stat_title': 'Library Item Counts',
-                'rows': [
-                    {'section_name': lib.get('section_name', ''), 'count': lib.get('count', 0)}
-                    for lib in libraries
-                ]
-            })
+            libraries, _ = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_libraries', None, None)
+            if libraries:
+                data['stats'].append({
+                    'stat_id': 'library_item_counts',
+                    'stat_title': 'Library Item Counts',
+                    'rows': [
+                        {'section_name': lib.get('section_name', ''), 'count': lib.get('count', 0)}
+                        for lib in libraries
+                    ]
+                })
 
-        graph_data = []
-        for command in graph_commands:
-            try:
-                gd, _ = run_tautulli_command(tautulli_base_url, tautulli_api_key, command["command"], command["name"], None, str(date_range), y_axis=stats_type)
-                graph_data.append(gd if gd is not None else {})
-            except Exception as e:
-                graph_data.append({})
-                logger.error(f"Error fetching graph data for {command['name']}: {e}")
-        
-        data['graph_data'] = graph_data
-        data['graph_commands'] = graph_commands
+            graph_data = []
+            for command in graph_commands:
+                try:
+                    gd, _ = run_tautulli_command(tautulli_base_url, tautulli_api_key, command["command"], command["name"], None, str(date_range), y_axis=stats_type)
+                    graph_data.append(gd if gd is not None else {})
+                except Exception as e:
+                    graph_data.append({})
+                    logger.error(f"Error fetching graph data for {command['name']}: {e}")
 
-        recent_data = fetch_recently_added_using_plex_sdk(tautulli_base_url, tautulli_api_key, items_count, recently_added_mode=recently_added_mode, recently_added_sort=recently_added_sort)
+            data['graph_data'] = graph_data
+            data['graph_commands'] = graph_commands
+
+        recent_data = fetch_recently_added(tautulli_base_url, tautulli_api_key, items_count, recently_added_mode=recently_added_mode, recently_added_sort=recently_added_sort)
         data['recent_data'] = recent_data
 
-        data['most_watched_data'] = fetch_most_watched_data(tautulli_base_url, tautulli_api_key)
-        data['most_watched_recent_data'] = fetch_most_watched_data(tautulli_base_url, tautulli_api_key, days=date_range)
+        if not jellyfin_active:
+            data['most_watched_data'] = fetch_most_watched_data(tautulli_base_url, tautulli_api_key)
+            data['most_watched_recent_data'] = fetch_most_watched_data(tautulli_base_url, tautulli_api_key, days=date_range)
         data['most_watched_recent_days'] = date_range
 
-        logger.info(f"Fetched Tautulli data: {len(data['stats'])} stats, {len(data['graph_data'])} graphs, {len(data['recent_data'])} recent sections")
-        
+        logger.info(f"Fetched media data: {len(data['stats'])} stats, {len(data['graph_data'])} graphs, {len(data['recent_data'])} recent sections")
+
     except Exception as e:
-        logger.exception(f"Error fetching Tautulli data: {e}")
-    
+        logger.exception(f"Error fetching media data: {e}")
+
     return data
 
 def fetch_recent_data_for_index(tautulli_base_url, tautulli_api_key, count, recently_added_mode="items", recently_added_sort="date"):
-    return fetch_recently_added_using_plex_sdk(tautulli_base_url, tautulli_api_key, int(count), recently_added_mode=recently_added_mode, recently_added_sort=recently_added_sort)
+    return fetch_recently_added(tautulli_base_url, tautulli_api_key, int(count), recently_added_mode=recently_added_mode, recently_added_sort=recently_added_sort)
 
 def _aggregate_history_rows(rows):
     """Collapse get_history play rows to top-level items with play counts:
@@ -376,6 +397,13 @@ def get_yearly_wrapped_cached(use_cache=True):
                 return cached
 
         _s = get_settings(decrypt_secrets=False)
+
+        if get_media_server_type(_s) == 'jellyfin':
+            stats_data = fetch_jellywatch_home_stats(days=days_since_year_start()) or None
+            if use_cache and stats_data:
+                set_cached_data('yearly_wrapped_json', stats_data, {'timestamp': time.time(), 'manual_fetch': True})
+            return stats_data
+
         row = (_s.get("tautulli_url"), _s.get("tautulli_api"), _s.get("stats_type")) if "id" in _s else None
 
         if not row or not row[0] or not row[1]:

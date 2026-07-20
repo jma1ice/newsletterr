@@ -28,8 +28,13 @@ def settings():
     cursor = conn.cursor()
 
     alert = request.args.get('alert')
+    # Audit results ride in the session, not the query string: the full audit
+    # JSON (plus the settings dict this route used to pass) overflowed
+    # gunicorn's request-line limit (4094 bytes) and 400'd the redirect after a
+    # successful save. Keep the ?audit= fallback for any in-flight old links.
+    audit_raw = session.pop('settings_audit', None) or request.args.get('audit')
     try:
-        audit_results = json.loads(request.args.get('audit') or 'null')
+        audit_results = json.loads(audit_raw or 'null')
     except (TypeError, ValueError):
         audit_results = None
 
@@ -497,7 +502,9 @@ def settings():
                 session.pop('authenticated', None)
                 return redirect(url_for('auth.login', alert="Settings saved successfully!"))
 
-            return redirect(url_for('settings.settings', alert="Settings saved successfully!", settings=settings, audit=audit_json))
+            if audit_json:
+                session['settings_audit'] = audit_json
+            return redirect(url_for('settings.settings', alert="Settings saved successfully!"))
 
         except Exception as e:
             try:

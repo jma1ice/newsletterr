@@ -236,7 +236,7 @@ Library names and stat titles are matched case-insensitively and may contain spa
 ```bash
 pip install -r requirements-dev.txt
 ruff check app/ newsletterr.py tests/   # lint
-pytest                                  # test suite, about a minute
+pytest                                  # test suite, about two minutes
 ```
 
 The email pipeline is covered by golden-master tests: full MIME output is compared against fixtures in `tests/goldens/`. After an intentional change to email output, regenerate them with `UPDATE_GOLDENS=1 pytest tests/test_golden_sends.py` and review the diff.
@@ -286,6 +286,7 @@ Released under the **MIT License** - see [LICENSE](LICENSE.txt) for details.
 * Appearance options: default landing page after login, calendar week-start day (Sun/Mon), date/time format (12/24h, MDY/DMY)
 * Layout coverage: classic/editorial/digest treatments for the sections that still render legacy inside the variant layouts (recommendations, collections, graph chrome, per-user DroppedNeedle wrapped)
 * Single-renderer cleanup: remove the legacy client-side email preview builders in static/js/app/04-stats-graphs.js and their hand-mirrored copies in templates/schedule_preview.html now that /preview_email renders previews server-side (needs a browser pass over every snap-in preview first)
+* Skip-on-no-new needs to have more triggers
 
 ### Blocked on upstream
 * Email click for recently added/available recommendations is going to browser on mobile instead of Plex app - this is an issue with the new Plex client, have not seen a fix yet and no info released by Plex at this time

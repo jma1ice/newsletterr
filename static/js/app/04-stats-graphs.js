@@ -1496,17 +1496,15 @@ function buildPreviewEmailHTML(contentHTML, serverName, subject, emailHeaderTitl
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('DOM loaded, testing preview...');
     const frame = document.getElementById('preview');
     if (frame) {
-        frame.srcdoc = '<html><body><h1>Test Preview</h1><p>If you can see this, the iframe is working.</p></body></html>';
-        console.log('Test preview set');
-    } else {
-        console.error('Preview iframe not found on DOM load!');
+        // A neutral loading state until the first server render returns. The
+        // real preview POST to /preview_email can take a moment on a cold load,
+        // so show something intentional rather than a leftover debug message.
+        frame.srcdoc = '<html><body style="margin:0;font-family:system-ui,sans-serif;color:#888;display:flex;align-items:center;justify-content:center;height:100vh;"><p>Loading preview&hellip;</p></body></html>';
     }
-    
+
     setTimeout(() => {
-        console.log('Running initial updatePreview...');
         updatePreview();
     }, 100);
 });

@@ -6,7 +6,7 @@ Flask app packaged as `app/` with an app factory (`app/__init__.py:create_app`) 
 
 ```bash
 pip install -r requirements-dev.txt
-pytest                                  # full suite, ~1 min, hermetic (no network, temp DB)
+pytest                                  # full suite (~333 tests, ~2 min), hermetic (no network, temp DB)
 ruff check app/ newsletterr.py tests/   # lint (F rules and E9 only)
 python newsletterr.py                   # dev server, PORT env overrides 6397
 ```

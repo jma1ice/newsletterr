@@ -1043,7 +1043,7 @@ document.addEventListener('click', async (e) => {
 
     if (!isAdd) return;
 
-    const { id, name, type } = btn.dataset;
+    let { id, name, type } = btn.dataset;
     if (!id || !type) return;
 
     console.log('Adding item:', { id, name, type });
@@ -1057,8 +1057,17 @@ document.addEventListener('click', async (e) => {
     }
     if (type === 'most_watched' && btn.dataset.lib) {
         extra.mwLibrary = btn.dataset.lib;
-        const mwCount = parseInt(btn.closest('.snapin-row')?.querySelector('.mw-count-input')?.value, 10);
+        const mwRow = btn.closest('.snapin-row');
+        const mwCount = parseInt(mwRow?.querySelector('.mw-count-input')?.value, 10);
         if (mwCount > 0) extra.mwCount = mwCount;
+        const mwScope = mwRow?.querySelector('.mw-scope-select')?.value || '';
+        if (mwScope) {
+            // distinct id/name so the all-time and pull-range variants of one
+            // library can both be added
+            extra.mwScope = mwScope;
+            id = `${id}-recent`;
+            name = `${name} (pull range)`;
+        }
     }
     if (type === 'recommendations' || type === 'droppedneedle_wrapped') {
         if (btn.dataset.userKey) extra.userKey = btn.dataset.userKey;

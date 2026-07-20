@@ -39,11 +39,13 @@ def play_count_text(item):
     count = item.get('play_count') or 0
     return f"{count} play{'s' if count != 1 else ''}"
 
-def build_most_watched_html_with_cids(most_watched_data, msg_root, theme_colors, library_filter=None, base_url="", grid_columns=5, poster_max_height=0, item_cap=0, hosted_images_enabled=False, hosted_base_url=""):
+def build_most_watched_html_with_cids(most_watched_data, msg_root, theme_colors, library_filter=None, base_url="", grid_columns=5, poster_max_height=0, item_cap=0, range_text="", hosted_images_enabled=False, hosted_base_url=""):
     heading = most_watched_heading(library_filter)
+    if range_text:
+        heading += f" ({range_text})"
     items = most_watched_items(most_watched_data, library_filter, item_cap)
     if not items:
-        return empty_state_html(theme_colors, f"No most watched items found{f' for {esc(library_filter)}' if library_filter else ''}.")
+        return empty_state_html(theme_colors, f"No most watched items found{f' for {esc(library_filter)}' if library_filter else ''}{f' ({range_text})' if range_text else ''}.")
 
     cols = max(1, int(grid_columns) if grid_columns else 5)
     poster_px = max(60, int(760 / cols) - 16)

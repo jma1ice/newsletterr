@@ -11,7 +11,10 @@ function buildSnapinTokenOptions() {
     raLibs.forEach(lib => options.push([`{{snapin:recently_added:${lib}}}`, `Recently Added: ${lib}`]));
 
     const mwLibs = [...new Set((mostWatchedPayload || []).flatMap(x => x?.most_watched || []).map(i => i.library_name).filter(Boolean))].sort();
-    mwLibs.forEach(lib => options.push([`{{snapin:most_watched:${lib}}}`, `Most Watched: ${lib}`]));
+    mwLibs.forEach(lib => {
+        options.push([`{{snapin:most_watched:${lib}}}`, `Most Watched: ${lib} (all-time)`]);
+        options.push([`{{snapin:most_watched:${lib}:recent}}`, `Most Watched: ${lib} (pull range)`]);
+    });
 
     (randomPickLibraries || []).forEach(lib => options.push([`{{snapin:random_pick:${lib.title}}}`, `Random Pick: ${lib.title}`]));
 

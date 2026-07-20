@@ -57,10 +57,10 @@ def pull_stats():
         'timestamp': time.time()
     }
 
-    # 19 units: home stats, library counts, wrapped, users, 12 graphs,
+    # 20 units: home stats, library counts, wrapped, users, 12 graphs,
     # library names, recently added (the per-library loop reports as one),
-    # most watched
-    progress_start('pull_stats', 19, 'Pulling home stats...')
+    # most watched (all-time), most watched (pull range)
+    progress_start('pull_stats', 20, 'Pulling home stats...')
 
     stats, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_home_stats', 'Stats', None, time_range, stats_type=stats_type)
     stats = stats or []
@@ -146,6 +146,10 @@ def pull_stats():
     progress_step('pull_stats', 'Pulling most watched...')
     most_watched_data = fetch_most_watched_data(tautulli_base_url, tautulli_api_key)
     set_cached_data('most_watched_data', most_watched_data, cache_params)
+
+    progress_step('pull_stats', 'Pulling most watched (pull range)...')
+    most_watched_recent_data = fetch_most_watched_data(tautulli_base_url, tautulli_api_key, days=time_range)
+    set_cached_data('most_watched_recent_data', most_watched_recent_data, cache_params)
 
     user_dict = {}
     users_full_data = None

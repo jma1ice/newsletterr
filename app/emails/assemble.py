@@ -232,7 +232,17 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, displ
         
         elif item_type == 'most_watched':
             mw_library = item.get('mwLibrary')
-            mw_data = tautulli_data.get('most_watched_data', [])
+            # Scope (NEWS-17 follow-up): '' = all-time lifetime counts,
+            # 'recent' = plays within the pull's time range (get_history
+            # aggregation cached at pull time).
+            mw_scope_recent = item.get('mwScope') == 'recent'
+            if mw_scope_recent:
+                mw_data = tautulli_data.get('most_watched_recent_data', [])
+                mw_days = tautulli_data.get('most_watched_recent_days') or date_range or (get_cache_info('most_watched_recent_data').get('params') or {}).get('time_range', '')
+                mw_range_text = f"Last {mw_days} days" if mw_days else "Recent"
+            else:
+                mw_data = tautulli_data.get('most_watched_data', [])
+                mw_range_text = ""
             # Per-library override saved on the builder item (blank = default),
             # same pattern as the recently-added raCount input.
             try:
@@ -240,9 +250,9 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, displ
             except (TypeError, ValueError):
                 mw_cap = 0
             if use_layout:
-                content_html += layouts.render_most_watched(email_layout, mw_data, msg_root, theme_colors, mw_library, base_url, grid_columns=ra_grid_columns, item_cap=mw_cap, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
+                content_html += layouts.render_most_watched(email_layout, mw_data, msg_root, theme_colors, mw_library, base_url, grid_columns=ra_grid_columns, item_cap=mw_cap, range_text=mw_range_text, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
             else:
-                content_html += build_most_watched_html_with_cids(mw_data, msg_root, theme_colors, mw_library, base_url, grid_columns=ra_grid_columns, poster_max_height=poster_max_height, item_cap=mw_cap, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
+                content_html += build_most_watched_html_with_cids(mw_data, msg_root, theme_colors, mw_library, base_url, grid_columns=ra_grid_columns, poster_max_height=poster_max_height, item_cap=mw_cap, range_text=mw_range_text, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
 
         elif item_type == 'random_pick':
             # The pick is drawn per render on purpose: previews and every send

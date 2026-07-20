@@ -31,6 +31,19 @@ def test_library_names_with_spaces_and_whitespace():
     out = expand_snapin_tokens("{{snapin:most_watched: TV Shows }}", _echo_render)
     assert out == "[most_watched|TV Shows]"
 
+def test_most_watched_scope_arg():
+    item = synthesize_snapin_item("most_watched", ["Movies", "recent"], [])
+    assert item["mwScope"] == "recent"
+    assert "mwCount" not in item
+    item = synthesize_snapin_item("most_watched", ["Movies", "5", "recent"], [])
+    assert item["mwScope"] == "recent"
+    assert item["mwCount"] == "5"
+    item = synthesize_snapin_item("most_watched", ["Movies", "recent", "5"], [])
+    assert item["mwScope"] == "recent"
+    assert item["mwCount"] == "5"
+    item = synthesize_snapin_item("most_watched", ["Movies"], [])
+    assert "mwScope" not in item
+
 def test_stats_token_resolves_title_to_index():
     item = synthesize_snapin_item("stats", ["most watched movies"], STATS)
     assert item == {"id": "stat-0", "name": "Most Watched Movies", "type": "stat"}

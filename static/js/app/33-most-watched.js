@@ -26,9 +26,15 @@ function buildMWLibraryRows() {
                     </button>
                 </div>
                 <span class="snapin-row-label" title="${escapeHtml(lib)}">${escapeHtml(lib)}</span>
+                <select class="mw-scope-select"
+                        title="Time scope for ${escapeHtml(lib)}: all-time play counts, or plays within the pulled time range. Set before clicking Add."
+                        style="width: 8em; margin-left: auto; flex-shrink: 0; font-size: .8rem; padding: .15rem .3rem;">
+                    <option value="">All-time</option>
+                    <option value="recent">Pull range</option>
+                </select>
                 <input type="number" class="mw-count-input" min="1" max="25" placeholder="10"
                        title="Max items shown for ${escapeHtml(lib)} (blank = 10). Set before clicking Add."
-                       style="width: 4em; margin-left: auto; flex-shrink: 0; font-size: .8rem; padding: .15rem .3rem;">
+                       style="width: 4em; flex-shrink: 0; font-size: .8rem; padding: .15rem .3rem;">
             </div>`;
         host.appendChild(row);
     });

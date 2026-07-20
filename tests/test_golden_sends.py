@@ -544,9 +544,19 @@ MOST_WATCHED_FIXTURE = [
     ]},
 ]
 
+MOST_WATCHED_RECENT_FIXTURE = [
+    {"most_watched": [
+        {"title": "Fresh Hit", "rating_key": "9", "year": "2026", "thumb": "/library/metadata/9/thumb",
+         "play_count": 12, "last_played": "", "media_type": "show", "type": "show",
+         "library_name": "Movies", "plex_url": ""},
+    ]},
+]
+
 def _fixed_tautulli_data_with_most_watched(*args, **kwargs):
     data = _fixed_tautulli_data()
     data["most_watched_data"] = MOST_WATCHED_FIXTURE
+    data["most_watched_recent_data"] = MOST_WATCHED_RECENT_FIXTURE
+    data["most_watched_recent_days"] = "30"
     return data
 
 def test_manual_most_watched_email_golden(manual_send_env, monkeypatch):
@@ -562,6 +572,7 @@ def test_manual_most_watched_email_golden(manual_send_env, monkeypatch):
         "selected_items": [
             {"type": "textblock", "content": "Crowd favorites"},
             {"type": "most_watched", "id": "mw-lib-movies", "mwLibrary": "Movies"},
+            {"type": "most_watched", "id": "mw-lib-movies-recent", "mwLibrary": "Movies", "mwScope": "recent"},
         ],
         "custom_html": "", "user_dict": {}, "expanded_collections": {},
     })
@@ -579,6 +590,10 @@ def test_manual_most_watched_email_golden(manual_send_env, monkeypatch):
     assert "Big Hit" in normalized["html"]
     assert "57 plays" in normalized["html"]
     assert "1 play<" in normalized["html"] or "1 play</div>" in normalized["html"]
+    # recent scope: separate section fed by the windowed data, range in heading
+    assert "Most Watched - Movies (Last 30 days)" in normalized["html"]
+    assert "Fresh Hit" in normalized["html"]
+    assert "12 plays" in normalized["html"]
     _assert_golden("manual_most_watched", normalized)
 
 def test_manual_custom_html_with_snapin_tokens_golden(manual_send_env, monkeypatch):

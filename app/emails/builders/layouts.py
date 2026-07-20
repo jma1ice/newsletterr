@@ -352,11 +352,11 @@ def _grid(cards, cols):
 
 # ---------------------------------------------------------------- most watched
 
-def render_most_watched(layout, most_watched_data, msg_root, theme, library_filter=None, base_url="", grid_columns=5, item_cap=0, hosted_images_enabled=False, hosted_base_url=""):
+def render_most_watched(layout, most_watched_data, msg_root, theme, library_filter=None, base_url="", grid_columns=5, item_cap=0, range_text="", hosted_images_enabled=False, hosted_base_url=""):
     label = most_watched_heading(library_filter)
     items = most_watched_items(most_watched_data, library_filter, item_cap)
     if not items:
-        return _shell(layout, theme, label, _empty_state_html(theme, f"No most watched items found{f' for {esc(library_filter)}' if library_filter else ''}."))
+        return _shell(layout, theme, label, _empty_state_html(theme, f"No most watched items found{f' for {esc(library_filter)}' if library_filter else ''}{f' ({range_text})' if range_text else ''}."), range_text=range_text)
 
     if layout == 'classic':
         cols = max(1, int(grid_columns) if grid_columns else 5)
@@ -365,7 +365,7 @@ def render_most_watched(layout, most_watched_data, msg_root, theme, library_filt
             title = item.get('title', 'Unknown')
             poster_src = most_watched_poster(item, msg_root, f"la-mw-{i}", base_url, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
             cards.append(_build_card_html(theme, truncate_text(title, 23), str(item.get('year') or ''), play_count_text(item), poster_src))
-        return _shell(layout, theme, label, _grid(cards, cols))
+        return _shell(layout, theme, label, _grid(cards, cols), range_text=range_text)
 
     if layout == 'editorial':
         rows = ""
@@ -383,13 +383,13 @@ def render_most_watched(layout, most_watched_data, msg_root, theme, library_filt
                     </td>
                 </tr></table>
             """
-        return _shell(layout, theme, label, rows, overline="Crowd favorites")
+        return _shell(layout, theme, label, rows, range_text=range_text, overline="Crowd favorites")
 
     # digest: ranked rows, title left / plays right
     rows = ""
     for item in items:
         rows += _digest_row(theme, _linked(item.get('title', 'Unknown'), item.get('plex_url', '')), esc(play_count_text(item)))
-    return _shell(layout, theme, label, rows)
+    return _shell(layout, theme, label, rows, range_text=range_text)
 
 # ---------------------------------------------------------------- random pick
 

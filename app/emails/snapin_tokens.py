@@ -39,11 +39,19 @@ def synthesize_snapin_item(name, args, stats):
         return item
 
     if name == 'most_watched':
+        # most_watched:<Library>[:count][:recent] - 'recent' scopes plays to
+        # the pull's time range instead of all-time counts. The scope word is
+        # accepted in either trailing position so a count is optional.
         item = {'id': 'token-most-watched', 'type': 'most_watched'}
         if args and args[0]:
             item['mwLibrary'] = args[0]
-        if len(args) > 1 and args[1]:
-            item['mwCount'] = args[1]
+        for arg in args[1:]:
+            if not arg:
+                continue
+            if arg.lower() in ('recent', 'range', 'window'):
+                item['mwScope'] = 'recent'
+            else:
+                item['mwCount'] = arg
         return item
 
     if name == 'random_pick':

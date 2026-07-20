@@ -25,6 +25,7 @@ def fetch_tautulli_data_for_email(tautulli_base_url, tautulli_api_key, date_rang
         'graph_data': [],
         'recent_data': [],
         'most_watched_data': [],
+        'most_watched_recent_data': [],
         'graph_commands': []
     }
     
@@ -75,6 +76,8 @@ def fetch_tautulli_data_for_email(tautulli_base_url, tautulli_api_key, date_rang
         data['recent_data'] = recent_data
 
         data['most_watched_data'] = fetch_most_watched_data(tautulli_base_url, tautulli_api_key)
+        data['most_watched_recent_data'] = fetch_most_watched_data(tautulli_base_url, tautulli_api_key, days=date_range)
+        data['most_watched_recent_days'] = date_range
 
         logger.info(f"Fetched Tautulli data: {len(data['stats'])} stats, {len(data['graph_data'])} graphs, {len(data['recent_data'])} recent sections")
         
@@ -86,12 +89,54 @@ def fetch_tautulli_data_for_email(tautulli_base_url, tautulli_api_key, date_rang
 def fetch_recent_data_for_index(tautulli_base_url, tautulli_api_key, count, recently_added_mode="items", recently_added_sort="date"):
     return fetch_recently_added_using_plex_sdk(tautulli_base_url, tautulli_api_key, int(count), recently_added_mode=recently_added_mode, recently_added_sort=recently_added_sort)
 
-def fetch_most_watched_data(tautulli_base_url, tautulli_api_key, per_library=25):
-    """Most Watched snap-in (NEWS-17): per-library media sorted by all-time
-    play count (Tautulli get_library_media_info), with pull-time plex_url
-    enrichment (the NEWS-5 pattern) so cards deep-link into Plex without a
-    render-time network call. Shaped like recent_data: a list of
-    {'most_watched': [items]} entries."""
+def _aggregate_history_rows(rows):
+    """Collapse get_history play rows to top-level items with play counts:
+    episodes roll up to their show, tracks to their album, movies stand
+    alone. Returns aggregates keyed for the most-watched item shape."""
+    aggregates = {}
+    for row in rows:
+        media_type = (row.get('media_type') or '').lower()
+        if media_type == 'episode':
+            key = str(row.get('grandparent_rating_key') or row.get('rating_key') or '')
+            title = row.get('grandparent_title') or row.get('title', 'Unknown')
+        elif media_type == 'track':
+            key = str(row.get('parent_rating_key') or row.get('grandparent_rating_key') or row.get('rating_key') or '')
+            title = row.get('parent_title') or row.get('grandparent_title') or row.get('title', 'Unknown')
+        else:
+            key = str(row.get('rating_key') or '')
+            title = row.get('title', 'Unknown')
+        if not key:
+            continue
+
+        agg = aggregates.get(key)
+        if agg is None:
+            # posters resolve by the aggregate's own rating key so a show
+            # never carries an episode still
+            thumb = row.get('thumb') if media_type not in ('episode', 'track') else f"/library/metadata/{key}/thumb"
+            aggregates[key] = {
+                'title': title,
+                'rating_key': key,
+                'year': str(row.get('year', '') or ''),
+                'thumb': thumb or '',
+                'play_count': 1,
+                'last_played': row.get('date', ''),
+                'media_type': 'show' if media_type == 'episode' else ('album' if media_type == 'track' else media_type),
+                'type': 'show' if media_type == 'episode' else ('album' if media_type == 'track' else media_type),
+            }
+        else:
+            agg['play_count'] += 1
+    return list(aggregates.values())
+
+def fetch_most_watched_data(tautulli_base_url, tautulli_api_key, per_library=25, days=None):
+    """Most Watched snap-in (NEWS-17): per-library most watched content with
+    pull-time plex_url enrichment (the NEWS-5 pattern) so cards deep-link
+    into Plex without a render-time network call. Shaped like recent_data:
+    a list of {'most_watched': [items]} entries.
+
+    days=None is all-time (Tautulli get_library_media_info ordered by
+    lifetime play_count). With days set, plays inside the window are pulled
+    via get_history and aggregated here, episodes rolling up to shows and
+    tracks to albums."""
     most_watched_data = []
     libraries, _ = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_library_names', None, None)
     if not libraries:
@@ -102,39 +147,50 @@ def fetch_most_watched_data(tautulli_base_url, tautulli_api_key, per_library=25)
     plex_configured = bool(settings.get('plex_url') and settings.get('plex_token'))
     machine_id = get_plex_machine_id() if plex_configured else None
 
+    after_date = None
+    if days:
+        try:
+            after_date = (datetime.now() - timedelta(days=int(days))).strftime('%Y-%m-%d')
+        except (TypeError, ValueError):
+            after_date = None
+
     for library in libraries:
         section_id = library.get('section_id')
         library_name = library.get('section_name', '')
-        info, _ = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_library_media_info', section_id, None, str(per_library))
-        rows = (info or {}).get('data') or []
 
         items = []
-        for row in rows:
-            try:
-                play_count = int(row.get('play_count') or 0)
-            except (TypeError, ValueError):
-                play_count = 0
-            if play_count <= 0:
-                continue
-            rating_key = str(row.get('rating_key', ''))
-            items.append({
-                'title': row.get('title', 'Unknown'),
-                'rating_key': rating_key,
-                'year': str(row.get('year', '') or ''),
-                'thumb': row.get('thumb', ''),
-                'play_count': play_count,
-                'last_played': row.get('last_played', ''),
-                'media_type': row.get('media_type', ''),
-                'type': row.get('media_type', ''),
-                'library_name': library_name,
-                'plex_url': build_plex_web_link(rating_key, machine_id, plex_web_url) if rating_key and machine_id else '',
-            })
+        if after_date:
+            history, _ = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_history', section_id, None, after_date)
+            items = _aggregate_history_rows((history or {}).get('data') or [])
+        else:
+            info, _ = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_library_media_info', section_id, None, str(per_library))
+            for row in (info or {}).get('data') or []:
+                try:
+                    play_count = int(row.get('play_count') or 0)
+                except (TypeError, ValueError):
+                    play_count = 0
+                if play_count <= 0:
+                    continue
+                items.append({
+                    'title': row.get('title', 'Unknown'),
+                    'rating_key': str(row.get('rating_key', '')),
+                    'year': str(row.get('year', '') or ''),
+                    'thumb': row.get('thumb', ''),
+                    'play_count': play_count,
+                    'last_played': row.get('last_played', ''),
+                    'media_type': row.get('media_type', ''),
+                    'type': row.get('media_type', ''),
+                })
+
+        for item in items:
+            item['library_name'] = library_name
+            rating_key = item.get('rating_key', '')
+            item['plex_url'] = build_plex_web_link(rating_key, machine_id, plex_web_url) if rating_key and machine_id else ''
 
         if items:
-            # Tautulli already orders by play_count desc, but re-sort defensively
-            # so the card grid ranking never depends on the API's ordering.
+            # rank explicitly so the card grid never depends on API ordering
             items.sort(key=lambda x: x['play_count'], reverse=True)
-            most_watched_data.append({'most_watched': items})
+            most_watched_data.append({'most_watched': items[:per_library]})
 
     return most_watched_data
 
@@ -145,6 +201,7 @@ def get_current_tautulli_data_for_email(settings):
         'graph_data': [],
         'recent_data': [],
         'most_watched_data': [],
+        'most_watched_recent_data': [],
         'graph_commands': []
     }
 
@@ -160,6 +217,10 @@ def get_current_tautulli_data_for_email(settings):
         most_watched_data = get_cached_data('most_watched_data', strict=False)
         if most_watched_data:
             data['most_watched_data'] = most_watched_data
+
+        most_watched_recent_data = get_cached_data('most_watched_recent_data', strict=False)
+        if most_watched_recent_data:
+            data['most_watched_recent_data'] = most_watched_recent_data
             
         graph_data = get_cached_data('graph_data', strict=False)
         if graph_data:

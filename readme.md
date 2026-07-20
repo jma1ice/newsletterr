@@ -199,7 +199,8 @@ When the **Custom HTML** toggle is on, you write the whole email yourself, but y
 |---|---|
 | `{{snapin:recently_added:Movies}}` | Recently Added grid for the named library |
 | `{{snapin:recently_added:Movies:5}}` | Same, capped to 5 items |
-| `{{snapin:most_watched:Movies}}` | Most Watched grid for the named library |
+| `{{snapin:most_watched:Movies}}` | Most Watched grid for the named library (all-time play counts) |
+| `{{snapin:most_watched:Movies:recent}}` | Same, scoped to plays within the pulled time range; combine with a count as `:Movies:5:recent` |
 | `{{snapin:random_pick:Movies}}` | One random item from the named library (fresh pick every send) |
 | `{{snapin:stats:Most Watched Movies}}` | The stats table with that title |
 | `{{snapin:wrapped}}` | Year in Plex wrapped section |

@@ -1,3 +1,4 @@
+import random
 import threading
 import uuid
 
@@ -433,6 +434,147 @@ def fetch_albums_from_plex_sdk(section_id, limit=10, machine_id=None, days=None)
         logger.exception(f"Error fetching albums from Plex API: {e}")
         mark_plex_failed()
         return []
+
+def fetch_library_sections_with_genres(include_genres=True):
+    """Libraries eligible for the Random Pick snap-in, with each section's
+    genre list for the optional genre filter. Returns a list of
+    {section_id, title, type, genres: [{id, title}]} dicts.
+    include_genres=False skips the per-section genre calls (used when only
+    resolving a library name to its section id)."""
+    try:
+        _s = get_settings(decrypt_secrets=False)
+        plex_settings = (_s.get("plex_url"), _s.get("plex_token")) if "id" in _s else None
+
+        if not plex_settings or not plex_settings[0] or not plex_settings[1]:
+            logger.debug("Plex not configured")
+            return []
+
+        plex_url = plex_settings[0].rstrip('/')
+        plex_token = decrypt(plex_settings[1])
+        headers = get_plex_headers({'X-Plex-Token': plex_token})
+
+        response = safe_get(f"{plex_url}/library/sections", headers=headers, timeout=10)
+        response.raise_for_status()
+        sections_data = response.json()
+
+        sections = []
+        for section in sections_data.get('MediaContainer', {}).get('Directory', []):
+            section_type = section.get('type', '')
+            if section_type not in ('movie', 'show', 'artist'):
+                continue
+            section_id = section.get('key')
+
+            genres = []
+            if include_genres:
+                try:
+                    genre_response = safe_get(f"{plex_url}/library/sections/{section_id}/genre", headers=headers, timeout=10)
+                    if genre_response.status_code == 200:
+                        for genre in genre_response.json().get('MediaContainer', {}).get('Directory', []):
+                            if genre.get('key') is not None:
+                                genres.append({'id': str(genre['key']), 'title': genre.get('title', '')})
+                except Exception:
+                    logger.debug("suppressed exception; section genres unavailable", exc_info=True)
+
+            sections.append({
+                'section_id': str(section_id),
+                'title': section.get('title', 'Unknown Library'),
+                'type': section_type,
+                'genres': genres,
+            })
+
+        return sections
+    except Exception as e:
+        logger.exception(f"Error fetching library sections for random pick: {e}")
+        mark_plex_failed()
+        return []
+
+def fetch_random_library_item(section_id, genre=None, machine_id=None):
+    """One random item from a library section (optionally filtered to a genre
+    id from the section's genre directory), normalized to the same shape the
+    recently-added fetchers produce. Randomness is per-call on purpose: every
+    render draws a fresh pick. Returns None when the section is empty or
+    Plex is unreachable."""
+    try:
+        _s = get_settings(decrypt_secrets=False)
+        plex_settings = (_s.get("plex_url"), _s.get("plex_token")) if "id" in _s else None
+
+        if not plex_settings or not plex_settings[0] or not plex_settings[1]:
+            logger.debug("Plex not configured")
+            return None
+
+        plex_url = plex_settings[0].rstrip('/')
+        plex_token = decrypt(plex_settings[1])
+        plex_web_url = _s.get("plex_web_url")
+        if machine_id is None:
+            machine_id = get_plex_machine_id()
+
+        genre_param = f"&genre={genre}" if genre else ""
+        headers = get_plex_headers()
+
+        # Size probe first: Container-Size=0 returns totalSize without items,
+        # then a random offset fetches exactly one item.
+        probe_url = (
+            f"{plex_url}/library/sections/{section_id}/all"
+            f"?X-Plex-Container-Start=0"
+            f"&X-Plex-Container-Size=0"
+            f"{genre_param}"
+            f"&X-Plex-Token={plex_token}"
+        )
+        probe = safe_get(probe_url, headers=headers, timeout=10)
+        probe.raise_for_status()
+        total = int(probe.json().get('MediaContainer', {}).get('totalSize', 0) or 0)
+        if total <= 0:
+            logger.debug(f"Random pick: section {section_id} has no items (genre={genre})")
+            return None
+
+        offset = random.randrange(total)
+        api_url = (
+            f"{plex_url}/library/sections/{section_id}/all"
+            f"?X-Plex-Container-Start={offset}"
+            f"&X-Plex-Container-Size=1"
+            f"{genre_param}"
+            f"&X-Plex-Token={plex_token}"
+        )
+        response = safe_get(api_url, headers=headers, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+
+        media_container = data.get('MediaContainer', {})
+        metadata = media_container.get('Metadata', [])
+        if not metadata:
+            logger.debug(f"Random pick: no metadata at offset {offset} for section {section_id}")
+            return None
+
+        entry = metadata[0]
+        rating_key = str(entry.get('ratingKey', ''))
+        media_type = entry.get('type', '')
+        genres = [g.get('tag', '') for g in (entry.get('Genre') or []) if g.get('tag')]
+
+        return {
+            'title': entry.get('title', 'Unknown'),
+            'rating_key': rating_key,
+            'year': str(entry.get('year', '')),
+            'thumb': entry.get('thumb', ''),
+            'art': entry.get('art', ''),
+            'summary': entry.get('summary', ''),
+            'tagline': entry.get('tagline', ''),
+            'added_at': str(entry.get('addedAt', '')),
+            'updated_at': str(entry.get('updatedAt', '')),
+            'content_rating': entry.get('contentRating', ''),
+            'duration': str(entry.get('duration', '')),
+            'guid': entry.get('guid', ''),
+            'key': entry.get('key', ''),
+            'media_type': media_type,
+            'type': media_type,
+            'genres': genres,
+            'library_name': media_container.get('librarySectionTitle', ''),
+            'plex_url': build_plex_web_link(rating_key, machine_id, plex_web_url) if rating_key else '',
+            'rating': str(entry.get('rating', ''))
+        }
+    except Exception as e:
+        logger.exception(f"Error fetching random library item: {e}")
+        mark_plex_failed()
+        return None
 
 def fetch_recently_added_using_plex_sdk(tautulli_base_url, tautulli_api_key, items_count=10, recently_added_mode="items", recently_added_sort="date"):
     recent_data = []

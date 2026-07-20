@@ -83,6 +83,10 @@
                                                 data-recipient-count="{{ email.recipient_count }}">
                                             {{ icon('repeat') }}
                                         </button>
+                                        <a class="icon-btn" title="Download PDF" aria-label="Download email as PDF"
+                                           href="{{ url_for('emails.email_history_pdf', email_id=email.id) }}">
+                                            {{ icon('download') }}
+                                        </a>
                                     {% else %}
                                         <span class="text-muted small">n/a</span>
                                     {% endif %}

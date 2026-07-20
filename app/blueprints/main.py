@@ -48,6 +48,7 @@ def index():
     ]
     graph_data = []
     recent_data = []
+    most_watched_data = []
     recommendations_json = {}
     filtered_users = {}
     droppedneedle_wrapped_json = {}
@@ -136,6 +137,7 @@ def index():
         users = get_cached_data('users', strict=True) or get_cached_data('users', strict=False)
         graph_data = get_cached_data('graph_data', strict=True) or get_cached_data('graph_data', strict=False) or []
         recent_data = get_cached_data('recent_data', strict=True) or get_cached_data('recent_data', strict=False) or []
+        most_watched_data = get_cached_data('most_watched_data', strict=True) or get_cached_data('most_watched_data', strict=False) or []
         recommendations_json = get_cached_data('recommendations_json', strict=True) or get_cached_data('recommendations_json', strict=False) or {}
         filtered_users = get_cached_data('filtered_users', strict=True) or get_cached_data('filtered_users', strict=False) or {}
         droppedneedle_wrapped_json = get_cached_data('droppedneedle_wrapped_json', strict=True) or get_cached_data('droppedneedle_wrapped_json', strict=False) or {}
@@ -201,6 +203,7 @@ def index():
     return render_template('index.html',
                            stats=stats, user_dict=user_dict, users_full_data=users_full_data,
                            graph_data=graph_data, graph_commands=graph_commands, recent_data=recent_data,
+                           most_watched_data=most_watched_data,
                            libs=libs, error=error, alert=alert, settings=settings, email_lists=email_lists,
                            cache_info=cache_info, pull_cache_fresh=pull_cache_fresh,
                            recommendations_json=recommendations_json,

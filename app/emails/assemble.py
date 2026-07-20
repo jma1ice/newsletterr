@@ -9,6 +9,10 @@ from app.emails.images import fetch_and_attach_image
 from app.emails.blocks import build_graph_html_with_frontend_image, build_text_block_html, build_separator_html, build_image_html_with_cid, build_emoji_html
 from app.emails.builders import build_stats_html_with_cid_background, build_recently_added_html_with_cids, build_recommendations_html_with_cids, build_droppedneedle_wrapped_html_with_cids, build_droppedneedle_server_stats_html_with_cids, build_collections_html_with_cids, build_yearly_wrapped_html_with_cids, build_sonarr_coming_soon_html_with_cids, build_radarr_coming_soon_html_with_cids, build_ombi_requests_html_with_cids, build_seerr_requests_html_with_cids
 from app.emails.builders import layouts
+from app.emails.builders.most_watched import build_most_watched_html_with_cids
+from app.emails.builders.random_pick import build_random_pick_html
+from app.emails.snapin_tokens import expand_snapin_tokens
+from app.clients.plex import fetch_random_library_item, fetch_library_sections_with_genres
 from app.theme import get_email_theme_colors, build_email_css_from_theme
 from app.security import escape_html_output as esc
 
@@ -122,10 +126,12 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, displ
     build_hosted_variant=True, only the non-personalized 'single body for
     everyone' senders should ever pass that, since the hosted newsletter
     page is public and unauthenticated (see send.py/scheduled.py)."""
+    # Custom HTML mode no longer returns immediately: snap-in tokens (NEWS-32)
+    # are expanded through the same per-item dispatch below, so the settings
+    # and theme locals must be computed first. The custom path still returns
+    # before the logo attach (custom emails never carried a logo part).
     custom_html = template_data.get('custom_html', '').strip()
-    if custom_html:
-        return custom_html, (custom_html if build_hosted_variant else None)
-    selected_items = json.loads(template_data.get('selected_items', '[]'))
+    selected_items = json.loads(template_data.get('selected_items') or '[]') if not custom_html else []
     email_text = template_data.get('email_text', '')
     subject = template_data.get('subject', '')
     server_name = tautulli_data.get('settings', {}).get('server_name', 'Plex Server')
@@ -157,33 +163,11 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, displ
     
     theme_colors = get_email_theme_colors()
 
-    if logo_filename == '' or logo_filename is None:
-        if theme_colors['email_theme'] == 'custom':
-            pass
-        else:
-            logo_filename = 'Asset_94x.png'
-
-    if logo_width == '' or logo_width is None:
-        if theme_colors['email_theme'] == 'custom':
-            pass
-        else:
-            logo_width = 80
-    
-    logo_src = ""
-    if logo_filename != '' and logo_filename is not None and logo_width != '' and logo_width is not None:
-        logo_result = attach_logo_image(msg_root, logo_filename, custom_logo_filename, base_url, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url if hosted_images_enabled else "")
-        if logo_filename == 'custom' and custom_logo_filename:
-            logo_src = logo_result if logo_result else f"/static/uploads/logos/{custom_logo_filename}"
-        else:
-            logo_src = logo_result if logo_result else f"/static/img/{logo_filename}"
-    
-    content_html = ""
-    
-    if email_text.strip():
-        email_text_resolved = email_text.replace('__DEFAULT_INTRO__', _resolved_intro).replace('__DEFAULT_OUTRO__', _resolved_outro)
-        content_html += build_text_block_html(email_text_resolved, 'textblock', theme_colors)
-
-    for group_index, item in enumerate(selected_items):
+    def _render_item(item, group_index=0):
+        """Single per-item dispatch shared by the selected-items loop and
+        snap-in token expansion in custom HTML (NEWS-32). Returns the item's
+        section HTML ('' when the item has nothing to render)."""
+        content_html = ""
         item_type = item.get('type', '')
 
         if item_type in ['textblock', 'titleblock', 'headerblock']:
@@ -218,7 +202,7 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, displ
             # user-info toggle: the top-users graphs name other users, so drop
             # them server-side regardless of what the template selected
             if not include_user_info and item.get('name') in ('Plays by Top Users', 'Stream Type by Top Users'):
-                continue
+                return ""
             content_html += build_graph_html_with_frontend_image(item, msg_root, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
         
         elif item_type == 'recently added':
@@ -246,6 +230,42 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, displ
             else:
                 content_html += build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, library_filter, base_url, max_items, recently_added_mode=recently_added_mode, ra_grid_columns=ra_grid_columns, poster_max_height=poster_max_height, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url, show_description=ra_show_description, library_item_cap=library_item_cap)
         
+        elif item_type == 'most_watched':
+            mw_library = item.get('mwLibrary')
+            mw_data = tautulli_data.get('most_watched_data', [])
+            # Per-library override saved on the builder item (blank = default),
+            # same pattern as the recently-added raCount input.
+            try:
+                mw_cap = int(item.get('mwCount') or 0)
+            except (TypeError, ValueError):
+                mw_cap = 0
+            if use_layout:
+                content_html += layouts.render_most_watched(email_layout, mw_data, msg_root, theme_colors, mw_library, base_url, grid_columns=ra_grid_columns, item_cap=mw_cap, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
+            else:
+                content_html += build_most_watched_html_with_cids(mw_data, msg_root, theme_colors, mw_library, base_url, grid_columns=ra_grid_columns, poster_max_height=poster_max_height, item_cap=mw_cap, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
+
+        elif item_type == 'random_pick':
+            # The pick is drawn per render on purpose: previews and every send
+            # each feature a fresh random item (the builder UI says so).
+            rp_section_id = item.get('sectionId') or item.get('section_id')
+            rp_library = item.get('library') or ''
+            if not rp_section_id and rp_library:
+                # Token form (NEWS-32) carries only the library name; resolve
+                # it against the live Plex section list.
+                for lib in fetch_library_sections_with_genres(include_genres=False):
+                    if lib['title'].lower() == rp_library.lower():
+                        rp_section_id = lib['section_id']
+                        break
+            if rp_section_id or rp_library:
+                # An unresolvable section renders the builder's empty state
+                # (pick=None) so token authors see the problem in the output.
+                pick = fetch_random_library_item(rp_section_id, genre=item.get('genre') or None) if rp_section_id else None
+                rp_genre_label = item.get('genreLabel') or ''
+                if use_layout:
+                    content_html += layouts.render_random_pick(email_layout, pick, msg_root, theme_colors, base_url, library_label=rp_library, genre_label=rp_genre_label, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
+                else:
+                    content_html += build_random_pick_html(pick, msg_root, theme_colors, base_url, library_label=rp_library, genre_label=rp_genre_label, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
+
         elif item_type == 'recommendations':
             if recommendations_data:
                 if target_user_key:
@@ -313,6 +333,45 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, displ
             group_collections = item.get('collections', [])
             if group_collections:
                 content_html += build_collections_html_with_cids(group_collections, msg_root, theme_colors, base_url, group_title, expanded_collections, group_index, poster_max_height=poster_max_height, grid_columns=collections_grid_columns, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
+
+        return content_html
+
+    if custom_html:
+        # NEWS-32: {{snapin:...}} tokens expand through the exact same
+        # per-item dispatch, so they are layout-aware and preview-mode aware.
+        # The raw HTML around the tokens is the author's and passes through
+        # untouched; unknown tokens become inline HTML comments.
+        expanded_html = expand_snapin_tokens(custom_html, _render_item, tautulli_data.get('stats') or [])
+        return expanded_html, (expanded_html if build_hosted_variant else None)
+
+    if logo_filename == '' or logo_filename is None:
+        if theme_colors['email_theme'] == 'custom':
+            pass
+        else:
+            logo_filename = 'Asset_94x.png'
+
+    if logo_width == '' or logo_width is None:
+        if theme_colors['email_theme'] == 'custom':
+            pass
+        else:
+            logo_width = 80
+
+    logo_src = ""
+    if logo_filename != '' and logo_filename is not None and logo_width != '' and logo_width is not None:
+        logo_result = attach_logo_image(msg_root, logo_filename, custom_logo_filename, base_url, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url if hosted_images_enabled else "")
+        if logo_filename == 'custom' and custom_logo_filename:
+            logo_src = logo_result if logo_result else f"/static/uploads/logos/{custom_logo_filename}"
+        else:
+            logo_src = logo_result if logo_result else f"/static/img/{logo_filename}"
+
+    content_html = ""
+
+    if email_text.strip():
+        email_text_resolved = email_text.replace('__DEFAULT_INTRO__', _resolved_intro).replace('__DEFAULT_OUTRO__', _resolved_outro)
+        content_html += build_text_block_html(email_text_resolved, 'textblock', theme_colors)
+
+    for group_index, item in enumerate(selected_items):
+        content_html += _render_item(item, group_index)
 
     email_html = build_complete_email_html_with_cid_logo(content_html, server_name, subject, email_header_title, logo_src, logo_width, is_scheduled, logo_position=logo_position, unsubscribe_placeholder=unsubscribe_placeholder, hosted_base_url=hosted_base_url, hosted_enabled=hosted_enabled, links_base_url=links_base_url, layout=email_layout)
 

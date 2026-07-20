@@ -64,6 +64,14 @@ document.getElementById('stats_form').addEventListener('submit', async (e) => {
             if (host) host.style.display = '';
         }
 
+        if (data.most_watched_data) {
+            mostWatchedPayload.length = 0;
+            data.most_watched_data.forEach(s => mostWatchedPayload.push(s));
+            buildMWLibraryRows();
+            const mwCard = document.getElementById('mw-card');
+            if (mwCard && mostWatchedPayload.length > 0) mwCard.style.display = '';
+        }
+
         if (data.stats) {
             statsList = data.stats;
             buildStatsRows();

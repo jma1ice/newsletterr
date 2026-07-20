@@ -24,7 +24,18 @@ from app.emails.builders.coming_soon import (
     filter_radarr_upcoming,
     upcoming_release_date,
 )
+from app.emails.builders.most_watched import (
+    most_watched_heading,
+    most_watched_items,
+    most_watched_poster,
+    play_count_text,
+)
 from app.emails.builders.ombi_requests import filter_ombi_pending
+from app.emails.builders.random_pick import (
+    random_pick_heading,
+    random_pick_meta_text,
+    attach_random_pick_poster,
+)
 from app.emails.builders.seerr_requests import filter_seerr_pending, TMDB_POSTER_BASE
 from app.emails.images import fetch_and_attach_image, email_icon_img, truncate_text
 from app.security import escape_html_output as esc
@@ -338,6 +349,84 @@ def _grid(cards, cols):
         cells += "".join(f'<td style="width: {width_pct}; padding: 8px;"></td>' for _ in range(cols - len(row)))
         rows_html += f'<tr>{cells}</tr>'
     return f'<table width="100%" cellpadding="0" cellspacing="0" border="0" style="table-layout: fixed;">{rows_html}</table>'
+
+# ---------------------------------------------------------------- most watched
+
+def render_most_watched(layout, most_watched_data, msg_root, theme, library_filter=None, base_url="", grid_columns=5, item_cap=0, hosted_images_enabled=False, hosted_base_url=""):
+    label = most_watched_heading(library_filter)
+    items = most_watched_items(most_watched_data, library_filter, item_cap)
+    if not items:
+        return _shell(layout, theme, label, _empty_state_html(theme, f"No most watched items found{f' for {esc(library_filter)}' if library_filter else ''}."))
+
+    if layout == 'classic':
+        cols = max(1, int(grid_columns) if grid_columns else 5)
+        cards = []
+        for i, item in enumerate(items):
+            title = item.get('title', 'Unknown')
+            poster_src = most_watched_poster(item, msg_root, f"la-mw-{i}", base_url, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
+            cards.append(_build_card_html(theme, truncate_text(title, 23), str(item.get('year') or ''), play_count_text(item), poster_src))
+        return _shell(layout, theme, label, _grid(cards, cols))
+
+    if layout == 'editorial':
+        rows = ""
+        for i, item in enumerate(items):
+            title = item.get('title', 'Unknown')
+            poster_src = most_watched_poster(item, msg_root, f"lb-mw-{i}", base_url, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url, target=(96, 144))
+            poster_html = f'<img src="{poster_src}" alt="{esc(title)}" width="96" style="width: 96px; height: auto; border-radius: 6px; display: block;">' if poster_src else ''
+            meta_bits = [str(item.get('year') or ''), play_count_text(item)]
+            rows += f"""
+                <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+                    <td width="96" valign="top" style="padding: 0 16px 12px 0;">{poster_html}</td>
+                    <td valign="top" style="padding-bottom: 12px; font-size: 12.5px; color: {theme['text']}; font-family: {FONT};">
+                        <b style="color: #ffffff; font-size: 14px;">{_linked(title, item.get('plex_url', ''))}</b><br>
+                        <span style="color: {theme['muted_text']}; font-size: 11px;">{' &middot; '.join(esc(b) for b in meta_bits if b)}</span>
+                    </td>
+                </tr></table>
+            """
+        return _shell(layout, theme, label, rows, overline="Crowd favorites")
+
+    # digest: ranked rows, title left / plays right
+    rows = ""
+    for item in items:
+        rows += _digest_row(theme, _linked(item.get('title', 'Unknown'), item.get('plex_url', '')), esc(play_count_text(item)))
+    return _shell(layout, theme, label, rows)
+
+# ---------------------------------------------------------------- random pick
+
+def render_random_pick(layout, pick, msg_root, theme, base_url="", library_label="", genre_label="", hosted_images_enabled=False, hosted_base_url=""):
+    label = random_pick_heading(library_label, genre_label)
+    if not pick:
+        return _shell(layout, theme, label, _empty_state_html(theme, f"No random pick available{f' for {esc(library_label)}' if library_label else ''}."))
+
+    title = pick.get('title', 'Unknown')
+    meta_text = random_pick_meta_text(pick)
+    summary = pick.get('tagline') or pick.get('summary', '')
+    plex_url = pick.get('plex_url', '')
+
+    if layout == 'digest':
+        right = esc(meta_text) if meta_text else ''
+        return _shell(layout, theme, label, _digest_row(theme, _linked(title, plex_url), right))
+
+    poster_w = 140 if layout == 'classic' else 110
+    poster_src = attach_random_pick_poster(pick, msg_root, base_url, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url, target=(poster_w, int(poster_w * 1.5)))
+    poster_html = f'<img src="{poster_src}" alt="{esc(title)}" width="{poster_w}" style="width: {poster_w}px; height: auto; border-radius: 8px; display: block;">' if poster_src else ''
+
+    open_link = f'<div style="margin-top: 8px;"><a href="{esc(plex_url)}" target="_blank" style="color: {theme["primary"]}; font-size: 12px; font-weight: 700; text-decoration: underline; font-family: {FONT};">Open in Plex</a></div>' if plex_url else ''
+
+    inner = f"""
+        <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+            {f'<td width="{poster_w}" valign="top" style="padding: {"14px 16px 14px 16px" if layout == "classic" else "0 16px 12px 0"};">{poster_html}</td>' if poster_html else ''}
+            <td valign="top" style="padding: {'14px 16px' if layout == 'classic' else '0 0 12px 0'}; font-size: 12.5px; color: {theme['text']}; font-family: {FONT};">
+                <b style="color: #ffffff; font-size: 17px;">{_linked(title, plex_url)}</b><br>
+                {f'<span style="color: {theme["muted_text"]}; font-size: 11px;">{esc(meta_text)}</span>' if meta_text else ''}
+                {f'<div style="margin-top: 6px; line-height: 1.4;">{esc(truncate_text(summary, 300))}</div>' if summary else ''}
+                {open_link}
+            </td>
+        </tr></table>
+    """
+    if layout == 'editorial':
+        return _shell(layout, theme, label, inner, overline="From the vault")
+    return _shell(layout, theme, label, inner)
 
 # ---------------------------------------------------------------- coming soon
 

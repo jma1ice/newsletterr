@@ -21,6 +21,7 @@ Newsletterr is a lightweight Flask application that talks to **[Tautulli](https:
 ### Templates & Reuse
 * **Email Templates** - save, load, clone, and delete custom templates (tracks chosen snap‑ins & layout) and re‑apply later.
 * **Template provenance tracking** - every sent email logs which template (or “Manual”) produced it; visible in Email History.
+* **Snap-in tokens in custom HTML** - drop `{{snapin:NAME}}` tokens into hand-written HTML to render live sections; see [Snap-in tokens in custom HTML](#snap-in-tokens-in-custom-html).
 
 ### Automation & Scheduling
 * **Automated Schedules** - create Daily / Weekly / Monthly schedules with start date, fixed send time, and data range.
@@ -190,6 +191,26 @@ The Settings page is split into sections: **Email Server**, **Connections**, **D
 5. Draft the body, use the stats, graphs, recently added, collections, and recommendations snap-ins on the right to include these in your email. 
 6. Hit **Send Email**. Success and error messages will show after running.  
 
+### Snap-in tokens in custom HTML
+
+When the **Custom HTML** toggle is on, you write the whole email yourself, but you can still drop rendered snap-in sections into it with tokens. A token looks like `{{snapin:NAME}}` or `{{snapin:NAME:ARG}}` and is replaced at preview and send time by the same section the builder would produce, in your selected email layout. The **Insert snap-in** dropdown above the editor lists every token valid for the data you have pulled and inserts it at the cursor.
+
+| Token | Renders |
+|---|---|
+| `{{snapin:recently_added:Movies}}` | Recently Added grid for the named library |
+| `{{snapin:recently_added:Movies:5}}` | Same, capped to 5 items |
+| `{{snapin:most_watched:Movies}}` | Most Watched grid for the named library |
+| `{{snapin:random_pick:Movies}}` | One random item from the named library (fresh pick every send) |
+| `{{snapin:stats:Most Watched Movies}}` | The stats table with that title |
+| `{{snapin:wrapped}}` | Year in Plex wrapped section |
+| `{{snapin:coming_soon_tv}}` | Coming Soon (TV) from Sonarr |
+| `{{snapin:coming_soon_movies}}` | Coming Soon (Movies) from Radarr |
+| `{{snapin:requests_ombi}}` | Recent requests from Ombi |
+| `{{snapin:requests_seerr}}` | Recent requests from Overseerr/Jellyseerr |
+| `{{snapin:dn_server}}` | DroppedNeedle server stats |
+
+Library names and stat titles are matched case-insensitively and may contain spaces (but not colons). Sections render from the data cached by the pull buttons, so pull first. A misspelled token never breaks the email; it is replaced with an HTML comment you can spot in the output source. Graph snap-ins are not available as tokens because their images are captured client-side per builder item.
+
 ---
 
 ## Development
@@ -236,14 +257,10 @@ Released under the **MIT License** - see [LICENSE](LICENSE.txt) for details.
 
 Work is organized into version sprints. Items may shift between sprints as priorities change.
 
-### v2026.5 - builder features
-* More snap-ins: random pick, most watched
-* Snap-ins working with custom HTML
-* PDF export
-
 ### v2026.6 - platform and reach
 * Emby/Jellyfin support - jellyfin uses jellywatch over tautulli
 * Rootless Docker image with UID/GID support
+* Demo on the website
 
 ### v2026.7
 * Items pulls episodes in even if it was just a one off, Days only pulls shows in if all the available for that season were added
@@ -252,7 +269,6 @@ Work is organized into version sprints. Items may shift between sprints as prior
 ### Community
 * GitHub webhook to pull submitted issues to Discord channel
 * Ko-fi -> Discord integration for contributor role
-* Demo on the website
 * Servarr PR
 
 ### Blocked on upstream
@@ -271,10 +287,14 @@ Work is organized into version sprints. Items may shift between sprints as prior
 * Email preview: desktop/tablet/phone views
 * Custom theme settings
 * Searchable settings
+* More snap-ins: random pick, most watched
+* Snap-ins working with custom HTML
+* PDF export
 
 #### Fixed:
 * UI adjustment to better organize snap-ins sections
 * Email BG color not respected by mac mail app
+* Text block titles update again while typing (inline handler blocked by CSP)
 
 ## v2026.3:
 

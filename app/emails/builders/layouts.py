@@ -298,7 +298,7 @@ def render_recently_added(layout, recent_data, msg_root, theme, library_filter=N
             sub_bits = [str(item.get('year') or item.get('grandparent_title') or item.get('parent_title') or ''), _ra_duration(item)]
             meta = _relative_added(item)
             poster_src = _ra_poster(item, msg_root, f"la-ra-{i}", base_url, hosted_images_enabled, hosted_base_url)
-            cards.append(_build_card_html(theme, truncate_text(title, 23), truncate_text(' &middot; '.join(b for b in sub_bits if b), 30), meta, poster_src))
+            cards.append(_build_card_html(theme, truncate_text(title, 23), truncate_text(' · '.join(b for b in sub_bits if b), 30), meta, poster_src))
         inner = _grid(cards, cols)
         return _shell(layout, theme, label, inner)
 
@@ -589,7 +589,7 @@ def render_requests(layout, source, data, msg_root, theme, base_url="", grid_col
         for i, entry in enumerate(entries):
             status = "Approved" if entry['approved'] else "Pending Approval"
             rel = _relative(entry['requested_date'])
-            meta = truncate_text(' &middot; '.join(b for b in [status, f'Requested {rel}' if rel else ''] if b), 46)
+            meta = truncate_text(' · '.join(b for b in [status, f'Requested {rel}' if rel else ''] if b), 46)
             extra = truncate_text(f"Requested by {entry['requested_by']}", 46) if include_user_info and entry.get('requested_by') else None
             cards.append(_build_card_html(theme, truncate_text(entry['title'], 23), entry['year'], meta, poster_src(entry, i), extra_line=extra))
         return _shell(layout, theme, "Recent Requests", _grid(cards, max(1, int(grid_columns or 5))))

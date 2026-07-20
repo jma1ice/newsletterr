@@ -149,9 +149,16 @@ window.pullRunners.stats = async function ({ chained = false } = {}) {
             allUserEmails.length = 0;
             Object.values(data.user_dict).filter(Boolean).forEach(e => allUserEmails.push(e));
 
+            // Only seed the BCC list from the full user set when the user has
+            // not already picked recipients. Otherwise a re-pull (notably the
+            // Get All chain, which runs stats first) would wipe a manual
+            // narrowing right before recommendations read the chip list.
             if (window.chipsClear && window.chipsAddTokens) {
-                window.chipsClear();
-                window.chipsAddTokens(Object.values(data.user_dict).join(', '));
+                const existingChips = document.querySelectorAll('#bcc_chips .nl-chip');
+                if (existingChips.length === 0) {
+                    window.chipsClear();
+                    window.chipsAddTokens(Object.values(data.user_dict).join(', '));
+                }
             }
 
             const selector = document.getElementById('email_list_selector');

@@ -199,6 +199,34 @@ def build_email_css_from_theme(theme_colors, logo_width):
                     min-height: 165px !important;
                     text-align: left !important;
                 }}
+
+                .recommendations-table {{
+                    display: block !important;
+                    width: 100% !important;
+                    text-align: center !important;
+                }}
+
+                .recommendations-row {{
+                    display: inline !important;
+                }}
+
+                .recommendations-table td {{
+                    width: 30% !important;
+                    padding: 6px !important;
+                    display: inline-block !important;
+                    vertical-align: top !important;
+                    box-sizing: border-box !important;
+                }}
+
+                .recommendations-card {{
+                    width: 100% !important;
+                    max-width: 150px !important;
+                    height: auto !important;
+                    margin: 0 auto 10px auto !important;
+                    overflow: hidden !important;
+                    border-radius: 10px !important;
+                    display: block !important;
+                }}
             }}
         </style>
     """

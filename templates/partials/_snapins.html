@@ -54,6 +54,37 @@
                             </div>
                         </div>
 
+                        <div class="builder-card snapin-card" id="mw-card" style="{{ '' if most_watched_data else 'display:none;' }}">
+                            <div class="snapin-card-header">
+                                <button type="button" class="snapin-collapse-toggle" aria-expanded="true" aria-label="Collapse section">{{ icon('chevron-down') }}</button>
+                                <h2>most watched</h2>
+                            </div>
+                            <div class="snapin-card-body">
+                                <div id="mw-lib-list" class="row"></div>
+                            </div>
+                        </div>
+
+                        <div class="builder-card snapin-card" id="random-pick-card" style="display:none;">
+                            <div class="snapin-card-header">
+                                <button type="button" class="snapin-collapse-toggle" aria-expanded="true" aria-label="Collapse section">{{ icon('chevron-down') }}</button>
+                                <h2>random pick</h2>
+                            </div>
+                            <div class="snapin-card-body">
+                                <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
+                                    <select id="random-pick-library" class="form-select flex-1" style="min-width: 10em;">
+                                        <option value="">Pick library...</option>
+                                    </select>
+                                    <select id="random-pick-genre" class="form-select flex-1" style="min-width: 10em;" disabled>
+                                        <option value="">Any genre</option>
+                                    </select>
+                                    <button type="button" id="random-pick-add-btn" class="nl-btn nl-btn--primary nl-btn--sm" disabled>
+                                        Add
+                                    </button>
+                                </div>
+                                <div class="text-muted" style="font-size: 0.85rem;">Features one random item from the library. A new random pick is drawn for each send.</div>
+                            </div>
+                        </div>
+
                         <div id="droppedneedle-col">
                             {% if droppedneedle_wrapped_json or droppedneedle_server_json %}
                                 <div class="builder-card snapin-card">

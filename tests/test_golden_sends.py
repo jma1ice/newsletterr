@@ -71,7 +71,8 @@ def send_env(app, monkeypatch):
             droppedneedle_url='', droppedneedle_api_key='', from_name='Newsletterr',
             logo_filename='Asset_94x.png', logo_width=80, custom_logo_filename='',
             scheduled_subject_prefix='enabled', send_mode='bcc', recipient_display_name='email',
-            login_toggle='disabled', hosted_enabled='disabled', hosted_base_url=''
+            login_toggle='disabled', hosted_enabled='disabled', hosted_base_url='',
+            email_layout='legacy'
         WHERE id = 1""",
         (encrypt("smtp-pw"), encrypt("tt-key")),
     )
@@ -177,6 +178,65 @@ def test_scheduled_user_email_golden(send_env):
     assert "Personal intro" in normalized["html"]
     _assert_golden("scheduled_user", normalized)
 
+def test_scheduled_skip_when_no_new_content(send_env):
+    # skip_if_no_new (GH 105): a template with a recently-added section and an
+    # empty pull is skipped, not sent; the schedule still counts as fired.
+    from app import config
+    conn = sqlite3.connect(config.DB_PATH)
+    conn.execute(
+        "INSERT OR REPLACE INTO email_templates (id, name, selected_items, subject, email_header_title) "
+        "VALUES (9010, 'golden-ra-skip', ?, 'Weekly RA', 'The Header')",
+        (json.dumps([{"type": "recently added", "raLibrary": ""}]),),
+    )
+    conn.execute(
+        "INSERT OR REPLACE INTO email_schedules (id, name, email_list_id, template_id, frequency, start_date, next_send, date_range, items_count, skip_if_no_new) "
+        "VALUES (9010, 'ra-skip', 9001, 9010, 'weekly', '2026-07-01T09:00:00', '2026-07-08T09:00:00', 7, 10, 1)"
+    )
+    conn.commit()
+    conn.close()
+
+    ok = send_env.send_scheduled_email_with_cids(9010, 9001, 9010)
+    assert ok is True  # a skip is a fired schedule, not a failure
+
+    sends = [s for inst in RecorderSMTP.instances for s in inst.sent]
+    assert sends == []  # nothing was emailed
+
+    conn = sqlite3.connect(config.DB_PATH)
+    row = conn.execute("SELECT status, error FROM email_history ORDER BY id DESC LIMIT 1").fetchone()
+    conn.close()
+    assert row[0] == "skipped"
+    assert "new" in (row[1] or "").lower()
+
+def test_scheduled_sends_when_new_content_present(send_env, monkeypatch):
+    # Same opted-in schedule, but the pull has an item this week -> it sends.
+    from app import config
+    from app.emails import scheduled
+
+    def _data_with_ra(*a, **k):
+        data = _tautulli_data_stub()
+        data["recent_data"] = [{"recently_added": [{"title": "Fresh Show", "media_type": "show", "library_name": "TV"}]}]
+        return data
+    monkeypatch.setattr(scheduled, "fetch_tautulli_data_for_email", _data_with_ra)
+
+    conn = sqlite3.connect(config.DB_PATH)
+    conn.execute(
+        "INSERT OR REPLACE INTO email_templates (id, name, selected_items, subject, email_header_title) "
+        "VALUES (9011, 'golden-ra-send', ?, 'Weekly RA', 'The Header')",
+        (json.dumps([{"type": "recently added", "raLibrary": ""}]),),
+    )
+    conn.execute(
+        "INSERT OR REPLACE INTO email_schedules (id, name, email_list_id, template_id, frequency, start_date, next_send, date_range, items_count, skip_if_no_new) "
+        "VALUES (9011, 'ra-send', 9001, 9011, 'weekly', '2026-07-01T09:00:00', '2026-07-08T09:00:00', 7, 10, 1)"
+    )
+    conn.commit()
+    conn.close()
+
+    ok = send_env.send_scheduled_email_with_cids(9011, 9001, 9011)
+    assert ok is True
+
+    sends = [s for inst in RecorderSMTP.instances for s in inst.sent]
+    assert len(sends) == 1  # content present, so the send proceeds normally
+
 @pytest.fixture()
 def hosted_scheduled_env(send_env):
     from app import config
@@ -251,14 +311,27 @@ def test_scheduled_user_email_hosted_gives_each_recipient_a_distinct_token(hoste
 # --- standard (manual) send paths, driven through the HTTP route
 
 def _fixed_tautulli_data(*args, **kwargs):
+    # email_layout is pinned explicitly: the manual goldens below guard the
+    # legacy renderer regardless of what the product default becomes. The
+    # layout goldens override this via _fixed_tautulli_data_for_layout.
     return {
         "settings": {"server_name": "TestPlex", "logo_filename": "Asset_94x.png",
-                     "logo_width": 80, "custom_logo_filename": "", "logo_position": "center"},
+                     "logo_width": 80, "custom_logo_filename": "", "logo_position": "center",
+                     "email_layout": "legacy"},
         "stats": [],
         "graph_data": [],
         "recent_data": [],
         "graph_commands": [],
     }
+
+def _fixed_tautulli_data_for_layout(layout):
+    def _data(*args, **kwargs):
+        data = _fixed_tautulli_data()
+        data["settings"]["email_layout"] = layout
+        # defined later in this module; resolved at call time
+        data["most_watched_data"] = MOST_WATCHED_FIXTURE
+        return data
+    return _data
 
 @pytest.fixture()
 def manual_send_env(send_env, client, monkeypatch):
@@ -419,6 +492,49 @@ def test_manual_standard_email_golden(manual_send_env):
     assert "Manual hello" in normalized["html"]
     _assert_golden("manual_standard", normalized)
 
+def test_manual_pride_theme_email_golden(manual_send_env):
+    # Pride email presets (NEWS-30): resolved preset colors flow through the
+    # same pipeline as the base presets; this pins one of them. The theme
+    # columns outlive send_env (it never resets them), so snapshot + restore.
+    from app import config
+    _THEME_COLS = ("email_theme", "primary_color", "secondary_color", "accent_color", "background_color", "text_color", "logo_filename")
+    conn = sqlite3.connect(config.DB_PATH)
+    saved = conn.execute(f"SELECT {', '.join(_THEME_COLS)} FROM settings WHERE id = 1").fetchone()
+    conn.execute(
+        "UPDATE settings SET email_theme='pride_trans', primary_color='#5bcefa', "
+        "secondary_color='#222222', accent_color='#f5a9b8', background_color='#333333', "
+        "text_color='#9bd7f2', logo_filename='Asset_51.png' WHERE id = 1"
+    )
+    conn.commit()
+    conn.close()
+
+    try:
+        client = manual_send_env
+        resp = _post_send(client, {
+            "to_emails": "a@b.c", "subject": "Pride News", "email_header_title": "The Header",
+            "selected_items": [{"type": "textblock", "content": "Pride hello"}],
+            "custom_html": "", "user_dict": {}, "expanded_collections": {},
+        })
+        assert resp.status_code == 200
+        assert resp.get_json().get("success") is True
+
+        sends = [s for inst in RecorderSMTP.instances for s in inst.sent]
+        assert len(sends) == 1
+        from_addr, to_addrs, content = sends[0]
+        normalized = _normalize(content)
+        normalized["envelope"] = {"from": from_addr, "to": to_addrs}
+        assert "#5bcefa" in normalized["html"]
+        assert "#f5a9b8" in normalized["html"]
+        _assert_golden("manual_pride_theme", normalized)
+    finally:
+        conn = sqlite3.connect(config.DB_PATH)
+        conn.execute(
+            f"UPDATE settings SET {', '.join(f'{c} = ?' for c in _THEME_COLS)} WHERE id = 1",
+            saved,
+        )
+        conn.commit()
+        conn.close()
+
 def test_manual_recommendations_email_golden(manual_send_env):
     client = manual_send_env
     resp = _post_send(client, {
@@ -475,6 +591,162 @@ def test_manual_yearly_wrapped_email_golden(manual_send_env, monkeypatch):
     assert "Severance" in normalized["html"]
     assert "Wrapped" in normalized["html"]
     _assert_golden("manual_yearly_wrapped", normalized)
+
+MOST_WATCHED_FIXTURE = [
+    {"most_watched": [
+        {"title": "Big Hit", "rating_key": "7", "year": "2020", "thumb": "/library/metadata/7/thumb",
+         "play_count": 57, "last_played": "", "media_type": "movie", "type": "movie",
+         "library_name": "Movies", "plex_url": "https://app.plex.tv/desktop/#!/server/m1/details?key=/library/metadata/7"},
+        {"title": "Second Best", "rating_key": "8", "year": "2019", "thumb": "",
+         "play_count": 1, "last_played": "", "media_type": "movie", "type": "movie",
+         "library_name": "Movies", "plex_url": ""},
+    ]},
+]
+
+MOST_WATCHED_RECENT_FIXTURE = [
+    {"most_watched": [
+        {"title": "Fresh Hit", "rating_key": "9", "year": "2026", "thumb": "/library/metadata/9/thumb",
+         "play_count": 12, "last_played": "", "media_type": "show", "type": "show",
+         "library_name": "Movies", "plex_url": ""},
+    ]},
+]
+
+def _fixed_tautulli_data_with_most_watched(*args, **kwargs):
+    data = _fixed_tautulli_data()
+    data["most_watched_data"] = MOST_WATCHED_FIXTURE
+    data["most_watched_recent_data"] = MOST_WATCHED_RECENT_FIXTURE
+    data["most_watched_recent_days"] = "30"
+    return data
+
+def test_manual_most_watched_email_golden(manual_send_env, monkeypatch):
+    from app.emails import send as send_mod
+    from app.emails.builders import most_watched as most_watched_mod
+
+    monkeypatch.setattr(send_mod, "get_current_tautulli_data_for_email", _fixed_tautulli_data_with_most_watched)
+    monkeypatch.setattr(most_watched_mod, "fetch_and_attach_image", lambda *a, **k: None)
+
+    client = manual_send_env
+    resp = _post_send(client, {
+        "to_emails": "a@b.c, d@e.f", "subject": "Manual Most Watched", "email_header_title": "The Header",
+        "selected_items": [
+            {"type": "textblock", "content": "Crowd favorites"},
+            {"type": "most_watched", "id": "mw-lib-movies", "mwLibrary": "Movies"},
+            {"type": "most_watched", "id": "mw-lib-movies-recent", "mwLibrary": "Movies", "mwScope": "recent"},
+        ],
+        "custom_html": "", "user_dict": {}, "expanded_collections": {},
+    })
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body.get("success") is True
+
+    sends = [s for inst in RecorderSMTP.instances for s in inst.sent]
+    assert len(sends) == 1
+    from_addr, to_addrs, content = sends[0]
+    normalized = _normalize(content)
+    normalized["envelope"] = {"from": from_addr, "to": to_addrs}
+    normalized["response"] = body
+    assert "Most Watched - Movies" in normalized["html"]
+    assert "Big Hit" in normalized["html"]
+    assert "57 plays" in normalized["html"]
+    assert "1 play<" in normalized["html"] or "1 play</div>" in normalized["html"]
+    # recent scope: separate section fed by the windowed data, range in heading
+    assert "Most Watched - Movies (Last 30 days)" in normalized["html"]
+    assert "Fresh Hit" in normalized["html"]
+    assert "12 plays" in normalized["html"]
+    _assert_golden("manual_most_watched", normalized)
+
+def test_manual_custom_html_with_snapin_tokens_golden(manual_send_env, monkeypatch):
+    # NEWS-32: custom HTML with tokens expands through the same per-item
+    # dispatch as builder sends; unknown tokens become inline comments.
+    from app.emails import send as send_mod
+    from app.emails.builders import most_watched as most_watched_mod
+
+    yearly_wrapped_fixture = [
+        {"stat_title": "Most Watched Movies", "rows": [{"title": "Dune", "total_plays": 42}]},
+        {"stat_title": "Most Watched TV Shows", "rows": [{"title": "Severance", "total_plays": 30}]},
+    ]
+    monkeypatch.setattr(send_mod, "get_current_tautulli_data_for_email", _fixed_tautulli_data_with_most_watched)
+    monkeypatch.setattr(send_mod, "get_yearly_wrapped_cached", lambda *a, **k: yearly_wrapped_fixture)
+    monkeypatch.setattr(most_watched_mod, "fetch_and_attach_image", lambda *a, **k: None)
+
+    custom_html = (
+        "<html><body><h1>Hand-written newsletter</h1>"
+        "{{snapin:most_watched:Movies}}"
+        "<p>and the year so far</p>"
+        "{{snapin:wrapped}}"
+        "{{snapin:not_a_real_token}}"
+        "</body></html>"
+    )
+
+    client = manual_send_env
+    resp = _post_send(client, {
+        "to_emails": "a@b.c, d@e.f", "subject": "Custom Tokens", "email_header_title": "The Header",
+        "selected_items": [], "custom_html": custom_html,
+        "user_dict": {}, "expanded_collections": {},
+    })
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body.get("success") is True
+
+    sends = [s for inst in RecorderSMTP.instances for s in inst.sent]
+    assert len(sends) == 1
+    from_addr, to_addrs, content = sends[0]
+    normalized = _normalize(content)
+    normalized["envelope"] = {"from": from_addr, "to": to_addrs}
+    normalized["response"] = body
+    html = normalized["html"]
+    assert "Hand-written newsletter" in html
+    assert "Big Hit" in html                # most_watched token expanded
+    assert "57 plays" in html
+    assert "Dune" in html                   # wrapped token expanded
+    assert "unknown snapin token" in html   # typo surfaced as a comment
+    assert "{{snapin:most_watched" not in html
+    _assert_golden("manual_custom_html_tokens", normalized)
+
+RANDOM_PICK_FIXTURE = {
+    "title": "Pinned Movie", "rating_key": "42", "year": "2001",
+    "thumb": "/library/metadata/42/thumb", "art": "", "summary": "A fixed random pick.",
+    "tagline": "", "added_at": "", "updated_at": "", "content_rating": "PG-13",
+    "duration": "5400000", "guid": "", "key": "", "media_type": "movie",
+    "type": "movie", "genres": ["Drama", "Crime"], "library_name": "Movies",
+    "plex_url": "https://app.plex.tv/desktop/#!/server/m1/details?key=/library/metadata/42",
+    "rating": "8.0",
+}
+
+def test_manual_random_pick_email_golden(manual_send_env, monkeypatch):
+    # The pick is drawn at render time inside assemble; pin it there so the
+    # golden is deterministic and no Plex HTTP (or RNG) is involved.
+    from app.emails import assemble as assemble_mod
+    from app.emails.builders import random_pick as random_pick_mod
+
+    monkeypatch.setattr(assemble_mod, "fetch_random_library_item", lambda *a, **k: dict(RANDOM_PICK_FIXTURE))
+    monkeypatch.setattr(random_pick_mod, "fetch_and_attach_image", lambda *a, **k: None)
+
+    client = manual_send_env
+    resp = _post_send(client, {
+        "to_emails": "a@b.c, d@e.f", "subject": "Manual Random Pick", "email_header_title": "The Header",
+        "selected_items": [
+            {"type": "textblock", "content": "Tonight's feature"},
+            {"type": "random_pick", "id": "random-pick-5", "sectionId": "5", "library": "Movies"},
+        ],
+        "custom_html": "", "user_dict": {}, "expanded_collections": {},
+    })
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body.get("success") is True
+
+    sends = [s for inst in RecorderSMTP.instances for s in inst.sent]
+    assert len(sends) == 1
+    from_addr, to_addrs, content = sends[0]
+    normalized = _normalize(content)
+    normalized["envelope"] = {"from": from_addr, "to": to_addrs}
+    normalized["response"] = body
+    assert "Random Pick - Movies" in normalized["html"]
+    assert "Pinned Movie" in normalized["html"]
+    assert "1h 30m" in normalized["html"]
+    assert "Drama" in normalized["html"]
+    assert "Open in Plex" in normalized["html"]
+    _assert_golden("manual_random_pick", normalized)
 
 SONARR_EPISODES_FIXTURE = [
     {
@@ -747,6 +1019,88 @@ def test_manual_seerr_requests_email_golden(manual_send_env, monkeypatch):
     # Already-available requests are filtered out before rendering.
     assert "Seerr Fulfilled Show" not in normalized["html"]
     _assert_golden("manual_seerr_requests", normalized)
+
+@pytest.mark.parametrize("layout", ["classic", "editorial", "digest"])
+def test_manual_layout_email_golden(manual_send_env, monkeypatch, layout):
+    # Email layouts (NEWS-30): one golden per variant over a representative
+    # item mix. Legacy is pinned by every other golden in this file. The
+    # email_layout column outlives send_env, so snapshot + restore.
+    from app import config
+    from app.emails import send as send_mod
+    from app.emails.builders import coming_soon as coming_soon_mod
+    from app.emails.builders import layouts as layouts_mod
+
+    yearly_wrapped_fixture = [
+        {"stat_title": "Most Watched Movies", "rows": [{"title": "Dune", "total_plays": 42}]},
+        {"stat_title": "Most Watched TV Shows", "rows": [{"title": "Severance", "total_plays": 30}]},
+    ]
+    monkeypatch.setattr(send_mod, "get_yearly_wrapped_cached", lambda *a, **k: yearly_wrapped_fixture)
+    monkeypatch.setattr(send_mod, "get_ombi_requests_cached", lambda *a, **k: OMBI_REQUESTS_FIXTURE)
+    monkeypatch.setattr(send_mod, "get_sonarr_coming_soon_cached", lambda *a, **k: SONARR_EPISODES_FIXTURE)
+    monkeypatch.setattr(layouts_mod, "fetch_and_attach_image", lambda *a, **k: None)
+    from app.emails import assemble as assemble_mod
+    from app.emails.builders import most_watched as most_watched_mod
+    from app.emails.builders import random_pick as random_pick_mod
+    monkeypatch.setattr(assemble_mod, "fetch_random_library_item", lambda *a, **k: dict(RANDOM_PICK_FIXTURE))
+    monkeypatch.setattr(most_watched_mod, "fetch_and_attach_image", lambda *a, **k: None)
+    monkeypatch.setattr(random_pick_mod, "fetch_and_attach_image", lambda *a, **k: None)
+    # the editorial/digest mastheads stamp datetime.now() (month, and day for
+    # digest), so freeze assemble's clock or the goldens drift with the calendar
+    monkeypatch.setattr(assemble_mod, "datetime", _FixedDatetime)
+    _freeze_coming_soon_clock(monkeypatch, coming_soon_mod)
+    # the manual send path reads its settings from the fixed tautulli dict
+    # (monkeypatched in manual_send_env), not the DB row, so the layout under
+    # test is injected there
+    monkeypatch.setattr(send_mod, "get_current_tautulli_data_for_email", _fixed_tautulli_data_for_layout(layout))
+
+    conn = sqlite3.connect(config.DB_PATH)
+    saved = conn.execute("SELECT email_layout FROM settings WHERE id = 1").fetchone()
+    conn.execute("UPDATE settings SET email_layout = ? WHERE id = 1", (layout,))
+    conn.commit()
+    conn.close()
+
+    try:
+        client = manual_send_env
+        resp = _post_send(client, {
+            "to_emails": "a@b.c", "subject": f"Layout {layout}", "email_header_title": "The Header",
+            "selected_items": [
+                {"type": "textblock", "content": "Layout sampler"},
+                {"type": "yearly_wrapped", "id": "yearly-wrapped"},
+                {"type": "sonarr_coming_soon", "id": "sonarr-coming-soon"},
+                {"type": "ombi_requests", "id": "ombi-requests"},
+                {"type": "random_pick", "id": "random-pick-5", "sectionId": "5", "library": "Movies"},
+                {"type": "most_watched", "id": "mw-lib-movies", "mwLibrary": "Movies"},
+            ],
+            "custom_html": "", "user_dict": {}, "expanded_collections": {},
+        })
+        assert resp.status_code == 200
+        assert resp.get_json().get("success") is True
+
+        sends = [s for inst in RecorderSMTP.instances for s in inst.sent]
+        assert len(sends) == 1
+        from_addr, to_addrs, content = sends[0]
+        normalized = _normalize(content)
+        normalized["envelope"] = {"from": from_addr, "to": to_addrs}
+        assert "Dune" in normalized["html"]
+        assert "Requested Movie" in normalized["html"]
+        assert "ombi-requester" in normalized["html"]
+        assert "Pinned Movie" in normalized["html"]
+        assert "Big Hit" in normalized["html"]
+        assert "57 plays" in normalized["html"]
+        # layout-distinct chrome markers, so a silent fallback to another
+        # layout can never masquerade as a pass
+        chrome_markers = {
+            "classic": "letter-spacing: .06em",
+            "editorial": "3px double",
+            "digest": "border-bottom: 2px solid",
+        }
+        assert chrome_markers[layout] in normalized["html"]
+        _assert_golden(f"manual_layout_{layout}", normalized)
+    finally:
+        conn = sqlite3.connect(config.DB_PATH)
+        conn.execute("UPDATE settings SET email_layout = ? WHERE id = 1", (saved[0],))
+        conn.commit()
+        conn.close()
 
 def test_manual_coming_soon_degrades_when_only_one_service_configured(manual_send_env, monkeypatch):
     from app.emails import send as send_mod

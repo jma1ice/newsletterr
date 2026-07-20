@@ -18,6 +18,8 @@ SECRET_COLUMNS = frozenset({
     "radarr_api_key",
     "ombi_api_key",
     "seerr_api_key",
+    "jellyfin_api_key",
+    "jellywatch_api_key",
 })
 
 # Empty/NULL columns are normalized with `or`-semantics, matching the
@@ -52,10 +54,17 @@ DEFAULTS = {
     "ra_show_description": "enabled",
     "include_user_info": "enabled",
     "recs_item_count": "",
+    "ui_custom_light": "",
+    "ui_custom_dark": "",
+    "email_layout": "classic",
     "appearance_theme": "dark",
     "pride_flag": "off",
     "snapins_floating": "1",
     "plex_web_url": DEFAULT_PLEX_WEB_URL,
+    "media_server_type": "plex",
+    "jellyfin_url": "",
+    "jellyfin_web_url": "",
+    "jellywatch_url": "",
 }
 
 INT_COLUMNS = {
@@ -110,4 +119,6 @@ def get_service_flags(s):
         ),
         "ombi": bool(s.get("ombi_url") and s.get("ombi_api_key")),
         "seerr": bool(s.get("seerr_url") and s.get("seerr_api_key")),
+        "jellyfin": bool(s.get("jellyfin_url") and s.get("jellyfin_api_key")),
+        "jellywatch": bool(s.get("jellywatch_url") and s.get("jellywatch_api_key")),
     }

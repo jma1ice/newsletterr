@@ -1,19 +1,72 @@
 import secrets
 
 from datetime import datetime, timezone
-from flask import Blueprint, jsonify, redirect, render_template, request, session, url_for
+from flask import Blueprint, Response, jsonify, redirect, render_template, request, session, url_for
 
 from app.db import db_connect
 from app.settings_store import get_settings
 from app.security import require_csrf_for_json, requires_auth, json_body
 from app.store import get_saved_email_lists, save_email_list, delete_email_list, get_suppressed_emails, remove_suppressed
 from app.emails.send import SendRequest, send_standard_email_with_cids, send_recommendations_email_with_cids, resend_email_from_history
+from app.emails.preview import render_preview_email
+from app.emails.pdf import render_html_to_pdf, render_history_email_to_pdf, pdf_filename
 
 import logging
 
 logger = logging.getLogger(__name__)
 
 bp = Blueprint('emails', __name__)
+
+@bp.route('/preview_email', methods=['POST'])
+@requires_auth
+def preview_email():
+    require_csrf_for_json()
+    data, err = json_body()
+    if err:
+        return err
+    try:
+        return jsonify({"html": render_preview_email(data)})
+    except Exception as e:
+        logger.exception("preview render failed")
+        return jsonify({"error": f"Preview render failed: {e}"}), 500
+
+@bp.route('/export_pdf', methods=['POST'])
+@requires_auth
+def export_pdf():
+    # NEWS-9: same payload as /preview_email; the preview pipeline renders
+    # (browser URLs) and weasyprint converts. Request-scoped, gthread-safe.
+    require_csrf_for_json()
+    data, err = json_body()
+    if err:
+        return err
+    try:
+        html = render_preview_email(data)
+        pdf_bytes = render_html_to_pdf(html)
+        filename = pdf_filename(data.get('subject'))
+        return Response(pdf_bytes, mimetype='application/pdf',
+                        headers={'Content-Disposition': f'attachment; filename="{filename}"'})
+    except Exception as e:
+        logger.exception("pdf export failed")
+        return jsonify({"error": f"PDF export failed: {e}"}), 500
+
+@bp.route('/email_history/<int:email_id>/pdf', methods=['GET'])
+@requires_auth
+def email_history_pdf(email_id):
+    try:
+        conn = db_connect()
+        cursor = conn.cursor()
+        cursor.execute("SELECT subject, email_content FROM email_history WHERE id = ?", (email_id,))
+        row = cursor.fetchone()
+        conn.close()
+        if not row or not row[1]:
+            return jsonify({"error": "No stored content for this email"}), 404
+        subject, email_content = row
+        pdf_bytes = render_history_email_to_pdf(email_content)
+        return Response(pdf_bytes, mimetype='application/pdf',
+                        headers={'Content-Disposition': f'attachment; filename="{pdf_filename(subject)}"'})
+    except Exception as e:
+        logger.exception("history pdf export failed")
+        return jsonify({"error": f"PDF export failed: {e}"}), 500
 
 @bp.route('/send_email', methods=['POST'])
 @requires_auth

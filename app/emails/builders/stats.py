@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from app.cache import get_cache_info
-from app.emails.images import fetch_and_attach_blurred_image, fetch_and_attach_small_thumbnail
+from app.emails.images import fetch_and_attach_blurred_image, fetch_and_attach_small_thumbnail, email_icon_img
 from app.security import escape_html_output as esc
 
 import logging
@@ -240,19 +240,23 @@ def build_yearly_wrapped_html_with_cids(stats_data, msg_root, theme_colors, year
         proxy_path = f"/proxy-art{thumb_path}" if not thumb_path.startswith('/proxy-art') else thumb_path
         return fetch_and_attach_small_thumbnail(proxy_path, msg_root, cid_name, base_url, height=60, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
 
+    # White icon tint: the wrapped card sits on the primary->accent gradient
+    def _hl_icon(name):
+        return email_icon_img(name, msg_root, base_url, tint='white', size=12, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
+
     highlights = []
     if top_movie:
-        highlights.append(('🎬 Top Movie', top_movie.get('title', ''), _thumb_src(top_movie, 'wrapped-movie'), False))
+        highlights.append((f"{_hl_icon('film')} Top Movie", top_movie.get('title', ''), _thumb_src(top_movie, 'wrapped-movie'), False))
     if top_show:
-        highlights.append(('📺 Top Show', top_show.get('title', ''), _thumb_src(top_show, 'wrapped-show'), False))
+        highlights.append((f"{_hl_icon('tv')} Top Show", top_show.get('title', ''), _thumb_src(top_show, 'wrapped-show'), False))
     if top_artist:
-        highlights.append(('🎵 Top Artist', top_artist.get('title', ''), _thumb_src(top_artist, 'wrapped-artist'), False))
+        highlights.append((f"{_hl_icon('music')} Top Artist", top_artist.get('title', ''), _thumb_src(top_artist, 'wrapped-artist'), False))
     if top_user and include_user_info:
         # user_thumb is an absolute plex.tv avatar URL; small-thumbnail fetch
         # handles http URLs directly (round style variant)
         user_thumb = top_user.get('user_thumb') or ''
         user_avatar = fetch_and_attach_small_thumbnail(user_thumb, msg_root, 'wrapped-user', base_url, height=60, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url) if user_thumb else None
-        highlights.append(('👤 Most Active', top_user.get('user', ''), user_avatar, True))
+        highlights.append((f"{_hl_icon('users')} Most Active", top_user.get('user', ''), user_avatar, True))
 
     if not highlights and not total_plays:
         return ""

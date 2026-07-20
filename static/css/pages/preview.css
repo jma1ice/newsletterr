@@ -41,3 +41,15 @@
 .preview-page #loading .text-info {
     color: var(--text-muted);
 }
+
+/* device-size preview chips (NEWS-27), mirroring the builder page treatment;
+   hidden on mobile like the builder toolbar controls */
+.preview-page .preview-size-toggle { display: inline-flex; gap: var(--space-1); }
+.preview-page .preview-size-btn.active {
+    border-color: var(--accent);
+    color: var(--accent-strong);
+    background: var(--accent-soft);
+}
+@media (max-width: 768px) {
+    .preview-page #preview-size-toggle { display: none !important; }
+}

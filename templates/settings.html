@@ -38,6 +38,9 @@
         <div class="settings-layout">
 
             <div class="settings-nav">
+                <div class="settings-search">
+                    <input type="search" id="settings-search-input" class="nl-input" placeholder="Search settings..." autocomplete="off" aria-label="Search settings">
+                </div>
                 <nav>
                     <button type="button" class="settings-nav-btn active" data-section="email-server">
                         email server
@@ -158,6 +161,16 @@
                         </div>
 
                         <div class="settings-field-group settings-group-card">
+                            <h6 class="text-uppercase">Media Server</h6>
+                            <label for="media_server_type">Active media server (drives stats, recently added, artwork, and deep links):</label><br>
+                            <select id="media_server_type" name="media_server_type" class="w-field">
+                                <option value="plex" {% if settings.media_server_type != 'jellyfin' %}selected{% endif %}>Plex</option>
+                                <option value="jellyfin" {% if settings.media_server_type == 'jellyfin' %}selected{% endif %}>Jellyfin</option>
+                            </select><br>
+                            <small class="form-text text-muted">Plex pairs with Tautulli for stats; Jellyfin pairs with Jellywatch. Requests via Jellyseerr work through the Seerr connection below.</small>
+                        </div>
+
+                        <div class="settings-field-group settings-group-card">
                             <h6 class="text-uppercase">Plex</h6>
                             <button id="connect_plex" type="button" class="nl-btn nl-btn--primary mb-2">{% if settings.plex_token %}Force Reconnect{% else %}Connect Plex{% endif %}</button>
                             <div id="plex_status" class="mb-3">{% if settings.plex_token %}<p class="plex-connected">Connected</p>{% endif %}</div>
@@ -183,7 +196,47 @@
                                 placeholder="https://app.plex.tv/desktop"><br>
                         </div>
 
+                        <div class="settings-field-group settings-group-card">
+                            <h6 class="text-uppercase">Jellyfin</h6>
+                            <label for="jellyfin_url">Jellyfin Base URL (for stats, recently added, artwork when Jellyfin is the media server):</label><br>
+                            <input type="text" id="jellyfin_url" name="jellyfin_url"
+                                {% if settings.jellyfin_url != "" %}value="{{ settings.jellyfin_url }}"{% endif %}
+                                placeholder="http://localhost:8096" class="w-field"><br>
+                            <small class="form-text text-muted">Leave blank to use http://localhost:8096. Clear the API key to disable.</small><br><br>
+
+                            <label for="jellyfin_api_key">Jellyfin API Key:</label><br>
+                            <input type="password" id="jellyfin_api_key" name="jellyfin_api_key" autocomplete="new-password" class="w-field"
+                                placeholder="{% if settings.has_jellyfin_api_key %}Saved - leave blank to keep{% else %}Dashboard > API Keys in Jellyfin{% endif %}"><br><br>
+
+                            <label for="jellyfin_web_url">Jellyfin Web URL (Optional - base URL for 'Open in Jellyfin' links in emails; defaults to the Jellyfin Base URL):</label><br>
+                            <input type="text" id="jellyfin_web_url" name="jellyfin_web_url"
+                                {% if settings.jellyfin_web_url != "" %}value="{{ settings.jellyfin_web_url }}"{% endif %}
+                                placeholder="https://your-jellyfin-domain" class="w-field"><br>
+                            <p class="text-info mt-2 field-hint">Jellyfin does not store user email addresses, so per-user sends and recommendations stay Plex-only; manage Jellyfin recipient lists manually under Email Lists. Requests are handled through Jellyseerr in the Seerr card below.</p>
+                            <div class="svc-test">
+                                <button type="button" id="test_jellyfin" class="nl-btn nl-btn--primary nl-btn--sm">Test Connection</button>
+                                <span id="jellyfin_test_result"></span>
+                            </div>
+                        </div>
+
                         <div class="settings-field-grid">
+                            <div class="settings-field-group settings-group-card">
+                                <h6 class="text-uppercase">Jellywatch</h6>
+                                <label for="jellywatch_url">Jellywatch Base URL (Optional - stats and graphs for Jellyfin, the role Tautulli plays for Plex):</label><br>
+                                <input type="text" id="jellywatch_url" name="jellywatch_url"
+                                    {% if settings.jellywatch_url != "" %}value="{{ settings.jellywatch_url }}"{% endif %}
+                                    placeholder="http://your-jellywatch-host" class="w-field"><br>
+                                <small class="form-text text-muted">Clear the API key to disable.</small><br><br>
+
+                                <label for="jellywatch_api_key">Jellywatch API Key:</label><br>
+                                <input type="password" id="jellywatch_api_key" name="jellywatch_api_key" autocomplete="new-password" class="w-field"
+                                    placeholder="{% if settings.has_jellywatch_api_key %}Saved - leave blank to keep{% else %}Jellywatch API Key{% endif %}"><br>
+                                <div class="svc-test">
+                                    <button type="button" id="test_jellywatch" class="nl-btn nl-btn--primary nl-btn--sm">Test Connection</button>
+                                    <span id="jellywatch_test_result"></span>
+                                </div>
+                            </div>
+
                             <div class="settings-field-group settings-group-card">
                                 <h6 class="text-uppercase">Tautulli</h6>
                                 <label for="tautulli_url">Tautulli Base URL (Optional - for user emails, stats, graphs, recently added):</label><br>
@@ -287,7 +340,7 @@
                                 <input type="text" id="seerr_url" name="seerr_url"
                                     {% if settings.seerr_url != "" %}value="{{ settings.seerr_url }}"{% endif %}
                                     placeholder="http://localhost:5055" class="w-field"><br>
-                                <small class="form-text text-muted">Leave blank to use http://localhost:5055 (the Seerr default). Also works with Overseerr and Jellyseerr. Clear the API key to disable.</small><br><br>
+                                <small class="form-text text-muted">Leave blank to use http://localhost:5055 (the Seerr default). Works with Overseerr and Jellyseerr alike (same /api/v1 surface), so this covers requests for both Plex and Jellyfin setups. Clear the API key to disable.</small><br><br>
 
                                 <label for="seerr_api_key">Seerr API Key:</label><br>
                                 <input type="password" id="seerr_api_key" name="seerr_api_key" autocomplete="new-password" class="w-field"
@@ -486,8 +539,10 @@
                         <select id="logo_filename" name="logo_filename">
                             <option value="newsletterr_blue_small" {% if settings.logo_filename == 'Asset_54x.png' %}selected{% endif %}>Newsletterr Square Blue</option>
                             <option value="newsletterr_orange_small" {% if settings.logo_filename == 'Asset_46x.png' %}selected{% endif %}>Newsletterr Square Orange</option>
+                            <option value="newsletterr_pride_small" {% if settings.logo_filename == 'Asset_50.png' %}selected{% endif %}>Newsletterr Square Pride</option>
                             <option value="newsletterr_blue_banner" {% if settings.email_theme == 'newsletterr_blue' or settings.logo_filename == 'Asset_94x.png' %}selected{% endif %}>Newsletterr Banner Blue</option>
                             <option value="newsletterr_orange_banner" {% if settings.email_theme == 'plex_orange' or settings.logo_filename == 'Asset_45x.png' %}selected{% endif %}>Newsletterr Banner Orange</option>
+                            <option value="newsletterr_pride_banner" {% if (settings.email_theme or '').startswith('pride_') or settings.logo_filename == 'Asset_51.png' %}selected{% endif %}>Newsletterr Banner Pride</option>
                             <option value="custom" {% if settings.logo_filename == 'custom' %}selected{% endif %}>Custom</option>
                             <option value="none" {% if settings.logo_filename == '' %}selected{% endif %}>No Logo</option>
                         </select><br>
@@ -530,11 +585,39 @@
                         </div>
 
                         <div class="settings-group-card">
+                        <h6 class="text-uppercase">Layout</h6>
+                        <label for="email_layout">Email Layout:</label><br>
+                        <select id="email_layout" name="email_layout">
+                            <option value="classic" {% if settings.get('email_layout', 'classic') == 'classic' %}selected{% endif %}>Polished Classic</option>
+                            <option value="editorial" {% if settings.get('email_layout') == 'editorial' %}selected{% endif %}>Editorial</option>
+                            <option value="digest" {% if settings.get('email_layout') == 'digest' %}selected{% endif %}>Compact Digest</option>
+                            <option value="legacy" {% if settings.get('email_layout') == 'legacy' %}selected{% endif %}>Legacy</option>
+                        </select><br>
+                        <p class="text-info mt-2 field-hint">
+                            Overall email design. A tightens the classic look into one card system, B is
+                            a magazine treatment, C is a dense one-scroll digest, Legacy is the
+                            pre-v2026.4 look unchanged. Applies to previews and all sends; graphs,
+                            recommendations, and collections keep their standard look in every layout
+                            for now.
+                        </p>
+                        </div>
+
+                        <div class="settings-group-card">
                         <h6 class="text-uppercase">Theme</h6>
                         <label for="email_theme">Email Theme (must choose custom to change the logo file):</label><br>
                         <select id="email_theme" name="email_theme">
                             <option value="newsletterr_blue" {% if settings.email_theme == 'newsletterr_blue' %}selected{% endif %}>Newsletterr Blue</option>
                             <option value="plex_orange" {% if settings.email_theme == 'plex_orange' %}selected{% endif %}>Plex Orange</option>
+                            <optgroup label="Pride">
+                                <option value="pride_rainbow" {% if settings.email_theme == 'pride_rainbow' %}selected{% endif %}>Rainbow</option>
+                                <option value="pride_trans" {% if settings.email_theme == 'pride_trans' %}selected{% endif %}>Trans</option>
+                                <option value="pride_bi" {% if settings.email_theme == 'pride_bi' %}selected{% endif %}>Bi</option>
+                                <option value="pride_pan" {% if settings.email_theme == 'pride_pan' %}selected{% endif %}>Pan</option>
+                                <option value="pride_lesbian" {% if settings.email_theme == 'pride_lesbian' %}selected{% endif %}>Lesbian</option>
+                                <option value="pride_nonbinary" {% if settings.email_theme == 'pride_nonbinary' %}selected{% endif %}>Nonbinary</option>
+                                <option value="pride_ace" {% if settings.email_theme == 'pride_ace' %}selected{% endif %}>Ace</option>
+                                <option value="pride_progress" {% if settings.email_theme == 'pride_progress' %}selected{% endif %}>Progress</option>
+                            </optgroup>
                             <option value="custom" {% if settings.email_theme == 'custom' %}selected{% endif %}>Custom</option>
                         </select><br><br>
 
@@ -719,9 +802,9 @@
                         <h4 class="mb-4">appearance</h4>
 
                         <div class="settings-group-card">
-                        <h6 class="text-uppercase">Pride Theme</h6>
+                        <h6 class="text-uppercase">UI Theme</h6>
                         {% set _pride = settings.get('pride_flag', 'off') %}
-                        <label for="pride_flag">Pride Theme:</label><br>
+                        <label for="pride_flag">UI Theme:</label><br>
                         <select id="pride_flag" name="pride_flag">
                             <option value="off" {% if _pride == 'off' %}selected{% endif %}>Off</option>
                             <option value="rainbow" {% if _pride == 'rainbow' %}selected{% endif %}>Rainbow</option>
@@ -732,13 +815,45 @@
                             <option value="lesbian" {% if _pride == 'lesbian' %}selected{% endif %}>Lesbian</option>
                             <option value="ace" {% if _pride == 'ace' %}selected{% endif %}>Asexual</option>
                             <option value="progress" {% if _pride == 'progress' %}selected{% endif %}>Progress</option>
+                            <option value="custom" {% if _pride == 'custom' %}selected{% endif %}>Custom</option>
                         </select><br>
                         <div class="pride-preview" aria-hidden="true"></div>
                         <p class="text-info mt-2 field-hint">
                             Recolors the whole interface with your chosen pride flag palette, in both
-                            light and dark mode. Saved to your account and applied wherever you sign in.
+                            light and dark mode. Custom builds your own palette instead. Saved to your
+                            account and applied wherever you sign in.
                         </p>
 
+                        {% set _uicl = settings.get('ui_custom_light_colors') or {} %}
+                        {% set _uicd = settings.get('ui_custom_dark_colors') or {} %}
+                        <div id="custom-theme-editor" class="mt-3 {% if _pride != 'custom' %}d-none{% endif %}" data-configured="{{ '1' if settings.get('ui_custom_configured') else '0' }}">
+                            <div class="custom-theme-mode">
+                                <strong>Light mode</strong>
+                                <div class="custom-theme-pickers">
+                                    <label>Background <input type="color" name="ui_light_bg" value="{{ _uicl.get('bg', '#eef1f2') }}"></label>
+                                    <label>Surface <input type="color" name="ui_light_surface" value="{{ _uicl.get('surface', '#fbfcfc') }}"></label>
+                                    <label>Border <input type="color" name="ui_light_border" value="{{ _uicl.get('border', '#c3ced1') }}"></label>
+                                    <label>Text <input type="color" name="ui_light_text" value="{{ _uicl.get('text', '#16272b') }}"></label>
+                                    <label>Muted Text <input type="color" name="ui_light_muted" value="{{ _uicl.get('muted', '#51666c') }}"></label>
+                                    <label>Accent <input type="color" name="ui_light_accent" value="{{ _uicl.get('accent', '#3e8d94') }}"></label>
+                                </div>
+                            </div>
+                            <div class="custom-theme-mode mt-2">
+                                <strong>Dark mode</strong>
+                                <div class="custom-theme-pickers">
+                                    <label>Background <input type="color" name="ui_dark_bg" value="{{ _uicd.get('bg', '#1d2426') }}"></label>
+                                    <label>Surface <input type="color" name="ui_dark_surface" value="{{ _uicd.get('surface', '#252d30') }}"></label>
+                                    <label>Border <input type="color" name="ui_dark_border" value="{{ _uicd.get('border', '#3a464a') }}"></label>
+                                    <label>Text <input type="color" name="ui_dark_text" value="{{ _uicd.get('text', '#e9f1f2') }}"></label>
+                                    <label>Muted Text <input type="color" name="ui_dark_muted" value="{{ _uicd.get('muted', '#a5b6ba') }}"></label>
+                                    <label>Accent <input type="color" name="ui_dark_accent" value="{{ _uicd.get('accent', '#62a1a4') }}"></label>
+                                </div>
+                            </div>
+                            <div class="mt-2">
+                                <button type="button" id="custom-theme-seed-btn" class="nl-btn nl-btn--ghost nl-btn--sm">Seed from previous palette</button>
+                                <span class="field-hint">Refills all pickers (light and dark) from the palette you switched away from. Your first visit to Custom starts from it automatically. Changes apply live; Apply Settings saves them.</span>
+                            </div>
+                        </div>
                         </div>
 
                         <div class="settings-group-card">
@@ -778,8 +893,73 @@
     }
 
     document.querySelectorAll('.settings-nav-btn').forEach(btn => {
-        btn.addEventListener('click', () => switchSection(btn.dataset.section));
+        btn.addEventListener('click', () => {
+            // A nav click always leaves search mode and shows that one section.
+            clearSettingsSearch();
+            switchSection(btn.dataset.section);
+        });
     });
+
+    // Settings search: while a term is entered, every section is shown at once
+    // and only matching units stay visible. Matching is done per .settings-field
+    // / .settings-field-group where the section has them, else per group card,
+    // so the mixed markup across sections all behaves. Highlighting is a class
+    // (accent edge), not text rewriting, so field listeners survive.
+    function _searchUnits() {
+        const units = [];
+        document.querySelectorAll('.settings-section .settings-group-card').forEach(card => {
+            const fields = card.querySelectorAll('.settings-field, .settings-field-group');
+            if (fields.length) {
+                fields.forEach(f => units.push({ el: f, card }));
+            } else {
+                units.push({ el: card, card });
+            }
+        });
+        return units;
+    }
+
+    function clearSettingsSearch() {
+        const input = document.getElementById('settings-search-input');
+        if (input) input.value = '';
+        document.querySelectorAll('.settings-section .d-none-search, .settings-section.d-none-search').forEach(el => el.classList.remove('d-none-search'));
+        document.querySelectorAll('.search-match').forEach(el => el.classList.remove('search-match'));
+        document.body.classList.remove('settings-searching');
+        const active = document.querySelector('.settings-nav-btn.active');
+        if (active) switchSection(active.dataset.section);
+    }
+
+    function applySettingsSearch(term) {
+        term = term.trim().toLowerCase();
+        if (!term) {
+            clearSettingsSearch();
+            return;
+        }
+        document.body.classList.add('settings-searching');
+        document.querySelectorAll('.settings-section').forEach(s => s.classList.remove('d-none'));
+
+        const matchedCards = new Set();
+        _searchUnits().forEach(({ el, card }) => {
+            const hit = el.textContent.toLowerCase().includes(term);
+            el.classList.toggle('d-none-search', !hit);
+            el.classList.toggle('search-match', hit);
+            if (hit) matchedCards.add(card);
+        });
+        document.querySelectorAll('.settings-section .settings-group-card').forEach(card => {
+            card.classList.toggle('d-none-search', !matchedCards.has(card));
+        });
+        document.querySelectorAll('.settings-section').forEach(section => {
+            const any = section.querySelector('.settings-group-card:not(.d-none-search)');
+            section.classList.toggle('d-none-search', !any);
+        });
+    }
+
+    const searchInput = document.getElementById('settings-search-input');
+    if (searchInput) {
+        searchInput.addEventListener('input', () => applySettingsSearch(searchInput.value));
+        searchInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') clearSettingsSearch();
+        });
+    }
 
     document.addEventListener('DOMContentLoaded', () => {
         const saved = sessionStorage.getItem('settings_section');
@@ -814,6 +994,7 @@
         window.fillDefaultUrlIfKeyed('radarr_url', 'radarr_api_key', HAS_RADARR_API_KEY, 'http://localhost:7878');
         window.fillDefaultUrlIfKeyed('ombi_url', 'ombi_api_key', HAS_OMBI_API_KEY, 'http://localhost:3579');
         window.fillDefaultUrlIfKeyed('seerr_url', 'seerr_api_key', HAS_SEERR_API_KEY, 'http://localhost:5055');
+        window.fillDefaultUrlIfKeyed('jellyfin_url', 'jellyfin_api_key', HAS_JELLYFIN_API_KEY, 'http://localhost:8096');
         const requiredFields = e.target.querySelectorAll('[required]');
         for (const field of requiredFields) {
             if (!field.validity.valid) {
@@ -839,23 +1020,160 @@
         const root = document.documentElement;
 
         function stripPride() {
-            root.classList.remove('pride');
+            root.classList.remove('pride', 'theme-custom');
             [...root.classList].forEach(c => { if (c.indexOf('pride-') === 0) root.classList.remove(c); });
         }
+
+        // custom UI theme (NEWS-29) live apply
+        const editor = document.getElementById('custom-theme-editor');
+
+        function readMode(prefix) {
+            const colors = {};
+            ['bg', 'surface', 'border', 'text', 'muted', 'accent'].forEach(k => {
+                colors[k] = document.querySelector(`[name="${prefix}_${k}"]`)?.value || '#888888';
+            });
+            return colors;
+        }
+
+        // Mirrors build_custom_ui_theme_css / _custom_token_block in
+        // app/theme.py; keep the two derivations identical.
+        function tokenBlock(c, mode) {
+            const strongMix = mode === 'light' ? '#000000' : '#ffffff';
+            const r = parseInt(c.accent.slice(1, 3), 16), g = parseInt(c.accent.slice(3, 5), 16), b = parseInt(c.accent.slice(5, 7), 16);
+            const onAccent = ((0.2126 * r + 0.7152 * g + 0.0722 * b) / 255) > 0.55 ? '#111417' : '#ffffff';
+            return `--bg: ${c.bg};` +
+                ` --surface-1: ${c.surface};` +
+                ` --surface-2: color-mix(in srgb, ${c.surface} 88%, ${c.bg});` +
+                ` --surface-3: color-mix(in srgb, ${c.surface} 76%, ${c.bg});` +
+                ` --border: ${c.border};` +
+                ` --border-soft: color-mix(in srgb, ${c.border} 55%, ${c.surface});` +
+                ` --text: ${c.text};` +
+                ` --text-muted: ${c.muted};` +
+                ` --text-faint: color-mix(in srgb, ${c.muted} 65%, ${c.surface});` +
+                ` --accent: ${c.accent};` +
+                ` --accent-strong: color-mix(in srgb, ${c.accent} 78%, ${strongMix});` +
+                ` --accent-soft: color-mix(in srgb, ${c.accent} 14%, ${c.surface});` +
+                ` --on-accent: ${onAccent};`;
+        }
+
+        function buildCustomCss() {
+            return `.theme-custom { ${tokenBlock(readMode('ui_light'), 'light')} }\n` +
+                   `.theme-custom.dark { ${tokenBlock(readMode('ui_dark'), 'dark')} }`;
+        }
+
+        function applyCustomCss() {
+            let styleEl = document.getElementById('custom-theme-style');
+            if (!styleEl) {
+                styleEl = document.createElement('style');
+                styleEl.id = 'custom-theme-style';
+                document.head.appendChild(styleEl);
+            }
+            const css = buildCustomCss();
+            styleEl.textContent = css;
+            localStorage.setItem('customThemeCss', css);
+        }
+
+        // Resolve the palette actually on screen to hex (custom properties may
+        // hold color-mix() expressions, so resolve through a computed color).
+        // Chromium serializes computed color-mix results as "color(srgb r g b)"
+        // rather than "rgb(r, g, b)", so both forms are parsed.
+        function resolveTokenHex(varName) {
+            const probe = document.createElement('div');
+            probe.style.color = `var(${varName})`;
+            document.body.appendChild(probe);
+            const rgb = getComputedStyle(probe).color;
+            probe.remove();
+            let m = rgb.match(/rgba?\((\d+)[,\s]+(\d+)[,\s]+(\d+)/);
+            if (m) {
+                return '#' + [m[1], m[2], m[3]].map(n => parseInt(n, 10).toString(16).padStart(2, '0')).join('');
+            }
+            m = rgb.match(/color\(srgb\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)/);
+            if (m) {
+                return '#' + [m[1], m[2], m[3]].map(n => Math.round(parseFloat(n) * 255).toString(16).padStart(2, '0')).join('');
+            }
+            return null;
+        }
+
+        const TOKEN_FOR = { bg: '--bg', surface: '--surface-1', border: '--border', text: '--text', muted: '--text-muted', accent: '--accent' };
+
+        // Resolve both modes by toggling the dark class synchronously (no
+        // paint happens between the toggles, so nothing flashes on screen).
+        function resolvePaletteBothModes() {
+            const wasDark = root.classList.contains('dark');
+            const out = { ui_light: {}, ui_dark: {} };
+            for (const [prefix, dark] of [['ui_light', false], ['ui_dark', true]]) {
+                root.classList.toggle('dark', dark);
+                for (const [key, token] of Object.entries(TOKEN_FOR)) {
+                    out[prefix][key] = resolveTokenHex(token) || '#888888';
+                }
+            }
+            root.classList.toggle('dark', wasDark);
+            return out;
+        }
+
+        function fillPickers(snapshot) {
+            for (const prefix of ['ui_light', 'ui_dark']) {
+                for (const key of Object.keys(TOKEN_FOR)) {
+                    const inp = document.querySelector(`[name="${prefix}_${key}"]`);
+                    if (inp && snapshot[prefix][key]) inp.value = snapshot[prefix][key];
+                }
+            }
+        }
+
+        // The palette in effect when the user switches INTO Custom. Captured
+        // before the custom theme applies, because once it applies the palette
+        // on screen is the custom theme itself and reading it back would make
+        // seeding a no-op.
+        let previousPalette = null;
 
         // The select value comes from the server (settings.pride_flag). Apply
         // the choice instantly and keep the localStorage mirror in sync; the
         // form POST is what persists it to the account.
         sel.addEventListener('change', () => {
             const val = sel.value;
+            if (val === 'custom' && !root.classList.contains('theme-custom')) {
+                previousPalette = resolvePaletteBothModes();
+            }
             stripPride();
-            if (val === 'off' || FLAGS.indexOf(val) === -1) {
+            if (editor) editor.classList.toggle('d-none', val !== 'custom');
+            if (val === 'custom') {
+                // First-ever visit to Custom: start from the palette the user
+                // was just using instead of the stock defaults.
+                if (editor && editor.dataset.configured !== '1' && previousPalette) {
+                    fillPickers(previousPalette);
+                    editor.dataset.configured = '1';
+                }
+                root.classList.add('theme-custom');
+                localStorage.setItem('pride', 'custom');
+                applyCustomCss();
+            } else if (val === 'off' || FLAGS.indexOf(val) === -1) {
                 localStorage.removeItem('pride');
+                localStorage.removeItem('customThemeCss');
             } else {
                 root.classList.add('pride', 'pride-' + val);
                 localStorage.setItem('pride', val);
+                localStorage.removeItem('customThemeCss');
             }
         });
+
+        if (editor) {
+            editor.querySelectorAll('input[type="color"]').forEach(inp => {
+                inp.addEventListener('input', () => {
+                    if (sel.value === 'custom') applyCustomCss();
+                });
+            });
+        }
+
+        const seedBtn = document.getElementById('custom-theme-seed-btn');
+        if (seedBtn) {
+            seedBtn.addEventListener('click', () => {
+                // Prefer the palette captured when switching into Custom; if
+                // the page loaded already in Custom there is nothing older to
+                // read, so fall back to what is on screen.
+                fillPickers(previousPalette || resolvePaletteBothModes());
+                if (sel.value === 'custom') applyCustomCss();
+            });
+        }
 
         // Floating snap-ins: flip the <html> class instantly; the form POST
         // persists snapins_floating alongside the pride flag.
@@ -873,6 +1191,7 @@
 <script nonce="{{ nonce }}">
     document.querySelectorAll('input[type="color"]').forEach(colorInput => {
         const textInput = colorInput.parentElement.querySelector('input[type="text"]');
+        if (!textInput) return; // custom theme pickers have no paired hex field
         colorInput.addEventListener('change', function() {
             textInput.value = this.value;
         });
@@ -1116,8 +1435,10 @@
     const preset_logo_name_to_file = {
         "newsletterr_blue_small": "Asset_54x.png",
         "newsletterr_orange_small": "Asset_46x.png",
+        "newsletterr_pride_small": "Asset_50.png",
         "newsletterr_blue_banner": "Asset_94x.png",
-        "newsletterr_orange_banner": "Asset_45x.png"
+        "newsletterr_orange_banner": "Asset_45x.png",
+        "newsletterr_pride_banner": "Asset_51.png"
     }
 
     const serverCustomLogoFilename = "{{ settings.custom_logo_filename if settings.custom_logo_filename else '' }}";
@@ -1323,6 +1644,8 @@
     const HAS_SEERR_API_KEY = {{ 'true' if settings.has_seerr_api_key else 'false' }};
     const HAS_TAUTULLI_API = {{ 'true' if settings.has_tautulli_api else 'false' }};
     const HAS_DROPPEDNEEDLE_API_KEY = {{ 'true' if settings.has_droppedneedle_api_key else 'false' }};
+    const HAS_JELLYFIN_API_KEY = {{ 'true' if settings.has_jellyfin_api_key else 'false' }};
+    const HAS_JELLYWATCH_API_KEY = {{ 'true' if settings.has_jellywatch_api_key else 'false' }};
 
     // When an API key is present (typed now or already saved) but the URL is
     // blank, fill in the default so the user sees what will be tested and saved.
@@ -1412,6 +1735,21 @@
         }, 'seerr_test_result', 'test_seerr');
     });
 
+    document.getElementById('test_jellyfin')?.addEventListener('click', () => {
+        window.fillDefaultUrlIfKeyed('jellyfin_url', 'jellyfin_api_key', HAS_JELLYFIN_API_KEY, 'http://localhost:8096');
+        runConnectionTest('/api/test/jellyfin', {
+            url: document.getElementById('jellyfin_url').value.trim(),
+            api_key: document.getElementById('jellyfin_api_key').value.trim()
+        }, 'jellyfin_test_result', 'test_jellyfin');
+    });
+
+    document.getElementById('test_jellywatch')?.addEventListener('click', () => {
+        runConnectionTest('/api/test/jellywatch', {
+            url: document.getElementById('jellywatch_url').value.trim(),
+            api_key: document.getElementById('jellywatch_api_key').value.trim()
+        }, 'jellywatch_test_result', 'test_jellywatch');
+    });
+
     // Test All: run each configured service in turn, reusing its inline result
     // display. Unconfigured services (no URL/key entered and no saved key) are
     // skipped. Plex has its own Reconnect flow and is not included.
@@ -1448,6 +1786,13 @@
               run: () => { window.fillDefaultUrlIfKeyed('seerr_url', 'seerr_api_key', HAS_SEERR_API_KEY, 'http://localhost:5055');
                   return runConnectionTest('/api/test/seerr',
                   { url: val('seerr_url'), api_key: val('seerr_api_key') }, 'seerr_test_result', 'test_seerr'); } },
+            { configured: () => !!val('jellyfin_url') || !!val('jellyfin_api_key') || HAS_JELLYFIN_API_KEY,
+              run: () => { window.fillDefaultUrlIfKeyed('jellyfin_url', 'jellyfin_api_key', HAS_JELLYFIN_API_KEY, 'http://localhost:8096');
+                  return runConnectionTest('/api/test/jellyfin',
+                  { url: val('jellyfin_url'), api_key: val('jellyfin_api_key') }, 'jellyfin_test_result', 'test_jellyfin'); } },
+            { configured: () => !!val('jellywatch_url') || !!val('jellywatch_api_key') || HAS_JELLYWATCH_API_KEY,
+              run: () => runConnectionTest('/api/test/jellywatch',
+                  { url: val('jellywatch_url'), api_key: val('jellywatch_api_key') }, 'jellywatch_test_result', 'test_jellywatch') },
         ];
 
         btn.disabled = true;

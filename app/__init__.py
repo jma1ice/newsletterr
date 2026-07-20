@@ -2,7 +2,7 @@ import os
 
 from flask import Flask
 
-from app import cache, config, crypto, db, hooks, scheduler, state
+from app import cache, config, crypto, db, demo, hooks, scheduler, state
 from app.clients import plex
 from app.log import setup_logging
 
@@ -50,6 +50,7 @@ def create_app():
     state.plex_headers = plex.get_plex_headers()
 
     hooks.register(app)
+    demo.install(app)
 
     # Same worker gate as the old __main__ block: skip only in the werkzeug
     # reloader parent (WERKZEUG_RUN_MAIN unset while FLASK_DEBUG=1).

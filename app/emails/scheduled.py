@@ -52,6 +52,42 @@ class ScheduleContext:
     seerr_requests_data: dict = None
     email_text: str = ""
 
+# Item types that represent "new content" for the skip_if_no_new option: the
+# recently-added grid and the most-watched grid. A template with none of these
+# has nothing that could be "new", so the toggle is a no-op there.
+SKIP_SENSITIVE_ITEM_TYPES = ('recently added', 'most_watched')
+
+def scheduled_send_has_new_content(selected_items, tautulli_data):
+    """True when at least one recently-added or most-watched section in the
+    template resolves to one or more items for the pulled data, honoring each
+    section's per-library filter. Backs the skip_if_no_new schedule option: a
+    quiet week (days mode with no new items) yields False so the send can be
+    skipped. Pure and side-effect free for unit testing. The caller is
+    responsible for the "template has no RA-type sections at all" case, where the
+    toggle does not apply."""
+    recent_data = tautulli_data.get('recent_data') or []
+    mw_all = tautulli_data.get('most_watched_data') or []
+    mw_recent = tautulli_data.get('most_watched_recent_data') or []
+
+    def _any_item(sections, inner_key, lib):
+        want = (lib or '').lower()
+        for section in sections:
+            for item in (section.get(inner_key) or []):
+                if not want or (item.get('library_name') or '').lower() == want:
+                    return True
+        return False
+
+    for item in selected_items:
+        item_type = item.get('type')
+        if item_type == 'recently added':
+            if _any_item(recent_data, 'recently_added', item.get('raLibrary')):
+                return True
+        elif item_type == 'most_watched':
+            source = mw_recent if item.get('mwScope') == 'recent' else mw_all
+            if _any_item(source, 'most_watched', item.get('mwLibrary')):
+                return True
+    return False
+
 def send_scheduled_email(schedule_id, email_list_id, template_id):
     return send_scheduled_email_with_cids(schedule_id, email_list_id, template_id)
 
@@ -59,7 +95,7 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
     try:
         schedule_conn = db_connect()
         schedule_cursor = schedule_conn.cursor()
-        schedule_cursor.execute("SELECT date_range, items_count FROM email_schedules WHERE id = ?", (schedule_id,))
+        schedule_cursor.execute("SELECT date_range, items_count, skip_if_no_new FROM email_schedules WHERE id = ?", (schedule_id,))
         schedule_result = schedule_cursor.fetchone()
         schedule_conn.close()
 
@@ -69,6 +105,7 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
 
         date_range = schedule_result[0] if schedule_result else 7
         items_count = schedule_result[1] if schedule_result else 10
+        skip_if_no_new = bool(schedule_result[2]) if schedule_result else False
 
         if email_list_id == 0 or email_list_id == 'ALL':
             if s.get("tautulli_url") and s.get("tautulli_api"):
@@ -130,6 +167,28 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
         if "id" not in s:
             logger.error("SMTP settings not found in database")
             return False
+
+        # skip_if_no_new (GH 105): when the template has recently-added or
+        # most-watched sections and the schedule opted in, probe the pull once up
+        # front and skip the whole send when nothing new landed in the window.
+        # Templates without RA-type sections ignore the toggle. The skip is
+        # recorded in history and counts as the schedule having fired (next_send
+        # already advanced in the scheduler), so it is a success, not a failure.
+        if skip_if_no_new and any(item.get('type') in SKIP_SENSITIVE_ITEM_TYPES for item in selected_items):
+            probe_data = fetch_tautulli_data_for_email(
+                s.get("tautulli_url"), s.get("tautulli_api"), date_range, s.get("server_name"), items_count,
+                stats_type=s.get("stats_type") or "plays",
+                recently_added_mode=s.get("recently_added_mode") or "items",
+                recently_added_sort=s.get("recently_added_sort") or "date",
+            )
+            if not scheduled_send_has_new_content(selected_items, probe_data):
+                logger.info(f"skip_if_no_new: schedule {schedule_id} found no new recently-added/most-watched items; skipping send")
+                record_email_history(
+                    f"[SCHEDULED] {subject}", ', '.join(to_emails_list), '', 0,
+                    len(to_emails_list), template_name, status='skipped',
+                    error='No new recently-added or most-watched items in the window',
+                )
+                return True
 
         public_base = config.INTERNAL_BASE_URL
         theme = 'dark'
@@ -410,6 +469,7 @@ def send_scheduled_user_email_with_cids(ctx, settings, recipients, user_key):
         tautulli_data["settings"]["collections_grid_columns"] = settings.get("collections_grid_columns", 5)
         tautulli_data["settings"]["ra_show_description"] = settings.get("ra_show_description", "enabled")
         tautulli_data["settings"]["include_user_info"] = settings.get("include_user_info", "enabled")
+        tautulli_data["settings"]["email_layout"] = settings.get("email_layout", "classic")
 
         template_data = {
             'selected_items': json.dumps(selected_items),
@@ -637,6 +697,7 @@ def send_scheduled_single_email_with_cids(ctx, settings, to_emails_list):
         tautulli_data["settings"]["collections_grid_columns"] = settings.get("collections_grid_columns", 5)
         tautulli_data["settings"]["ra_show_description"] = settings.get("ra_show_description", "enabled")
         tautulli_data["settings"]["include_user_info"] = settings.get("include_user_info", "enabled")
+        tautulli_data["settings"]["email_layout"] = settings.get("email_layout", "classic")
 
         template_data = {
             'selected_items': json.dumps(selected_items),

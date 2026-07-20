@@ -81,6 +81,7 @@
                                     data-send-time="{{ schedule.send_time or '09:00' }}"
                                     data-date-range="{{ schedule.date_range or 7 }}"
                                     data-items-count="{{ schedule.items_count or 10 }}"
+                                    data-skip-if-no-new="{{ '1' if schedule.skip_if_no_new else '0' }}"
                                     data-bs-toggle="modal"
                                     data-bs-target="#scheduleModal">
                                 {{ icon('edit') }}
@@ -243,6 +244,12 @@
                         </div>
                     </div>
                     
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="skip-if-no-new">
+                        <label class="form-check-label" for="skip-if-no-new">Skip send when nothing new</label>
+                        <div class="form-text text-info">When the template has a recently-added or most-watched section and no new items landed in the window, skip the send. The history logs it as Skipped and the next send is unaffected. Templates without those sections ignore this.</div>
+                    </div>
+
                     <div class="alert alert-info theme-alert" role="alert">
                         <strong>Note:</strong> The schedule will become active immediately upon creation. The first email will be sent according to your specified start date and frequency.
                     </div>
@@ -532,8 +539,9 @@
             document.getElementById('send-time').value = '09:00';
             document.getElementById('date-range-select').value = '7';
             document.getElementById('items-count-select').value = '10';
+            document.getElementById('skip-if-no-new').checked = false;
         }
-        
+
         function populateEditModal(scheduleData) {
             document.getElementById('scheduleModalLabel').textContent = 'Edit Email Schedule';
             document.getElementById('save-schedule-btn').textContent = 'Update Schedule';
@@ -555,6 +563,7 @@
             document.getElementById('send-time').value = scheduleData.sendTime;
             document.getElementById('date-range-select').value = scheduleData.dateRange || '7';
             document.getElementById('items-count-select').value = scheduleData.itemsCount || '10';
+            document.getElementById('skip-if-no-new').checked = scheduleData.skipIfNoNew === '1' || scheduleData.skipIfNoNew === 1 || scheduleData.skipIfNoNew === true;
         }
         
         document.getElementById('add-schedule-btn').addEventListener('click', function() {
@@ -572,7 +581,8 @@
                     startDate: this.dataset.startDate,
                     sendTime: this.dataset.sendTime,
                     dateRange: this.dataset.dateRange,
-                    itemsCount: this.dataset.itemsCount
+                    itemsCount: this.dataset.itemsCount,
+                    skipIfNoNew: this.dataset.skipIfNoNew
                 };
                 populateEditModal(scheduleData);
             });
@@ -588,7 +598,8 @@
             const sendTime = document.getElementById('send-time').value;
             const dateRange = document.getElementById('date-range-select').value;
             const itemsCount = document.getElementById('items-count-select').value;
-            
+            const skipIfNoNew = document.getElementById('skip-if-no-new').checked;
+
             if (!name || !emailListId || !templateId || !frequency || !startDate || !sendTime || !dateRange || !itemsCount) {
                 alert('Please fill in all fields');
                 return;
@@ -613,7 +624,8 @@
                         start_date: startDate,
                         send_time: sendTime,
                         date_range: parseInt(dateRange),
-                        items_count: parseInt(itemsCount)
+                        items_count: parseInt(itemsCount),
+                        skip_if_no_new: skipIfNoNew
                     })
                 });
                 

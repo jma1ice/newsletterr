@@ -52,12 +52,13 @@ def is_safe_fetch_url(url, allowed_hosts=()):
     return True, "public"
 
 def configured_media_hosts():
-    """Hosts of the operator-configured Plex and Tautulli servers, allowed
-    even on a private LAN. Imported lazily to keep this module leaf-level."""
+    """Hosts of the operator-configured media servers (Plex, Tautulli,
+    Jellyfin, Jellywatch), allowed even on a private LAN. Imported lazily to
+    keep this module leaf-level."""
     from app.settings_store import get_settings
     s = get_settings(decrypt_secrets=False)
     hosts = []
-    for key in ("plex_url", "tautulli_url"):
+    for key in ("plex_url", "tautulli_url", "jellyfin_url", "jellywatch_url"):
         h = _host_of(s.get(key) or "")
         if h:
             hosts.append(h)

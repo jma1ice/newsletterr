@@ -20,7 +20,7 @@
     <p id="alert_p" class="nl-alert nl-alert--success mb-3" style="display: none;">{{ alert or '' }}</p>
     <p id="error_p" class="nl-alert nl-alert--danger mb-3" style="display: none;">{{ error or '' }}</p>
     <div id="plex_warning_p" class="nl-alert nl-alert--warning nl-alert--dismissible mb-3" style="display: none;">
-        <span>Plex connection failed, showing cached/Tautulli data (previews, images, and collections may be missing). Use Force Reconnect in settings.</span>
+        <span>{% if settings.media_server_type == 'jellyfin' %}Jellyfin connection failed, showing cached data (previews and images may be missing). Check the Jellyfin connection in settings.{% else %}Plex connection failed, showing cached/Tautulli data (previews, images, and collections may be missing). Use Force Reconnect in settings.{% endif %}</span>
         <button type="button" class="nl-alert__close" id="plex_warning_close" aria-label="Dismiss">&times;</button>
     </div>
     <div class="foreground">
@@ -78,8 +78,16 @@
                 <div class="d-flex justify-content-between align-items-center mb-2 preview-toolbar">
                     <span>Preview:</span>
                     <div class="d-flex gap-2">
+                        <div class="preview-size-toggle" id="preview-size-toggle" role="group" aria-label="Preview device size">
+                            <button type="button" class="nl-btn nl-btn--ghost nl-btn--sm preview-size-btn" data-size="desktop" title="Preview at desktop width (800px)">Desktop</button>
+                            <button type="button" class="nl-btn nl-btn--ghost nl-btn--sm preview-size-btn" data-size="tablet" title="Preview at tablet width (600px)">Tablet</button>
+                            <button type="button" class="nl-btn nl-btn--ghost nl-btn--sm preview-size-btn" data-size="phone" title="Preview at phone width (375px)">Phone</button>
+                        </div>
                         <button id="export-html-btn" class="nl-btn nl-btn--ghost nl-btn--sm" title="Export email as HTML file">
                             &#8681; Export HTML
+                        </button>
+                        <button id="export-pdf-btn" class="nl-btn nl-btn--ghost nl-btn--sm" title="Export email as PDF file">
+                            &#8681; Export PDF
                         </button>
                         <button id="import-html-btn" class="nl-btn nl-btn--ghost nl-btn--sm" title="Import HTML file as template">
                             &#8679; Import HTML
@@ -124,8 +132,14 @@
                         </div>
                     </div>
                     <div id="custom-html-pane" style="display: none;">
+                        <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
+                            <select id="snapin-token-picker" class="form-select" style="max-width: 22em;">
+                                <option value="">Insert snap-in...</option>
+                            </select>
+                            <span class="text-muted" style="font-size: 0.8rem;">Tokens render the live section at send time. Graphs are not available as tokens.</span>
+                        </div>
                         <textarea id="custom-html-editor" class="form-control font-monospace text-alert"
-                                placeholder="Paste your complete HTML email here..."></textarea>
+                                placeholder="Paste your complete HTML email here... Use Insert snap-in to drop {{ '{{snapin:...}}' }} tokens that render live sections."></textarea>
                     </div>
                 </div>
 {% include 'partials/_snapins.html' %}

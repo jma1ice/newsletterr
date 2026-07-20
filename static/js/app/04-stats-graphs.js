@@ -18,6 +18,13 @@ try {
     console.error("Error parsing stats:", e);
 }
 
+// Mirrors email_icon_img in app/emails/images.py: PNG icons for email-bound
+// HTML because Gmail strips inline SVG. Previews use the static path directly.
+function emailIconImg(name, tint = 'gray', size = 14) {
+    if (!name) return '';
+    return `<img src="/static/img/email-icons/${name}-${tint}.png" alt="" width="${size}" height="${size}" style="width: ${size}px; height: ${size}px; border: 0; vertical-align: -2px; display: inline-block;">`;
+}
+
 function buildStatPreviewHTML(statId) {
     const statIndex = parseInt(statId.split('-')[1]);
     
@@ -592,12 +599,12 @@ function buildYearlyWrappedPreviewHTML() {
 
     const highlights = [];
     const includeUserInfo = window.APP?.includeUserInfo !== 'disabled';
-    if (topMovie) highlights.push(['🎬 Top Movie', topMovie.title || '', thumbSrc(topMovie), false]);
-    if (topShow) highlights.push(['📺 Top Show', topShow.title || '', thumbSrc(topShow), false]);
-    if (topArtist) highlights.push(['🎵 Top Artist', topArtist.title || '', thumbSrc(topArtist), false]);
+    if (topMovie) highlights.push([`${emailIconImg('film', 'white', 12)} Top Movie`, topMovie.title || '', thumbSrc(topMovie), false]);
+    if (topShow) highlights.push([`${emailIconImg('tv', 'white', 12)} Top Show`, topShow.title || '', thumbSrc(topShow), false]);
+    if (topArtist) highlights.push([`${emailIconImg('music', 'white', 12)} Top Artist`, topArtist.title || '', thumbSrc(topArtist), false]);
     if (topUser && includeUserInfo) {
         const userThumb = topUser.user_thumb || null;
-        highlights.push(['👤 Most Active', topUser.user || '', userThumb, true]);
+        highlights.push([`${emailIconImg('users', 'white', 12)} Most Active`, topUser.user || '', userThumb, true]);
     }
 
     if (!highlights.length && !totalPlays) {
@@ -1057,7 +1064,7 @@ function buildCollectionCard(collection, themeColors) {
     const collectionTitle = escapeHtml(collection.title || 'Unknown Collection');
     const count = collection.childCount || 0;
     const subtype = collection.subtype || 'unknown';
-    const typeIcon = subtype === 'movie' ? '📽️' : subtype === 'show' ? '📺' : '🎧';
+    const typeIcon = emailIconImg(subtype === 'movie' ? 'film' : subtype === 'show' ? 'tv' : 'music', 'gray', 12);
     
     let posterURL = null;
     const thumbUrl = collection.thumb;
@@ -1290,12 +1297,12 @@ function buildIndividualItemCard(item, themeColors) {
 
 function getTypeIcon(type) {
     switch (type) {
-        case 'movie': return '🎬';
-        case 'show': return '📺';
-        case 'album': return '💿';
-        case 'track': return '🎵';
-        case 'artist': return '🎤';
-        default: return '📄';
+        case 'movie': return emailIconImg('film');
+        case 'show': return emailIconImg('tv');
+        case 'album': return emailIconImg('music');
+        case 'track': return emailIconImg('music');
+        case 'artist': return emailIconImg('music');
+        default: return '';
     }
 }
 
@@ -1489,17 +1496,15 @@ function buildPreviewEmailHTML(contentHTML, serverName, subject, emailHeaderTitl
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('DOM loaded, testing preview...');
     const frame = document.getElementById('preview');
     if (frame) {
-        frame.srcdoc = '<html><body><h1>Test Preview</h1><p>If you can see this, the iframe is working.</p></body></html>';
-        console.log('Test preview set');
-    } else {
-        console.error('Preview iframe not found on DOM load!');
+        // A neutral loading state until the first server render returns. The
+        // real preview POST to /preview_email can take a moment on a cold load,
+        // so show something intentional rather than a leftover debug message.
+        frame.srcdoc = '<html><body style="margin:0;font-family:system-ui,sans-serif;color:#888;display:flex;align-items:center;justify-content:center;height:100vh;"><p>Loading preview&hellip;</p></body></html>';
     }
-    
+
     setTimeout(() => {
-        console.log('Running initial updatePreview...');
         updatePreview();
     }, 100);
 });

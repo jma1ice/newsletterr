@@ -17,6 +17,7 @@
                 <div class="chips" id="status-filter" role="group" aria-label="Filter by status">
                     <button type="button" class="chip is-active" data-filter="all">All <span class="n" id="count-all">0</span></button>
                     <button type="button" class="chip" data-filter="sent">Sent <span class="n" id="count-sent">0</span></button>
+                    <button type="button" class="chip" data-filter="skipped">Skipped <span class="n" id="count-skipped">0</span></button>
                     <button type="button" class="chip" data-filter="failed">Failed <span class="n" id="count-failed">0</span></button>
                 </div>
                 <div class="history-toolbar-right">
@@ -46,18 +47,20 @@
                     </thead>
                     <tbody id="history-rows">
                         {% for email in emails %}
-                            <tr data-status="{{ 'failed' if email.status == 'failed' else 'sent' }}">
+                            <tr data-status="{{ email.status if email.status in ['failed', 'skipped'] else 'sent' }}">
                                 <td>
                                     {% if email.status == 'failed' %}
                                         <span class="pill pill--fail" title="{{ email.error or 'Send failed' }}">Failed</span>
+                                    {% elif email.status == 'skipped' %}
+                                        <span class="pill pill--muted" title="{{ email.error or 'Nothing new to send' }}">Skipped</span>
                                     {% else %}
                                         <span class="pill pill--ok"><span class="dotc" style="background: var(--success);"></span> Sent</span>
                                     {% endif %}
                                 </td>
                                 <td>
                                     <strong>{{ email.subject }}</strong>
-                                    {% if email.status == 'failed' and email.error %}
-                                        <div class="small text-danger">{{ email.error }}</div>
+                                    {% if email.status in ['failed', 'skipped'] and email.error %}
+                                        <div class="small text-muted">{{ email.error }}</div>
                                     {% endif %}
                                 </td>
                                 <td><span class="text-muted">{{ email.sent_at }}</span></td>
@@ -76,13 +79,17 @@
                                     </button>
                                 </td>
                                 <td>
-                                    {% if email.status != 'failed' %}
+                                    {% if email.status not in ['failed', 'skipped'] %}
                                         <button class="icon-btn resend-btn" title="Resend" aria-label="Resend email"
                                                 data-email-id="{{ email.id }}"
                                                 data-subject="{{ email.subject }}"
                                                 data-recipient-count="{{ email.recipient_count }}">
                                             {{ icon('repeat') }}
                                         </button>
+                                        <a class="icon-btn" title="Download PDF" aria-label="Download email as PDF"
+                                           href="{{ url_for('emails.email_history_pdf', email_id=email.id) }}">
+                                            {{ icon('download') }}
+                                        </a>
                                     {% else %}
                                         <span class="text-muted small">n/a</span>
                                     {% endif %}
@@ -229,11 +236,12 @@
             // Status filter chips: count rows and show/hide by data-status.
             const rows = Array.from(document.querySelectorAll('#history-rows tr'));
             const emptyNote = document.getElementById('history-empty-filter');
-            const counts = { all: rows.length, sent: 0, failed: 0 };
+            const counts = { all: rows.length, sent: 0, skipped: 0, failed: 0 };
             rows.forEach(r => { counts[r.dataset.status] = (counts[r.dataset.status] || 0) + 1; });
             const setCount = (id, n) => { const el = document.getElementById(id); if (el) el.textContent = n; };
             setCount('count-all', counts.all);
             setCount('count-sent', counts.sent);
+            setCount('count-skipped', counts.skipped);
             setCount('count-failed', counts.failed);
 
             document.querySelectorAll('#status-filter .chip').forEach(chip => {

@@ -1,5 +1,5 @@
-document.getElementById('pullSeerrRequestsBtn').addEventListener('click', async (e) => {
-    if (!confirmFreshRepull(e.currentTarget, 'seerr')) return;
+window.pullRunners = window.pullRunners || {};
+window.pullRunners.seerr = async function ({ chained = false } = {}) {
     showSpinner('Pulling Seerr requests...', 'seerr_requests');
 
     const payload = {
@@ -57,12 +57,19 @@ document.getElementById('pullSeerrRequestsBtn').addEventListener('click', async 
 
         buildSeerrRequestsRow();
         markPullCacheFresh('seerr', true);
+        return { ok: true };
     } catch (err) {
         console.error("Error pulling Seerr requests:", err);
         const error_p = document.getElementById('error_p');
         if (error_p) error_p.textContent = err;
-        alert("Something went wrong while pulling Seerr requests.");
+        if (!chained) alert("Something went wrong while pulling Seerr requests.");
+        return { ok: false, error: String((err && err.message) || err) };
     } finally {
         try { hideSpinner(); } catch(_) {}
     }
+};
+
+document.getElementById('pullSeerrRequestsBtn').addEventListener('click', (e) => {
+    if (!confirmFreshRepull(e.currentTarget, 'seerr')) return;
+    window.pullRunners.seerr({ chained: false });
 });

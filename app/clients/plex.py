@@ -1,3 +1,4 @@
+import random
 import threading
 import uuid
 
@@ -197,6 +198,57 @@ def search_plex_for_rating_key(title, year, media_type, plex_url, plex_token, tm
         logger.exception(f"Error searching Plex for {title}: {e}")
         return None
 
+def group_recent_episodes_into_shows(metadata, cutoff_ts):
+    """Roll a Plex type=4 (episode) listing up to one card per show for days
+    mode. A show is included when AT LEAST ONE of its episodes was added at or
+    after cutoff_ts (a unix timestamp); new_episode_count counts only those
+    in-window episodes, so a single new episode of a long-running show reads as
+    "1 new episode" instead of pulling the whole back catalogue in whenever the
+    season happens to be complete inside the window. Shows are ordered by their
+    most-recent in-window episode, newest first. Pure and side-effect free so it
+    can be unit-tested with synthetic added_at spreads; the caller enriches each
+    returned show with library_name and plex_url."""
+    shows = {}
+    order = []
+    for ep in metadata:
+        try:
+            added = int(ep.get('addedAt', 0) or 0)
+        except (TypeError, ValueError):
+            added = 0
+        if added < cutoff_ts:
+            continue
+        key = str(ep.get('grandparentRatingKey') or '')
+        if not key:
+            continue
+        entry = shows.get(key)
+        if entry is None:
+            entry = {
+                'title': ep.get('grandparentTitle', 'Unknown'),
+                'rating_key': key,
+                'year': str(ep.get('parentYear') or ep.get('year') or ''),
+                'thumb': ep.get('grandparentThumb', ''),
+                'art': ep.get('grandparentArt') or ep.get('art', ''),
+                'summary': ep.get('grandparentSummary') or ep.get('summary', ''),
+                'added_at': str(added),
+                'updated_at': str(added),
+                'content_rating': ep.get('grandparentContentRating') or ep.get('contentRating', ''),
+                'guid': ep.get('grandparentGuid', ''),
+                'media_type': 'show',
+                'type': 'show',
+                'new_episode_count': 0,
+                '_latest': added,
+            }
+            shows[key] = entry
+            order.append(key)
+        entry['new_episode_count'] += 1
+        if added > entry['_latest']:
+            entry['_latest'] = added
+            entry['added_at'] = str(added)
+            entry['updated_at'] = str(added)
+    result = [shows[k] for k in order]
+    result.sort(key=lambda s: s.pop('_latest'), reverse=True)
+    return result
+
 def fetch_tv_shows_from_plex_sdk(section_id, limit=10, machine_id=None, days=None):
     try:
         _s = get_settings(decrypt_secrets=False)
@@ -211,9 +263,14 @@ def fetch_tv_shows_from_plex_sdk(section_id, limit=10, machine_id=None, days=Non
         plex_web_url = _s.get("plex_web_url")
 
         if days:
+            # Query episodes (type=4), not shows: a show's own addedAt only moves
+            # when the show entity is first added, so filtering shows by addedAt
+            # misses existing shows that just got a new episode. Grouping the
+            # in-window episodes back up to their show (below) is what makes days
+            # mode include a show whenever ANY episode landed in the window.
             api_url = (
                 f"{plex_url}/library/sections/{section_id}/all"
-                f"?type=2"
+                f"?type=4"
                 f"&sort=addedAt:desc"
                 f"&addedAt%3E%3E=-{days}d"
                 f"&X-Plex-Container-Start=0"
@@ -229,17 +286,28 @@ def fetch_tv_shows_from_plex_sdk(section_id, limit=10, machine_id=None, days=Non
                 f"&X-Plex-Container-Size={limit}"
                 f"&X-Plex-Token={plex_token}"
             )
-        
+
         headers = get_plex_headers()
-        
+
         response = safe_get(api_url, headers=headers, timeout=10)
         response.raise_for_status()
         data = response.json()
-        
-        shows = []
+
         media_container = data.get('MediaContainer', {})
         library_name = media_container.get('librarySectionTitle', '')
-        
+
+        if days:
+            cutoff_ts = int((datetime.now() - timedelta(days=int(days))).timestamp())
+            shows = group_recent_episodes_into_shows(media_container.get('Metadata', []), cutoff_ts)
+            for show in shows:
+                show['library_name'] = library_name
+                rating_key = show.get('rating_key')
+                show['plex_url'] = build_plex_web_link(rating_key, machine_id, plex_web_url) if rating_key else ''
+                show.setdefault('rating', '')
+            logger.debug(f"Grouped {len(shows)} shows from recent episodes in '{library_name}' (last {days}d)")
+            return shows
+
+        shows = []
         for directory in media_container.get('Metadata', []):
             rating_key = str(directory.get('ratingKey', ''))
 
@@ -269,7 +337,7 @@ def fetch_tv_shows_from_plex_sdk(section_id, limit=10, machine_id=None, days=Non
             }
             shows.append(show)
         
-        logger.debug(f"Fetched {len(shows)} TV shows from Plex API ({'by date filter' if days else 'sorted by recent episode'})")
+        logger.debug(f"Fetched {len(shows)} TV shows from Plex API (sorted by recent episode)")
         return shows
             
     except Exception as e:
@@ -433,6 +501,147 @@ def fetch_albums_from_plex_sdk(section_id, limit=10, machine_id=None, days=None)
         logger.exception(f"Error fetching albums from Plex API: {e}")
         mark_plex_failed()
         return []
+
+def fetch_library_sections_with_genres(include_genres=True):
+    """Libraries eligible for the Random Pick snap-in, with each section's
+    genre list for the optional genre filter. Returns a list of
+    {section_id, title, type, genres: [{id, title}]} dicts.
+    include_genres=False skips the per-section genre calls (used when only
+    resolving a library name to its section id)."""
+    try:
+        _s = get_settings(decrypt_secrets=False)
+        plex_settings = (_s.get("plex_url"), _s.get("plex_token")) if "id" in _s else None
+
+        if not plex_settings or not plex_settings[0] or not plex_settings[1]:
+            logger.debug("Plex not configured")
+            return []
+
+        plex_url = plex_settings[0].rstrip('/')
+        plex_token = decrypt(plex_settings[1])
+        headers = get_plex_headers({'X-Plex-Token': plex_token})
+
+        response = safe_get(f"{plex_url}/library/sections", headers=headers, timeout=10)
+        response.raise_for_status()
+        sections_data = response.json()
+
+        sections = []
+        for section in sections_data.get('MediaContainer', {}).get('Directory', []):
+            section_type = section.get('type', '')
+            if section_type not in ('movie', 'show', 'artist'):
+                continue
+            section_id = section.get('key')
+
+            genres = []
+            if include_genres:
+                try:
+                    genre_response = safe_get(f"{plex_url}/library/sections/{section_id}/genre", headers=headers, timeout=10)
+                    if genre_response.status_code == 200:
+                        for genre in genre_response.json().get('MediaContainer', {}).get('Directory', []):
+                            if genre.get('key') is not None:
+                                genres.append({'id': str(genre['key']), 'title': genre.get('title', '')})
+                except Exception:
+                    logger.debug("suppressed exception; section genres unavailable", exc_info=True)
+
+            sections.append({
+                'section_id': str(section_id),
+                'title': section.get('title', 'Unknown Library'),
+                'type': section_type,
+                'genres': genres,
+            })
+
+        return sections
+    except Exception as e:
+        logger.exception(f"Error fetching library sections for random pick: {e}")
+        mark_plex_failed()
+        return []
+
+def fetch_random_library_item(section_id, genre=None, machine_id=None):
+    """One random item from a library section (optionally filtered to a genre
+    id from the section's genre directory), normalized to the same shape the
+    recently-added fetchers produce. Randomness is per-call on purpose: every
+    render draws a fresh pick. Returns None when the section is empty or
+    Plex is unreachable."""
+    try:
+        _s = get_settings(decrypt_secrets=False)
+        plex_settings = (_s.get("plex_url"), _s.get("plex_token")) if "id" in _s else None
+
+        if not plex_settings or not plex_settings[0] or not plex_settings[1]:
+            logger.debug("Plex not configured")
+            return None
+
+        plex_url = plex_settings[0].rstrip('/')
+        plex_token = decrypt(plex_settings[1])
+        plex_web_url = _s.get("plex_web_url")
+        if machine_id is None:
+            machine_id = get_plex_machine_id()
+
+        genre_param = f"&genre={genre}" if genre else ""
+        headers = get_plex_headers()
+
+        # Size probe first: Container-Size=0 returns totalSize without items,
+        # then a random offset fetches exactly one item.
+        probe_url = (
+            f"{plex_url}/library/sections/{section_id}/all"
+            f"?X-Plex-Container-Start=0"
+            f"&X-Plex-Container-Size=0"
+            f"{genre_param}"
+            f"&X-Plex-Token={plex_token}"
+        )
+        probe = safe_get(probe_url, headers=headers, timeout=10)
+        probe.raise_for_status()
+        total = int(probe.json().get('MediaContainer', {}).get('totalSize', 0) or 0)
+        if total <= 0:
+            logger.debug(f"Random pick: section {section_id} has no items (genre={genre})")
+            return None
+
+        offset = random.randrange(total)
+        api_url = (
+            f"{plex_url}/library/sections/{section_id}/all"
+            f"?X-Plex-Container-Start={offset}"
+            f"&X-Plex-Container-Size=1"
+            f"{genre_param}"
+            f"&X-Plex-Token={plex_token}"
+        )
+        response = safe_get(api_url, headers=headers, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+
+        media_container = data.get('MediaContainer', {})
+        metadata = media_container.get('Metadata', [])
+        if not metadata:
+            logger.debug(f"Random pick: no metadata at offset {offset} for section {section_id}")
+            return None
+
+        entry = metadata[0]
+        rating_key = str(entry.get('ratingKey', ''))
+        media_type = entry.get('type', '')
+        genres = [g.get('tag', '') for g in (entry.get('Genre') or []) if g.get('tag')]
+
+        return {
+            'title': entry.get('title', 'Unknown'),
+            'rating_key': rating_key,
+            'year': str(entry.get('year', '')),
+            'thumb': entry.get('thumb', ''),
+            'art': entry.get('art', ''),
+            'summary': entry.get('summary', ''),
+            'tagline': entry.get('tagline', ''),
+            'added_at': str(entry.get('addedAt', '')),
+            'updated_at': str(entry.get('updatedAt', '')),
+            'content_rating': entry.get('contentRating', ''),
+            'duration': str(entry.get('duration', '')),
+            'guid': entry.get('guid', ''),
+            'key': entry.get('key', ''),
+            'media_type': media_type,
+            'type': media_type,
+            'genres': genres,
+            'library_name': media_container.get('librarySectionTitle', ''),
+            'plex_url': build_plex_web_link(rating_key, machine_id, plex_web_url) if rating_key else '',
+            'rating': str(entry.get('rating', ''))
+        }
+    except Exception as e:
+        logger.exception(f"Error fetching random library item: {e}")
+        mark_plex_failed()
+        return None
 
 def fetch_recently_added_using_plex_sdk(tautulli_base_url, tautulli_api_key, items_count=10, recently_added_mode="items", recently_added_sort="date"):
     recent_data = []

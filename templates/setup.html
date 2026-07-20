@@ -121,11 +121,44 @@
                         <input type="text" class="form-control{% if settings.plex_url %} d-none{% endif %}" id="plex_url" name="plex_url" value="{{ settings.plex_url or '' }}" placeholder="http://localhost:32400">
                     </div>
                     <div class="d-flex gap-2">
-                        <a href="{{ url_for('auth.setup_tautulli') }}" class="btn btn-outline-secondary w-100">Skip</a>
+                        <a href="{{ url_for('auth.setup_jellyfin') }}" class="btn btn-outline-secondary w-100">Skip</a>
                         <button type="submit" class="btn btn-primary btn-login w-100">Continue</button>
                     </div>
                 </form>
                 <p class="text-center mt-3"><a href="{{ url_for('auth.setup_email') }}">&larr; Back</a></p>
+
+            {% elif step == 'jellyfin' %}
+                <h5 class="step-title">Jellyfin (optional)</h5>
+                <p class="step-subtitle">Using Jellyfin instead of Plex? Connect it here; filling this in makes Jellyfin your media server. Jellywatch fills the stats role Tautulli plays for Plex. Jellyfin has no user emails, so manage recipient lists manually; requests still work through Jellyseerr in the Seerr step.</p>
+                <form method="POST" id="jellyfin-form">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+                    <div class="mb-3">
+                        <label for="jellyfin_url" class="form-label">Jellyfin URL</label>
+                        <input type="text" class="form-control" id="jellyfin_url" name="jellyfin_url" value="{{ settings.jellyfin_url or '' }}" placeholder="http://localhost:8096">
+                        <small class="form-text text-muted">Leave blank to use http://localhost:8096. Clear the API key to disable.</small>
+                    </div>
+                    <div class="mb-3">
+                        <label for="jellyfin_api_key" class="form-label">Jellyfin API Key</label>
+                        <input type="password" class="form-control" id="jellyfin_api_key" name="jellyfin_api_key" autocomplete="off">
+                        <button type="button" id="test_jellyfin" class="btn btn-outline-secondary btn-sm mt-2">Test Connection</button>
+                        <span id="jellyfin_test_result" class="test-result"></span>
+                    </div>
+                    <div class="mb-3">
+                        <label for="jellywatch_url" class="form-label">Jellywatch URL</label>
+                        <input type="text" class="form-control" id="jellywatch_url" name="jellywatch_url" value="{{ settings.jellywatch_url or '' }}" placeholder="http://your-jellywatch-host">
+                    </div>
+                    <div class="mb-3">
+                        <label for="jellywatch_api_key" class="form-label">Jellywatch API Key</label>
+                        <input type="password" class="form-control" id="jellywatch_api_key" name="jellywatch_api_key" autocomplete="off">
+                        <button type="button" id="test_jellywatch" class="btn btn-outline-secondary btn-sm mt-2">Test Connection</button>
+                        <span id="jellywatch_test_result" class="test-result"></span>
+                    </div>
+                    <div class="d-flex gap-2 mt-4">
+                        <a href="{{ url_for('auth.setup_tautulli') }}" class="btn btn-outline-secondary w-100">Skip</a>
+                        <button type="submit" class="btn btn-primary btn-login w-100">Continue</button>
+                    </div>
+                </form>
+                <p class="text-center mt-3"><a href="{{ url_for('auth.setup_plex') }}">&larr; Back</a></p>
 
             {% elif step == 'tautulli' %}
                 <h5 class="step-title">Tautulli (optional)</h5>
@@ -148,7 +181,7 @@
                         <button type="submit" class="btn btn-primary btn-login w-100">Continue</button>
                     </div>
                 </form>
-                <p class="text-center mt-3"><a href="{{ url_for('auth.setup_plex') }}">&larr; Back</a></p>
+                <p class="text-center mt-3"><a href="{{ url_for('auth.setup_jellyfin') }}">&larr; Back</a></p>
 
             {% elif step == 'conjurr' %}
                 <h5 class="step-title">Conjurr (optional)</h5>
@@ -268,7 +301,7 @@
                     <div class="mb-3">
                         <label for="seerr_url" class="form-label">Seerr URL</label>
                         <input type="text" class="form-control" id="seerr_url" name="seerr_url" value="{{ settings.seerr_url or '' }}" placeholder="http://localhost:5055">
-                        <small class="form-text text-muted">Leave blank to use http://localhost:5055 (the Seerr default). Also works with Overseerr and Jellyseerr. Clear the API key to disable.</small>
+                        <small class="form-text text-muted">Leave blank to use http://localhost:5055 (the Seerr default). Works with Overseerr and Jellyseerr alike (same API), covering requests for both Plex and Jellyfin. Clear the API key to disable.</small>
                     </div>
                     <div class="mb-3">
                         <label for="seerr_api_key" class="form-label">Seerr API Key</label>
@@ -517,6 +550,21 @@
                     url: document.getElementById('tautulli_url').value.trim(),
                     api_key: document.getElementById('tautulli_api').value.trim()
                 }, 'tautulli_test_result', 'test_tautulli');
+            });
+
+            document.getElementById('test_jellyfin')?.addEventListener('click', () => {
+                fillDefaultUrlIfKeyed('jellyfin_url', 'jellyfin_api_key', 'http://localhost:8096');
+                runConnectionTest('/api/test/jellyfin', {
+                    url: document.getElementById('jellyfin_url').value.trim(),
+                    api_key: document.getElementById('jellyfin_api_key').value.trim()
+                }, 'jellyfin_test_result', 'test_jellyfin');
+            });
+
+            document.getElementById('test_jellywatch')?.addEventListener('click', () => {
+                runConnectionTest('/api/test/jellywatch', {
+                    url: document.getElementById('jellywatch_url').value.trim(),
+                    api_key: document.getElementById('jellywatch_api_key').value.trim()
+                }, 'jellywatch_test_result', 'test_jellywatch');
             });
 
             document.getElementById('test_conjurr')?.addEventListener('click', () => {

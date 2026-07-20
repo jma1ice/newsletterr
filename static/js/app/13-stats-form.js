@@ -27,9 +27,10 @@ function updateCacheBadge(cacheInfo, timeRange) {
     }).join('');
 }
 
-document.getElementById('stats_form').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    if (!confirmFreshRepull(e.target.querySelector('button[type="submit"]'), 'stats')) return;
+// Exposed as an awaitable runner so the Get All orchestrator (35-get-all.js)
+// can chain it; the standalone form submit below still drives it directly.
+window.pullRunners = window.pullRunners || {};
+window.pullRunners.stats = async function ({ chained = false } = {}) {
     showSpinner('Getting stats and users...', 'pull_stats');
 
     const time_range = document.getElementById('days_to_pull').value;
@@ -62,6 +63,14 @@ document.getElementById('stats_form').addEventListener('submit', async (e) => {
             const raHeader = document.getElementById('ra-header');
             if (raHeader) raHeader.style.display = '';
             if (host) host.style.display = '';
+        }
+
+        if (data.most_watched_data) {
+            mostWatchedPayload.length = 0;
+            data.most_watched_data.forEach(s => mostWatchedPayload.push(s));
+            buildMWLibraryRows();
+            const mwCard = document.getElementById('mw-card');
+            if (mwCard && mostWatchedPayload.length > 0) mwCard.style.display = '';
         }
 
         if (data.stats) {
@@ -140,9 +149,16 @@ document.getElementById('stats_form').addEventListener('submit', async (e) => {
             allUserEmails.length = 0;
             Object.values(data.user_dict).filter(Boolean).forEach(e => allUserEmails.push(e));
 
+            // Only seed the BCC list from the full user set when the user has
+            // not already picked recipients. Otherwise a re-pull (notably the
+            // Get All chain, which runs stats first) would wipe a manual
+            // narrowing right before recommendations read the chip list.
             if (window.chipsClear && window.chipsAddTokens) {
-                window.chipsClear();
-                window.chipsAddTokens(Object.values(data.user_dict).join(', '));
+                const existingChips = document.querySelectorAll('#bcc_chips .nl-chip');
+                if (existingChips.length === 0) {
+                    window.chipsClear();
+                    window.chipsAddTokens(Object.values(data.user_dict).join(', '));
+                }
             }
 
             const selector = document.getElementById('email_list_selector');
@@ -153,11 +169,22 @@ document.getElementById('stats_form').addEventListener('submit', async (e) => {
                 }
             }
         }
+        return { ok: true };
     } catch (err) {
         console.error('Error pulling stats:', err);
         const errorEl = document.getElementById('error_p');
-        if (errorEl) errorEl.textContent = 'Something went wrong pulling stats.';
+        if (errorEl) {
+            errorEl.textContent = 'Something went wrong pulling stats.';
+            errorEl.style.display = '';
+        }
+        return { ok: false, error: String((err && err.message) || err) };
     } finally {
         hideSpinner();
     }
+};
+
+document.getElementById('stats_form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (!confirmFreshRepull(e.target.querySelector('button[type="submit"]'), 'stats')) return;
+    window.pullRunners.stats({ chained: false });
 });

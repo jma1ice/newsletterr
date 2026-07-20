@@ -12,6 +12,27 @@ def _count(status=None):
     conn.close()
     return n
 
+def test_history_page_renders_skipped_status(client, seeded_settings):
+    conn = sqlite3.connect(config.DB_PATH)
+    conn.execute("DELETE FROM email_history")
+    conn.commit()
+    conn.close()
+
+    record_email_history(
+        "[SCHEDULED] Quiet week", "a@b.c", "", 0, 1, "Weekly",
+        status="skipped", error="No new recently-added or most-watched items in the window",
+    )
+
+    resp = client.get("/email_history")
+    assert resp.status_code == 200
+    body = resp.data.decode("utf-8", "replace")
+    assert "Skipped" in body            # the status pill / filter chip label
+    assert 'data-filter="skipped"' in body
+    assert 'data-status="skipped"' in body   # row is filterable as skipped
+    # a skipped row carries no content, so it must not offer a resend button
+    # (the class string only appears on the button element, not the JS selector)
+    assert 'class="icon-btn resend-btn"' not in body
+
 def test_record_success_and_failure(app):
     conn = sqlite3.connect(config.DB_PATH)
     conn.execute("DELETE FROM email_history")

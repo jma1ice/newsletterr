@@ -9,6 +9,7 @@ Newsletterr is a lightweight Flask application that talks to **[Tautulli](https:
 ## Features
 
 ### Data & Content
+* **Plex or Jellyfin** - choose your media server in Settings; Jellyfin uses Jellywatch for stats (the role Tautulli fills for Plex) and Seerr or Ombi for requests, with recently added, library counts, and deep links working the same either way.
 * **One‑click stats pull** - pick a time range (quick buttons: 7 / 30 / 90 / … days) and "recently added" count; Newsletterr queries Tautulli for most watched movies/shows, active users, platforms, libraries, artists and more.
 * **User Recommendations** - integrate with **conjurr** to show personalized watch suggestions (per BCC list at fetch time).
 * **Snap‑ins (drag/add workflow)** - add Stats, Graphs, Recently Added (library selection supported), Recommendations, Collections, and Text Blocks (Title, Header, Intro, Body, Outro) in any order (Title sticks to the top) to compose a tailored newsletter body.
@@ -21,6 +22,7 @@ Newsletterr is a lightweight Flask application that talks to **[Tautulli](https:
 ### Templates & Reuse
 * **Email Templates** - save, load, clone, and delete custom templates (tracks chosen snap‑ins & layout) and re‑apply later.
 * **Template provenance tracking** - every sent email logs which template (or “Manual”) produced it; visible in Email History.
+* **Snap-in tokens in custom HTML** - drop `{{snapin:NAME}}` tokens into hand-written HTML to render live sections; see [Snap-in tokens in custom HTML](#snap-in-tokens-in-custom-html).
 
 ### Automation & Scheduling
 * **Automated Schedules** - create Daily / Weekly / Monthly schedules with start date, fixed send time, and data range.
@@ -125,6 +127,20 @@ volumes:
   newsletterr-uploads:
 ```
 
+The image runs as a non-root user (uid 1000) by default. To use linuxserver.io-style
+ownership instead, start the container as root with `PUID`/`PGID` set and the
+entrypoint will chown the volumes to that user before dropping privileges:
+```
+docker run -d --name newsletterr \
+  -p 6397:6397 \
+  --user 0:0 \
+  -e PUID=1000 -e PGID=1000 \
+  -v newsletterr-db:/app/database \
+  -v newsletterr-env:/app/env \
+  -v newsletterr-uploads:/app/static/uploads \
+  jma1ice/newsletterr:latest
+```
+
 ### 3. Run
 
 For development:
@@ -151,6 +167,8 @@ On first visit you will be asked to create a login (username and password), then
 | `DATA_ENC_KEY` | Fernet key encrypting stored credentials; auto-generated into `env/.env` on first run | generated |
 | `NEWSLETTERR_SECRET_KEY` | Session signing key; auto-generated into `env/.env` so sessions survive restarts | generated |
 | `INTERNAL_TOKEN` | Token for the app's internal self-requests | generated per boot |
+| `PUID` / `PGID` | When the Docker container is started as root, the uid/gid to chown volumes to and drop privileges into (linuxserver.io convention) | container's built-in `app` user |
+| `DEMO_MODE` | Set to `1` for a public read-only showcase: auth is bypassed, changes are blocked with a banner, and the caches are seeded with sample data | `0` |
 
 ---
 
@@ -190,6 +208,27 @@ The Settings page is split into sections: **Email Server**, **Connections**, **D
 5. Draft the body, use the stats, graphs, recently added, collections, and recommendations snap-ins on the right to include these in your email. 
 6. Hit **Send Email**. Success and error messages will show after running.  
 
+### Snap-in tokens in custom HTML
+
+When the **Custom HTML** toggle is on, you write the whole email yourself, but you can still drop rendered snap-in sections into it with tokens. A token looks like `{{snapin:NAME}}` or `{{snapin:NAME:ARG}}` and is replaced at preview and send time by the same section the builder would produce, in your selected email layout. The **Insert snap-in** dropdown above the editor lists every token valid for the data you have pulled and inserts it at the cursor.
+
+| Token | Renders |
+|---|---|
+| `{{snapin:recently_added:Movies}}` | Recently Added grid for the named library |
+| `{{snapin:recently_added:Movies:5}}` | Same, capped to 5 items |
+| `{{snapin:most_watched:Movies}}` | Most Watched grid for the named library (all-time play counts) |
+| `{{snapin:most_watched:Movies:recent}}` | Same, scoped to plays within the pulled time range; combine with a count as `:Movies:5:recent` |
+| `{{snapin:random_pick:Movies}}` | One random item from the named library (fresh pick every send) |
+| `{{snapin:stats:Most Watched Movies}}` | The stats table with that title |
+| `{{snapin:wrapped}}` | Year in Plex wrapped section |
+| `{{snapin:coming_soon_tv}}` | Coming Soon (TV) from Sonarr |
+| `{{snapin:coming_soon_movies}}` | Coming Soon (Movies) from Radarr |
+| `{{snapin:requests_ombi}}` | Recent requests from Ombi |
+| `{{snapin:requests_seerr}}` | Recent requests from Overseerr/Jellyseerr |
+| `{{snapin:dn_server}}` | DroppedNeedle server stats |
+
+Library names and stat titles are matched case-insensitively and may contain spaces (but not colons). Sections render from the data cached by the pull buttons, so pull first. A misspelled token never breaks the email; it is replaced with an HTML comment you can spot in the output source. Graph snap-ins are not available as tokens because their images are captured client-side per builder item.
+
 ---
 
 ## Development
@@ -197,7 +236,7 @@ The Settings page is split into sections: **Email Server**, **Connections**, **D
 ```bash
 pip install -r requirements-dev.txt
 ruff check app/ newsletterr.py tests/   # lint
-pytest                                  # test suite, about a minute
+pytest                                  # test suite, about two minutes
 ```
 
 The email pipeline is covered by golden-master tests: full MIME output is compared against fixtures in `tests/goldens/`. After an intentional change to email output, regenerate them with `UPDATE_GOLDENS=1 pytest tests/test_golden_sends.py` and review the diff.
@@ -234,38 +273,52 @@ Released under the **MIT License** - see [LICENSE](LICENSE.txt) for details.
 
 ## Planned Changes
 
-Work is organized into version sprints. Items may shift between sprints as priorities change.
+### Community
+* GitHub webhook to pull submitted issues to Discord channel
+* Ko-fi -> Discord integration for contributor role
+* Servarr PR
+* Embed the demo on the website (the app-side DEMO_MODE flag ships in v2026.4)
 
-### v2026.4 - email look and feel
+### Misc.
+* Finish jellyfin/emby integration
+* New layouts need images
+* Pull more/different info on dn/wrapped
+* Appearance options: default landing page after login, calendar week-start day (Sun/Mon), date/time format (12/24h, MDY/DMY)
+* Layout coverage: classic/editorial/digest treatments for the sections that still render legacy inside the variant layouts (recommendations, collections, graph chrome, per-user DroppedNeedle wrapped)
+* Single-renderer cleanup: remove the legacy client-side email preview builders in static/js/app/04-stats-graphs.js and their hand-mirrored copies in templates/schedule_preview.html now that /preview_email renders previews server-side (needs a browser pass over every snap-in preview first)
+* Skip-on-no-new needs to have more triggers
+
+### Blocked on upstream
+* Email click for recently added/available recommendations is going to browser on mobile instead of Plex app - this is an issue with the new Plex client, have not seen a fix yet and no info released by Plex at this time
+* Ask Conjurr for N recommendations over the API instead of slicing after enrichment - needs a Conjurr-side count parameter; falls back to the current slice until that exists
+
+---
+
+## Recent Changes
+
+## v2026.4:
+
+#### New Features:
 * Default email layout/UI overhaul with pride theme options
 * SVG over emoji where possible in emails
 * Clean up looks on DN stats, coming soon, and wrapped
 * Email preview: desktop/tablet/phone views
 * Custom theme settings
-* Email BG color not respected by mac mail app
 * Searchable settings
-
-### v2026.5 - builder features
 * More snap-ins: random pick, most watched
 * Snap-ins working with custom HTML
 * PDF export
+* Jellyfin support
+* Rootless Docker image
+* Demo mode (DEMO_MODE) for a public, read-only showcase deployment
+* Get All button on builder left pane
+* Option to skip scheduled send if nothing is new
 
-### v2026.6 - platform and reach
-* Emby/Jellyfin support - jellyfin uses jellywatch over tautulli
-* Rootless Docker image with UID/GID support
-* Demo on the website
-* Servarr PR
-
-### Community
-* GitHub webhook to pull submitted issues to Discord channel
-* Ko-fi -> Discord integration for contributor role
-
-### Blocked on upstream
-* Email click for recently added/available recommendations is going to browser on mobile instead of Plex app - this is an issue with the new Plex client, have not seen a fix yet and no info released by Plex at this time
-
----
-
-## Recent Changes
+#### Fixed:
+* UI adjustment to better organize snap-ins sections
+* Email BG color not respected by mac mail app
+* Text block titles update again while typing (inline handler blocked by CSP)
+* Recently Added by Days now pulls at an episode level
 
 ## v2026.3:
 
@@ -277,45 +330,17 @@ Work is organized into version sprints. Items may shift between sprints as prior
 * Show which user requested each item in the Recently Requested snap-in
 * Progress bar on the loading spinner where possible
 
-## v2026.2.2:
-
-#### New Features:
-* Plex URL input moved to a dropdown
-* Thanks @s3ntin3l8 for the Plex Web URL option for where email links go
-* Thanks @bferd for the Ombi integration functionality and the Recently Requested snap-in
-* Seerr integration (works with Overseerr and Jellyseerr) for the Recently Requested snap-in
-* Settings sections further moved into cards
-* Fresh cache repull and blank continue on setup confirmation
-
-#### Fixed:
-* Plex OAuth issue, thanks @bferd for the diagnostics and issue fixes
-* Export logs button text was same color as bg
-* Setup/settings wasn't autofilling some URLs
-* Spinner board - filled and smaller and fixed
-* Header buttons wrap fixed on small screens
-* Schedule search moved out of INFO logs
-
-### v2026.2.1:
-
-#### New Features:
-* Unsubscribed list
-* Hosted image retention moved into settings
-
-#### Fixed:
-* Thanks @bferd for the `includes` to `==` to fix similar library name issue
-* Fixed whitespace issue that made emails bigger
-* Preview now shows unsubscribe and view in browser link
-
 ---
 
 ## Acknowledgements
 
 * [Tautulli](https://github.com/Tautulli/Tautulli) for the Plex charts, users, and graphs  
+* [Jellyfin](https://github.com/jellyfin/jellyfin) & [Jellywatch](https://github.com/JellyWatchteam/JellyWatch) APIs for Jellyfin 'Stats/Graphs' and recently added
 * [conjurr](https://github.com/yungsnuzzy/conjurr) for user watchlist based recommendations  
 * [DroppedNeedle](https://github.com/HabiRabbu/DroppedNeedle) for user yearly wrapped music  
 * [Sonarr](https://github.com/Sonarr/Sonarr) & [Radarr](https://github.com/Radarr/Radarr) for coming soon calendar  
-- [Ombi](https://github.com/Ombi-app/Ombi) for recently requested  
-- [Seerr](https://github.com/seerr-team/seerr) (works with Overseerr and Jellyseerr) for recently requested  
+* [Ombi](https://github.com/Ombi-app/Ombi) for recently requested  
+* [Seerr](https://github.com/seerr-team/seerr) (works with Overseerr and Jellyseerr) for recently requested  
 * [Highcharts](https://www.highcharts.com/) for charting  
 
 Happy streaming!

@@ -6,3 +6,4 @@ python-dotenv==1.2.2
 cryptography==49.0.0
 playwright==1.61.0
 Pillow==12.3.0
+weasyprint==69.0

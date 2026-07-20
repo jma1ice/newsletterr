@@ -224,7 +224,7 @@ def build_recommendations_section_with_cids(available_items, unavailable_items, 
     rows_html = ""
     for i in range(0, len(all_items), items_per_row):
         row_items = all_items[i:i + items_per_row]
-        row_html = "<tr>"
+        row_html = '<tr class="recommendations-row">'
         
         for j, item in enumerate(row_items):
             is_unavailable = (i + j) >= len(available_items)
@@ -290,7 +290,7 @@ def build_recommendations_section_with_cids(available_items, unavailable_items, 
                 ]))
 
                 card_content = f"""
-                    <div style="
+                    <div class="recommendations-card" style="
                         background-color: {theme_colors['card_bg']};
                         border-radius: 12px;
                         overflow: hidden;
@@ -337,7 +337,7 @@ def build_recommendations_section_with_cids(available_items, unavailable_items, 
                 card_html = f'<a href="{esc(href)}" style="text-decoration: none; color: inherit; display: block;" target="_blank" title="{link_title}">{card_content}</a>'
             else:
                 card_html = f"""
-                    <div style="
+                    <div class="recommendations-card" style="
                         background-color: {theme_colors['card_bg']};
                         border-radius: 12px;
                         border: 1px solid {theme_colors['border']};
@@ -375,10 +375,10 @@ def build_recommendations_section_with_cids(available_items, unavailable_items, 
                     </div>
                 """
             
-            row_html += f'<td style="{cell_style}">{card_html}</td>'
-        
+            row_html += f'<td class="recommendations-cell" style="{cell_style}">{card_html}</td>'
+
         while len(row_items) < items_per_row:
-            row_html += f'<td style="width: {cell_width_pct}; padding: 6px;"></td>'
+            row_html += f'<td class="recommendations-cell" style="width: {cell_width_pct}; padding: 6px;"></td>'
             row_items.append(None)
         
         row_html += "</tr>"
@@ -397,12 +397,13 @@ def build_recommendations_section_with_cids(available_items, unavailable_items, 
         border-collapse: collapse;
         padding: 0;
         margin: 0;
+        table-layout: fixed;
     """
-    
+
     return f"""
         <div style="margin: 20px 0;">
             <h3 style="{section_title_style}">{title}</h3>
-            <table style="{table_style}">
+            <table class="recommendations-table" style="{table_style}">
                 {rows_html}
             </table>
         </div>

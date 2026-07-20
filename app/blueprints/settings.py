@@ -5,14 +5,15 @@ import os, time
 from flask import Blueprint, abort, current_app, jsonify, redirect, render_template, request, session, url_for
 from PIL import Image
 
-from app.config import DEFAULT_RADARR_URL, DEFAULT_SONARR_URL, DEFAULT_OMBI_URL, DEFAULT_SEERR_URL, DEFAULT_PLEX_WEB_URL, DEFAULT_TAUTULLI_URL, DEFAULT_DROPPEDNEEDLE_URL
+from app.config import DEFAULT_RADARR_URL, DEFAULT_SONARR_URL, DEFAULT_OMBI_URL, DEFAULT_SEERR_URL, DEFAULT_PLEX_WEB_URL, DEFAULT_TAUTULLI_URL, DEFAULT_DROPPEDNEEDLE_URL, DEFAULT_JELLYFIN_URL
 from app.db import db_connect
 from app.settings_store import get_settings
 from app.crypto import encrypt, decrypt
 from werkzeug.security import generate_password_hash
 from app.hooks import refresh_hsts_setting
+from app.theme import CUSTOM_UI_KEYS, parse_custom_ui_colors
 from app.security import require_csrf_for_json, requires_auth
-from app.blueprints.api import test_tautulli_connection, test_conjurr_connection, test_droppedneedle_connection, test_sonarr_connection, test_radarr_connection, test_ombi_connection, test_seerr_connection
+from app.blueprints.api import test_tautulli_connection, test_conjurr_connection, test_droppedneedle_connection, test_sonarr_connection, test_radarr_connection, test_ombi_connection, test_seerr_connection, test_jellyfin_connection, test_jellywatch_connection
 
 import logging
 
@@ -27,8 +28,13 @@ def settings():
     cursor = conn.cursor()
 
     alert = request.args.get('alert')
+    # Audit results ride in the session, not the query string: the full audit
+    # JSON (plus the settings dict this route used to pass) overflowed
+    # gunicorn's request-line limit (4094 bytes) and 400'd the redirect after a
+    # successful save. Keep the ?audit= fallback for any in-flight old links.
+    audit_raw = session.pop('settings_audit', None) or request.args.get('audit')
     try:
-        audit_results = json.loads(request.args.get('audit') or 'null')
+        audit_results = json.loads(audit_raw or 'null')
     except (TypeError, ValueError):
         audit_results = None
 
@@ -48,14 +54,83 @@ def settings():
             "background_color": "#333333",
             "text_color": "#cc7b19",
             "logo_filename": "Asset_45x.png"
+        },
+        # Pride presets (NEWS-30): flag signature colors on the same dark
+        # chassis as the base presets so card text contrast holds. The header
+        # gradient runs accent -> primary; all use the pride banner logo.
+        "pride_rainbow": {
+            "primary_color": "#ff8c00",
+            "secondary_color": "#222222",
+            "accent_color": "#e40303",
+            "background_color": "#333333",
+            "text_color": "#ffb163",
+            "logo_filename": "Asset_51.png"
+        },
+        "pride_trans": {
+            "primary_color": "#5bcefa",
+            "secondary_color": "#222222",
+            "accent_color": "#f5a9b8",
+            "background_color": "#333333",
+            "text_color": "#9bd7f2",
+            "logo_filename": "Asset_51.png"
+        },
+        "pride_bi": {
+            "primary_color": "#d60270",
+            "secondary_color": "#222222",
+            "accent_color": "#9b4f96",
+            "background_color": "#333333",
+            "text_color": "#e07db4",
+            "logo_filename": "Asset_51.png"
+        },
+        "pride_pan": {
+            "primary_color": "#ff218c",
+            "secondary_color": "#222222",
+            "accent_color": "#21b1ff",
+            "background_color": "#333333",
+            "text_color": "#6ec8ff",
+            "logo_filename": "Asset_51.png"
+        },
+        "pride_lesbian": {
+            "primary_color": "#ff9a56",
+            "secondary_color": "#222222",
+            "accent_color": "#d52d00",
+            "background_color": "#333333",
+            "text_color": "#ffb185",
+            "logo_filename": "Asset_51.png"
+        },
+        "pride_nonbinary": {
+            "primary_color": "#9c59d1",
+            "secondary_color": "#222222",
+            "accent_color": "#7a3fb0",
+            "background_color": "#333333",
+            "text_color": "#c9a2e8",
+            "logo_filename": "Asset_51.png"
+        },
+        "pride_ace": {
+            "primary_color": "#800080",
+            "secondary_color": "#222222",
+            "accent_color": "#a3a3a3",
+            "background_color": "#333333",
+            "text_color": "#c79fc7",
+            "logo_filename": "Asset_51.png"
+        },
+        "pride_progress": {
+            "primary_color": "#ff8c00",
+            "secondary_color": "#222222",
+            "accent_color": "#5bcefa",
+            "background_color": "#333333",
+            "text_color": "#ffb163",
+            "logo_filename": "Asset_51.png"
         }
     }
 
     preset_logo_name_to_file = {
         "newsletterr_blue_small": "Asset_54x.png",
         "newsletterr_orange_small": "Asset_46x.png",
+        "newsletterr_pride_small": "Asset_50.png",
         "newsletterr_blue_banner": "Asset_94x.png",
-        "newsletterr_orange_banner": "Asset_45x.png"
+        "newsletterr_orange_banner": "Asset_45x.png",
+        "newsletterr_pride_banner": "Asset_51.png"
     }
 
     if request.method == "POST":
@@ -68,7 +143,7 @@ def settings():
             db_custom_logo = cursor.fetchone()
             existing_custom_logo = db_custom_logo[0] if db_custom_logo and db_custom_logo[0] else ""
 
-            cursor.execute("SELECT login_toggle, nl_username, nl_password, password, tautulli_api, droppedneedle_api_key, discord_webhook_url, sonarr_api_key, radarr_api_key, ombi_api_key, seerr_api_key FROM settings WHERE id = 1")
+            cursor.execute("SELECT login_toggle, nl_username, nl_password, password, tautulli_api, droppedneedle_api_key, discord_webhook_url, sonarr_api_key, radarr_api_key, ombi_api_key, seerr_api_key, jellyfin_api_key, jellywatch_api_key FROM settings WHERE id = 1")
             db_login_info = cursor.fetchone()
             existing_login_toggle = db_login_info[0] if db_login_info and db_login_info[0] else ""
             existing_nl_username = db_login_info[1] if db_login_info and db_login_info[1] else ""
@@ -81,6 +156,8 @@ def settings():
             existing_radarr_api_key = db_login_info[8] if db_login_info and db_login_info[8] else ""
             existing_ombi_api_key = db_login_info[9] if db_login_info and db_login_info[9] else ""
             existing_seerr_api_key = db_login_info[10] if db_login_info and db_login_info[10] else ""
+            existing_jellyfin_api_key = db_login_info[11] if db_login_info and db_login_info[11] else ""
+            existing_jellywatch_api_key = db_login_info[12] if db_login_info and db_login_info[12] else ""
 
             # secret fields are write-only: a blank submission keeps the stored
             # value rather than overwriting it with an empty string
@@ -113,6 +190,14 @@ def settings():
             ombi_api_key = _secret("ombi_api_key", existing_ombi_api_key)
             seerr_url = request.form.get("seerr_url")
             seerr_api_key = _secret("seerr_api_key", existing_seerr_api_key)
+            media_server_type = request.form.get("media_server_type", "plex")
+            if media_server_type not in ("plex", "jellyfin"):
+                media_server_type = "plex"
+            jellyfin_url = request.form.get("jellyfin_url")
+            jellyfin_api_key = _secret("jellyfin_api_key", existing_jellyfin_api_key)
+            jellyfin_web_url = (request.form.get("jellyfin_web_url") or "").strip()
+            jellywatch_url = request.form.get("jellywatch_url")
+            jellywatch_api_key = _secret("jellywatch_api_key", existing_jellywatch_api_key)
             # A blank URL with an API key present (submitted or saved) falls back
             # to the default; clearing the API key is how you disable the integration.
             # Conjurr is URL-only, so its blank URL simply means disabled.
@@ -128,6 +213,8 @@ def settings():
                 ombi_url = DEFAULT_OMBI_URL
             if not (seerr_url or "").strip() and seerr_api_key:
                 seerr_url = DEFAULT_SEERR_URL
+            if not (jellyfin_url or "").strip() and jellyfin_api_key:
+                jellyfin_url = DEFAULT_JELLYFIN_URL
             coming_soon_days_ahead = request.form.get("coming_soon_days_ahead", "14")
             coming_soon_grid_columns = request.form.get("coming_soon_grid_columns", "5")
             collections_grid_columns = request.form.get("collections_grid_columns", "5")
@@ -176,6 +263,9 @@ def settings():
             ra_grid_columns = request.form.get("ra_grid_columns", "5")
             recs_grid_columns = request.form.get("recs_grid_columns", "5")
             recs_item_count = request.form.get("recs_item_count", "")
+            email_layout = request.form.get("email_layout", "classic")
+            if email_layout not in ("legacy", "classic", "editorial", "digest"):
+                email_layout = "classic"
             stat_cover_art = request.form.get("stat_cover_art", "disabled")
             send_mode = request.form.get("send_mode", "bcc")
             poster_max_height = request.form.get("poster_max_height", "")
@@ -184,6 +274,14 @@ def settings():
             # /api/appearance; pride and floating round-trip through this form.
             pride_flag = request.form.get("pride_flag", "off")
             snapins_floating = "0" if request.form.get("snapins_floating") == "0" else "1"
+            # Custom UI theme colors: stored as JSON per mode; blank when the
+            # pickers were never touched. Values are validated (hex-only) at
+            # render time in app/theme.py, so raw form input is safe to store.
+            def _custom_ui_json(prefix):
+                colors = {k: (request.form.get(f"{prefix}_{k}") or "").strip() for k in CUSTOM_UI_KEYS}
+                return json.dumps(colors) if any(colors.values()) else ""
+            ui_custom_light = _custom_ui_json("ui_light")
+            ui_custom_dark = _custom_ui_json("ui_dark")
 
             if not custom_logo_filename and existing_custom_logo:
                 custom_logo_filename = existing_custom_logo
@@ -220,8 +318,8 @@ def settings():
                 INSERT INTO settings
                 (id, from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, plex_url, plex_web_url, tautulli_url,
                     tautulli_api, conjurr_url, droppedneedle_url, droppedneedle_api_key, recipient_display_name, logo_filename, logo_width, email_theme, primary_color, secondary_color, accent_color, background_color,
-                    text_color, from_name, custom_logo_filename, login_toggle, nl_username, nl_password, default_intro_text, default_outro_text, hsts_enabled, scheduled_subject_prefix, logo_position, hide_stat_play_counts, hide_graph_play_counts, stats_type, recently_added_mode, recently_added_sort, ra_grid_columns, recs_grid_columns, recs_item_count, stat_cover_art, send_mode, poster_max_height, discord_webhook_url, sonarr_url, sonarr_api_key, radarr_url, radarr_api_key, ombi_url, ombi_api_key, seerr_url, seerr_api_key, coming_soon_days_ahead, coming_soon_grid_columns, hosted_enabled, hosted_base_url, hosted_images_enabled, hosted_image_retention_days, hosted_links_enabled, hosted_links_base_url, collections_grid_columns, ra_show_description, exclude_inactive_days, include_user_info, email_size_warn_mb, pride_flag, snapins_floating)
-                VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    text_color, from_name, custom_logo_filename, login_toggle, nl_username, nl_password, default_intro_text, default_outro_text, hsts_enabled, scheduled_subject_prefix, logo_position, hide_stat_play_counts, hide_graph_play_counts, stats_type, recently_added_mode, recently_added_sort, ra_grid_columns, recs_grid_columns, recs_item_count, stat_cover_art, send_mode, poster_max_height, discord_webhook_url, sonarr_url, sonarr_api_key, radarr_url, radarr_api_key, ombi_url, ombi_api_key, seerr_url, seerr_api_key, coming_soon_days_ahead, coming_soon_grid_columns, hosted_enabled, hosted_base_url, hosted_images_enabled, hosted_image_retention_days, hosted_links_enabled, hosted_links_base_url, collections_grid_columns, ra_show_description, exclude_inactive_days, include_user_info, email_size_warn_mb, pride_flag, snapins_floating, ui_custom_light, ui_custom_dark, email_layout, media_server_type, jellyfin_url, jellyfin_api_key, jellyfin_web_url, jellywatch_url, jellywatch_api_key)
+                VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT (id) DO UPDATE
                 SET from_email = excluded.from_email, alias_email = excluded.alias_email, reply_to_email = excluded.reply_to_email, password = excluded.password,
                     smtp_username = excluded.smtp_username, smtp_server = excluded.smtp_server, smtp_port = excluded.smtp_port, smtp_protocol = excluded.smtp_protocol,
@@ -262,13 +360,23 @@ def settings():
                     include_user_info = excluded.include_user_info,
                     email_size_warn_mb = excluded.email_size_warn_mb,
                     pride_flag = excluded.pride_flag,
-                    snapins_floating = excluded.snapins_floating
+                    snapins_floating = excluded.snapins_floating,
+                    ui_custom_light = excluded.ui_custom_light,
+                    ui_custom_dark = excluded.ui_custom_dark,
+                    email_layout = excluded.email_layout,
+                    media_server_type = excluded.media_server_type,
+                    jellyfin_url = excluded.jellyfin_url,
+                    jellyfin_api_key = excluded.jellyfin_api_key,
+                    jellyfin_web_url = excluded.jellyfin_web_url,
+                    jellywatch_url = excluded.jellywatch_url,
+                    jellywatch_api_key = excluded.jellywatch_api_key
             """, (from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, plex_url, plex_web_url, tautulli_url, tautulli_api,
                   conjurr_url, droppedneedle_url, droppedneedle_api_key, recipient_display_name, logo_filename, logo_width, email_theme, primary_color, secondary_color, accent_color, background_color, text_color, from_name,
                   custom_logo_filename, login_toggle, nl_username, nl_password, default_intro_text, default_outro_text, hsts_enabled, scheduled_subject_prefix, logo_position,
                   hide_stat_play_counts, hide_graph_play_counts, stats_type, recently_added_mode, recently_added_sort, ra_grid_columns, recs_grid_columns, recs_item_count, stat_cover_art, send_mode, poster_max_height, discord_webhook_url,
                   sonarr_url, sonarr_api_key, radarr_url, radarr_api_key, ombi_url, ombi_api_key, seerr_url, seerr_api_key, coming_soon_days_ahead, coming_soon_grid_columns, hosted_enabled, hosted_base_url, hosted_images_enabled, hosted_image_retention_days, hosted_links_enabled, hosted_links_base_url,
-                  collections_grid_columns, ra_show_description, exclude_inactive_days, include_user_info, email_size_warn_mb, pride_flag, snapins_floating))
+                  collections_grid_columns, ra_show_description, exclude_inactive_days, include_user_info, email_size_warn_mb, pride_flag, snapins_floating, ui_custom_light, ui_custom_dark, email_layout,
+                  media_server_type, jellyfin_url, jellyfin_api_key, jellyfin_web_url, jellywatch_url, jellywatch_api_key))
             conn.commit()
             cursor.execute("SELECT plex_token FROM settings WHERE id = 1")
             plex_token = cursor.fetchone()[0]
@@ -319,6 +427,7 @@ def settings():
                 "ra_grid_columns": ra_grid_columns,
                 "recs_grid_columns": recs_grid_columns,
                 "recs_item_count": recs_item_count,
+                "email_layout": email_layout,
                 "stat_cover_art": stat_cover_art,
                 "send_mode": send_mode,
                 "poster_max_height": poster_max_height,
@@ -331,6 +440,12 @@ def settings():
                 "ombi_api_key": decrypt(ombi_api_key),
                 "seerr_url": seerr_url,
                 "seerr_api_key": decrypt(seerr_api_key),
+                "media_server_type": media_server_type,
+                "jellyfin_url": jellyfin_url,
+                "jellyfin_api_key": decrypt(jellyfin_api_key),
+                "jellyfin_web_url": jellyfin_web_url,
+                "jellywatch_url": jellywatch_url,
+                "jellywatch_api_key": decrypt(jellywatch_api_key),
                 "coming_soon_days_ahead": coming_soon_days_ahead,
                 "coming_soon_grid_columns": coming_soon_grid_columns,
                 "collections_grid_columns": collections_grid_columns,
@@ -361,6 +476,10 @@ def settings():
                 audit_results.append({"service": "Ombi", **test_ombi_connection(settings["ombi_url"], settings["ombi_api_key"])})
             if settings["seerr_url"]:
                 audit_results.append({"service": "Seerr", **test_seerr_connection(settings["seerr_url"], settings["seerr_api_key"])})
+            if settings["jellyfin_url"] and settings["jellyfin_api_key"]:
+                audit_results.append({"service": "Jellyfin", **test_jellyfin_connection(settings["jellyfin_url"], settings["jellyfin_api_key"])})
+            if settings["jellywatch_url"] and settings["jellywatch_api_key"]:
+                audit_results.append({"service": "Jellywatch", **test_jellywatch_connection(settings["jellywatch_url"], settings["jellywatch_api_key"])})
             audit_json = json.dumps(audit_results) if audit_results else None
 
             refresh_hsts_setting()
@@ -383,7 +502,9 @@ def settings():
                 session.pop('authenticated', None)
                 return redirect(url_for('auth.login', alert="Settings saved successfully!"))
 
-            return redirect(url_for('settings.settings', alert="Settings saved successfully!", settings=settings, audit=audit_json))
+            if audit_json:
+                session['settings_audit'] = audit_json
+            return redirect(url_for('settings.settings', alert="Settings saved successfully!"))
 
         except Exception as e:
             try:
@@ -420,6 +541,12 @@ def settings():
                 "ombi_api_key": request.form.get("ombi_api_key", ""),
                 "seerr_url": request.form.get("seerr_url", ""),
                 "seerr_api_key": request.form.get("seerr_api_key", ""),
+                "media_server_type": request.form.get("media_server_type", "plex"),
+                "jellyfin_url": request.form.get("jellyfin_url", ""),
+                "jellyfin_api_key": request.form.get("jellyfin_api_key", ""),
+                "jellyfin_web_url": request.form.get("jellyfin_web_url", ""),
+                "jellywatch_url": request.form.get("jellywatch_url", ""),
+                "jellywatch_api_key": request.form.get("jellywatch_api_key", ""),
                 "coming_soon_days_ahead": request.form.get("coming_soon_days_ahead", "14"),
                 "coming_soon_grid_columns": request.form.get("coming_soon_grid_columns", "5"),
                 "collections_grid_columns": request.form.get("collections_grid_columns", "5"),
@@ -513,6 +640,7 @@ def settings():
     ra_grid_columns = s.get("ra_grid_columns")
     recs_grid_columns = s.get("recs_grid_columns")
     recs_item_count = s.get("recs_item_count")
+    email_layout = s.get("email_layout")
     stat_cover_art = s.get("stat_cover_art")
     send_mode = s.get("send_mode")
     poster_max_height = s.get("poster_max_height")
@@ -525,6 +653,12 @@ def settings():
     ombi_api_key = s.get("ombi_api_key")
     seerr_url = s.get("seerr_url")
     seerr_api_key = s.get("seerr_api_key")
+    media_server_type = s.get("media_server_type")
+    jellyfin_url = s.get("jellyfin_url")
+    jellyfin_api_key = s.get("jellyfin_api_key")
+    jellyfin_web_url = s.get("jellyfin_web_url")
+    jellywatch_url = s.get("jellywatch_url")
+    jellywatch_api_key = s.get("jellywatch_api_key")
     coming_soon_days_ahead = s.get("coming_soon_days_ahead")
     coming_soon_grid_columns = s.get("coming_soon_grid_columns")
     collections_grid_columns = s.get("collections_grid_columns")
@@ -589,6 +723,7 @@ def settings():
         "ra_grid_columns": ra_grid_columns or "5",
         "recs_grid_columns": recs_grid_columns or "5",
         "recs_item_count": recs_item_count or "",
+        "email_layout": email_layout or "classic",
         "stat_cover_art": stat_cover_art or "disabled",
         "send_mode": send_mode or "bcc",
         "poster_max_height": poster_max_height or "",
@@ -596,6 +731,10 @@ def settings():
         "radarr_url": radarr_url or "",
         "ombi_url": ombi_url or "",
         "seerr_url": seerr_url or "",
+        "media_server_type": media_server_type or "plex",
+        "jellyfin_url": jellyfin_url or "",
+        "jellyfin_web_url": jellyfin_web_url or "",
+        "jellywatch_url": jellywatch_url or "",
         "coming_soon_days_ahead": coming_soon_days_ahead or "14",
         "coming_soon_grid_columns": coming_soon_grid_columns or "5",
         "collections_grid_columns": collections_grid_columns or "5",
@@ -612,6 +751,13 @@ def settings():
         "pride_flag": pride_flag or "off",
         "snapins_floating": snapins_floating if snapins_floating not in (None, "") else "1",
     }
+    # Effective custom UI theme colors for the appearance pickers (validated,
+    # with per-key fallbacks, so the inputs always hold a usable value)
+    # whether custom colors were ever saved: first entry into Custom auto-seeds
+    # the pickers from the palette being switched away from
+    settings["ui_custom_configured"] = bool(s.get("ui_custom_light") or s.get("ui_custom_dark"))
+    settings["ui_custom_light_colors"] = parse_custom_ui_colors(s.get("ui_custom_light"), 'light')
+    settings["ui_custom_dark_colors"] = parse_custom_ui_colors(s.get("ui_custom_dark"), 'dark')
     # secrets are never sent to the browser; the form shows a placeholder and
     # a blank submission keeps the stored value (write-only fields)
     settings["password"] = ""
@@ -632,6 +778,10 @@ def settings():
     settings["has_ombi_api_key"] = bool(ombi_api_key)
     settings["seerr_api_key"] = ""
     settings["has_seerr_api_key"] = bool(seerr_api_key)
+    settings["jellyfin_api_key"] = ""
+    settings["has_jellyfin_api_key"] = bool(jellyfin_api_key)
+    settings["jellywatch_api_key"] = ""
+    settings["has_jellywatch_api_key"] = bool(jellywatch_api_key)
     if smtp_port == '' or smtp_port is None:
         settings["smtp_port"] = 587
         cursor.execute("""

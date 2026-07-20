@@ -13,6 +13,7 @@
                 customLogoFilename: {{ settings.custom_logo_filename | string | tojson }},
                 logoPosition: {{ settings.get('logo_position', 'center') | string | tojson }},
                 recentPayload: {{ recent_data | tojson }},
+                mostWatchedPayload: {{ (most_watched_data or []) | tojson }},
                 graphDataList: {{ graph_data | tojson }},
                 graphCommands: {{ graph_commands | tojson }},
                 themeSettings: {{ (theme_settings if theme_settings else {}) | tojson }},
@@ -89,4 +90,8 @@
         <script src="{{ url_for('static', filename='js/app/29-pull-ombi-requests.js') }}" nonce="{{ nonce }}"></script>
         <script src="{{ url_for('static', filename='js/app/30-seerr-requests.js') }}" nonce="{{ nonce }}"></script>
         <script src="{{ url_for('static', filename='js/app/31-pull-seerr-requests.js') }}" nonce="{{ nonce }}"></script>
+        <script src="{{ url_for('static', filename='js/app/32-random-pick.js') }}" nonce="{{ nonce }}"></script>
+        <script src="{{ url_for('static', filename='js/app/33-most-watched.js') }}" nonce="{{ nonce }}"></script>
+        <script src="{{ url_for('static', filename='js/app/34-snapin-tokens.js') }}" nonce="{{ nonce }}"></script>
+        <script src="{{ url_for('static', filename='js/app/35-get-all.js') }}" nonce="{{ nonce }}"></script>
     </div>

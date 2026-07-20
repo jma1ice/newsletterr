@@ -12,7 +12,19 @@
             window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
         document.documentElement.classList.toggle('dark', dark);
         const pride = localStorage.getItem('pride');
-        if (pride) document.documentElement.classList.add('pride', 'pride-' + pride);
+        if (pride === 'custom') {
+            // Custom UI theme: pre-auth pages replay the CSS mirrored to
+            // localStorage by base.html so login does not flash unthemed.
+            document.documentElement.classList.add('theme-custom');
+            const css = localStorage.getItem('customThemeCss');
+            if (css) {
+                const styleEl = document.createElement('style');
+                styleEl.textContent = css;
+                document.head.appendChild(styleEl);
+            }
+        } else if (pride) {
+            document.documentElement.classList.add('pride', 'pride-' + pride);
+        }
     } catch (_) {}
 </script>
 <link rel="icon" type="image/x-icon" href="/static/img/favicon.ico">

@@ -20,7 +20,7 @@
     <p id="alert_p" class="nl-alert nl-alert--success mb-3" style="display: none;">{{ alert or '' }}</p>
     <p id="error_p" class="nl-alert nl-alert--danger mb-3" style="display: none;">{{ error or '' }}</p>
     <div id="plex_warning_p" class="nl-alert nl-alert--warning nl-alert--dismissible mb-3" style="display: none;">
-        <span>Plex connection failed, showing cached/Tautulli data (previews, images, and collections may be missing). Use Force Reconnect in settings.</span>
+        <span>{% if settings.media_server_type == 'jellyfin' %}Jellyfin connection failed, showing cached data (previews and images may be missing). Check the Jellyfin connection in settings.{% else %}Plex connection failed, showing cached/Tautulli data (previews, images, and collections may be missing). Use Force Reconnect in settings.{% endif %}</span>
         <button type="button" class="nl-alert__close" id="plex_warning_close" aria-label="Dismiss">&times;</button>
     </div>
     <div class="foreground">

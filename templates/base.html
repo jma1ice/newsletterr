@@ -135,6 +135,9 @@
             {# Pages opt into a header (title + actions) by overriding page_header.
                Pages not yet restyled render no header, avoiding an empty bar. #}
             {% block page_header %}{% endblock %}
+            {% if demo_mode %}
+            <div class="nl-alert nl-alert--warning mb-3" role="status">{{ demo_notice }}</div>
+            {% endif %}
             <main>{% block content %}{% endblock %}</main>
             <footer class="site-foot-flow">
                 <a class="foot-left" target="_blank" href="https://github.com/jma1ice/newsletterr">

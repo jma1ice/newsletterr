@@ -4,7 +4,7 @@ import time
 
 from flask import Blueprint, abort, redirect, render_template, request, session, url_for
 
-from app.config import DEFAULT_RADARR_URL, DEFAULT_SONARR_URL, DEFAULT_OMBI_URL, DEFAULT_SEERR_URL, DEFAULT_TAUTULLI_URL, DEFAULT_DROPPEDNEEDLE_URL
+from app.config import DEFAULT_RADARR_URL, DEFAULT_SONARR_URL, DEFAULT_OMBI_URL, DEFAULT_SEERR_URL, DEFAULT_TAUTULLI_URL, DEFAULT_DROPPEDNEEDLE_URL, DEFAULT_JELLYFIN_URL
 from app.crypto import encrypt
 from app.db import db_connect
 from app.settings_store import get_settings
@@ -54,7 +54,7 @@ def _clear_failures(ip):
     with _attempts_lock:
         _attempts.pop(ip, None)
 
-SETUP_STEPS = ['admin', 'email', 'plex', 'tautulli', 'conjurr', 'droppedneedle', 'sonarr', 'radarr', 'ombi', 'seerr']
+SETUP_STEPS = ['admin', 'email', 'plex', 'jellyfin', 'tautulli', 'conjurr', 'droppedneedle', 'sonarr', 'radarr', 'ombi', 'seerr']
 
 @bp.route('/setup', methods=['GET', 'POST'])
 def setup():
@@ -153,9 +153,45 @@ def setup_plex():
             conn.execute("UPDATE settings SET plex_url = ? WHERE id = 1", (plex_url,))
             conn.commit()
             conn.close()
-        return redirect(url_for('auth.setup_tautulli'))
+        return redirect(url_for('auth.setup_jellyfin'))
 
     return render_template('setup.html', step='plex', steps=SETUP_STEPS, settings=s, csrf_token=session["csrf_token"])
+
+@bp.route('/setup/jellyfin', methods=['GET', 'POST'])
+@requires_auth
+def setup_jellyfin():
+    if not session.get("csrf_token"):
+        session["csrf_token"] = secrets.token_urlsafe(32)
+    s = get_settings(decrypt_secrets=False)
+
+    if request.method == 'POST':
+        token = request.form.get("csrf_token", "").strip()
+        if not token or token != session.get("csrf_token"):
+            abort(400)
+
+        jellyfin_url = request.form.get('jellyfin_url', '').strip() or DEFAULT_JELLYFIN_URL
+        jellyfin_api_key = request.form.get('jellyfin_api_key', '').strip()
+        jellywatch_url = request.form.get('jellywatch_url', '').strip()
+        jellywatch_api_key = request.form.get('jellywatch_api_key', '').strip()
+        if jellyfin_api_key:
+            conn = db_connect()
+            conn.execute("INSERT OR IGNORE INTO settings (id) VALUES (1)")
+            # Filling in Jellyfin during setup means Jellyfin is the media
+            # server; the choice can be flipped any time in Settings.
+            conn.execute(
+                "UPDATE settings SET media_server_type = 'jellyfin', jellyfin_url = ?, jellyfin_api_key = ? WHERE id = 1",
+                (jellyfin_url, encrypt(jellyfin_api_key)),
+            )
+            if jellywatch_url and jellywatch_api_key:
+                conn.execute(
+                    "UPDATE settings SET jellywatch_url = ?, jellywatch_api_key = ? WHERE id = 1",
+                    (jellywatch_url, encrypt(jellywatch_api_key)),
+                )
+            conn.commit()
+            conn.close()
+        return redirect(url_for('auth.setup_tautulli'))
+
+    return render_template('setup.html', step='jellyfin', steps=SETUP_STEPS, settings=s, csrf_token=session["csrf_token"])
 
 @bp.route('/setup/tautulli', methods=['GET', 'POST'])
 @requires_auth

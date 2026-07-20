@@ -59,3 +59,49 @@ jobs:
 
       - name: Tests
         run: pytest
+
+  docker-smoke:
+    # Guards the rootless image (NEWS-7): the container must start as the
+    # baked-in non-root user and the server must answer, so a permission
+    # regression on the volumes cannot land silently.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: newsletterr:smoke
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Run container as non-root and check it answers
+        run: |
+          docker run -d --name nl-smoke -p 6397:6397 newsletterr:smoke
+
+          # The default user must be non-root (uid 1000), not root.
+          UID_IN_CONTAINER="$(docker exec nl-smoke id -u)"
+          if [ "$UID_IN_CONTAINER" != "1000" ]; then
+            echo "::error::Container is running as uid $UID_IN_CONTAINER, expected non-root 1000"
+            docker logs nl-smoke
+            exit 1
+          fi
+
+          # Wait for the server; /login redirects to /setup on a fresh install,
+          # so follow redirects and require a final 200.
+          for i in $(seq 1 30); do
+            if curl -fsSL -o /dev/null http://127.0.0.1:6397/login; then
+              echo "Server answered after ${i}s"
+              docker rm -f nl-smoke
+              exit 0
+            fi
+            sleep 1
+          done
+
+          echo "::error::Server did not answer /login within 30s"
+          docker logs nl-smoke
+          exit 1

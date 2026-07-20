@@ -5,7 +5,7 @@ from flask import Blueprint, Response, jsonify, redirect, render_template, reque
 from urllib.parse import quote
 import re
 
-from app import state
+from app import config, state
 from app.db import db_connect
 from app.cache import is_cache_valid, get_cached_data, get_cache_info, clear_cache
 from app.progress import progress_get
@@ -13,6 +13,7 @@ from app.crypto import decrypt
 from app.net import is_safe_fetch_url, configured_media_hosts
 from app.settings_store import get_service_flags, get_settings
 from app.security import require_csrf_for_json, requires_auth, safe_get
+from app.clients.jellyfin import get_jellyfin_headers
 from app.store import get_saved_email_lists
 from app.theme import get_theme_settings
 
@@ -127,7 +128,9 @@ def index():
     else:
         settings['logo_width'] = int(logo_width)
 
-    if settings['from_email'] == "":
+    # Demo mode has no configured email server and settings are read-only, so
+    # the first-run redirect would trap the visitor on a page they cannot use.
+    if settings['from_email'] == "" and not config.DEMO_MODE:
         return redirect(url_for('settings.settings'))
     
     conn.close()
@@ -220,6 +223,14 @@ def index():
 @requires_auth
 def proxy_art(art_path):
     _s = get_settings(decrypt_secrets=False)
+
+    # /proxy-art is the hardcoded artwork chokepoint in every builder and the
+    # frontend JS. When Jellyfin is the active media server, item thumbs are
+    # Jellyfin art paths, so serve them through the Jellyfin fetch instead of
+    # requiring every caller to know which proxy to use (zero builder changes).
+    if (_s.get('media_server_type') or 'plex') == 'jellyfin':
+        return _fetch_jellyfin_art(art_path, _s)
+
     row = (_s.get("plex_url"), _s.get("plex_token")) if "id" in _s else None
 
     if row:
@@ -281,6 +292,44 @@ def proxy_art(art_path):
         })
     except Exception as e:
         logger.error(f"proxy-art: Error fetching {_redact_token(full_url)}: {e}")
+        return Response("Image not found", status=404)
+
+@bp.route('/proxy-jf-art/<path:art_path>')
+@requires_auth
+def proxy_jf_art(art_path):
+    # Mirrors /proxy-art for Jellyfin artwork. Auth rides in the X-Emby-Token
+    # header (injected here, never appended to the URL), so no token can leak
+    # into email HTML or hosted pages. /proxy-art also lands here when
+    # Jellyfin is the active media server.
+    return _fetch_jellyfin_art(art_path, get_settings(decrypt_secrets=False))
+
+def _fetch_jellyfin_art(art_path, s):
+    jellyfin_url = (s.get('jellyfin_url') or '').rstrip('/')
+    jellyfin_api_key = decrypt(s.get('jellyfin_api_key') or '')
+    if not jellyfin_url or not jellyfin_api_key:
+        return Response("Jellyfin is not configured.", status=400)
+
+    full_url = f"{jellyfin_url}/{art_path.lstrip('/')}"
+    # image sizing params (maxWidth etc.) arrive as our query string; pass
+    # them through to Jellyfin untouched
+    query = request.query_string.decode()
+    if query:
+        full_url += ('&' if '?' in full_url else '?') + query
+
+    try:
+        r = safe_get(
+            full_url,
+            stream=True,
+            timeout=15,
+            headers=get_jellyfin_headers(jellyfin_api_key, {'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8'}),
+        )
+        r.raise_for_status()
+        content_type = r.headers.get('Content-Type', 'image/jpeg')
+        return Response(r.content, content_type=content_type, headers={
+            'Cache-Control': 'public, max-age=86400'
+        })
+    except Exception as e:
+        logger.error(f"proxy-jf-art: Error fetching {full_url}: {e}")
         return Response("Image not found", status=404)
 
 @bp.route('/proxy-sonarr-art/<path:art_path>')

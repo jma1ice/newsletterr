@@ -29,6 +29,11 @@ def run_tautulli_command(base_url, api_key, command, section_id, error, time_ran
         logger.info(f"Tautulli API call: get_recently_added with count={time_range}, start={start}")
     elif command == 'get_home_stats':
         api_url = f"{base_url}/api/v2?apikey={decrypt(api_key)}&cmd={command}&time_range={time_range}&stats_type={stats_type}"
+    elif command == 'get_library_media_info':
+        # Most Watched snap-in (NEWS-17): per-library media sorted by all-time
+        # play count. time_range carries the row count here (like
+        # get_recently_added reuses it for count).
+        api_url = f"{base_url}/api/v2?apikey={decrypt(api_key)}&cmd={command}&section_id={section_id}&order_column=play_count&order_dir=desc&length={time_range}&start={start}"
     else:
         _y = f"&y_axis={y_axis}" if command not in _NO_Y_AXIS_COMMANDS else ""
         if command == 'get_plays_per_month':

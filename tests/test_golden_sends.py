@@ -269,6 +269,8 @@ def _fixed_tautulli_data_for_layout(layout):
     def _data(*args, **kwargs):
         data = _fixed_tautulli_data()
         data["settings"]["email_layout"] = layout
+        # defined later in this module; resolved at call time
+        data["most_watched_data"] = MOST_WATCHED_FIXTURE
         return data
     return _data
 
@@ -530,6 +532,147 @@ def test_manual_yearly_wrapped_email_golden(manual_send_env, monkeypatch):
     assert "Severance" in normalized["html"]
     assert "Wrapped" in normalized["html"]
     _assert_golden("manual_yearly_wrapped", normalized)
+
+MOST_WATCHED_FIXTURE = [
+    {"most_watched": [
+        {"title": "Big Hit", "rating_key": "7", "year": "2020", "thumb": "/library/metadata/7/thumb",
+         "play_count": 57, "last_played": "", "media_type": "movie", "type": "movie",
+         "library_name": "Movies", "plex_url": "https://app.plex.tv/desktop/#!/server/m1/details?key=/library/metadata/7"},
+        {"title": "Second Best", "rating_key": "8", "year": "2019", "thumb": "",
+         "play_count": 1, "last_played": "", "media_type": "movie", "type": "movie",
+         "library_name": "Movies", "plex_url": ""},
+    ]},
+]
+
+def _fixed_tautulli_data_with_most_watched(*args, **kwargs):
+    data = _fixed_tautulli_data()
+    data["most_watched_data"] = MOST_WATCHED_FIXTURE
+    return data
+
+def test_manual_most_watched_email_golden(manual_send_env, monkeypatch):
+    from app.emails import send as send_mod
+    from app.emails.builders import most_watched as most_watched_mod
+
+    monkeypatch.setattr(send_mod, "get_current_tautulli_data_for_email", _fixed_tautulli_data_with_most_watched)
+    monkeypatch.setattr(most_watched_mod, "fetch_and_attach_image", lambda *a, **k: None)
+
+    client = manual_send_env
+    resp = _post_send(client, {
+        "to_emails": "a@b.c, d@e.f", "subject": "Manual Most Watched", "email_header_title": "The Header",
+        "selected_items": [
+            {"type": "textblock", "content": "Crowd favorites"},
+            {"type": "most_watched", "id": "mw-lib-movies", "mwLibrary": "Movies"},
+        ],
+        "custom_html": "", "user_dict": {}, "expanded_collections": {},
+    })
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body.get("success") is True
+
+    sends = [s for inst in RecorderSMTP.instances for s in inst.sent]
+    assert len(sends) == 1
+    from_addr, to_addrs, content = sends[0]
+    normalized = _normalize(content)
+    normalized["envelope"] = {"from": from_addr, "to": to_addrs}
+    normalized["response"] = body
+    assert "Most Watched - Movies" in normalized["html"]
+    assert "Big Hit" in normalized["html"]
+    assert "57 plays" in normalized["html"]
+    assert "1 play<" in normalized["html"] or "1 play</div>" in normalized["html"]
+    _assert_golden("manual_most_watched", normalized)
+
+def test_manual_custom_html_with_snapin_tokens_golden(manual_send_env, monkeypatch):
+    # NEWS-32: custom HTML with tokens expands through the same per-item
+    # dispatch as builder sends; unknown tokens become inline comments.
+    from app.emails import send as send_mod
+    from app.emails.builders import most_watched as most_watched_mod
+
+    yearly_wrapped_fixture = [
+        {"stat_title": "Most Watched Movies", "rows": [{"title": "Dune", "total_plays": 42}]},
+        {"stat_title": "Most Watched TV Shows", "rows": [{"title": "Severance", "total_plays": 30}]},
+    ]
+    monkeypatch.setattr(send_mod, "get_current_tautulli_data_for_email", _fixed_tautulli_data_with_most_watched)
+    monkeypatch.setattr(send_mod, "get_yearly_wrapped_cached", lambda *a, **k: yearly_wrapped_fixture)
+    monkeypatch.setattr(most_watched_mod, "fetch_and_attach_image", lambda *a, **k: None)
+
+    custom_html = (
+        "<html><body><h1>Hand-written newsletter</h1>"
+        "{{snapin:most_watched:Movies}}"
+        "<p>and the year so far</p>"
+        "{{snapin:wrapped}}"
+        "{{snapin:not_a_real_token}}"
+        "</body></html>"
+    )
+
+    client = manual_send_env
+    resp = _post_send(client, {
+        "to_emails": "a@b.c, d@e.f", "subject": "Custom Tokens", "email_header_title": "The Header",
+        "selected_items": [], "custom_html": custom_html,
+        "user_dict": {}, "expanded_collections": {},
+    })
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body.get("success") is True
+
+    sends = [s for inst in RecorderSMTP.instances for s in inst.sent]
+    assert len(sends) == 1
+    from_addr, to_addrs, content = sends[0]
+    normalized = _normalize(content)
+    normalized["envelope"] = {"from": from_addr, "to": to_addrs}
+    normalized["response"] = body
+    html = normalized["html"]
+    assert "Hand-written newsletter" in html
+    assert "Big Hit" in html                # most_watched token expanded
+    assert "57 plays" in html
+    assert "Dune" in html                   # wrapped token expanded
+    assert "unknown snapin token" in html   # typo surfaced as a comment
+    assert "{{snapin:most_watched" not in html
+    _assert_golden("manual_custom_html_tokens", normalized)
+
+RANDOM_PICK_FIXTURE = {
+    "title": "Pinned Movie", "rating_key": "42", "year": "2001",
+    "thumb": "/library/metadata/42/thumb", "art": "", "summary": "A fixed random pick.",
+    "tagline": "", "added_at": "", "updated_at": "", "content_rating": "PG-13",
+    "duration": "5400000", "guid": "", "key": "", "media_type": "movie",
+    "type": "movie", "genres": ["Drama", "Crime"], "library_name": "Movies",
+    "plex_url": "https://app.plex.tv/desktop/#!/server/m1/details?key=/library/metadata/42",
+    "rating": "8.0",
+}
+
+def test_manual_random_pick_email_golden(manual_send_env, monkeypatch):
+    # The pick is drawn at render time inside assemble; pin it there so the
+    # golden is deterministic and no Plex HTTP (or RNG) is involved.
+    from app.emails import assemble as assemble_mod
+    from app.emails.builders import random_pick as random_pick_mod
+
+    monkeypatch.setattr(assemble_mod, "fetch_random_library_item", lambda *a, **k: dict(RANDOM_PICK_FIXTURE))
+    monkeypatch.setattr(random_pick_mod, "fetch_and_attach_image", lambda *a, **k: None)
+
+    client = manual_send_env
+    resp = _post_send(client, {
+        "to_emails": "a@b.c, d@e.f", "subject": "Manual Random Pick", "email_header_title": "The Header",
+        "selected_items": [
+            {"type": "textblock", "content": "Tonight's feature"},
+            {"type": "random_pick", "id": "random-pick-5", "sectionId": "5", "library": "Movies"},
+        ],
+        "custom_html": "", "user_dict": {}, "expanded_collections": {},
+    })
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body.get("success") is True
+
+    sends = [s for inst in RecorderSMTP.instances for s in inst.sent]
+    assert len(sends) == 1
+    from_addr, to_addrs, content = sends[0]
+    normalized = _normalize(content)
+    normalized["envelope"] = {"from": from_addr, "to": to_addrs}
+    normalized["response"] = body
+    assert "Random Pick - Movies" in normalized["html"]
+    assert "Pinned Movie" in normalized["html"]
+    assert "1h 30m" in normalized["html"]
+    assert "Drama" in normalized["html"]
+    assert "Open in Plex" in normalized["html"]
+    _assert_golden("manual_random_pick", normalized)
 
 SONARR_EPISODES_FIXTURE = [
     {
@@ -821,6 +964,12 @@ def test_manual_layout_email_golden(manual_send_env, monkeypatch, layout):
     monkeypatch.setattr(send_mod, "get_ombi_requests_cached", lambda *a, **k: OMBI_REQUESTS_FIXTURE)
     monkeypatch.setattr(send_mod, "get_sonarr_coming_soon_cached", lambda *a, **k: SONARR_EPISODES_FIXTURE)
     monkeypatch.setattr(layouts_mod, "fetch_and_attach_image", lambda *a, **k: None)
+    from app.emails import assemble as assemble_mod
+    from app.emails.builders import most_watched as most_watched_mod
+    from app.emails.builders import random_pick as random_pick_mod
+    monkeypatch.setattr(assemble_mod, "fetch_random_library_item", lambda *a, **k: dict(RANDOM_PICK_FIXTURE))
+    monkeypatch.setattr(most_watched_mod, "fetch_and_attach_image", lambda *a, **k: None)
+    monkeypatch.setattr(random_pick_mod, "fetch_and_attach_image", lambda *a, **k: None)
     _freeze_coming_soon_clock(monkeypatch, coming_soon_mod)
     # the manual send path reads its settings from the fixed tautulli dict
     # (monkeypatched in manual_send_env), not the DB row, so the layout under
@@ -842,6 +991,8 @@ def test_manual_layout_email_golden(manual_send_env, monkeypatch, layout):
                 {"type": "yearly_wrapped", "id": "yearly-wrapped"},
                 {"type": "sonarr_coming_soon", "id": "sonarr-coming-soon"},
                 {"type": "ombi_requests", "id": "ombi-requests"},
+                {"type": "random_pick", "id": "random-pick-5", "sectionId": "5", "library": "Movies"},
+                {"type": "most_watched", "id": "mw-lib-movies", "mwLibrary": "Movies"},
             ],
             "custom_html": "", "user_dict": {}, "expanded_collections": {},
         })
@@ -856,6 +1007,9 @@ def test_manual_layout_email_golden(manual_send_env, monkeypatch, layout):
         assert "Dune" in normalized["html"]
         assert "Requested Movie" in normalized["html"]
         assert "ombi-requester" in normalized["html"]
+        assert "Pinned Movie" in normalized["html"]
+        assert "Big Hit" in normalized["html"]
+        assert "57 plays" in normalized["html"]
         # layout-distinct chrome markers, so a silent fallback to another
         # layout can never masquerade as a pass
         chrome_markers = {

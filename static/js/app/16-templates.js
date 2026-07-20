@@ -100,7 +100,7 @@ document.getElementById('reset-template-btn').addEventListener('click', function
         
         document.getElementById('delete-template-btn').style.display = 'none';
         
-        document.querySelectorAll('.add-stat-btn, .add-graph-btn, .ra-add-btn, .recs-add-btn, .droppedneedle-add-btn, .droppedneedle-server-add-btn, .yearly-wrapped-add-btn, .sonarr-coming-soon-add-btn, .radarr-coming-soon-add-btn, .ombi-requests-add-btn, .seerr-requests-add-btn').forEach(btn => {
+        document.querySelectorAll('.add-stat-btn, .add-graph-btn, .ra-add-btn, .mw-add-btn, .recs-add-btn, .droppedneedle-add-btn, .droppedneedle-server-add-btn, .yearly-wrapped-add-btn, .sonarr-coming-soon-add-btn, .radarr-coming-soon-add-btn, .ombi-requests-add-btn, .seerr-requests-add-btn').forEach(btn => {
             btn.textContent = 'Add';
             btn.classList.remove('nl-btn--success');
             btn.classList.add('nl-btn--primary');
@@ -193,7 +193,7 @@ function loadTemplate(template) {
 
         selectedItems = [];
         
-        document.querySelectorAll('.add-stat-btn, .add-graph-btn, .ra-add-btn, .recs-add-btn, .droppedneedle-add-btn, .droppedneedle-server-add-btn, .yearly-wrapped-add-btn, .sonarr-coming-soon-add-btn, .radarr-coming-soon-add-btn, .ombi-requests-add-btn, .seerr-requests-add-btn').forEach(btn => {
+        document.querySelectorAll('.add-stat-btn, .add-graph-btn, .ra-add-btn, .mw-add-btn, .recs-add-btn, .droppedneedle-add-btn, .droppedneedle-server-add-btn, .yearly-wrapped-add-btn, .sonarr-coming-soon-add-btn, .radarr-coming-soon-add-btn, .ombi-requests-add-btn, .seerr-requests-add-btn').forEach(btn => {
             btn.textContent = 'Add';
             btn.classList.remove('nl-btn--success');
             btn.classList.add('nl-btn--primary');
@@ -396,6 +396,44 @@ document.getElementById('export-html-btn').addEventListener('click', async () =>
     } catch (err) {
         console.error('Export failed:', err);
         alert('Something went wrong exporting the email.');
+    } finally {
+        hideSpinner();
+    }
+});
+
+// PDF export (NEWS-9): same payload as the preview; the server renders via
+// the preview pipeline and converts with weasyprint.
+document.getElementById('export-pdf-btn').addEventListener('click', async () => {
+    const payload = await buildPreviewPayload();
+    if (payload === null) {
+        alert('Nothing to export, add some snap-ins first.');
+        return;
+    }
+
+    showSpinner('Rendering PDF...');
+    try {
+        const resp = await fetch('/export_pdf', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': APP.csrfToken },
+            body: JSON.stringify(payload)
+        });
+        if (!resp.ok) {
+            const data = await resp.json().catch(() => ({}));
+            throw new Error(data.error || resp.statusText);
+        }
+        const blob = await resp.blob();
+
+        const subject = document.getElementById('subject')?.value.trim() || 'newsletterr-email';
+        const filename = (subject.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'newsletterr-email') + '.pdf';
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(url);
+    } catch (err) {
+        console.error('Error exporting PDF:', err);
+        alert('PDF export failed: ' + err.message);
     } finally {
         hideSpinner();
     }

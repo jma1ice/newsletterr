@@ -9,7 +9,7 @@ from app.cache import set_cached_data, get_cache_info
 from app.crypto import decrypt
 from app.security import require_csrf_for_json, requires_auth, safe_get, json_body
 from app.theme import get_theme_settings
-from app.clients.plex import get_plex_headers, get_plex_machine_id, build_plex_web_link, reset_plex_health, plex_call_failed
+from app.clients.plex import get_plex_headers, get_plex_machine_id, build_plex_web_link, reset_plex_health, plex_call_failed, fetch_library_sections_with_genres
 from app.clients.tautulli import run_tautulli_command, days_since_year_start
 from app.progress import progress_start, progress_step, progress_done
 from app.clients.conjurr import run_conjurr_command
@@ -18,7 +18,7 @@ from app.clients.sonarr import fetch_sonarr_calendar
 from app.clients.radarr import fetch_radarr_calendar
 from app.clients.ombi import fetch_ombi_movie_requests, fetch_ombi_tv_requests
 from app.clients.seerr import fetch_seerr_requests
-from app.emails.fetchers import fetch_recent_data_for_index
+from app.emails.fetchers import fetch_recent_data_for_index, fetch_most_watched_data
 
 from datetime import datetime, timedelta
 
@@ -57,9 +57,10 @@ def pull_stats():
         'timestamp': time.time()
     }
 
-    # 18 units: home stats, library counts, wrapped, users, 12 graphs,
-    # library names, recently added (the per-library loop reports as one)
-    progress_start('pull_stats', 18, 'Pulling home stats...')
+    # 19 units: home stats, library counts, wrapped, users, 12 graphs,
+    # library names, recently added (the per-library loop reports as one),
+    # most watched
+    progress_start('pull_stats', 19, 'Pulling home stats...')
 
     stats, error = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_home_stats', 'Stats', None, time_range, stats_type=stats_type)
     stats = stats or []
@@ -142,6 +143,10 @@ def pull_stats():
     plex_unavailable = plex_configured and plex_call_failed()
     set_cached_data('recent_data', recent_data, cache_params)
 
+    progress_step('pull_stats', 'Pulling most watched...')
+    most_watched_data = fetch_most_watched_data(tautulli_base_url, tautulli_api_key)
+    set_cached_data('most_watched_data', most_watched_data, cache_params)
+
     user_dict = {}
     users_full_data = None
     if users:
@@ -160,6 +165,7 @@ def pull_stats():
         "graph_data": graph_data,
         "graph_commands": graph_commands,
         "recent_data": recent_data,
+        "most_watched_data": most_watched_data,
         "user_dict": user_dict,
         "users_full_data": users_full_data,
         "cache_info": {
@@ -587,6 +593,18 @@ def pull_seerr_requests():
                             seerr_requests_json=seerr_requests_json,
                             alert=alert, error=error, theme_settings=theme_settings, service_flags=get_service_flags(_s),
                             csrf_token=session.get("csrf_token", ""))
+
+@bp.route('/random_pick_options', methods=['GET'])
+@requires_auth
+def random_pick_options():
+    """Libraries (with per-section genre lists) for the Random Pick snap-in
+    dropdowns. Returns an empty list when Plex is not configured."""
+    try:
+        libraries = fetch_library_sections_with_genres()
+        return jsonify({"status": "success", "libraries": libraries})
+    except Exception as e:
+        logger.error(f"Error fetching random pick options: {e}")
+        return jsonify({"status": "error", "message": str(e)})
 
 @bp.route('/fetch_collections/<collection_type>', methods=['GET'])
 @requires_auth

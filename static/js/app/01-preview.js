@@ -308,23 +308,23 @@ function resizePreviewFrame(frame) {
 
 // Server-rendered preview: one POST to /preview_email runs the real email
 // builders in preview mode, so the pane, pop-out, and sends share a single
-// renderer (layouts included). Custom HTML mode stays client-side.
+// renderer (layouts included). Custom HTML also posts through it so snap-in
+// tokens (NEWS-32) expand live; an empty editor keeps the blank frame.
 let _previewSeq = 0;
 
-async function updatePreview() {
-    try {
-        if (document.getElementById('custom-html-toggle')?.checked) {
-            const html = document.getElementById('custom-html-editor')?.value || '';
-            const frame = document.getElementById('preview');
-            if (frame) frame.srcdoc = html;
-            return;
-        }
+// Builder state -> /preview_email (and /export_pdf) payload. Returns null
+// when custom HTML mode is on with an empty editor (nothing to render).
+async function buildPreviewPayload() {
+    const isCustomHtml = document.getElementById('custom-html-toggle')?.checked || false;
+    const customHtml = isCustomHtml ? (document.getElementById('custom-html-editor')?.value || '') : '';
+    if (isCustomHtml && !customHtml.trim()) return null;
 
-        if (typeof selectedItems === 'undefined') {
-            console.error('selectedItems is undefined in updatePreview');
-            return;
-        }
+    if (typeof selectedItems === 'undefined') {
+        console.error('selectedItems is undefined in buildPreviewPayload');
+        return null;
+    }
 
+    if (!isCustomHtml) {
         for (const item of selectedItems) {
             if (item.type === 'graph' && !item.chartImage) {
                 const chartImage = await captureChartAsBase64(item.id);
@@ -336,15 +336,26 @@ async function updatePreview() {
                 item.content = getTextBlockContent(item.id);
             }
         });
+    }
 
-        const payload = {
-            subject: document.getElementById('subject').value,
-            email_header_title: document.getElementById('email_header_title').value,
-            selected_items: selectedItems,
-            expanded_collections: (typeof convertExpandedCollectionsForBackend === 'function') ? convertExpandedCollectionsForBackend() : {},
-            items_count: parseInt(document.getElementById('items_to_pull')?.value, 10) || null,
-            custom_html: ''
-        };
+    return {
+        subject: document.getElementById('subject').value,
+        email_header_title: document.getElementById('email_header_title').value,
+        selected_items: isCustomHtml ? [] : selectedItems,
+        expanded_collections: (typeof convertExpandedCollectionsForBackend === 'function') ? convertExpandedCollectionsForBackend() : {},
+        items_count: parseInt(document.getElementById('items_to_pull')?.value, 10) || null,
+        custom_html: customHtml
+    };
+}
+
+async function updatePreview() {
+    try {
+        const payload = await buildPreviewPayload();
+        if (payload === null) {
+            const frame = document.getElementById('preview');
+            if (frame) frame.srcdoc = '';
+            return;
+        }
 
         const seq = ++_previewSeq;
         const resp = await fetch('/preview_email', {

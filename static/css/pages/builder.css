@@ -709,6 +709,7 @@
    toolbar button group and the pop-out status line under 768px. */
 @media (max-width: 768px) {
     .builder-page #export-html-btn,
+    .builder-page #export-pdf-btn,
     .builder-page #import-html-btn,
     .builder-page #popout-preview-btn,
     .builder-page #preview-size-toggle,

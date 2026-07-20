@@ -86,6 +86,9 @@
                         <button id="export-html-btn" class="nl-btn nl-btn--ghost nl-btn--sm" title="Export email as HTML file">
                             &#8681; Export HTML
                         </button>
+                        <button id="export-pdf-btn" class="nl-btn nl-btn--ghost nl-btn--sm" title="Export email as PDF file">
+                            &#8681; Export PDF
+                        </button>
                         <button id="import-html-btn" class="nl-btn nl-btn--ghost nl-btn--sm" title="Import HTML file as template">
                             &#8679; Import HTML
                         </button>
@@ -129,8 +132,14 @@
                         </div>
                     </div>
                     <div id="custom-html-pane" style="display: none;">
+                        <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
+                            <select id="snapin-token-picker" class="form-select" style="max-width: 22em;">
+                                <option value="">Insert snap-in...</option>
+                            </select>
+                            <span class="text-muted" style="font-size: 0.8rem;">Tokens render the live section at send time. Graphs are not available as tokens.</span>
+                        </div>
                         <textarea id="custom-html-editor" class="form-control font-monospace text-alert"
-                                placeholder="Paste your complete HTML email here..."></textarea>
+                                placeholder="Paste your complete HTML email here... Use Insert snap-in to drop {{ '{{snapin:...}}' }} tokens that render live sections."></textarea>
                     </div>
                 </div>
 {% include 'partials/_snapins.html' %}

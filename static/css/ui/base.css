@@ -26,6 +26,10 @@
     box-sizing: border-box;
 }
 
+html {
+    scrollbar-gutter: stable;
+}
+
 /* Body reset + shell body. Only base.html links this and it always renders the .app-shell,
    so the legacy non-shell body rules were dead and dropped; margin:0 stays
    because nothing else zeroes the UA default. */

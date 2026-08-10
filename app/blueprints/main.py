@@ -7,7 +7,7 @@ import re
 
 from app import config, state
 from app.db import db_connect
-from app.cache import is_cache_valid, get_cached_data, get_cache_info, clear_cache
+from app.cache import is_cache_valid, get_cached_data, get_cache_info, clear_cache, get_global_cache_status
 from app.progress import progress_get
 from app.crypto import decrypt
 from app.net import is_safe_fetch_url, configured_media_hosts
@@ -414,6 +414,13 @@ def cache_status():
             'is_valid': is_cache_valid(key),
             'age_seconds': int(time.time() - state.cache_storage[key]['timestamp']) if state.cache_storage[key]['timestamp'] > 0 else 0
         }
+    badge = get_global_cache_status()
+    status['badge'] = {
+        'class': badge.get('class', 'cache-badge-muted'),
+        'title': badge.get('status', ''),
+        'text': badge.get('age_display', 'none') if badge.get('has_data') else 'none',
+        'has_data': bool(badge.get('has_data')),
+    }
     return jsonify(status)
 
 @bp.route('/pull_progress', methods=['GET'])

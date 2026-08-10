@@ -12,12 +12,13 @@ Newsletterr is a lightweight Flask application that talks to **[Tautulli](https:
 * **Plex or Jellyfin** - choose your media server in Settings; Jellyfin uses Jellywatch for stats (the role Tautulli fills for Plex) and Seerr or Ombi for requests, with recently added, library counts, and deep links working the same either way.
 * **One‑click stats pull** - pick a time range (quick buttons: 7 / 30 / 90 / … days) and "recently added" count; Newsletterr queries Tautulli for most watched movies/shows, active users, platforms, libraries, artists and more.
 * **User Recommendations** - integrate with **conjurr** to show personalized watch suggestions (per BCC list at fetch time).
-* **Snap‑ins (drag/add workflow)** - add Stats, Graphs, Recently Added (library selection supported), Recommendations, Collections, and Text Blocks (Title, Header, Intro, Body, Outro) in any order (Title sticks to the top) to compose a tailored newsletter body.
+* **Snap‑ins (drag/add workflow)** - add Stats, Graphs, Recently Added (library selection supported), Most Watched, Random Pick, Featured Pick, Top Viewer, Recommendations, Collections, and Text Blocks (Title, Header, Intro, Body, Outro) in any order to compose a tailored newsletter body.
 
 ### Visualization
 * **Interactive charts** - Highcharts rendered in‑app; suitable images captured for reliable e‑mail client display.
 * **Styled data tables** - Plex / Tautulli metrics rendered as clean, responsive tables prior to embedding.
 * **Live WYSIWYG preview** - side‑by‑side iframe updates instantly as you assemble the email.
+* **Five email layouts** - Polished Classic, Editorial, Compact Digest, Spotlight, and Legacy; pick one in Settings and every preview and send follows it.
 
 ### Templates & Reuse
 * **Email Templates** - save, load, clone, and delete custom templates (tracks chosen snap‑ins & layout) and re‑apply later.
@@ -195,6 +196,9 @@ The Settings page is split into sections: **Email Server**, **Connections**, **D
    * **Logo Filename (optional)** - this sets the logo at the top of the newsletter. There are some preset newsletterr options as well as custom and none. To use a custom logo, choose custom as your theme and custom here, then upload your image  
    * **Logo Width (optional)** - use this to adjust the size of your custom logo. A small logo should be ~20, medium ~40, and banner size ~80  
    * **Email Theme** - choose from one of our preset newsletterr blue or plex orange themes, or create your own custom theme! Preset themes use our newsletterr banners, so if you want a custom logo you must choose to use a custom theme  
+   * **Email Layout** - the overall design of the email. Polished Classic tightens the classic look into one card system, Editorial is a magazine treatment, Compact Digest is a dense one-scroll digest, Spotlight is a dark stack of cards that leads with one featured title and ends with a button to your server, and Legacy is the pre-v2026.4 look unchanged
+   * **Server Name in Header (optional)** - the Polished Classic, Editorial, Compact Digest, and Spotlight layouts can print your server name in the email header. Hidden by default, so the header shows just your logo and header title; set this to Show to add the name back  
+   * **Header Background (optional)** - the area behind the logo and header title. Theme gradient blends your accent and primary colors; pick Solid color for a single color, which is safer in clients that drop gradients  
 4. Click **Apply Settings**.  Settings are saved to `database/data.db`.
 
 ---
@@ -219,6 +223,8 @@ When the **Custom HTML** toggle is on, you write the whole email yourself, but y
 | `{{snapin:most_watched:Movies}}` | Most Watched grid for the named library (all-time play counts) |
 | `{{snapin:most_watched:Movies:recent}}` | Same, scoped to plays within the pulled time range; combine with a count as `:Movies:5:recent` |
 | `{{snapin:random_pick:Movies}}` | One random item from the named library (fresh pick every send) |
+| `{{snapin:featured_pick:The Grand Voyage}}` | One title you choose, matched by name at send time |
+| `{{snapin:top_viewer}}` | Callout for whoever streamed the most over the pulled time range |
 | `{{snapin:stats:Most Watched Movies}}` | The stats table with that title |
 | `{{snapin:wrapped}}` | Year in Plex wrapped section |
 | `{{snapin:coming_soon_tv}}` | Coming Soon (TV) from Sonarr |
@@ -281,10 +287,9 @@ Released under the **MIT License** - see [LICENSE](LICENSE.txt) for details.
 
 ### Misc.
 * Finish jellyfin/emby integration
-* New layouts need images
 * Pull more/different info on dn/wrapped
 * Appearance options: default landing page after login, calendar week-start day (Sun/Mon), date/time format (12/24h, MDY/DMY)
-* Layout coverage: classic/editorial/digest treatments for the sections that still render legacy inside the variant layouts (recommendations, collections, graph chrome, per-user DroppedNeedle wrapped)
+* Layout coverage: classic/editorial/digest/spotlight treatments for the sections that still render legacy inside the variant layouts (recommendations, collections, graph chrome, per-user DroppedNeedle wrapped)
 * Single-renderer cleanup: remove the legacy client-side email preview builders in static/js/app/04-stats-graphs.js and their hand-mirrored copies in templates/schedule_preview.html now that /preview_email renders previews server-side (needs a browser pass over every snap-in preview first)
 * Skip-on-no-new needs to have more triggers
 
@@ -295,6 +300,19 @@ Released under the **MIT License** - see [LICENSE](LICENSE.txt) for details.
 ---
 
 ## Recent Changes
+
+## v2026.4.1:
+
+#### New Features:
+* Option in settings for solid or gradient email header background
+* New simple stylized Spotlight email layout
+* New 'Top Viewer' snap-in
+* New 'Featured Pick' snap-in
+
+#### Fixed:
+* Images were missing in new layouts
+* Cache Badge status was only updating on refresh
+* Text was moving to title of snap-in on reload
 
 ## v2026.4:
 
@@ -319,16 +337,6 @@ Released under the **MIT License** - see [LICENSE](LICENSE.txt) for details.
 * Email BG color not respected by mac mail app
 * Text block titles update again while typing (inline handler blocked by CSP)
 * Recently Added by Days now pulls at an episode level
-
-## v2026.3:
-
-#### New Features:
-* CSP out of Report-Only after trial run
-* Clickable titles in stats tables, going to the item in Plex like recommendations do
-* Setting to control how many recommended items appear
-* Per library item counts for the Recently Added snap-in
-* Show which user requested each item in the Recently Requested snap-in
-* Progress bar on the loading spinner where possible
 
 ---
 

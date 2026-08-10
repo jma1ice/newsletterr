@@ -22,6 +22,8 @@ function buildSnapinTokenOptions() {
         if (stat.stat_title) options.push([`{{snapin:stats:${stat.stat_title}}}`, `Stat: ${stat.stat_title}`]);
     });
 
+    options.push(['{{snapin:top_viewer}}', 'Top Viewer']);
+    options.push(['{{snapin:featured_pick:TITLE}}', 'Featured Pick: (replace TITLE)']);
     options.push(['{{snapin:wrapped}}', 'Year in Plex (wrapped)']);
     options.push(['{{snapin:coming_soon_tv}}', 'Coming Soon: TV']);
     options.push(['{{snapin:coming_soon_movies}}', 'Coming Soon: Movies']);

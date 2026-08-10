@@ -74,22 +74,38 @@ def get_plex_headers(extra=None):
         headers.update(extra)
     return headers
 
+_MACHINE_ID_TTL = timedelta(minutes=30)
+_machine_id_lock = threading.Lock()
+_machine_id_cache = {}
+
+def _fetch_plex_machine_id(plex_url, plex_token):
+    headers = get_plex_headers({'X-Plex-Token': plex_token})
+    response = safe_get(f"{plex_url}/identity", headers=headers, timeout=10)
+    response.raise_for_status()
+    return response.json().get('MediaContainer', {}).get('machineIdentifier')
+
 def get_plex_machine_id():
     try:
         _s = get_settings(decrypt_secrets=False)
         plex_settings = (_s.get("plex_url"), _s.get("plex_token")) if "id" in _s else None
-        
+
         if not plex_settings or not plex_settings[0] or not plex_settings[1]:
             return None
-        
+
         plex_url = plex_settings[0].rstrip('/')
         plex_token = decrypt(plex_settings[1])
 
-        headers = get_plex_headers({'X-Plex-Token': plex_token})
-        response = safe_get(f"{plex_url}/identity", headers=headers, timeout=10)
-        response.raise_for_status()
-        data = response.json()
-        return data.get('MediaContainer', {}).get('machineIdentifier')
+        key = (plex_url, plex_token)
+        with _machine_id_lock:
+            cached = _machine_id_cache.get(key)
+            if cached and cached[1] > datetime.now():
+                return cached[0]
+
+            machine_id = _fetch_plex_machine_id(plex_url, plex_token)
+            if machine_id:
+                _machine_id_cache.clear()
+                _machine_id_cache[key] = (machine_id, datetime.now() + _MACHINE_ID_TTL)
+            return machine_id
     except Exception as e:
         logger.error(f"Error getting Plex machine ID: {e}")
         mark_plex_failed()
@@ -555,6 +571,34 @@ def fetch_library_sections_with_genres(include_genres=True):
         mark_plex_failed()
         return []
 
+def normalize_plex_item(entry, media_container=None, machine_id=None, plex_web_url=None):
+    media_container = media_container or {}
+    rating_key = str(entry.get('ratingKey', ''))
+    media_type = entry.get('type', '')
+    genres = [g.get('tag', '') for g in (entry.get('Genre') or []) if g.get('tag')]
+
+    return {
+        'title': entry.get('title', 'Unknown'),
+        'rating_key': rating_key,
+        'year': str(entry.get('year', '')),
+        'thumb': entry.get('thumb', ''),
+        'art': entry.get('art', ''),
+        'summary': entry.get('summary', ''),
+        'tagline': entry.get('tagline', ''),
+        'added_at': str(entry.get('addedAt', '')),
+        'updated_at': str(entry.get('updatedAt', '')),
+        'content_rating': entry.get('contentRating', ''),
+        'duration': str(entry.get('duration', '')),
+        'guid': entry.get('guid', ''),
+        'key': entry.get('key', ''),
+        'media_type': media_type,
+        'type': media_type,
+        'genres': genres,
+        'library_name': media_container.get('librarySectionTitle', '') or entry.get('librarySectionTitle', ''),
+        'plex_url': build_plex_web_link(rating_key, machine_id, plex_web_url) if rating_key else '',
+        'rating': str(entry.get('rating', ''))
+    }
+
 def fetch_random_library_item(section_id, genre=None, machine_id=None):
     """One random item from a library section (optionally filtered to a genre
     id from the section's genre directory), normalized to the same shape the
@@ -612,34 +656,88 @@ def fetch_random_library_item(section_id, genre=None, machine_id=None):
             logger.debug(f"Random pick: no metadata at offset {offset} for section {section_id}")
             return None
 
-        entry = metadata[0]
-        rating_key = str(entry.get('ratingKey', ''))
-        media_type = entry.get('type', '')
-        genres = [g.get('tag', '') for g in (entry.get('Genre') or []) if g.get('tag')]
-
-        return {
-            'title': entry.get('title', 'Unknown'),
-            'rating_key': rating_key,
-            'year': str(entry.get('year', '')),
-            'thumb': entry.get('thumb', ''),
-            'art': entry.get('art', ''),
-            'summary': entry.get('summary', ''),
-            'tagline': entry.get('tagline', ''),
-            'added_at': str(entry.get('addedAt', '')),
-            'updated_at': str(entry.get('updatedAt', '')),
-            'content_rating': entry.get('contentRating', ''),
-            'duration': str(entry.get('duration', '')),
-            'guid': entry.get('guid', ''),
-            'key': entry.get('key', ''),
-            'media_type': media_type,
-            'type': media_type,
-            'genres': genres,
-            'library_name': media_container.get('librarySectionTitle', ''),
-            'plex_url': build_plex_web_link(rating_key, machine_id, plex_web_url) if rating_key else '',
-            'rating': str(entry.get('rating', ''))
-        }
+        return normalize_plex_item(metadata[0], media_container, machine_id, plex_web_url)
     except Exception as e:
         logger.exception(f"Error fetching random library item: {e}")
+        mark_plex_failed()
+        return None
+
+def _plex_connection():
+    """(url, token, web_url) or None when Plex is not configured."""
+    _s = get_settings(decrypt_secrets=False)
+    if "id" not in _s or not _s.get("plex_url") or not _s.get("plex_token"):
+        logger.debug("Plex not configured")
+        return None
+    return _s["plex_url"].rstrip('/'), decrypt(_s["plex_token"]), _s.get("plex_web_url")
+
+def search_library_items(query, section_id=None, limit=20):
+    query = (query or '').strip()
+    if not query:
+        return []
+    try:
+        conn = _plex_connection()
+        if not conn:
+            return []
+        plex_url, plex_token, _ = conn
+        headers = get_plex_headers()
+
+        if section_id:
+            api_url = (f"{plex_url}/library/sections/{section_id}/all"
+                       f"?title={quote_plus(query)}&X-Plex-Container-Size={int(limit)}"
+                       f"&X-Plex-Token={plex_token}")
+        else:
+            api_url = f"{plex_url}/search?query={quote_plus(query)}&X-Plex-Token={plex_token}"
+
+        response = safe_get(api_url, headers=headers, timeout=10)
+        response.raise_for_status()
+        container = response.json().get('MediaContainer', {})
+
+        results = []
+        for entry in container.get('Metadata', []) or []:
+            if entry.get('type') not in ('movie', 'show', 'album', 'artist', 'season', 'episode'):
+                continue
+            rating_key = str(entry.get('ratingKey', ''))
+            if not rating_key:
+                continue
+            results.append({
+                'rating_key': rating_key,
+                'title': entry.get('title', 'Unknown'),
+                'year': str(entry.get('year', '') or ''),
+                'type': entry.get('type', ''),
+                'thumb': entry.get('thumb', ''),
+                'library_name': entry.get('librarySectionTitle', '') or container.get('librarySectionTitle', ''),
+            })
+            if len(results) >= int(limit):
+                break
+        return results
+    except Exception as e:
+        logger.exception(f"Error searching library items: {e}")
+        mark_plex_failed()
+        return []
+
+def fetch_library_item_by_rating_key(rating_key, machine_id=None):
+    rating_key = str(rating_key or '').strip()
+    if not rating_key:
+        return None
+    try:
+        conn = _plex_connection()
+        if not conn:
+            return None
+        plex_url, plex_token, plex_web_url = conn
+        if machine_id is None:
+            machine_id = get_plex_machine_id()
+
+        api_url = f"{plex_url}/library/metadata/{quote_plus(rating_key)}?X-Plex-Token={plex_token}"
+        response = safe_get(api_url, headers=get_plex_headers(), timeout=10)
+        response.raise_for_status()
+        container = response.json().get('MediaContainer', {})
+        metadata = container.get('Metadata', []) or []
+        if not metadata:
+            logger.debug(f"Featured pick: rating key {rating_key} no longer resolves")
+            return None
+        return normalize_plex_item(metadata[0], container, machine_id, plex_web_url)
+    except Exception as e:
+        logger.exception(f"Error fetching library item {rating_key}: {e}")
         mark_plex_failed()
         return None
 

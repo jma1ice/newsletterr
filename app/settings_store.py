@@ -57,6 +57,8 @@ DEFAULTS = {
     "ui_custom_light": "",
     "ui_custom_dark": "",
     "email_layout": "classic",
+    "email_show_server_name": "disabled",
+    "email_header_bg": "",
     "appearance_theme": "dark",
     "pride_flag": "off",
     "snapins_floating": "1",

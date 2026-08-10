@@ -193,7 +193,7 @@ function updateSelectedItemsDisplay() {
                 const placeholderText = 'Enter your title here...';
                 htmlContent += `
                     <div class="selected-item d-flex flex-column p-2 mb-2 border rounded" 
-                         data-index="${index}" draggable="true">
+                         data-index="${index}" draggable="false">
                         <div class="d-flex justify-content-between align-items-center mb-2">
                             <span class="item-name">${escapeHtml(item.name)}</span>
                             <div>
@@ -221,7 +221,7 @@ function updateSelectedItemsDisplay() {
                 const placeholderText = item.type === 'headerblock' ? 'Enter your header here...' : 'Enter your text here...';
                 htmlContent += `
                     <div class="selected-item d-flex flex-column p-2 mb-2 border rounded" 
-                         data-index="${index}" draggable="true">
+                         data-index="${index}" draggable="false">
                         <div class="d-flex justify-content-between align-items-center mb-2">
                             <span class="item-name">${escapeHtml(item.name)}</span>
                             <div>
@@ -246,7 +246,7 @@ function updateSelectedItemsDisplay() {
             } else if (item.type === 'separator') {
                 htmlContent += `
                     <div class="selected-item d-flex align-items-center justify-content-between p-2 mb-2 border rounded"
-                        data-index="${index}" draggable="true">
+                        data-index="${index}" draggable="false">
                         <span class="item-name" style="font-size: 0.9rem;">- Separator</span>
                         <div>
                             <span class="badge badge-secondary me-2">separator</span>
@@ -257,7 +257,7 @@ function updateSelectedItemsDisplay() {
             } else if (item.type === 'image' || item.type === 'gif') {
                 htmlContent += `
                     <div class="selected-item d-flex flex-column p-2 mb-2 border rounded"
-                        data-index="${index}" draggable="true">
+                        data-index="${index}" draggable="false">
                         <div class="d-flex justify-content-between align-items-center mb-2">
                             <span class="item-name">${item.type === 'gif' ? 'GIF' : 'Image/GIF'}</span>
                             <div>
@@ -298,7 +298,7 @@ function updateSelectedItemsDisplay() {
                 
                 htmlContent += `
                     <div class="selected-item d-flex flex-column p-2 mb-2 border rounded" 
-                        data-index="${index}" draggable="true">
+                        data-index="${index}" draggable="false">
                         <div class="d-flex justify-content-between align-items-center mb-2">
                             <input type="text" 
                                 class="form-control form-control-sm collection-group-title" 
@@ -375,7 +375,7 @@ function updateSelectedItemsDisplay() {
             } else if (item.type === 'random_pick') {
                 htmlContent += `
                     <div class="selected-item d-flex flex-column p-2 mb-2 border rounded bg-light"
-                         data-index="${index}" draggable="true">
+                         data-index="${index}" draggable="false">
                         <div class="d-flex justify-content-between align-items-center">
                             <span class="item-name">${escapeHtml(item.name)}</span>
                             <div>
@@ -389,7 +389,7 @@ function updateSelectedItemsDisplay() {
             } else {
                 htmlContent += `
                     <div class="selected-item d-flex justify-content-between align-items-center p-2 mb-2 border rounded bg-light"
-                         data-index="${index}" draggable="true">
+                         data-index="${index}" draggable="false">
                         <span class="item-name">${escapeHtml(item.name)}</span>
                         <div>
                             <span class="badge badge-secondary me-2">${item.type}</span>
@@ -784,12 +784,22 @@ function removeItem(index) {
     }
 }
 
+const DRAG_EXEMPT_SELECTOR = 'input, textarea, select, button, a, [contenteditable="true"], emoji-picker';
+
 function setupDragAndDrop() {
     const items = () => Array.from(document.querySelectorAll('.selected-item'));
     const indexOfEl = (el) => allItems().indexOf(el);
     let draggedElement = null;
-    
+
     items().forEach((item, index) => {
+        item.addEventListener('mousedown', (e) => {
+            item.draggable = !(e.target.closest && e.target.closest(DRAG_EXEMPT_SELECTOR));
+        });
+
+        item.addEventListener('mouseup', () => {
+            item.draggable = false;
+        });
+
         item.addEventListener('dragstart', (e) => {
             draggedElement = item;
             e.dataTransfer.setData('text/plain', index);
@@ -801,6 +811,7 @@ function setupDragAndDrop() {
         });
         
         item.addEventListener('dragend', () => {
+            item.draggable = false;
             item.classList.remove('dragging');
             items().forEach(i => i.classList.remove('drag-over'));
             draggedElement = null;
@@ -858,31 +869,32 @@ function createTextBlock(blockType = 'text') {
     }
     
     if (addItem(textBlockId, displayName, 'textblock')) {
-        setTimeout(() => {
-            setTextBlockContent(textBlockId, textContent);
-            debouncedUpdatePreview();
-        }, 100);
+        setTextBlockContent(textBlockId, textContent);
+        debouncedUpdatePreview();
         return textBlockId;
     }
     return null;
 }
 
 function getTextBlockContent(textBlockId) {
-    const textarea = document.querySelector(`[data-textblock-id="${textBlockId}"]`);
-    return textarea ? textarea.value : '';
+    const textarea = document.querySelector(`textarea[data-textblock-id="${textBlockId}"]`);
+    if (textarea) return textarea.value;
+    const item = selectedItems.find(item => item.id === textBlockId);
+    return (item && typeof item.content === 'string') ? item.content : '';
 }
 
 function setTextBlockContent(textBlockId, content) {
-    const textarea = document.querySelector(`[data-textblock-id="${textBlockId}"]`);
+    const textarea = document.querySelector(`textarea[data-textblock-id="${textBlockId}"]`);
     if (textarea) {
         textarea.value = content;
-        const index = selectedItems.findIndex(item => item.id === textBlockId);
-        if (index !== -1) {
-            selectedItems[index].name = getTextBlockDisplayName(content);
-            const nameSpan = document.querySelector(`[data-index="${index}"] .item-name`);
-            if (nameSpan) {
-                nameSpan.textContent = selectedItems[index].name;
-            }
+    }
+    const index = selectedItems.findIndex(item => item.id === textBlockId);
+    if (index !== -1) {
+        selectedItems[index].content = content;
+        selectedItems[index].name = getTextBlockDisplayName(content);
+        const nameSpan = document.querySelector(`[data-index="${index}"] .item-name`);
+        if (nameSpan) {
+            nameSpan.textContent = selectedItems[index].name;
         }
     }
 }
@@ -891,7 +903,6 @@ function getTextBlockDisplayName(content) {
     const firstLine = content.split('\n')[0].trim();
     if (firstLine.length === 0) return 'Empty text block';
     if (firstLine.substring(0, 1) === '<') return 'HTML block';
-    console.log('firstChar: ' + firstLine.substring(0, 1))
     return firstLine.length > 30 ? firstLine.substring(0, 30) + '...' : firstLine;
 }
 
@@ -900,8 +911,9 @@ function updateTextBlockName(textBlockId, index) {
     const newName = getTextBlockDisplayName(content);
     
     if (selectedItems[index]) {
+        selectedItems[index].content = content;
         selectedItems[index].name = newName;
-        
+
         const nameSpan = document.querySelector(`[data-index="${index}"] .item-name`);
         if (nameSpan) {
             nameSpan.textContent = newName;
@@ -926,10 +938,8 @@ function createIntroBlock() {
     const displayName = 'Intro: Member message';
     
     if (addItem(textBlockId, displayName, 'textblock')) {
-        setTimeout(() => {
-            setTextBlockContent(textBlockId, introContent);
-            debouncedUpdatePreview();
-        }, 100);
+        setTextBlockContent(textBlockId, introContent);
+        debouncedUpdatePreview();
         return textBlockId;
     }
     return null;
@@ -942,10 +952,8 @@ function createOutroBlock() {
     const displayName = 'Outro: Thank you message';
     
     if (addItem(textBlockId, displayName, 'textblock')) {
-        setTimeout(() => {
-            setTextBlockContent(textBlockId, outroContent);
-            debouncedUpdatePreview();
-        }, 100);
+        setTextBlockContent(textBlockId, outroContent);
+        debouncedUpdatePreview();
         return textBlockId;
     }
     return null;
@@ -961,10 +969,8 @@ function createTitleBlock() {
         const displayName = 'Title: Newsletter Title';
         
         if (addItem(textBlockId, displayName, 'titleblock')) {
-            setTimeout(() => {
-                setTextBlockContent(textBlockId, titleContent);
-                debouncedUpdatePreview();
-            }, 100);
+            setTextBlockContent(textBlockId, titleContent);
+            debouncedUpdatePreview();
             return textBlockId;
         }
         return null;
@@ -978,10 +984,8 @@ function createHeaderBlock() {
     const displayName = 'Header: Newsletter Header';
     
     if (addItem(textBlockId, displayName, 'headerblock')) {
-        setTimeout(() => {
-            setTextBlockContent(textBlockId, headerContent);
-            debouncedUpdatePreview();
-        }, 100);
+        setTextBlockContent(textBlockId, headerContent);
+        debouncedUpdatePreview();
         return textBlockId;
     }
     return null;
@@ -1039,7 +1043,9 @@ document.addEventListener('click', async (e) => {
         btn.classList.contains('sonarr-coming-soon-add-btn') ||
         btn.classList.contains('radarr-coming-soon-add-btn') ||
         btn.classList.contains('ombi-requests-add-btn') ||
-        btn.classList.contains('seerr-requests-add-btn');
+        btn.classList.contains('seerr-requests-add-btn') ||
+        btn.classList.contains('top-viewer-add-btn') ||
+        btn.classList.contains('featured-pick-add-btn');
 
     if (!isAdd) return;
 
@@ -1068,6 +1074,9 @@ document.addEventListener('click', async (e) => {
             id = `${id}-recent`;
             name = `${name} (pull range)`;
         }
+    }
+    if (type === 'featured_pick' && btn.dataset.ratingKey) {
+        extra.ratingKey = btn.dataset.ratingKey;
     }
     if (type === 'recommendations' || type === 'droppedneedle_wrapped') {
         if (btn.dataset.userKey) extra.userKey = btn.dataset.userKey;

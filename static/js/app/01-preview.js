@@ -348,7 +348,29 @@ async function buildPreviewPayload() {
     };
 }
 
+let _previewAbort = null;
+
+async function postPreview(payload, signal) {
+    for (let attempt = 0; ; attempt++) {
+        try {
+            return await fetch('/preview_email', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': APP.csrfToken },
+                body: JSON.stringify(payload),
+                signal: signal
+            });
+        } catch (e) {
+            if (attempt >= 1 || e.name === 'AbortError' || signal.aborted) throw e;
+        }
+    }
+}
+
 async function updatePreview() {
+    const seq = ++_previewSeq;
+    if (_previewAbort) _previewAbort.abort();
+    const controller = new AbortController();
+    _previewAbort = controller;
+
     try {
         const payload = await buildPreviewPayload();
         if (payload === null) {
@@ -357,12 +379,7 @@ async function updatePreview() {
             return;
         }
 
-        const seq = ++_previewSeq;
-        const resp = await fetch('/preview_email', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': APP.csrfToken },
-            body: JSON.stringify(payload)
-        });
+        const resp = await postPreview(payload, controller.signal);
         const data = await resp.json();
         if (seq !== _previewSeq) return; // a newer render is already in flight
         if (!resp.ok) throw new Error(data.error || resp.statusText);
@@ -390,11 +407,14 @@ async function updatePreview() {
             }
         };
     } catch (error) {
+        if (error.name === 'AbortError' || seq !== _previewSeq) return;
         console.error('Error in updatePreview:', error);
         const frame = document.getElementById('preview');
         if (frame) {
             frame.srcdoc = `<html><body><p>Error updating preview: ${error.message}</p></body></html>`;
         }
+    } finally {
+        if (_previewAbort === controller) _previewAbort = null;
     }
 }
 

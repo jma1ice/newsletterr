@@ -36,6 +36,7 @@ EXPECTED_RULES = [
     "/email_templates/<int:template_id>",
     "/export_pdf",
     "/fetch_collections/<collection_type>",
+    "/featured_pick_search",
     "/get_collection_items",
     "/i/<token>",
     "/login",

@@ -88,9 +88,37 @@
         });
     }
 
+    var BURST_WINDOW_MS = 1000;
+    var BURST_LIMIT = 20;
+    var COOLDOWN_MIN_MS = 250;
+    var COOLDOWN_MAX_MS = 8000;
+
     var relayoutPending = false;
+    var burstStart = 0;
+    var burstCount = 0;
+    var cooldownUntil = 0;
+    var cooldownMs = COOLDOWN_MIN_MS;
+
     function scheduleRelayout() {
         if (relayoutPending) return;
+
+        var now = Date.now();
+        if (now < cooldownUntil) return;
+
+        if (now - burstStart > BURST_WINDOW_MS) {
+            burstStart = now;
+            burstCount = 0;
+            // The last cooldown held, so start over from the shortest pause.
+            if (now - cooldownUntil > BURST_WINDOW_MS) cooldownMs = COOLDOWN_MIN_MS;
+        }
+        if (++burstCount > BURST_LIMIT) {
+            cooldownUntil = now + cooldownMs;
+            cooldownMs = Math.min(cooldownMs * 2, COOLDOWN_MAX_MS);
+            burstCount = 0;
+            burstStart = cooldownUntil;
+            return;
+        }
+
         relayoutPending = true;
         window.requestAnimationFrame(function () {
             relayoutPending = false;

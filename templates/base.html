@@ -86,7 +86,7 @@
             </ul>
             <div class="sidebar-foot">
                 {% set cache_status = get_cache_status() %}
-                <span class="sidebar-cache cache-badge-base {{ cache_status.class }}"
+                <span id="cache-badge-wrap" class="sidebar-cache cache-badge-base {{ cache_status.class }}"
                       title="{{ cache_status.status }}">
                     <strong id="cache-badge">Cache:
                         {% if cache_status.has_data %}{{ cache_status.age_display }}{% else %}none{% endif %}

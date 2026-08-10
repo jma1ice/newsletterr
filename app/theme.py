@@ -23,6 +23,9 @@ _CUSTOM_UI_FALLBACK = {
     'dark': {'bg': '#1d2426', 'surface': '#252d30', 'border': '#3a464a', 'text': '#e9f1f2', 'muted': '#a5b6ba', 'accent': '#62a1a4'},
 }
 
+def is_hex_color(value):
+    return bool(isinstance(value, str) and _HEX_RE.match(value or ''))
+
 def _safe_hex(value, fallback):
     return value if isinstance(value, str) and _HEX_RE.match(value or '') else fallback
 
@@ -99,7 +102,25 @@ def get_email_theme_colors():
         'email_theme': theme_settings['email_theme']
     }
 
-def build_email_css_from_theme(theme_colors, logo_width):
+def get_email_chrome_settings():
+    try:
+        s = get_settings(decrypt_secrets=False)
+    except Exception as e:
+        logger.error(f"Error getting email chrome settings: {e}")
+        s = {}
+    header_bg = (s.get('email_header_bg') or '').strip()
+    jellyfin = (s.get('media_server_type') or 'plex') == 'jellyfin'
+    server_url = (s.get('jellyfin_web_url') if jellyfin else s.get('plex_web_url')) or ''
+    return {
+        'show_server_name': s.get('email_show_server_name') == 'enabled',
+        # blank (or anything not #rrggbb) keeps the default gradient
+        'header_bg': header_bg if is_hex_color(header_bg) else '',
+        # the spotlight layout's call to action; blank hides the button
+        'server_url': server_url.strip(),
+        'server_cta': 'Open Jellyfin' if jellyfin else 'Open Plex',
+    }
+
+def build_email_css_from_theme(theme_colors, logo_width, container_width=800):
     return f"""
         <style>
             @import url(https://fonts.googleapis.com/css?family=IBM+Plex+Sans:400,700&display=swap);
@@ -135,7 +156,7 @@ def build_email_css_from_theme(theme_colors, logo_width):
             .ExternalClass * {{ line-height: 100% !important; }}
 
             .email-container {{
-                max-width: 800px !important;
+                max-width: {container_width}px !important;
                 width: 100% !important;
                 margin: 0 auto !important;
             }}

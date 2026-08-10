@@ -17,6 +17,50 @@
         if (e.animationName === 'alertFadeOut') e.target.style.display = 'none';
     });
 
+    var badgeClasses = ['cache-badge-muted', 'cache-badge-missing', 'cache-badge-fresh',
+                        'cache-badge-warn', 'cache-badge-old', 'cache-badge-stale'];
+
+    window.refreshCacheBadge = async function () {
+        var wrap = document.getElementById('cache-badge-wrap');
+        var label = document.getElementById('cache-badge');
+        if (!wrap || !label) return;
+        try {
+            var resp = await fetch('/cache_status', { credentials: 'same-origin' });
+            if (!resp.ok) return;
+            var badge = (await resp.json()).badge;
+            if (!badge) return;
+            badgeClasses.forEach(function (c) { wrap.classList.remove(c); });
+            wrap.classList.add(badge.class);
+            wrap.title = badge.title || '';
+            label.textContent = 'Cache: ' + (badge.text || 'none');
+        } catch (e) {
+            /* a failed poll just leaves the badge as-is */
+        }
+    };
+
+    function hookPullRunners() {
+        var runners = window.pullRunners;
+        if (!runners) return;
+        Object.keys(runners).forEach(function (key) {
+            var original = runners[key];
+            if (typeof original !== 'function' || original.__badgeHooked) return;
+            var wrapped = async function () {
+                try {
+                    return await original.apply(this, arguments);
+                } finally {
+                    window.refreshCacheBadge();
+                }
+            };
+            wrapped.__badgeHooked = true;
+            runners[key] = wrapped;
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', hookPullRunners);
+    document.addEventListener('visibilitychange', function () {
+        if (!document.hidden) window.refreshCacheBadge();
+    });
+
     function setCollapsed(collapsed) {
         root.classList.toggle('sidebar-collapsed', collapsed);
         try { localStorage.setItem('sidebar', collapsed ? 'collapsed' : 'expanded'); } catch (e) {}

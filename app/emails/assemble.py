@@ -11,9 +11,10 @@ from app.emails.builders import build_stats_html_with_cid_background, build_rece
 from app.emails.builders import layouts
 from app.emails.builders.most_watched import build_most_watched_html_with_cids
 from app.emails.builders.random_pick import build_random_pick_html
+from app.emails.builders.top_viewer import build_top_viewer_html, find_top_viewer
 from app.emails.snapin_tokens import expand_snapin_tokens
-from app.clients.plex import fetch_random_library_item, fetch_library_sections_with_genres
-from app.theme import get_email_theme_colors, build_email_css_from_theme
+from app.clients.plex import fetch_random_library_item, fetch_library_item_by_rating_key, search_library_items, fetch_library_sections_with_genres
+from app.theme import get_email_theme_colors, get_email_chrome_settings, build_email_css_from_theme
 from app.security import escape_html_output as esc
 
 _BLOCK_TAGS = {'p', 'div', 'tr', 'ul', 'ol', 'table', 'blockquote', 'section', 'article'}
@@ -161,7 +162,7 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, displ
     expanded_collections = expanded_collections or {}
     email_header_title = email_header_title or ''
     
-    theme_colors = get_email_theme_colors()
+    theme_colors = layouts.apply_theme(email_layout, get_email_theme_colors())
 
     def _render_item(item, group_index=0):
         """Single per-item dispatch shared by the selected-items loop and
@@ -194,7 +195,7 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, displ
                 stat_data = tautulli_data['stats'][stat_index]
                 _resolved_range = date_range or (get_cache_info('stats').get('params') or {}).get('time_range', '')
                 if use_layout:
-                    content_html += layouts.render_stats(email_layout, stat_data, msg_root, theme_colors, base_url, _resolved_range, hide_play_counts=hide_stat_play_counts, include_user_info=include_user_info, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
+                    content_html += layouts.render_stats(email_layout, stat_data, msg_root, theme_colors, base_url, _resolved_range, hide_play_counts=hide_stat_play_counts, include_user_info=include_user_info, show_cover_art=show_cover_art, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
                 else:
                     content_html += build_stats_html_with_cid_background(stat_data, msg_root, theme_colors, base_url, date_range, hide_play_counts=hide_stat_play_counts, show_cover_art=show_cover_art, include_user_info=include_user_info, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
 
@@ -275,6 +276,30 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, displ
                     content_html += layouts.render_random_pick(email_layout, pick, msg_root, theme_colors, base_url, library_label=rp_library, genre_label=rp_genre_label, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
                 else:
                     content_html += build_random_pick_html(pick, msg_root, theme_colors, base_url, library_label=rp_library, genre_label=rp_genre_label, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
+
+        elif item_type == 'featured_pick':
+            fp_key = item.get('ratingKey') or item.get('rating_key') or ''
+            fp_title = (item.get('title') or '').strip()
+            fp_pick = fetch_library_item_by_rating_key(fp_key) if fp_key else None
+            if fp_pick is None and fp_title:
+                matches = search_library_items(fp_title, limit=1)
+                if matches:
+                    fp_pick = fetch_library_item_by_rating_key(matches[0]['rating_key'])
+            fp_heading = item.get('heading') or 'Featured Pick'
+            if use_layout:
+                content_html += layouts.render_random_pick(email_layout, fp_pick, msg_root, theme_colors, base_url, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url, heading=fp_heading)
+            else:
+                content_html += build_random_pick_html(fp_pick, msg_root, theme_colors, base_url, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url, heading=fp_heading)
+
+        elif item_type == 'top_viewer':
+            champ = find_top_viewer(tautulli_data.get('stats') or [])
+            if champ:
+                _tv_range = date_range or (get_cache_info('stats').get('params') or {}).get('time_range', '')
+                _tv_range_text = f"Last {_tv_range} days" if _tv_range else ""
+                if use_layout:
+                    content_html += layouts.render_top_viewer(email_layout, champ, msg_root, theme_colors, base_url, range_text=_tv_range_text, include_user_info=include_user_info, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
+                else:
+                    content_html += build_top_viewer_html(champ, msg_root, theme_colors, base_url, range_text=_tv_range_text, include_user_info=include_user_info, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
 
         elif item_type == 'recommendations':
             if recommendations_data:
@@ -392,10 +417,14 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, displ
     return email_html, hosted_html
 
 def build_complete_email_html_with_cid_logo(content_html, server_name, subject, email_header_title, logo_src, logo_width, is_scheduled=False, logo_position='center', unsubscribe_placeholder=None, hosted_base_url="", hosted_enabled=False, links_base_url="", layout='legacy'):
-    theme_colors = get_email_theme_colors()
+    theme_colors = layouts.apply_theme(layout, get_email_theme_colors())
+    chrome = get_email_chrome_settings()
+    show_server_name = chrome['show_server_name']
+    header_bg = chrome['header_bg']
     links_base_url = links_base_url or hosted_base_url
-    
-    css = build_email_css_from_theme(theme_colors, logo_width)
+
+    container_width = 640 if layout == 'spotlight' else 800
+    css = build_email_css_from_theme(theme_colors, logo_width, container_width=container_width)
     
     body_style = f"""
         margin: 0;
@@ -408,20 +437,33 @@ def build_complete_email_html_with_cid_logo(content_html, server_name, subject, 
         -ms-text-size-adjust: 100%;
     """
     
-    container_style = f"""
-        width: 100%;
-        max-width: 800px;
-        margin: 0 auto;
-        background-color: {theme_colors['card_bg']};
-        border-radius: 8px;
-        overflow: hidden;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-        border: 1px solid {theme_colors['border']};
-        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
-    """
+    if layout == 'spotlight':
+        container_style = """
+            width: 100%;
+            max-width: 640px;
+            margin: 0 auto;
+            font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
+        """
+    else:
+        container_style = f"""
+            width: 100%;
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: {theme_colors['card_bg']};
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            border: 1px solid {theme_colors['border']};
+            font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
+        """
     
+    _header_bg_css = (
+        f"background-color: {header_bg}; background: {header_bg};"
+        if header_bg else
+        f"background: linear-gradient(135deg, {theme_colors['accent']} 0%, {theme_colors['primary']} 100%);"
+    )
     header_style = f"""
-        background: linear-gradient(135deg, {theme_colors['accent']} 0%, {theme_colors['primary']} 100%);
+        {_header_bg_css}
         color: white;
         padding: 10px 20px;
         text-align: center;
@@ -454,9 +496,9 @@ def build_complete_email_html_with_cid_logo(content_html, server_name, subject, 
     """
     
     content_style = f"""
-        padding: 10px 15px;
+        padding: {'0' if layout == 'spotlight' else '10px 15px'};
         color: {theme_colors['text']};
-        background-color: {theme_colors['card_bg']};
+        background-color: {'transparent' if layout == 'spotlight' else theme_colors['card_bg']};
         font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
     """
     
@@ -521,18 +563,39 @@ def build_complete_email_html_with_cid_logo(content_html, server_name, subject, 
                             </div>{unsubscribe_footer_html}
                         </div>"""
 
-    if layout == 'classic':
-        brand_line = f'<div style="font-weight: 700; letter-spacing: .06em; font-size: 13px; color: #ffffff; opacity: .9; text-transform: lowercase; font-family: {_FONT};">{esc(server_name)}</div>'
+    if layout == 'spotlight':
+        kicker = esc(server_name) if show_server_name else 'Your server'
+        greeting = email_header_title or 'This week on the server'
+        header_block = f"""
+            <div style="padding: 4px 20px 18px 20px; font-family: {_FONT};">
+                {logo_html}
+                <div style="font-size: 12px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; color: {theme_colors['accent']};">{kicker}</div>
+                <div style="padding-top: 8px; font-size: 29px; line-height: 1.15; font-weight: 800; color: #ffffff;">{greeting}</div>
+            </div>"""
+        cta_html = ""
+        if chrome.get('server_url'):
+            cta_html = f"""
+                <div style="text-align: center; padding: 6px 20px 20px 20px;">
+                    <a href="{esc(chrome['server_url'])}" target="_blank" style="display: inline-block; background-color: {theme_colors['accent']}; color: #111111; text-decoration: none; font-size: 14px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; padding: 13px 26px; border-radius: 7px; font-family: {_FONT};">{esc(chrome.get('server_cta') or 'Open Plex')}</a>
+                </div>"""
+        footer_block = cta_html + f"""
+                        <div style="text-align: center; padding: 4px 20px 24px 20px; font-size: 11px; line-height: 1.7; color: {theme_colors['muted_text']}; font-family: {_FONT};">
+                            Generated by <a href="https://github.com/jma1ice/newsletterr" style="{footer_link_style}">newsletterr</a> &middot; not affiliated with Plex, Inc.{unsubscribe_footer_html}
+                        </div>"""
+    elif layout == 'classic':
+        brand_line = f'<div style="font-weight: 700; letter-spacing: .06em; font-size: 13px; color: #ffffff; opacity: .9; text-transform: lowercase; font-family: {_FONT};">{esc(server_name)}</div>' if show_server_name else ''
         classic_title = f'<div style="font-size: 24px; font-weight: 700; color: #ffffff; margin-top: 2px; text-shadow: 0 2px 4px rgba(0,0,0,.25); font-family: {_FONT};">{email_header_title}</div>' if email_header_title else ''
         header_block = f'<div style="{header_style} padding: 18px 24px;">{logo_html}{brand_line}{classic_title}</div>'
     elif layout == 'editorial':
         kicker = email_header_title or 'Your server, this month'
         display_date = datetime.now().strftime('%B %Y')
+        editorial_bg = header_bg or theme_colors['card_bg']
+        name_line = f'<div style="font-size: 30px; font-weight: 800; color: #ffffff; margin: 4px 0 2px 0; letter-spacing: -.01em;">{esc(str(server_name).upper())}</div>' if show_server_name else ''
         header_block = f"""
-            <div style="padding: 26px 26px 18px 26px; text-align: center; border-bottom: 3px double {theme_colors['border']}; background-color: {theme_colors['card_bg']}; font-family: {_FONT};">
+            <div style="padding: 26px 26px 18px 26px; text-align: center; border-bottom: 3px double {theme_colors['border']}; background-color: {editorial_bg}; font-family: {_FONT};">
                 {logo_html}
                 <div style="font-size: 10.5px; letter-spacing: .22em; text-transform: uppercase; color: {theme_colors['muted_text']};">{kicker}</div>
-                <div style="font-size: 30px; font-weight: 800; color: #ffffff; margin: 4px 0 2px 0; letter-spacing: -.01em;">{esc(str(server_name).upper())}</div>
+                {name_line}
                 <div style="font-size: 11.5px; color: {theme_colors['text']};">{display_date}</div>
             </div>"""
         footer_block = f"""
@@ -541,14 +604,17 @@ def build_complete_email_html_with_cid_logo(content_html, server_name, subject, 
                         </div>"""
     elif layout == 'digest':
         display_date = datetime.now().strftime('%B %-d, %Y')
-        digest_title = f' <span style="color: {theme_colors["primary"]}; font-weight: 700;">/ {email_header_title}</span>' if email_header_title else ''
+        _title_lead = '/ ' if show_server_name else ''
+        digest_title = f' <span style="color: {theme_colors["primary"]}; font-weight: 700;">{_title_lead}{email_header_title}</span>' if email_header_title else ''
+        digest_bg = header_bg or theme_colors['card_bg']
+        name_span = f'<span style="font-weight: 700; color: #ffffff;">{esc(server_name)}</span>' if show_server_name else ''
         # the head CSS forces img height:auto !important, so constrain via the
         # email-logo class (max-width follows the logo width setting); same
         # show-only-when-width-set guard as the legacy logo_html above
         logo_cell = f'<img src="{logo_src}" alt="" class="email-logo" style="width: auto; border: 0; vertical-align: middle; margin-right: 8px;">' if logo_html else ''
         header_block = f"""
-            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: {theme_colors['card_bg']}; border-bottom: 2px solid {theme_colors['primary']};"><tr>
-                <td style="padding: 12px 18px; font-size: 14px; font-family: {_FONT};">{logo_cell}<span style="font-weight: 700; color: #ffffff;">{esc(server_name)}</span>{digest_title}</td>
+            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: {digest_bg}; border-bottom: 2px solid {theme_colors['primary']};"><tr>
+                <td style="padding: 12px 18px; font-size: 14px; font-family: {_FONT};">{logo_cell}{name_span}{digest_title}</td>
                 <td align="right" style="padding: 12px 18px; font-size: 11px; color: {theme_colors['muted_text']}; white-space: nowrap; font-family: {_FONT};">{display_date}</td>
             </tr></table>"""
         footer_block = f"""

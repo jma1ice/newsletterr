@@ -18,6 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const result = await response.json();
                     const freshFlags = window.APP?.pullCacheFresh || {};
                     Object.keys(freshFlags).forEach(k => { freshFlags[k] = false; });
+                    window.refreshCacheBadge?.();
                     clearCacheBtn.textContent = 'Cleared!';
                     clearCacheBtn.style.backgroundColor = '#28a745';
                     setTimeout(() => {
@@ -100,7 +101,7 @@ document.getElementById('reset-template-btn').addEventListener('click', function
         
         document.getElementById('delete-template-btn').style.display = 'none';
         
-        document.querySelectorAll('.add-stat-btn, .add-graph-btn, .ra-add-btn, .mw-add-btn, .recs-add-btn, .droppedneedle-add-btn, .droppedneedle-server-add-btn, .yearly-wrapped-add-btn, .sonarr-coming-soon-add-btn, .radarr-coming-soon-add-btn, .ombi-requests-add-btn, .seerr-requests-add-btn').forEach(btn => {
+        document.querySelectorAll('.add-stat-btn, .add-graph-btn, .ra-add-btn, .mw-add-btn, .recs-add-btn, .droppedneedle-add-btn, .droppedneedle-server-add-btn, .yearly-wrapped-add-btn, .sonarr-coming-soon-add-btn, .radarr-coming-soon-add-btn, .ombi-requests-add-btn, .seerr-requests-add-btn, .top-viewer-add-btn').forEach(btn => {
             btn.textContent = 'Add';
             btn.classList.remove('nl-btn--success');
             btn.classList.add('nl-btn--primary');
@@ -113,8 +114,12 @@ document.getElementById('reset-template-btn').addEventListener('click', function
         }
         
         updateSelectedItemsDisplay();
-        
+
         textBlockCounter = 0;
+        titleBlockCounter = 0;
+        headerBlockCounter = 0;
+
+        if (typeof window.clearDraft === 'function') window.clearDraft();
     }
 });
 
@@ -166,6 +171,7 @@ async function saveCurrentTemplate(name) {
         if (result.status === 'success') {
             console.log('Template saved successfully');
             await loadEmailTemplates();
+            if (typeof window.clearDraft === 'function') window.clearDraft();
         } else {
             alert('Error saving template: ' + result.message);
         }
@@ -193,7 +199,7 @@ function loadTemplate(template) {
 
         selectedItems = [];
         
-        document.querySelectorAll('.add-stat-btn, .add-graph-btn, .ra-add-btn, .mw-add-btn, .recs-add-btn, .droppedneedle-add-btn, .droppedneedle-server-add-btn, .yearly-wrapped-add-btn, .sonarr-coming-soon-add-btn, .radarr-coming-soon-add-btn, .ombi-requests-add-btn, .seerr-requests-add-btn').forEach(btn => {
+        document.querySelectorAll('.add-stat-btn, .add-graph-btn, .ra-add-btn, .mw-add-btn, .recs-add-btn, .droppedneedle-add-btn, .droppedneedle-server-add-btn, .yearly-wrapped-add-btn, .sonarr-coming-soon-add-btn, .radarr-coming-soon-add-btn, .ombi-requests-add-btn, .seerr-requests-add-btn, .top-viewer-add-btn').forEach(btn => {
             btn.textContent = 'Add';
             btn.classList.remove('nl-btn--success');
             btn.classList.add('nl-btn--primary');
@@ -201,35 +207,22 @@ function loadTemplate(template) {
         });
         
         selectedItems = items.map(item => {
-            if ((item.type === 'textblock' || item.type === 'titleblock' || item.type === 'headerblock') && item.content) {
-                if (item.type === 'textblock' && item.id.startsWith('text-block-')) {
-                    const counter = parseInt(item.id.split('-')[2]);
-                    if (counter >= textBlockCounter) {
-                        textBlockCounter = counter;
-                    }
-                } else if (item.type === 'titleblock' && item.id.startsWith('title-block-')) {
-                    const counter = parseInt(item.id.split('-')[2]);
-                    if (counter >= titleBlockCounter) {
-                        titleBlockCounter = counter;
-                    }
-                } else if (item.type === 'headerblock' && item.id.startsWith('header-block-')) {
-                    const counter = parseInt(item.id.split('-')[2]);
-                    if (counter >= headerBlockCounter) {
-                        headerBlockCounter = counter;
-                    }
-                } else if (item.type === 'textblock' && item.id.startsWith('intro-block-')) {
-                    const counter = parseInt(item.id.split('-')[2]);
-                    if (counter >= textBlockCounter) {
-                        textBlockCounter = counter;
-                    }
-                } else if (item.type === 'textblock' && item.id.startsWith('outro-block-')) {
-                    const counter = parseInt(item.id.split('-')[2]);
-                    if (counter >= textBlockCounter) {
+            const restored = { ...item };
+            if (restored.type === 'textblock' || restored.type === 'titleblock' || restored.type === 'headerblock') {
+                const counter = parseInt(restored.id.split('-')[2]);
+                if (!Number.isNaN(counter)) {
+                    if (restored.type === 'titleblock' && restored.id.startsWith('title-block-')) {
+                        if (counter >= titleBlockCounter) titleBlockCounter = counter;
+                    } else if (restored.type === 'headerblock' && restored.id.startsWith('header-block-')) {
+                        if (counter >= headerBlockCounter) headerBlockCounter = counter;
+                    } else if (counter >= textBlockCounter) {
                         textBlockCounter = counter;
                     }
                 }
+                if (restored.content === '__DEFAULT_INTRO__') restored.content = _resolvedIntroDefault;
+                else if (restored.content === '__DEFAULT_OUTRO__') restored.content = _resolvedOutroDefault;
             }
-            return { ...item };
+            return restored;
         });
 
         if (template.expanded_collections) {
@@ -297,15 +290,13 @@ function loadTemplate(template) {
         setTimeout(() => {
             selectedItems.forEach(item => {
                 if ((item.type === 'textblock' || item.type === 'titleblock' || item.type === 'headerblock') && item.content) {
-                    let content = item.content;
-                    if (content === '__DEFAULT_INTRO__') content = _resolvedIntroDefault;
-                    else if (content === '__DEFAULT_OUTRO__') content = _resolvedOutroDefault;
-                    setTextBlockContent(item.id, content);
+                    setTextBlockContent(item.id, item.content);
                 }
             });
             updatePreview();
+            if (typeof window.markDraftClean === 'function') window.markDraftClean();
         }, 100);
-        
+
         console.log('Template loaded:', template.name);
     } catch (error) {
         console.error('Error loading template:', error);

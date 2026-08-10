@@ -64,6 +64,40 @@
                             </div>
                         </div>
 
+                        <div class="builder-card snapin-card" id="featured-pick-card" style="display:none;">
+                            <div class="snapin-card-header">
+                                <button type="button" class="snapin-collapse-toggle" aria-expanded="true" aria-label="Collapse section">{{ icon('chevron-down') }}</button>
+                                <h2>featured pick</h2>
+                            </div>
+                            <div class="snapin-card-body">
+                                <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
+                                    <select id="featured-pick-library" class="form-select flex-1" style="min-width: 10em;">
+                                        <option value="">All libraries</option>
+                                    </select>
+                                    <input type="text" id="featured-pick-query" class="form-control flex-1" style="min-width: 10em;" placeholder="Search a title...">
+                                    <button type="button" id="featured-pick-search-btn" class="nl-btn nl-btn--primary nl-btn--sm">Search</button>
+                                </div>
+                                <div id="featured-pick-results" class="mb-2"></div>
+                                <div class="text-muted" style="font-size: 0.85rem;">Features a title you choose, in the same card as Random Pick. The artwork and details are pulled fresh at send time.</div>
+                            </div>
+                        </div>
+
+                        <div class="builder-card snapin-card" id="top-viewer-card" style="display:none;">
+                            <div class="snapin-card-header">
+                                <button type="button" class="snapin-collapse-toggle" aria-expanded="true" aria-label="Collapse section">{{ icon('chevron-down') }}</button>
+                                <h2>top viewer</h2>
+                            </div>
+                            <div class="snapin-card-body">
+                                <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
+                                    <button type="button" id="top-viewer-add-btn" class="nl-btn nl-btn--primary nl-btn--sm top-viewer-add-btn"
+                                            data-id="top-viewer" data-name="Top Viewer" data-type="top_viewer">
+                                        Add
+                                    </button>
+                                </div>
+                                <div class="text-muted" style="font-size: 0.85rem;">Calls out whoever streamed the most over your pull's time range. With user info turned off it still shows the numbers, without the name.</div>
+                            </div>
+                        </div>
+
                         <div class="builder-card snapin-card" id="random-pick-card" style="display:none;">
                             <div class="snapin-card-header">
                                 <button type="button" class="snapin-collapse-toggle" aria-expanded="true" aria-label="Collapse section">{{ icon('chevron-down') }}</button>

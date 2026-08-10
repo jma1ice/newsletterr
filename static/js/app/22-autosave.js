@@ -5,6 +5,8 @@
 
     const $ = (id) => document.getElementById(id);
 
+    let baseline = null;
+
     function snapshot() {
         return {
             subject: $('subject')?.value || '',
@@ -15,6 +17,16 @@
         };
     }
 
+    function signature(snap) {
+        const items = (snap.items || []).map(({ chartImage, ...rest }) => rest);
+        return JSON.stringify({
+            subject: snap.subject,
+            header: snap.header,
+            customHtml: snap.customHtml,
+            items,
+        });
+    }
+
     function saveDraft() {
         if (restoring) return;
         try {
@@ -22,17 +34,26 @@
             const hasContent = snap.subject || snap.header || (snap.items && snap.items.length);
             if (!hasContent) return;
             localStorage.setItem(KEY, JSON.stringify(snap));
-            dirty = true;
+            dirty = baseline !== null && signature(snap) !== baseline;
         } catch (e) {
             /* storage full or unavailable: ignore */
         }
     }
 
+    window.markDraftClean = function () {
+        try {
+            baseline = signature(snapshot());
+        } catch (e) {
+            baseline = null;
+        }
+        dirty = false;
+    };
+
     const debouncedSave = (typeof debounce === 'function') ? debounce(saveDraft, 500) : saveDraft;
 
     window.clearDraft = function () {
         try { localStorage.removeItem(KEY); } catch (e) {}
-        dirty = false;
+        window.markDraftClean();
     };
 
     function restoreDraft() {
@@ -45,7 +66,7 @@
         if (!draft) return;
 
         const builderEmpty = (typeof selectedItems === 'undefined' || !selectedItems.length)
-            && !($('subject')?.value) && !($('email_header_title')?.value);
+            && !($('custom-html-editor')?.value);
         if (!builderEmpty) return;  // do not clobber an already-populated builder
 
         const when = new Date(draft.ts || Date.now()).toLocaleString();
@@ -75,6 +96,7 @@
 
     document.addEventListener('DOMContentLoaded', function () {
         restoreDraft();
+        window.markDraftClean();
 
         ['subject', 'email_header_title', 'custom-html-editor'].forEach(id => {
             $(id)?.addEventListener('input', debouncedSave);

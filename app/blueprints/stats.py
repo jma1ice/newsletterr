@@ -9,7 +9,7 @@ from app.cache import set_cached_data, get_cache_info
 from app.crypto import decrypt
 from app.security import require_csrf_for_json, requires_auth, safe_get, json_body
 from app.theme import get_theme_settings
-from app.clients.plex import get_plex_headers, get_plex_machine_id, build_plex_web_link, reset_plex_health, plex_call_failed, fetch_library_sections_with_genres
+from app.clients.plex import get_plex_headers, get_plex_machine_id, build_plex_web_link, reset_plex_health, plex_call_failed, fetch_library_sections_with_genres, search_library_items
 from app.clients.jellyfin import reset_jellyfin_health, jellyfin_call_failed, fetch_recently_added_using_jellyfin, fetch_jellyfin_library_counts, get_jellyfin_server_id, build_jellyfin_web_link
 from app.clients.jellywatch import fetch_jellywatch_home_stats
 from app.clients.mediaserver import get_media_server_type
@@ -723,6 +723,20 @@ def random_pick_options():
     except Exception as e:
         logger.error(f"Error fetching random pick options: {e}")
         return jsonify({"status": "error", "message": str(e)})
+
+@bp.route('/featured_pick_search', methods=['GET'])
+@requires_auth
+def featured_pick_search():
+    query = (request.args.get('q') or '').strip()
+    section_id = (request.args.get('section_id') or '').strip() or None
+    if not query:
+        return jsonify({"status": "success", "results": []})
+    try:
+        results = search_library_items(query, section_id=section_id, limit=20)
+        return jsonify({"status": "success", "results": results})
+    except Exception as e:
+        logger.error(f"Error searching for featured pick: {e}")
+        return jsonify({"status": "error", "message": str(e), "results": []})
 
 @bp.route('/fetch_collections/<collection_type>', methods=['GET'])
 @requires_auth

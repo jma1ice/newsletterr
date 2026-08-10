@@ -8,9 +8,9 @@
                                             </div>
                                             <div class="card-body blur-container p-0">
                                                 {% if stat.rows %}
-                                                    {% if stat.rows[0].art != '' %}
+                                                    {% if stat.rows[0].art %}
                                                         <img src="/proxy-art{{ stat.rows[0].art }}" class="bg-blur" alt="" />
-                                                    {% elif stat.rows[0].grandparent_thumb != '' %}
+                                                    {% elif stat.rows[0].grandparent_thumb %}
                                                         <img src="/proxy-art{{ stat.rows[0].grandparent_thumb }}" class="bg-blur" alt="" />
                                                     {% endif %}
                                                     <table class="table table-striped content-table m-0">

@@ -324,6 +324,18 @@ def _fixed_tautulli_data(*args, **kwargs):
         "graph_commands": [],
     }
 
+TOP_USERS_FIXTURE = [
+    {"stat_id": "top_users", "stat_title": "Most Active Users", "rows": [
+        {"user": "top-watcher", "total_plays": 42, "total_duration": 65520, "user_thumb": ""},
+        {"user": "runner-up", "total_plays": 9, "total_duration": 3600, "user_thumb": ""},
+    ]},
+]
+
+def _fixed_tautulli_data_with_top_users(*args, **kwargs):
+    data = _fixed_tautulli_data()
+    data["stats"] = TOP_USERS_FIXTURE
+    return data
+
 def _fixed_tautulli_data_for_layout(layout):
     def _data(*args, **kwargs):
         data = _fixed_tautulli_data()
@@ -1020,7 +1032,7 @@ def test_manual_seerr_requests_email_golden(manual_send_env, monkeypatch):
     assert "Seerr Fulfilled Show" not in normalized["html"]
     _assert_golden("manual_seerr_requests", normalized)
 
-@pytest.mark.parametrize("layout", ["classic", "editorial", "digest"])
+@pytest.mark.parametrize("layout", ["classic", "editorial", "digest", "spotlight"])
 def test_manual_layout_email_golden(manual_send_env, monkeypatch, layout):
     # Email layouts (NEWS-30): one golden per variant over a representative
     # item mix. Legacy is pinned by every other golden in this file. The
@@ -1086,13 +1098,23 @@ def test_manual_layout_email_golden(manual_send_env, monkeypatch, layout):
         assert "ombi-requester" in normalized["html"]
         assert "Pinned Movie" in normalized["html"]
         assert "Big Hit" in normalized["html"]
-        assert "57 plays" in normalized["html"]
+        # spotlight stacks the metric as a number over its unit; every other
+        # layout writes it inline
+        if layout == 'spotlight':
+            assert ">57</div>" in normalized["html"] and ">plays</div>" in normalized["html"]
+        else:
+            assert "57 plays" in normalized["html"]
         # layout-distinct chrome markers, so a silent fallback to another
         # layout can never masquerade as a pass
         chrome_markers = {
-            "classic": "letter-spacing: .06em",
+            # classic's own header padding: the brand line that used to mark it
+            # only renders when email_show_server_name is on, which is off by
+            # default
+            "classic": "padding: 18px 24px",
             "editorial": "3px double",
             "digest": "border-bottom: 2px solid",
+            # spotlight has no header band at all: its kicker sits on the canvas
+            "spotlight": "letter-spacing: 2px; text-transform: uppercase",
         }
         assert chrome_markers[layout] in normalized["html"]
         _assert_golden(f"manual_layout_{layout}", normalized)
@@ -1320,3 +1342,93 @@ def test_hosted_image_write_failure_falls_back_to_cid(hosted_images_send_env, mo
     assert "https://nl.example.com/i/" not in normalized["html"]
     image_parts = [p for p in normalized["parts"] if p["content_type"].startswith("image/")]
     assert len(image_parts) >= 1
+
+
+def test_manual_top_viewer_email_golden(manual_send_env, monkeypatch):
+    """Top Viewer reads the cached Most Active Users stat; no
+    provider call is involved, so the fixture stats are the whole input."""
+    import time as _time
+
+    from app.cache import set_cached_data
+    from app.emails import send as send_mod
+    monkeypatch.setattr(send_mod, "get_current_tautulli_data_for_email", _fixed_tautulli_data_with_top_users)
+    # The heading carries the pull's range, which assemble reads from the stats
+    # cache params. Pin it here so the golden does not depend on whatever an
+    # earlier test happened to leave cached.
+    set_cached_data("stats", TOP_USERS_FIXTURE, {"time_range": "30", "timestamp": _time.time()})
+
+    client = manual_send_env
+    resp = _post_send(client, {
+        "to_emails": "a@b.c", "subject": "Top Viewer", "email_header_title": "The Header",
+        "selected_items": [{"type": "top_viewer", "id": "top-viewer"}],
+        "custom_html": "", "user_dict": {}, "expanded_collections": {},
+    })
+    assert resp.status_code == 200
+    assert resp.get_json().get("success") is True
+
+    sends = [s for inst in RecorderSMTP.instances for s in inst.sent]
+    assert len(sends) == 1
+    from_addr, to_addrs, content = sends[0]
+    normalized = _normalize(content)
+    normalized["envelope"] = {"from": from_addr, "to": to_addrs}
+    assert "top-watcher" in normalized["html"]
+    assert "18h 12m" in normalized["html"]
+    assert "runner-up" not in normalized["html"]
+    _assert_golden("manual_top_viewer", normalized)
+
+
+FEATURED_PICK_FIXTURE = {
+    "title": "Pinned Movie", "rating_key": "77", "year": "2024",
+    "thumb": "/library/metadata/77/thumb", "art": "", "summary": "The one we chose.",
+    "tagline": "", "duration": "5400000", "content_rating": "PG",
+    "genres": ["Drama"], "media_type": "movie", "type": "movie",
+    "plex_url": "https://app.plex.tv/desktop/#!/server/m1/details?key=/library/metadata/77",
+    "rating": "7.7", "library_name": "Movies",
+}
+
+def test_manual_featured_pick_email_golden(manual_send_env, monkeypatch):
+    """Featured Pick stores only a rating key; the send resolves it."""
+    from app.emails import assemble as assemble_mod
+    resolved = []
+
+    def _fetch(rating_key, *a, **k):
+        resolved.append(str(rating_key))
+        return dict(FEATURED_PICK_FIXTURE)
+
+    monkeypatch.setattr(assemble_mod, "fetch_library_item_by_rating_key", _fetch)
+
+    client = manual_send_env
+    resp = _post_send(client, {
+        "to_emails": "a@b.c", "subject": "Featured Pick", "email_header_title": "The Header",
+        "selected_items": [{"type": "featured_pick", "id": "featured-pick-77", "ratingKey": "77"}],
+        "custom_html": "", "user_dict": {}, "expanded_collections": {},
+    })
+    assert resp.status_code == 200
+    assert resp.get_json().get("success") is True
+    assert resolved == ["77"]  # resolved at render time, not stored
+
+    sends = [s for inst in RecorderSMTP.instances for s in inst.sent]
+    assert len(sends) == 1
+    from_addr, to_addrs, content = sends[0]
+    normalized = _normalize(content)
+    normalized["envelope"] = {"from": from_addr, "to": to_addrs}
+    assert "Featured Pick" in normalized["html"]
+    assert "Pinned Movie" in normalized["html"]
+    _assert_golden("manual_featured_pick", normalized)
+
+def test_featured_pick_with_a_deleted_item_still_sends(manual_send_env, monkeypatch):
+    """A key that no longer resolves must not break the send."""
+    from app.emails import assemble as assemble_mod
+    monkeypatch.setattr(assemble_mod, "fetch_library_item_by_rating_key", lambda *a, **k: None)
+
+    client = manual_send_env
+    resp = _post_send(client, {
+        "to_emails": "a@b.c", "subject": "Featured Pick", "email_header_title": "The Header",
+        "selected_items": [{"type": "featured_pick", "id": "featured-pick-77", "ratingKey": "77"}],
+        "custom_html": "", "user_dict": {}, "expanded_collections": {},
+    })
+    assert resp.status_code == 200
+    assert resp.get_json().get("success") is True
+    sends = [s for inst in RecorderSMTP.instances for s in inst.sent]
+    content = sends[-1][2]
+    assert "Featured Pick" in _normalize(content)["html"]

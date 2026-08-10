@@ -591,14 +591,42 @@
                             <option value="classic" {% if settings.get('email_layout', 'classic') == 'classic' %}selected{% endif %}>Polished Classic</option>
                             <option value="editorial" {% if settings.get('email_layout') == 'editorial' %}selected{% endif %}>Editorial</option>
                             <option value="digest" {% if settings.get('email_layout') == 'digest' %}selected{% endif %}>Compact Digest</option>
+                            <option value="spotlight" {% if settings.get('email_layout') == 'spotlight' %}selected{% endif %}>Spotlight</option>
                             <option value="legacy" {% if settings.get('email_layout') == 'legacy' %}selected{% endif %}>Legacy</option>
                         </select><br>
                         <p class="text-info mt-2 field-hint">
-                            Overall email design. A tightens the classic look into one card system, B is
-                            a magazine treatment, C is a dense one-scroll digest, Legacy is the
+                            Overall email design. Polished Classic tightens the classic look into one
+                            card system, Editorial is a magazine treatment, Compact Digest is a dense
+                            one-scroll digest, Spotlight is a dark card stack that leads with one
+                            featured title and ends with a button to your server, and Legacy is the
                             pre-v2026.4 look unchanged. Applies to previews and all sends; graphs,
                             recommendations, and collections keep their standard look in every layout
                             for now.
+                        </p>
+
+                        <label for="email_show_server_name">Server Name in Header:</label><br>
+                        <select id="email_show_server_name" name="email_show_server_name">
+                            <option value="enabled"  {% if settings.get('email_show_server_name') == 'enabled' %}selected{% endif %}>Show</option>
+                            <option value="disabled" {% if settings.get('email_show_server_name') != 'enabled' %}selected{% endif %}>Hide</option>
+                        </select>
+                        <p class="text-info mt-2 field-hint">
+                            Polished Classic, Editorial, and Compact Digest can print your server name
+                            in the email header. Hidden by default, leaving just the logo and header
+                            title. Legacy never showed it either way.
+                        </p>
+
+                        <label for="email_header_bg_mode">Header Background:</label><br>
+                        <select id="email_header_bg_mode" name="email_header_bg_mode">
+                            <option value="gradient" {% if not settings.get('email_header_bg') %}selected{% endif %}>Theme gradient</option>
+                            <option value="solid"    {% if settings.get('email_header_bg') %}selected{% endif %}>Solid color</option>
+                        </select>
+                        <div id="email_header_bg_wrap" class="input-group" style="display: {% if settings.get('email_header_bg') %}flex{% else %}none{% endif %};">
+                            <input type="color" id="email_header_bg" name="email_header_bg" value="{{ settings.get('email_header_bg') or '#2d2d2d' }}">
+                            <input type="text" value="{{ settings.get('email_header_bg') or '#2d2d2d' }}" readonly>
+                        </div>
+                        <p class="text-info mt-2 field-hint">
+                            Background behind the logo and header title. The default blends your accent
+                            and primary colors; a solid color is safer in clients that drop gradients.
                         </p>
                         </div>
 
@@ -1206,6 +1234,11 @@
 <script nonce="{{ nonce }}">
     document.getElementById('email_theme').addEventListener('change', function() {
         document.getElementById('color_inputs').style.display = this.value === 'custom' ? 'block' : 'none';
+    });
+
+    document.getElementById('email_header_bg_mode')?.addEventListener('change', function() {
+        const wrap = document.getElementById('email_header_bg_wrap');
+        if (wrap) wrap.style.display = this.value === 'solid' ? 'flex' : 'none';
     });
 </script>
 

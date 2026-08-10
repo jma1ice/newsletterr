@@ -54,8 +54,8 @@ def attach_random_pick_poster(pick, msg_root, base_url, hosted_images_enabled=Fa
                 return poster_src
     return None
 
-def build_random_pick_html(pick, msg_root, theme_colors, base_url="", library_label="", genre_label="", hosted_images_enabled=False, hosted_base_url=""):
-    heading = random_pick_heading(library_label, genre_label)
+def build_random_pick_html(pick, msg_root, theme_colors, base_url="", library_label="", genre_label="", hosted_images_enabled=False, hosted_base_url="", heading=None):
+    heading = heading or random_pick_heading(library_label, genre_label)
 
     if not pick:
         return f"""

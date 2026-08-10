@@ -54,6 +54,14 @@ def synthesize_snapin_item(name, args, stats):
                 item['mwCount'] = arg
         return item
 
+    if name == 'featured_pick':
+        if not args or not args[0]:
+            return None
+        return {'id': f'featured-pick-{args[0]}', 'type': 'featured_pick', 'title': args[0]}
+
+    if name == 'top_viewer':
+        return {'id': 'top-viewer', 'type': 'top_viewer'}
+
     if name == 'random_pick':
         if not args or not args[0]:
             return None

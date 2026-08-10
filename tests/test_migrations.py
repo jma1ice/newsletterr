@@ -60,7 +60,7 @@ def test_header_title_migration_survives_quoted_server_name(tmp_path, monkeypatc
         CREATE TABLE settings (id INTEGER PRIMARY KEY, server_name TEXT DEFAULT '');
         CREATE TABLE email_templates (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE NOT NULL, selected_items TEXT NOT NULL);
     """)
-    conn.execute("INSERT INTO settings (id, server_name) VALUES (1, ?)", ("Jamie's Plex",))
+    conn.execute("INSERT INTO settings (id, server_name) VALUES (1, ?)", ("User's Plex",))
     conn.execute("INSERT INTO email_templates (name, selected_items) VALUES (?, ?)", ("tpl", "[]"))
     conn.commit()
     conn.close()
@@ -70,7 +70,7 @@ def test_header_title_migration_survives_quoted_server_name(tmp_path, monkeypatc
 
     conn = sqlite3.connect(db)
     val = conn.execute("SELECT email_header_title FROM email_templates WHERE name = 'tpl'").fetchone()[0]
-    assert val == "Jamie's Plex Newsletter"
+    assert val == "User's Plex Newsletter"
     conn.close()
 
 def test_migration_noop_on_fresh_schema(tmp_path, monkeypatch):

@@ -386,6 +386,53 @@ function updateSelectedItemsDisplay() {
                         <div class="text-muted" style="font-size: 0.8rem;">A new random pick is drawn for each send; the preview shows a different pick than the send will.</div>
                     </div>
                 `;
+            } else if (item.type === 'recently added' || item.type === 'most_watched') {
+                // Per-library snap-ins stay editable after they are added: the
+                // count set on the source row was previously frozen at add time.
+                const isRA = item.type === 'recently added';
+                const countValue = isRA ? (item.raCount || '') : (item.mwCount || '');
+                const countLabel = isRA ? 'Items' : 'Titles';
+                const orientation = item.raOrientation || '';
+                const heroChoices = (isRA && window.raItemsForLibrary) ? window.raItemsForLibrary(item.raLibrary) : [];
+                const spotlight = (window.APP?.emailLayout || '') === 'spotlight';
+
+                htmlContent += `
+                    <div class="selected-item d-flex flex-column p-2 mb-2 border rounded bg-light"
+                         data-index="${index}" draggable="false">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="item-name">${escapeHtml(item.name)}</span>
+                            <div>
+                                <span class="badge badge-secondary me-2">${item.type}</span>
+                                <button type="button" class="btn btn-sm btn-outline-danger remove-item-btn" data-index="${index}">x</button>
+                            </div>
+                        </div>
+                        <div class="d-flex gap-2 align-items-center flex-wrap mt-2">
+                            <label style="font-size: 0.8rem; white-space: nowrap;">${countLabel}:</label>
+                            <input type="number" class="form-control form-control-sm snapin-count-input"
+                                data-index="${index}" min="1" max="99" placeholder="all"
+                                title="Blank uses the pulled item count"
+                                value="${escapeHtml(String(countValue))}" style="width: 5em;">
+                            ${isRA ? `
+                            <label style="font-size: 0.8rem; white-space: nowrap;">Display:</label>
+                            <select class="form-select form-select-sm ra-orientation-select" data-index="${index}" style="width: auto;">
+                                <option value=""     ${orientation === ''      ? 'selected' : ''}>Layout default</option>
+                                <option value="grid" ${orientation === 'grid'  ? 'selected' : ''}>Horizontal grid</option>
+                                <option value="list" ${orientation === 'list'  ? 'selected' : ''}>Vertical list</option>
+                            </select>` : ''}
+                        </div>
+                        ${(isRA && spotlight) ? `
+                        <div class="d-flex gap-2 align-items-center flex-wrap mt-2">
+                            <label style="font-size: 0.8rem; white-space: nowrap;">Spotlight feature:</label>
+                            <select class="form-select form-select-sm ra-hero-select" data-index="${index}" style="max-width: 260px;">
+                                <option value="">First item (newest)</option>
+                                ${heroChoices.map(choice => `
+                                    <option value="${escapeHtml(choice.key)}" ${String(item.raHero || '') === choice.key ? 'selected' : ''}>
+                                        ${escapeHtml(choice.title)}${choice.year ? ` (${escapeHtml(String(choice.year))})` : ''}
+                                    </option>`).join('')}
+                            </select>
+                        </div>` : ''}
+                    </div>
+                `;
             } else {
                 htmlContent += `
                     <div class="selected-item d-flex justify-content-between align-items-center p-2 mb-2 border rounded bg-light"
@@ -511,6 +558,48 @@ function updateSelectedItemsDisplay() {
                     selectedItems[index].align = e.target.value;
                     debouncedUpdatePreview();
                 }
+            });
+        });
+
+        document.querySelectorAll('.snapin-count-input').forEach(input => {
+            input.addEventListener('input', (e) => {
+                const index = parseInt(e.target.dataset.index);
+                const target = selectedItems[index];
+                if (!target) return;
+                const key = target.type === 'recently added' ? 'raCount' : 'mwCount';
+                const count = parseInt(e.target.value, 10);
+                if (count > 0) {
+                    target[key] = count;
+                } else {
+                    delete target[key];
+                }
+                debouncedUpdatePreview();
+            });
+        });
+
+        document.querySelectorAll('.ra-orientation-select').forEach(sel => {
+            sel.addEventListener('change', (e) => {
+                const index = parseInt(e.target.dataset.index);
+                if (!selectedItems[index]) return;
+                if (e.target.value) {
+                    selectedItems[index].raOrientation = e.target.value;
+                } else {
+                    delete selectedItems[index].raOrientation;
+                }
+                debouncedUpdatePreview();
+            });
+        });
+
+        document.querySelectorAll('.ra-hero-select').forEach(sel => {
+            sel.addEventListener('change', (e) => {
+                const index = parseInt(e.target.dataset.index);
+                if (!selectedItems[index]) return;
+                if (e.target.value) {
+                    selectedItems[index].raHero = e.target.value;
+                } else {
+                    delete selectedItems[index].raHero;
+                }
+                debouncedUpdatePreview();
             });
         });
 

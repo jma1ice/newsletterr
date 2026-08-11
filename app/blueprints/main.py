@@ -82,6 +82,7 @@ def index():
         "default_outro_text": s["default_outro_text"],
         "recently_added_mode": s["recently_added_mode"],
         "recently_added_sort": s["recently_added_sort"],
+        "email_layout": s.get("email_layout") or "classic",
         "ra_grid_columns": s["ra_grid_columns"],
         "recs_grid_columns": s["recs_grid_columns"],
         "stat_cover_art": s["stat_cover_art"],

@@ -1113,8 +1113,9 @@ def test_manual_layout_email_golden(manual_send_env, monkeypatch, layout):
             "classic": "padding: 18px 24px",
             "editorial": "3px double",
             "digest": "border-bottom: 2px solid",
-            # spotlight has no header band at all: its kicker sits on the canvas
-            "spotlight": "letter-spacing: 2px; text-transform: uppercase",
+            # spotlight has no header band at all and is the one layout on the
+            # narrow canvas
+            "spotlight": "max-width: 640px",
         }
         assert chrome_markers[layout] in normalized["html"]
         _assert_golden(f"manual_layout_{layout}", normalized)

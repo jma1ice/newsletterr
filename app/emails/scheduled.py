@@ -468,6 +468,7 @@ def send_scheduled_user_email_with_cids(ctx, settings, recipients, user_key):
         tautulli_data["settings"]["coming_soon_grid_columns"] = coming_soon_grid_columns
         tautulli_data["settings"]["collections_grid_columns"] = settings.get("collections_grid_columns", 5)
         tautulli_data["settings"]["ra_show_description"] = settings.get("ra_show_description", "enabled")
+        tautulli_data["settings"]["recs_show_description"] = settings.get("recs_show_description", "enabled")
         tautulli_data["settings"]["include_user_info"] = settings.get("include_user_info", "enabled")
         tautulli_data["settings"]["email_layout"] = settings.get("email_layout", "classic")
 
@@ -696,6 +697,7 @@ def send_scheduled_single_email_with_cids(ctx, settings, to_emails_list):
         tautulli_data["settings"]["coming_soon_grid_columns"] = coming_soon_grid_columns
         tautulli_data["settings"]["collections_grid_columns"] = settings.get("collections_grid_columns", 5)
         tautulli_data["settings"]["ra_show_description"] = settings.get("ra_show_description", "enabled")
+        tautulli_data["settings"]["recs_show_description"] = settings.get("recs_show_description", "enabled")
         tautulli_data["settings"]["include_user_info"] = settings.get("include_user_info", "enabled")
         tautulli_data["settings"]["email_layout"] = settings.get("email_layout", "classic")
 

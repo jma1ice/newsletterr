@@ -1,7 +1,8 @@
 # Snap-in tokens in custom HTML (NEWS-32).
 #
-# Grammar: {{snapin:NAME}} and {{snapin:NAME:ARG}} (recently_added takes an
-# optional second ARG for the per-library count). Each supported name maps
+# Grammar: {{snapin:NAME}} and {{snapin:NAME:ARG}} (recently_added takes
+# optional trailing ARGs for the per-library count and the grid/list
+# orientation). Each supported name maps
 # onto the assemble per-item dispatch; expansion synthesizes the equivalent
 # selected_item and renders it through the exact same code path, so tokens
 # are layout-aware and preview-mode aware for free. Graphs are excluded:
@@ -31,11 +32,18 @@ def synthesize_snapin_item(name, args, stats):
     name = name.lower()
 
     if name == 'recently_added':
+        # recently_added:<Library>[:count][:grid|list] - the orientation word
+        # is accepted in either trailing position so a count stays optional.
         item = {'id': 'token-recently-added', 'type': 'recently added'}
         if args and args[0]:
             item['raLibrary'] = args[0]
-        if len(args) > 1 and args[1]:
-            item['raCount'] = args[1]
+        for arg in args[1:]:
+            if not arg:
+                continue
+            if arg.lower() in ('grid', 'list'):
+                item['raOrientation'] = arg.lower()
+            else:
+                item['raCount'] = arg
         return item
 
     if name == 'most_watched':

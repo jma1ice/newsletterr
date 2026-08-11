@@ -206,6 +206,22 @@ _COVER_ART_TITLES = frozenset({
 _STAT_THUMB_PX = {'classic': (26, 32), 'editorial': (30, 38), 'spotlight': (42, 36)}
 _STAT_THUMB_DIGEST = (18, 22)
 
+# Aggregate stats key off a user/library/platform, but Tautulli still ships the
+# last-watched item on the row (title, year, plex_url, artwork). Naming those
+# rows by 'title' would label a user with a show name, so the label field is
+# pinned per stat exactly as the legacy table does it.
+_STAT_NAME_KEYS = {
+    "Most Active Libraries": 'section_name',
+    "Library Item Counts": 'section_name',
+    "Most Active Users": 'user',
+    "Most Active Platforms": 'platform',
+}
+
+_STAT_SKIP_YEAR = frozenset({
+    "Most Active Libraries", "Library Item Counts", "Most Active Users",
+    "Most Active Platforms", "Most Concurrent Streams",
+})
+
 def _stat_row_thumb(row, title, msg_root, cid, base_url, poster_w, avatar_px, show_cover_art,
                     include_user_info, hosted_images_enabled, hosted_base_url):
     if title == "Most Active Users":
@@ -246,13 +262,24 @@ def render_stats(layout, stat_data, msg_root, theme, base_url="", date_range="",
     if title == "Most Active Users" and not include_user_info:
         return ""
 
+    name_key = _STAT_NAME_KEYS.get(title)
+    skip_year = title in _STAT_SKIP_YEAR
+
     def _name(row):
-        return row.get('title') or row.get('user') or row.get('platform') or row.get('section_name') or ''
+        return (row.get(name_key) if name_key else row.get('title')) or ''
+
+    def _row_url(row):
+        # the row's plex_url points at the last-watched item, which is not what
+        # an aggregate row is named after
+        return '' if name_key else row.get('plex_url')
+
+    def _year(row):
+        return '' if skip_year else str(row.get('year') or '')
 
     def _meta_bits(row):
         bits = []
-        if row.get('year'):
-            bits.append(str(row['year']))
+        if _year(row):
+            bits.append(_year(row))
         if not hide_play_counts and row.get('total_plays'):
             bits.append(f"{row['total_plays']} plays")
         if row.get('total_duration'):
@@ -283,7 +310,7 @@ def render_stats(layout, stat_data, msg_root, theme, base_url="", date_range="",
             rows_html += _spotlight_row(
                 theme,
                 thumb(row, i),
-                _linked(_name(row), row.get('plex_url'), underline=False),
+                _linked(_name(row), _row_url(row), underline=False),
                 _spotlight_meta(meta_bits, plays),
                 _spotlight_value(theme, plays, unit),
                 last=(i == len(rows) - 1),
@@ -301,11 +328,11 @@ def render_stats(layout, stat_data, msg_root, theme, base_url="", date_range="",
         body_rows = ""
         for i, row in enumerate(rows):
             meta = _meta_bits(row)
-            year = str(row.get('year', '')) if row.get('year') else ''
+            year = _year(row)
             nums = ' &middot; '.join(esc(b) for b in meta if b != year)
             body_rows += f"""
                 <tr>
-                    <td style="padding: 8px 16px; border-top: 1px solid {theme['border']}; font-size: 12.5px; color: #ffffff; font-family: {FONT};">{thumb(row, i)}{_linked(_name(row), row.get('plex_url'))}{f' <span style="color: {theme["muted_text"]};">({esc(year)})</span>' if year else ''}</td>
+                    <td style="padding: 8px 16px; border-top: 1px solid {theme['border']}; font-size: 12.5px; color: #ffffff; font-family: {FONT};">{thumb(row, i)}{_linked(_name(row), _row_url(row))}{f' <span style="color: {theme["muted_text"]};">({esc(year)})</span>' if year else ''}</td>
                     <td align="right" style="padding: 8px 16px; border-top: 1px solid {theme['border']}; font-size: 12.5px; color: {theme['muted_text']}; white-space: nowrap; font-family: {FONT};">{nums}</td>
                 </tr>
             """
@@ -324,7 +351,7 @@ def render_stats(layout, stat_data, msg_root, theme, base_url="", date_range="",
                 <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
                     <td width="30" valign="top" align="right" style="padding: 7px 14px 7px 0; font-size: 20px; font-weight: 800; color: {theme['primary']}; font-family: {FONT};">{i}</td>
                     <td style="padding: 7px 0; font-family: {FONT};">
-                        <span style="color: #ffffff; font-weight: 600; font-size: 13.5px;">{thumb(row, i)}{_linked(_name(row), row.get('plex_url'))}</span>
+                        <span style="color: #ffffff; font-weight: 600; font-size: 13.5px;">{thumb(row, i)}{_linked(_name(row), _row_url(row))}</span>
                         <span style="color: {theme['muted_text']}; font-size: 11.5px;"> {meta}</span>
                         {bar}
                     </td>
@@ -335,9 +362,9 @@ def render_stats(layout, stat_data, msg_root, theme, base_url="", date_range="",
     # digest
     inner = ""
     for i, row in enumerate(rows):
-        year = f" ({row.get('year')})" if row.get('year') else ""
-        meta = ' &middot; '.join(esc(b) for b in _meta_bits(row) if str(b) != str(row.get('year', '')))
-        inner += _digest_row(theme, f"{thumb(row, i)}{_linked(_name(row), row.get('plex_url'))}{esc(year)}", meta)
+        year = f" ({_year(row)})" if _year(row) else ""
+        meta = ' &middot; '.join(esc(b) for b in _meta_bits(row) if b != _year(row))
+        inner += _digest_row(theme, f"{thumb(row, i)}{_linked(_name(row), _row_url(row))}{esc(year)}", meta)
     return _shell(layout, theme, title, inner, range_text)
 
 # ---------------------------------------------------------------- wrapped
@@ -565,14 +592,55 @@ def _ra_duration(item):
     h, m = s // 3600, (s % 3600) // 60
     return f"{h}h {m}m" if h else f"{m}m"
 
-def render_recently_added(layout, recent_data, msg_root, theme, library_filter=None, base_url="", max_items=None, recently_added_mode="items", ra_grid_columns=5, poster_max_height=0, show_description=True, library_item_cap=0, hosted_images_enabled=False, hosted_base_url=""):
+# Each layout's designed treatment for recently added. A builder item may
+# override it per snap-in with orientation='grid'/'list’.
+_RA_NATURAL_ORIENTATION = {'classic': 'grid', 'editorial': 'list', 'digest': 'grid', 'spotlight': 'list'}
+
+def ra_orientation(layout, orientation):
+    """Resolved orientation: '' keeps the layout's own treatment."""
+    if orientation in ('grid', 'list'):
+        return orientation
+    return _RA_NATURAL_ORIENTATION.get(layout, 'grid')
+
+def ra_hero_index(items, hero_key):
+    """Index of the builder-chosen spotlight hero. Matches on rating_key first
+    (stable across pulls), then title; 0 when unset or no longer in the pull."""
+    if not hero_key:
+        return 0
+    key = str(hero_key)
+    for i, item in enumerate(items):
+        if str(item.get('rating_key') or '') == key or (item.get('title') or '') == key:
+            return i
+    return 0
+
+def _ra_stacked_row(theme, poster_html, title_html, meta, summary, poster_px, last=False):
+    """One recently-added item as a full-width row (list orientation)."""
+    border = "" if last else f" border-bottom: 1px solid {theme['border']};"
+    poster_cell = (f'<td width="{poster_px}" valign="top" style="padding: 10px 14px 10px 0;{border}">{poster_html}</td>'
+                   if poster_html else '')
+    return f"""
+        <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+            {poster_cell}
+            <td valign="top" style="padding: 10px 0;{border} font-family: {FONT};">
+                <div style="font-size: 14px; font-weight: 700; color: #ffffff; line-height: 1.25;">{title_html}</div>
+                {f'<div style="padding-top: 3px; font-size: 11.5px; color: {theme["muted_text"]};">{meta}</div>' if meta else ''}
+                {f'<div style="padding-top: 6px; font-size: 12px; line-height: 1.45; color: {theme["text"]};">{esc(truncate_text(summary, 180))}</div>' if summary else ''}
+            </td>
+        </tr></table>
+    """
+
+def render_recently_added(layout, recent_data, msg_root, theme, library_filter=None, base_url="", max_items=None, recently_added_mode="items", ra_grid_columns=5, poster_max_height=0, show_description=True, library_item_cap=0, hosted_images_enabled=False, hosted_base_url="", orientation="", hero_key=""):
     items = _ra_items(recent_data, library_filter, max_items, recently_added_mode, library_item_cap)
     label = f"Recently Added{f' - {library_filter}' if library_filter else ''}"
     if not items:
         return _shell(layout, theme, label, _empty_state_html(theme, f"No recently added items found{f' for {esc(library_filter)}' if library_filter else ''}."))
 
+    mode = ra_orientation(layout, orientation)
+    cols = max(1, int(ra_grid_columns) if ra_grid_columns else 5)
+
     if layout == 'spotlight':
-        hero, rest = items[0], items[1:]
+        hero_i = ra_hero_index(items, hero_key)
+        hero, rest = items[hero_i], items[:hero_i] + items[hero_i + 1:]
         hero_title = hero.get('title') or hero.get('grandparent_title') or '(untitled)'
         hero_meta = ' &middot; '.join(esc(b) for b in [
             str(hero.get('year') or ''), str(hero.get('content_rating') or ''),
@@ -593,31 +661,61 @@ def render_recently_added(layout, recent_data, msg_root, theme, library_filter=N
                 </tr>
             </table>
         """
-        rows_html = ""
-        for i, item in enumerate(rest):
-            title = item.get('title') or item.get('grandparent_title') or '(untitled)'
-            src = _ra_poster(item, msg_root, f"ld-ra-{i}", base_url, hosted_images_enabled, hosted_base_url, target=(42, 63))
-            art = f'<img src="{src}" alt="{esc(title)}" width="42" style="width: 42px; height: auto; border-radius: 5px; display: block;">' if src else ''
-            meta = ' &middot; '.join(esc(b) for b in [
-                str(item.get('year') or ''), _ra_duration(item), _relative_added(item)] if b)
-            rows_html += _spotlight_row(theme, art, _linked(title, item.get('plex_url'), underline=False), meta, "",
+        if mode == 'grid':
+            cards = []
+            for i, item in enumerate(rest):
+                title = item.get('title') or item.get('grandparent_title') or '(untitled)'
+                sub_bits = [str(item.get('year') or item.get('grandparent_title') or item.get('parent_title') or ''), _ra_duration(item)]
+                poster_src = _ra_poster(item, msg_root, f"ld-ra-{i}", base_url, hosted_images_enabled, hosted_base_url)
+                cards.append(_build_card_html(theme, truncate_text(title, 23), truncate_text(' · '.join(b for b in sub_bits if b), 30), _relative_added(item), poster_src))
+            inner = _grid(cards, cols)
+        else:
+            inner = ""
+            for i, item in enumerate(rest):
+                title = item.get('title') or item.get('grandparent_title') or '(untitled)'
+                src = _ra_poster(item, msg_root, f"ld-ra-{i}", base_url, hosted_images_enabled, hosted_base_url, target=(42, 63))
+                art = f'<img src="{src}" alt="{esc(title)}" width="42" style="width: 42px; height: auto; border-radius: 5px; display: block;">' if src else ''
+                meta = ' &middot; '.join(esc(b) for b in [
+                    str(item.get('year') or ''), _ra_duration(item), _relative_added(item)] if b)
+                inner += _spotlight_row(theme, art, _linked(title, item.get('plex_url'), underline=False), meta, "",
                                         last=(i == len(rest) - 1))
-        body = _shell(layout, theme, 'Also new this week', rows_html) if rows_html else ""
+        body = _shell(layout, theme, 'Also new this week', inner) if rest else ""
         return hero_html + body
 
     if layout == 'classic':
-        cols = max(1, int(ra_grid_columns) if ra_grid_columns else 5)
-        cards = []
-        for i, item in enumerate(items):
-            title = item.get('title') or item.get('grandparent_title') or '(untitled)'
-            sub_bits = [str(item.get('year') or item.get('grandparent_title') or item.get('parent_title') or ''), _ra_duration(item)]
-            meta = _relative_added(item)
-            poster_src = _ra_poster(item, msg_root, f"la-ra-{i}", base_url, hosted_images_enabled, hosted_base_url)
-            cards.append(_build_card_html(theme, truncate_text(title, 23), truncate_text(' · '.join(b for b in sub_bits if b), 30), meta, poster_src))
-        inner = _grid(cards, cols)
+        if mode == 'grid':
+            cards = []
+            for i, item in enumerate(items):
+                title = item.get('title') or item.get('grandparent_title') or '(untitled)'
+                sub_bits = [str(item.get('year') or item.get('grandparent_title') or item.get('parent_title') or ''), _ra_duration(item)]
+                meta = _relative_added(item)
+                poster_src = _ra_poster(item, msg_root, f"la-ra-{i}", base_url, hosted_images_enabled, hosted_base_url)
+                cards.append(_build_card_html(theme, truncate_text(title, 23), truncate_text(' · '.join(b for b in sub_bits if b), 30), meta, poster_src))
+            inner = _grid(cards, cols)
+        else:
+            inner = '<div style="padding: 4px 16px 10px 16px;">'
+            for i, item in enumerate(items):
+                title = item.get('title') or item.get('grandparent_title') or '(untitled)'
+                meta = ' &middot; '.join(esc(b) for b in [
+                    str(item.get('year') or ''), str(item.get('content_rating') or ''),
+                    _ra_duration(item), _relative_added(item)] if b)
+                summary = (item.get('tagline') or item.get('summary') or '') if show_description else ''
+                poster_src = _ra_poster(item, msg_root, f"la-ra-{i}", base_url, hosted_images_enabled, hosted_base_url, target=(60, 90))
+                poster_html = f'<img src="{poster_src}" alt="{esc(title)}" width="60" style="width: 60px; height: auto; border-radius: 6px; display: block;">' if poster_src else ''
+                inner += _ra_stacked_row(theme, poster_html, _linked(title, item.get('plex_url'), underline=False),
+                                         meta, summary, 60, last=(i == len(items) - 1))
+            inner += '</div>'
         return _shell(layout, theme, label, inner)
 
     if layout == 'editorial':
+        if mode == 'grid':
+            cards = []
+            for i, item in enumerate(items):
+                title = item.get('title') or item.get('grandparent_title') or '(untitled)'
+                sub_bits = [str(item.get('year') or item.get('grandparent_title') or item.get('parent_title') or ''), _ra_duration(item)]
+                poster_src = _ra_poster(item, msg_root, f"lb-ra-{i}", base_url, hosted_images_enabled, hosted_base_url)
+                cards.append(_build_card_html(theme, truncate_text(title, 23), truncate_text(' · '.join(b for b in sub_bits if b), 30), _relative_added(item), poster_src))
+            return _shell(layout, theme, label, _grid(cards, cols), overline="New on the shelf")
         rows = ""
         for i, item in enumerate(items):
             title = item.get('title') or item.get('grandparent_title') or '(untitled)'
@@ -637,15 +735,38 @@ def render_recently_added(layout, recent_data, msg_root, theme, library_filter=N
             """
         return _shell(layout, theme, label, rows, overline="New on the shelf")
 
-    # digest: poster strip with tiny captions
-    strip_items = items[:6]
-    cells = ""
-    for i, item in enumerate(strip_items):
-        title = item.get('title') or item.get('grandparent_title') or '(untitled)'
-        poster_src = _ra_poster(item, msg_root, f"lc-ra-{i}", base_url, hosted_images_enabled, hosted_base_url, target=(74, 111))
-        poster_html = f'<img src="{poster_src}" alt="{esc(title)}" width="74" style="width: 74px; height: auto; border-radius: 6px; display: block;">' if poster_src else f'<div style="width: 74px; height: 111px; background-color: {theme["card_bg"]}; border: 1px solid {theme["border"]}; border-radius: 6px;">&nbsp;</div>'
-        cells += f'<td valign="top" style="padding-right: 8px;">{poster_html}<div style="font-size: 10px; color: {theme["muted_text"]}; max-width: 74px; padding-top: 3px; font-family: {FONT};">{esc(truncate_text(title, 20))}</div></td>'
-    inner = f'<table cellpadding="0" cellspacing="0" border="0"><tr>{cells}</tr></table>'
+    # digest: ledger rows, or a poster strip that wraps at the column count
+    if mode == 'list':
+        rows = ""
+        for item in items:
+            title = item.get('title') or item.get('grandparent_title') or '(untitled)'
+            right = ' &middot; '.join(esc(b) for b in [_ra_duration(item), _relative_added(item)] if b)
+            year = item.get('year')
+            left = _linked(title, item.get('plex_url')) + (f' <span style="color: {theme["muted_text"]};">{esc(str(year))}</span>' if year else '')
+            rows += _digest_row(theme, left, right)
+        return _shell(layout, theme, label, rows)
+
+    # The strip used to hard-stop at six posters in a single row; it now wraps
+    # every item into rows of ra_grid_columns like the other grid layouts.
+    poster_px = max(40, min(74, int(740 / cols) - 10))
+    caption_len = max(10, int(120 / cols) + 6)
+    cell_pct = f"{100 / cols:.4f}%"
+    rows_html = ""
+    for start in range(0, len(items), cols):
+        cells = ""
+        chunk = items[start:start + cols]
+        for offset, item in enumerate(chunk):
+            i = start + offset
+            title = item.get('title') or item.get('grandparent_title') or '(untitled)'
+            poster_src = _ra_poster(item, msg_root, f"lc-ra-{i}", base_url, hosted_images_enabled, hosted_base_url, target=(poster_px, int(round(poster_px * 1.5))))
+            poster_html = (f'<img src="{poster_src}" alt="{esc(title)}" width="{poster_px}" style="width: 100%; max-width: {poster_px}px; height: auto; border-radius: 6px; display: block;">'
+                           if poster_src else
+                           f'<div style="width: 100%; max-width: {poster_px}px; height: {int(round(poster_px * 1.5))}px; background-color: {theme["card_bg"]}; border: 1px solid {theme["border"]}; border-radius: 6px;">&nbsp;</div>')
+            cells += (f'<td valign="top" style="width: {cell_pct}; padding: 0 8px 10px 0;">{poster_html}'
+                      f'<div style="font-size: 10px; color: {theme["muted_text"]}; max-width: {poster_px}px; padding-top: 3px; font-family: {FONT};">{esc(truncate_text(title, caption_len))}</div></td>')
+        cells += "".join(f'<td style="width: {cell_pct}; padding: 0 8px 10px 0;"></td>' for _ in range(cols - len(chunk)))
+        rows_html += f'<tr>{cells}</tr>'
+    inner = f'<table width="100%" cellpadding="0" cellspacing="0" border="0" style="table-layout: fixed;">{rows_html}</table>'
     return _shell(layout, theme, label, inner)
 
 def _relative_added(item):

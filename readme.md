@@ -198,6 +198,8 @@ The Settings page is split into sections: **Email Server**, **Connections**, **D
    * **Email Theme** - choose from one of our preset newsletterr blue or plex orange themes, or create your own custom theme! Preset themes use our newsletterr banners, so if you want a custom logo you must choose to use a custom theme  
    * **Email Layout** - the overall design of the email. Polished Classic tightens the classic look into one card system, Editorial is a magazine treatment, Compact Digest is a dense one-scroll digest, Spotlight is a dark stack of cards that leads with one featured title and ends with a button to your server, and Legacy is the pre-v2026.4 look unchanged
    * **Server Name in Header (optional)** - the Polished Classic, Editorial, Compact Digest, and Spotlight layouts can print your server name in the email header. Hidden by default, so the header shows just your logo and header title; set this to Show to add the name back  
+   * **Header Eyebrow Text (optional)** - the small uppercase line above the header title in the Editorial and Spotlight layouts. Blank falls back to your server name when Server Name in Header is on, and otherwise prints nothing unless Auto Header Text is enabled  
+   * **Auto Header Text (optional)** - off by default. When on, a blank header title or eyebrow falls back to newsletterr's stock wording ("Your server", "This week on the server", "Your server, this month") in the Editorial and Spotlight layouts. When off, a blank field simply leaves the line out  
    * **Header Background (optional)** - the area behind the logo and header title. Theme gradient blends your accent and primary colors; pick Solid color for a single color, which is safer in clients that drop gradients  
 4. Click **Apply Settings**.  Settings are saved to `database/data.db`.
 
@@ -212,6 +214,12 @@ The Settings page is split into sections: **Email Server**, **Connections**, **D
 5. Draft the body, use the stats, graphs, recently added, collections, and recommendations snap-ins on the right to include these in your email. 
 6. Hit **Send Email**. Success and error messages will show after running.  
 
+An added Recently Added or Most Watched snap-in stays editable in the email body list, so you do not have to remove and re-add it to change how it renders:
+
+* **Items/Titles** - the per-library count, blank to use the number you pulled
+* **Display** (Recently Added) - Layout default, Horizontal grid, or Vertical list. Layout default keeps each email layout's own treatment; the grid uses the Recently Added Grid Columns setting
+* **Spotlight feature** (Recently Added, shown when the Spotlight layout is selected) - which title the layout leads with. Defaults to the newest item, and falls back to it if the chosen title is no longer in the pull
+
 ### Snap-in tokens in custom HTML
 
 When the **Custom HTML** toggle is on, you write the whole email yourself, but you can still drop rendered snap-in sections into it with tokens. A token looks like `{{snapin:NAME}}` or `{{snapin:NAME:ARG}}` and is replaced at preview and send time by the same section the builder would produce, in your selected email layout. The **Insert snap-in** dropdown above the editor lists every token valid for the data you have pulled and inserts it at the cursor.
@@ -220,6 +228,7 @@ When the **Custom HTML** toggle is on, you write the whole email yourself, but y
 |---|---|
 | `{{snapin:recently_added:Movies}}` | Recently Added grid for the named library |
 | `{{snapin:recently_added:Movies:5}}` | Same, capped to 5 items |
+| `{{snapin:recently_added:Movies:list}}` | Same, forced to the vertical list display; combine with a count as `:Movies:5:list` |
 | `{{snapin:most_watched:Movies}}` | Most Watched grid for the named library (all-time play counts) |
 | `{{snapin:most_watched:Movies:recent}}` | Same, scoped to plays within the pulled time range; combine with a count as `:Movies:5:recent` |
 | `{{snapin:random_pick:Movies}}` | One random item from the named library (fresh pick every send) |
@@ -301,6 +310,22 @@ Released under the **MIT License** - see [LICENSE](LICENSE.txt) for details.
 
 ## Recent Changes
 
+## v2026.4.2:
+
+#### New Features:
+* Recommendations snap-in rows show how many movies and shows were pulled for each user, and the Add button is disabled when conjurr returned nothing
+* Show/hide setting for recommendation descriptions, matching the Recently Added option
+* Recently Added and Most Watched snap-ins keep their per-library count editable after they are added to the email body
+* Recently Added snap-ins can be forced to a horizontal grid or a vertical list, per snap-in, in any layout
+* The Spotlight layout's featured title is selectable per Recently Added snap-in instead of always being the newest item
+* Header Eyebrow Text setting for the small uppercase line in the Editorial and Spotlight layouts
+* Auto Header Text setting (off by default) for whether a blank header title falls back to newsletterr's stock wording
+
+#### Fixed:
+* Jinja page issue was blocking recommendations list from pulling
+* Non-legacy layouts were using last streamed in place of user name in most active users stat card
+* Compact Digest capped Recently Added at six posters in a single row and ignored the grid column setting
+
 ## v2026.4.1:
 
 #### New Features:
@@ -313,30 +338,6 @@ Released under the **MIT License** - see [LICENSE](LICENSE.txt) for details.
 * Images were missing in new layouts
 * Cache Badge status was only updating on refresh
 * Text was moving to title of snap-in on reload
-
-## v2026.4:
-
-#### New Features:
-* Default email layout/UI overhaul with pride theme options
-* SVG over emoji where possible in emails
-* Clean up looks on DN stats, coming soon, and wrapped
-* Email preview: desktop/tablet/phone views
-* Custom theme settings
-* Searchable settings
-* More snap-ins: random pick, most watched
-* Snap-ins working with custom HTML
-* PDF export
-* Jellyfin support
-* Rootless Docker image
-* Demo mode (DEMO_MODE) for a public, read-only showcase deployment
-* Get All button on builder left pane
-* Option to skip scheduled send if nothing is new
-
-#### Fixed:
-* UI adjustment to better organize snap-ins sections
-* Email BG color not respected by mac mail app
-* Text block titles update again while typing (inline handler blocked by CSP)
-* Recently Added by Days now pulls at an episode level
 
 ---
 

@@ -128,17 +128,86 @@ def test_settings_form_round_trips_the_chrome_fields(csrf_client):
     assert row == ("disabled", "")
 
 
-def test_spotlight_kicker_falls_back_when_the_name_is_hidden():
-    """Its kicker is structural, so hiding the name substitutes a neutral one
-    rather than leaving an empty line."""
-    from app.emails.assemble import build_complete_email_html_with_cid_logo
-    import sqlite3
+# --- header eyebrow text and the stock auto text
+
+@pytest.fixture()
+def header_text_env(app, seeded_settings):
+    """Sets the header-text columns and renders a layout."""
     from app import config
-    conn = sqlite3.connect(config.DB_PATH)
-    conn.execute("UPDATE settings SET email_show_server_name = 'disabled' WHERE id = 1")
-    conn.commit()
-    conn.close()
-    html = build_complete_email_html_with_cid_logo(
-        "<p>b</p>", SERVER_NAME, "Subject", "The Header", "", "", layout="spotlight")
+    from app.emails.assemble import build_complete_email_html_with_cid_logo
+
+    def render(layout, title="The Header", eyebrow="", auto="disabled", show_name="disabled"):
+        conn = sqlite3.connect(config.DB_PATH)
+        conn.execute(
+            "UPDATE settings SET email_show_server_name = ?, email_eyebrow_text = ?, "
+            "email_auto_header_text = ? WHERE id = 1",
+            (show_name, eyebrow, auto),
+        )
+        conn.commit()
+        conn.close()
+        return build_complete_email_html_with_cid_logo(
+            "<p>b</p>", SERVER_NAME, "Subject", title, "", "", layout=layout)
+
+    return render
+
+
+def test_auto_header_text_is_off_by_default(header_text_env):
+    """A hidden server name used to substitute stock filler; now the line is
+    simply left out unless the setting asks for it."""
+    html = header_text_env("spotlight")
     assert SERVER_NAME not in html
-    assert "Your server" in html
+    assert "Your server" not in html
+    assert "The Header" in html
+
+
+def test_auto_header_text_restores_the_stock_wording(header_text_env):
+    assert "Your server" in header_text_env("spotlight", auto="enabled")
+    assert "This week on the server" in header_text_env("spotlight", title="", auto="enabled")
+    assert "Your server, this month" in header_text_env("editorial", title="", auto="enabled")
+
+
+@pytest.mark.parametrize("layout", ("spotlight", "editorial"))
+def test_blank_header_title_prints_nothing_when_auto_is_off(header_text_env, layout):
+    html = header_text_env(layout, title="")
+    assert "This week on the server" not in html
+    assert "Your server" not in html
+
+
+@pytest.mark.parametrize("layout", ("spotlight", "editorial"))
+def test_custom_eyebrow_wins_over_the_name_and_the_auto_text(header_text_env, layout):
+    html = header_text_env(layout, eyebrow="Fresh this week", auto="enabled", show_name="enabled")
+    assert "Fresh this week" in html
+    assert "Your server" not in html
+    # the eyebrow replaces the name on that line, the name keeps its own slot
+    # in editorial only
+    assert (SERVER_NAME.upper() in html) if layout == "editorial" else (SERVER_NAME not in html)
+
+
+def test_eyebrow_text_is_escaped(header_text_env):
+    html = header_text_env("spotlight", eyebrow='<script>alert(1)</script>')
+    assert "<script>alert(1)</script>" not in html
+    assert "&lt;script&gt;" in html
+
+
+def test_settings_form_round_trips_the_header_text_fields(csrf_client):
+    from tests.test_routes import SETTINGS_FORM
+    from app import config
+
+    client, token = csrf_client
+    base = {**SETTINGS_FORM, "csrf_token": token}
+
+    client.post("/settings", data={**base, "email_eyebrow_text": "  Fresh this week  ",
+                                   "email_auto_header_text": "enabled"})
+    conn = sqlite3.connect(config.DB_PATH)
+    row = conn.execute(
+        "SELECT email_eyebrow_text, email_auto_header_text FROM settings WHERE id = 1").fetchone()
+    conn.close()
+    assert row == ("Fresh this week", "enabled")
+
+    # an absent select posts nothing, which means the default (off)
+    client.post("/settings", data={**base, "email_eyebrow_text": ""})
+    conn = sqlite3.connect(config.DB_PATH)
+    row = conn.execute(
+        "SELECT email_eyebrow_text, email_auto_header_text FROM settings WHERE id = 1").fetchone()
+    conn.close()
+    assert row == ("", "disabled")

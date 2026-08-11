@@ -7,7 +7,79 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, library_filter=None, base_url="", max_items=None, recently_added_mode="items", ra_grid_columns=5, poster_max_height=0, hosted_images_enabled=False, hosted_base_url="", show_description=True, library_item_cap=0):
+def _relative_added(raw):
+    timestamp = int(raw) if isinstance(raw, str) and raw.isdigit() else raw
+    if isinstance(timestamp, (int, float)):
+        dt = datetime.fromtimestamp(timestamp)
+    else:
+        dt = datetime.fromisoformat(str(timestamp))
+
+    now = datetime.now()
+    if dt.tzinfo:
+        now = datetime.now(timezone.utc)
+        dt = dt.replace(tzinfo=timezone.utc)
+
+    diff_days = (now - dt).days
+    if diff_days < 0:
+        return f"in {abs(diff_days)} days"
+    if diff_days == 0:
+        return "today"
+    if diff_days == 1:
+        return "yesterday"
+    return f"{diff_days} days ago"
+
+def _added_text(item):
+    if not item.get('updated_at'):
+        return ""
+    try:
+        return _relative_added(item['updated_at'])
+    except Exception:
+        logger.debug("suppressed exception; using fallback", exc_info=True)
+    if item.get('originally_available_at'):
+        try:
+            return _relative_added(item['originally_available_at'])
+        except Exception:
+            logger.debug("suppressed exception; using fallback", exc_info=True)
+    return ""
+
+def _duration_text(item):
+    """Runtime, or the days-mode episode rollup count when the pull carries
+    one (a per-episode runtime no longer applies to that card)."""
+    duration = ""
+    if (item.get('media_type') or item.get('type') or '').lower() == 'album':
+        duration = item.get('duration') or item.get('grandparent_title') or item.get('parent_title') or 'Audio'
+    elif item.get('duration'):
+        try:
+            s = int(item['duration']) // 1000
+            h, m = s // 3600, (s % 3600) // 60
+            duration = f"{h}h {m}m" if h else f"{m}m"
+        except Exception:
+            logger.debug("suppressed exception; using fallback", exc_info=True)
+
+    new_ep_count = item.get('new_episode_count')
+    if new_ep_count:
+        try:
+            n = int(new_ep_count)
+        except (TypeError, ValueError):
+            n = 0
+        if n > 0:
+            duration = f"{n} new episode" + ("s" if n != 1 else "")
+    return duration
+
+def recently_added_title(library_filter, recently_added_mode, max_items):
+    """Section heading. Days mode spells out the window it covers."""
+    if recently_added_mode == "days" and max_items:
+        try:
+            since_date = (datetime.now() - timedelta(days=int(max_items))).strftime("%-m/%-d/%y")
+            end_date = datetime.now().strftime("%-m/%-d/%y")
+            date_range = f"{since_date} - {end_date}"
+        except Exception:
+            logger.debug("suppressed exception; using fallback", exc_info=True)
+            date_range = ""
+        return (f"Added to {library_filter}" if library_filter else "Recently Added") + (f" {date_range}" if date_range else "")
+    return f"Recently Added{f' - {library_filter}' if library_filter else ''}"
+
+def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, library_filter=None, base_url="", max_items=None, recently_added_mode="items", ra_grid_columns=5, poster_max_height=0, hosted_images_enabled=False, hosted_base_url="", show_description=True, library_item_cap=0, orientation=""):
     if not recent_data:
         return f"""
         <div style="background-color: {theme_colors['card_bg']}; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid {theme_colors['border']}; font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;">
@@ -41,8 +113,16 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
         """
     
     items_html = ""
-    items_per_row = max(1, int(ra_grid_columns) if ra_grid_columns else 5)
+    # orientation is the builder item's per-snap-in override: 'list' stacks the
+    # items one per row, anything else keeps the poster grid.
+    items_per_row = 1 if orientation == 'list' else max(1, int(ra_grid_columns) if ra_grid_columns else 5)
     cell_width_pct = f"{100 / items_per_row:.4f}%"
+
+    if orientation == 'list':
+        return _build_recently_added_list_html(
+            items, msg_root, theme_colors, base_url,
+            recently_added_title(library_filter, recently_added_mode, max_items),
+            poster_max_height, hosted_images_enabled, hosted_base_url, show_description)
 
     # Email-safe uniform poster box: the delivered bytes are cropped to a 2:3
     # box (see poster_target below), so `width:100%; height:auto` renders a
@@ -67,8 +147,8 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
                 year = item.get('grandparent_title') or item.get('parent_title') or ''
             content_rating = item.get('content_rating', '')
             library = item.get('library_name', '')
-            added_date = ""
-            duration = ""
+            added_date = _added_text(item)
+            duration = _duration_text(item)
 
             item_type = (item.get('media_type') or item.get('type') or '').lower()
             if item_type in ['episode', 'season']:
@@ -113,91 +193,6 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
                     if poster_src_result:
                         break
                         
-            if item.get('updated_at'):
-                try:
-                    timestamp = item['updated_at']
-                    if isinstance(timestamp, str) and timestamp.isdigit():
-                        timestamp = int(timestamp)
-                    
-                    if isinstance(timestamp, (int, float)):
-                        dt = datetime.fromtimestamp(timestamp)
-                    else:
-                        dt = datetime.fromisoformat(str(timestamp))
-
-                    now = datetime.now()
-                    if dt.tzinfo:
-                        now = datetime.now(timezone.utc)
-                        dt = dt.replace(tzinfo=timezone.utc)
-                    
-                    diff_days = (now - dt).days
-                    
-                    if diff_days < 0:
-                        added_date = f"in {abs(diff_days)} days"
-                    elif diff_days == 0:
-                        added_date = "today"
-                    elif diff_days == 1:
-                        added_date = "yesterday"
-                    else:
-                        added_date = f"{diff_days} days ago"
-
-                except Exception as e:
-                    logger.debug("suppressed exception; using fallback", exc_info=True)
-                    if item.get('originally_available_at'):
-                        try:
-                            timestamp = item['originally_available_at']
-                            if isinstance(timestamp, str) and timestamp.isdigit():
-                                timestamp = int(timestamp)
-                            
-                            if isinstance(timestamp, (int, float)):
-                                dt = datetime.fromtimestamp(timestamp)
-                            else:
-                                dt = datetime.fromisoformat(str(timestamp))
-
-                            now = datetime.now()
-                            if dt.tzinfo:
-                                now = datetime.now(timezone.utc)
-                                dt = dt.replace(tzinfo=timezone.utc)
-                            
-                            diff_days = (now - dt).days
-                            
-                            if diff_days < 0:
-                                added_date = f"in {abs(diff_days)} days"
-                            elif diff_days == 0:
-                                added_date = "today"
-                            elif diff_days == 1:
-                                added_date = "yesterday"
-                            else:
-                                added_date = f"{diff_days} days ago"
-
-                        except Exception as e2:
-                            logger.debug("suppressed exception; using fallback", exc_info=True)
-                            added_date = ""
-            
-            if item_type == 'album':
-                duration = item.get('duration') or item.get('grandparent_title') or item.get('parent_title') or 'Audio'
-            else:
-                if item.get('duration'):
-                    try:
-                        ms = int(item['duration'])
-                        s = ms // 1000
-                        h = s // 3600
-                        m = (s % 3600) // 60
-                        duration = f"{h}h {m}m" if h else f"{m}m"
-                    except:
-                        logger.debug("suppressed exception; using fallback", exc_info=True)
-                        pass
-
-            # days-mode show rollups carry an in-window episode count; surface it
-            # in place of a per-episode runtime that no longer applies to the card
-            new_ep_count = item.get('new_episode_count')
-            if new_ep_count:
-                try:
-                    n = int(new_ep_count)
-                except (TypeError, ValueError):
-                    n = 0
-                if n > 0:
-                    duration = f"{n} new episode" + ("s" if n != 1 else "")
-            
             cell_style = f"""
                 width: {cell_width_pct};
                 padding: 8px;
@@ -372,23 +367,100 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
         table-layout: fixed;
     """
     
-    if recently_added_mode == "days" and max_items:
-        try:
-            since_date = (datetime.now() - timedelta(days=int(max_items))).strftime("%-m/%-d/%y")
-            end_date = datetime.now().strftime("%-m/%-d/%y")
-            date_range = f"{since_date} - {end_date}"
-        except Exception:
-            logger.debug("suppressed exception; using fallback", exc_info=True)
-            date_range = ""
-        ra_title = (f"Added to {library_filter}" if library_filter else "Recently Added") + (f" {date_range}" if date_range else "")
-    else:
-        ra_title = f"Recently Added{f' - {library_filter}' if library_filter else ''}"
+    ra_title = recently_added_title(library_filter, recently_added_mode, max_items)
 
     return f"""
         <div style="{container_style}">
             <h2 style="{title_style}">{esc(ra_title)}</h2>
             <table class="recently-added-table" style="{table_style}">
                 {items_html}
+            </table>
+        </div>
+    """
+
+def _build_recently_added_list_html(items, msg_root, theme_colors, base_url, ra_title, poster_max_height, hosted_images_enabled, hosted_base_url, show_description):
+    """Vertical orientation: one item per row, poster left, details right."""
+    poster_px = 80
+    if poster_max_height:
+        poster_px = min(poster_px, max(40, int(int(poster_max_height) * 2 // 3)))
+    poster_target = (poster_px, int(round(poster_px * 1.5)))
+
+    rows_html = ""
+    for i, item in enumerate(items):
+        title = item.get('title', 'Unknown')
+        year = item.get('year', '')
+        item_type = (item.get('media_type') or item.get('type') or '').lower()
+        if not year and item_type == 'album':
+            year = item.get('grandparent_title') or item.get('parent_title') or ''
+        if item_type in ['episode', 'season']:
+            summary = (item.get('grandparent_tagline') or item.get('grandparent_summary')
+                       or item.get('parent_summary') or item.get('tagline') or item.get('summary', ''))
+            poster_candidates = [item.get('grandparent_thumb'), item.get('parent_thumb'), item.get('thumb'), item.get('art')]
+        else:
+            summary = item.get('tagline') or item.get('summary', '')
+            poster_candidates = [item.get('thumb'), item.get('art'), item.get('parent_thumb'), item.get('grandparent_thumb')]
+
+        poster_src = None
+        for candidate in poster_candidates:
+            if candidate:
+                poster_url = f"/proxy-art{candidate}" if not candidate.startswith('/proxy-art') else candidate
+                poster_src = fetch_and_attach_image(poster_url, msg_root, f"recent-{i}", base_url, target=poster_target,
+                                                    hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
+                if poster_src:
+                    break
+
+        meta_text = ' • '.join(filter(None, [
+            str(year) if year else '',
+            _duration_text(item),
+            item.get('content_rating', ''),
+            item.get('library_name', ''),
+            f"Added {_added_text(item)}" if _added_text(item) else '',
+        ]))
+
+        poster_html = (f'<img class="card-poster-img" src="{poster_src}" alt="{esc(title)}" width="{poster_px}" '
+                       f'style="width: {poster_px}px; height: auto; display: block; border-radius: 8px; background-color: #f8f9fa;">'
+                       if poster_src else '')
+        title_html = esc(truncate_text(title, 60))
+        plex_url = item.get('plex_url', '')
+        if plex_url:
+            title_html = f'<a href="{esc(plex_url)}" target="_blank" style="color: inherit; text-decoration: none;" title="Open in Plex">{title_html}</a>'
+
+        border = "" if i == len(items) - 1 else f" border-bottom: 1px solid {theme_colors['border']};"
+        rows_html += f"""
+            <tr class="recently-added-row">
+                {f'<td class="recently-added-cell" width="{poster_px}" valign="top" style="padding: 10px 14px 10px 0;{border}">{poster_html}</td>' if poster_html else ''}
+                <td class="recently-added-cell" valign="top" style="padding: 10px 0;{border} font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;">
+                    <div style="font-weight: bold; font-size: 15px; color: {theme_colors['text']}; line-height: 1.25;">{title_html}</div>
+                    {f'<div style="font-size: 11px; color: {theme_colors["muted_text"]}; padding-top: 3px;">{esc(meta_text)}</div>' if meta_text else ''}
+                    {f'<div style="font-size: 12px; color: {theme_colors["text"]}; opacity: 0.8; line-height: 1.4; padding-top: 6px;">{esc(truncate_text(summary, 220))}</div>' if (summary and show_description) else ''}
+                </td>
+            </tr>
+        """
+
+    container_style = f"""
+        background-color: {theme_colors['card_bg']};
+        padding: 0 15px 10px 15px;
+        border-radius: 8px;
+        margin: 20px 0;
+        border: 1px solid {theme_colors['border']};
+        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
+        overflow: hidden;
+        max-width: 100%;
+    """
+    title_style = f"""
+        text-align: center;
+        color: {theme_colors['text']};
+        margin: 0 0 10px 0;
+        padding-top: 10px;
+        font-size: 24px;
+        font-weight: bold;
+        font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
+    """
+    return f"""
+        <div style="{container_style}">
+            <h2 style="{title_style}">{esc(ra_title)}</h2>
+            <table class="recently-added-table" width="100%" cellpadding="0" cellspacing="0" border="0" style="width: 100%; border-collapse: collapse;">
+                {rows_html}
             </table>
         </div>
     """

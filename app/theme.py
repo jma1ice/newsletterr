@@ -115,6 +115,13 @@ def get_email_chrome_settings():
         'show_server_name': s.get('email_show_server_name') == 'enabled',
         # blank (or anything not #rrggbb) keeps the default gradient
         'header_bg': header_bg if is_hex_color(header_bg) else '',
+        # the small uppercase line above the header title in the editorial and
+        # spotlight layouts; blank falls through to the server name or the
+        # auto text below
+        'eyebrow_text': (s.get('email_eyebrow_text') or '').strip(),
+        # off by default: a blank header title (or eyebrow) then renders
+        # nothing instead of newsletterr's stock filler phrases
+        'auto_header_text': s.get('email_auto_header_text') == 'enabled',
         # the spotlight layout's call to action; blank hides the button
         'server_url': server_url.strip(),
         'server_cta': 'Open Jellyfin' if jellyfin else 'Open Plex',

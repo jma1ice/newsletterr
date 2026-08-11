@@ -267,6 +267,7 @@ def preview_schedule(schedule_id):
                 "poster_max_height": int(settings_row[17] or 0) if settings_row[17] else 0,
                 "collections_grid_columns": settings_row[18] or '5',
                 "ra_show_description": settings_row[19] or 'enabled',
+                "recs_show_description": _s.get("recs_show_description") or 'enabled',
                 "include_user_info": settings_row[20] or 'enabled',
                 "email_layout": _s.get("email_layout") or 'classic',
             }
@@ -320,6 +321,7 @@ def preview_schedule(schedule_id):
         tautulli_data["settings"]["poster_max_height"] = settings.get("poster_max_height", 0)
         tautulli_data["settings"]["collections_grid_columns"] = int(settings.get("collections_grid_columns") or 5)
         tautulli_data["settings"]["ra_show_description"] = settings.get("ra_show_description", "enabled")
+        tautulli_data["settings"]["recs_show_description"] = settings.get("recs_show_description", "enabled")
         tautulli_data["settings"]["include_user_info"] = settings.get("include_user_info", "enabled")
         tautulli_data["settings"]["email_layout"] = settings.get("email_layout", "classic")
 
@@ -438,6 +440,7 @@ def preview_schedule_page(schedule_id):
         "logo_position": logo_position or 'center',
         "collections_grid_columns": collections_grid_columns or '5',
         "ra_show_description": ra_show_description or 'enabled',
+        "recs_show_description": _s.get("recs_show_description") or 'enabled',
         "include_user_info": include_user_info or 'enabled',
         "email_layout": _s.get("email_layout") or 'classic',
         "hosted_enabled": hosted_enabled or 'disabled',

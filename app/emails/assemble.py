@@ -149,6 +149,7 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, displ
     coming_soon_grid_columns = int(tautulli_data.get('settings', {}).get('coming_soon_grid_columns', 5) or 5)
     collections_grid_columns = int(tautulli_data.get('settings', {}).get('collections_grid_columns', 5) or 5)
     ra_show_description = tautulli_data.get('settings', {}).get('ra_show_description', 'enabled') != 'disabled'
+    recs_show_description = tautulli_data.get('settings', {}).get('recs_show_description', 'enabled') != 'disabled'
     include_user_info = tautulli_data.get('settings', {}).get('include_user_info', 'enabled') != 'disabled'
     # Email layout (NEWS-30): 'legacy' keeps every pre-v2026.4 builder path
     # untouched; classic/editorial/digest route the restyled sections through
@@ -226,10 +227,16 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, displ
             except (TypeError, ValueError):
                 library_item_cap = 0
 
+            # Per-snap-in display overrides saved on the builder item: blank
+            # orientation keeps each layout's own treatment, and raHero names
+            # the item the spotlight layout leads with.
+            ra_orientation = item.get('raOrientation') or ''
+            ra_hero_key = item.get('raHero') or ''
+
             if use_layout:
-                content_html += layouts.render_recently_added(email_layout, recent_data, msg_root, theme_colors, library_filter, base_url, max_items, recently_added_mode=recently_added_mode, ra_grid_columns=ra_grid_columns, poster_max_height=poster_max_height, show_description=ra_show_description, library_item_cap=library_item_cap, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
+                content_html += layouts.render_recently_added(email_layout, recent_data, msg_root, theme_colors, library_filter, base_url, max_items, recently_added_mode=recently_added_mode, ra_grid_columns=ra_grid_columns, poster_max_height=poster_max_height, show_description=ra_show_description, library_item_cap=library_item_cap, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url, orientation=ra_orientation, hero_key=ra_hero_key)
             else:
-                content_html += build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, library_filter, base_url, max_items, recently_added_mode=recently_added_mode, ra_grid_columns=ra_grid_columns, poster_max_height=poster_max_height, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url, show_description=ra_show_description, library_item_cap=library_item_cap)
+                content_html += build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, library_filter, base_url, max_items, recently_added_mode=recently_added_mode, ra_grid_columns=ra_grid_columns, poster_max_height=poster_max_height, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url, show_description=ra_show_description, library_item_cap=library_item_cap, orientation=ra_orientation)
         
         elif item_type == 'most_watched':
             mw_library = item.get('mwLibrary')
@@ -307,9 +314,9 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, displ
                     if item.get('userKey') == str(target_user_key):
                         filtered_recommendations = {target_user_key: recommendations_data.get(target_user_key, {})}
                         filtered_user_dict = {target_user_key: user_dict.get(target_user_key, target_user_key)} if user_dict else {target_user_key: target_user_key}
-                        content_html += build_recommendations_html_with_cids(filtered_recommendations, msg_root, theme_colors, filtered_user_dict, base_url, display_preference, users_data, recs_grid_columns=recs_grid_columns, poster_max_height=poster_max_height, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
+                        content_html += build_recommendations_html_with_cids(filtered_recommendations, msg_root, theme_colors, filtered_user_dict, base_url, display_preference, users_data, recs_grid_columns=recs_grid_columns, poster_max_height=poster_max_height, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url, show_description=recs_show_description)
                 else:
-                    content_html += build_recommendations_html_with_cids(recommendations_data, msg_root, theme_colors, user_dict, base_url, display_preference, users_data, recs_grid_columns=recs_grid_columns, poster_max_height=poster_max_height, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
+                    content_html += build_recommendations_html_with_cids(recommendations_data, msg_root, theme_colors, user_dict, base_url, display_preference, users_data, recs_grid_columns=recs_grid_columns, poster_max_height=poster_max_height, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url, show_description=recs_show_description)
 
         elif item_type == 'droppedneedle_wrapped':
             if droppedneedle_wrapped_data:
@@ -421,6 +428,12 @@ def build_complete_email_html_with_cid_logo(content_html, server_name, subject, 
     chrome = get_email_chrome_settings()
     show_server_name = chrome['show_server_name']
     header_bg = chrome['header_bg']
+    eyebrow_text = chrome['eyebrow_text']
+    auto_header_text = chrome['auto_header_text']
+
+    def _auto(text):
+        """Stock filler for a blank header field, only when the setting is on."""
+        return text if auto_header_text else ''
     links_base_url = links_base_url or hosted_base_url
 
     container_width = 640 if layout == 'spotlight' else 800
@@ -564,13 +577,13 @@ def build_complete_email_html_with_cid_logo(content_html, server_name, subject, 
                         </div>"""
 
     if layout == 'spotlight':
-        kicker = esc(server_name) if show_server_name else 'Your server'
-        greeting = email_header_title or 'This week on the server'
+        kicker = esc(eyebrow_text) or (esc(server_name) if show_server_name else _auto('Your server'))
+        greeting = email_header_title or _auto('This week on the server')
         header_block = f"""
             <div style="padding: 4px 20px 18px 20px; font-family: {_FONT};">
                 {logo_html}
-                <div style="font-size: 12px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; color: {theme_colors['accent']};">{kicker}</div>
-                <div style="padding-top: 8px; font-size: 29px; line-height: 1.15; font-weight: 800; color: #ffffff;">{greeting}</div>
+                {f'<div style="font-size: 12px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; color: {theme_colors["accent"]};">{kicker}</div>' if kicker else ''}
+                {f'<div style="padding-top: 8px; font-size: 29px; line-height: 1.15; font-weight: 800; color: #ffffff;">{greeting}</div>' if greeting else ''}
             </div>"""
         cta_html = ""
         if chrome.get('server_url'):
@@ -587,14 +600,14 @@ def build_complete_email_html_with_cid_logo(content_html, server_name, subject, 
         classic_title = f'<div style="font-size: 24px; font-weight: 700; color: #ffffff; margin-top: 2px; text-shadow: 0 2px 4px rgba(0,0,0,.25); font-family: {_FONT};">{email_header_title}</div>' if email_header_title else ''
         header_block = f'<div style="{header_style} padding: 18px 24px;">{logo_html}{brand_line}{classic_title}</div>'
     elif layout == 'editorial':
-        kicker = email_header_title or 'Your server, this month'
+        kicker = esc(eyebrow_text) or email_header_title or _auto('Your server, this month')
         display_date = datetime.now().strftime('%B %Y')
         editorial_bg = header_bg or theme_colors['card_bg']
         name_line = f'<div style="font-size: 30px; font-weight: 800; color: #ffffff; margin: 4px 0 2px 0; letter-spacing: -.01em;">{esc(str(server_name).upper())}</div>' if show_server_name else ''
         header_block = f"""
             <div style="padding: 26px 26px 18px 26px; text-align: center; border-bottom: 3px double {theme_colors['border']}; background-color: {editorial_bg}; font-family: {_FONT};">
                 {logo_html}
-                <div style="font-size: 10.5px; letter-spacing: .22em; text-transform: uppercase; color: {theme_colors['muted_text']};">{kicker}</div>
+                {f'<div style="font-size: 10.5px; letter-spacing: .22em; text-transform: uppercase; color: {theme_colors["muted_text"]};">{kicker}</div>' if kicker else ''}
                 {name_line}
                 <div style="font-size: 11.5px; color: {theme_colors['text']};">{display_date}</div>
             </div>"""

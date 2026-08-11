@@ -90,6 +90,21 @@ function buildItemsFromPayload() {
 }
 let items = buildItemsFromPayload();
 
+// Titles a builder item can feature as the Spotlight layout hero. rating_key
+// is the stable handle the backend matches on; title is the fallback.
+function raItemsForLibrary(lib) {
+    const wanted = String(lib || '').toLowerCase();
+    return flatten(recentPayload)
+        .filter(it => !wanted || String(it.library_name || it.section_name || '').toLowerCase() === wanted)
+        .map(it => ({
+            key: String(it.rating_key || it.title || ''),
+            title: it.title || it.full_title || it.parent_title || it.grandparent_title || '(untitled)',
+            year: it.year || ''
+        }))
+        .filter(it => it.key);
+}
+window.raItemsForLibrary = raItemsForLibrary;
+
 const slug = s => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'');
 
 function renderRAGrid(list, target) {
@@ -136,7 +151,7 @@ function buildRALibraryRows() {
                 </div>
                 <span class="snapin-row-label" title="${escapeHtml(lib)}">${escapeHtml(lib)}</span>
                 <input type="number" class="ra-count-input" min="1" max="99" placeholder="all"
-                       title="Max items shown for ${escapeHtml(lib)} (blank = the pulled item count). Set before clicking Add."
+                       title="Max items shown for ${escapeHtml(lib)} (blank = the pulled item count). Editable again on the added snap-in."
                        style="width: 4em; margin-left: auto; flex-shrink: 0; font-size: .8rem; padding: .15rem .3rem;">
             </div>`;
         host.appendChild(row);

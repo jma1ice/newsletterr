@@ -153,16 +153,33 @@ function buildRecsBlockForUser(userKey, { headingTag = 'h4' } = {}, { bgColorway
     return wrap;
 }
 
+function recsCountsForUser(data) {
+    const n = key => (data[key] || []).length;
+    const movies = n('movie_posters') + n('movie_posters_unavailable');
+    const shows = n('show_posters') + n('show_posters_unavailable');
+    const label = (movies || shows)
+        ? `${movies} ${movies === 1 ? 'movie' : 'movies'}, ${shows} ${shows === 1 ? 'show' : 'shows'}`
+        : 'no recommendations';
+    const title = (movies || shows)
+        ? `${movies} movies (${n('movie_posters_unavailable')} unavailable), `
+          + `${shows} shows (${n('show_posters_unavailable')} unavailable)`
+        : 'conjurr returned no recommendations for this user; pull again to retry';
+    return { movies, shows, label, title };
+}
+
 function buildRecsUserRows() {
     recsPayload = readJSONFromScript('recommendations-json');
     const host = document.getElementById('recs-user-list');
     if (!host) return;
+    host.innerHTML = '';
 
     const users = Object.keys(recsPayload || {}).filter(Boolean).sort();
 
     users.forEach(userKey => {
         const display = userDict[userKey] || userKey;
         const id = `recs-user-${slug(display)}`;
+        const counts = recsCountsForUser(recsPayload[userKey] || {});
+        const isEmpty = !counts.movies && !counts.shows;
 
         const row = document.createElement('div');
         row.className = 'col-12 mb-2';
@@ -174,9 +191,11 @@ function buildRecsUserRows() {
                             data-type="recommendations" data-id="${id}"
                             data-name="Recommendations: ${escapeHtml(display)}"
                             data-user-key="${escapeHtml(userKey)}"
+                            ${isEmpty ? `disabled title="${escapeHtml(counts.title)}"` : ''}
                             style="font-size: .8rem; padding: .25rem .5rem;">Add</button>
                 </div>
                 <span class="snapin-row-label" title="${escapeHtml(display)}">${escapeHtml(display)}</span>
+                <span class="snapin-row-count${isEmpty ? ' is-empty' : ''}" title="${escapeHtml(counts.title)}">${escapeHtml(counts.label)}</span>
             </div>`;
         host.appendChild(row);
     });

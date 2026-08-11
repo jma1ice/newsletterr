@@ -219,6 +219,7 @@ def settings():
             coming_soon_grid_columns = request.form.get("coming_soon_grid_columns", "5")
             collections_grid_columns = request.form.get("collections_grid_columns", "5")
             ra_show_description = request.form.get("ra_show_description", "enabled")
+            recs_show_description = request.form.get("recs_show_description", "enabled")
             exclude_inactive_days = request.form.get("exclude_inactive_days", "0")
             include_user_info = request.form.get("include_user_info", "enabled")
             hosted_enabled = request.form.get("hosted_enabled", "disabled")
@@ -270,6 +271,8 @@ def settings():
             email_header_bg = (request.form.get("email_header_bg") or "").strip()
             if request.form.get("email_header_bg_mode") != "solid" or not is_hex_color(email_header_bg):
                 email_header_bg = ""
+            email_eyebrow_text = (request.form.get("email_eyebrow_text") or "").strip()[:120]
+            email_auto_header_text = "enabled" if request.form.get("email_auto_header_text") == "enabled" else "disabled"
             stat_cover_art = request.form.get("stat_cover_art", "disabled")
             send_mode = request.form.get("send_mode", "bcc")
             poster_max_height = request.form.get("poster_max_height", "")
@@ -322,8 +325,8 @@ def settings():
                 INSERT INTO settings
                 (id, from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, plex_url, plex_web_url, tautulli_url,
                     tautulli_api, conjurr_url, droppedneedle_url, droppedneedle_api_key, recipient_display_name, logo_filename, logo_width, email_theme, primary_color, secondary_color, accent_color, background_color,
-                    text_color, from_name, custom_logo_filename, login_toggle, nl_username, nl_password, default_intro_text, default_outro_text, hsts_enabled, scheduled_subject_prefix, logo_position, hide_stat_play_counts, hide_graph_play_counts, stats_type, recently_added_mode, recently_added_sort, ra_grid_columns, recs_grid_columns, recs_item_count, stat_cover_art, send_mode, poster_max_height, discord_webhook_url, sonarr_url, sonarr_api_key, radarr_url, radarr_api_key, ombi_url, ombi_api_key, seerr_url, seerr_api_key, coming_soon_days_ahead, coming_soon_grid_columns, hosted_enabled, hosted_base_url, hosted_images_enabled, hosted_image_retention_days, hosted_links_enabled, hosted_links_base_url, collections_grid_columns, ra_show_description, exclude_inactive_days, include_user_info, email_size_warn_mb, pride_flag, snapins_floating, ui_custom_light, ui_custom_dark, email_layout, email_show_server_name, email_header_bg, media_server_type, jellyfin_url, jellyfin_api_key, jellyfin_web_url, jellywatch_url, jellywatch_api_key)
-                VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    text_color, from_name, custom_logo_filename, login_toggle, nl_username, nl_password, default_intro_text, default_outro_text, hsts_enabled, scheduled_subject_prefix, logo_position, hide_stat_play_counts, hide_graph_play_counts, stats_type, recently_added_mode, recently_added_sort, ra_grid_columns, recs_grid_columns, recs_item_count, stat_cover_art, send_mode, poster_max_height, discord_webhook_url, sonarr_url, sonarr_api_key, radarr_url, radarr_api_key, ombi_url, ombi_api_key, seerr_url, seerr_api_key, coming_soon_days_ahead, coming_soon_grid_columns, hosted_enabled, hosted_base_url, hosted_images_enabled, hosted_image_retention_days, hosted_links_enabled, hosted_links_base_url, collections_grid_columns, ra_show_description, recs_show_description, exclude_inactive_days, include_user_info, email_size_warn_mb, pride_flag, snapins_floating, ui_custom_light, ui_custom_dark, email_layout, email_show_server_name, email_header_bg, email_eyebrow_text, email_auto_header_text, media_server_type, jellyfin_url, jellyfin_api_key, jellyfin_web_url, jellywatch_url, jellywatch_api_key)
+                VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT (id) DO UPDATE
                 SET from_email = excluded.from_email, alias_email = excluded.alias_email, reply_to_email = excluded.reply_to_email, password = excluded.password,
                     smtp_username = excluded.smtp_username, smtp_server = excluded.smtp_server, smtp_port = excluded.smtp_port, smtp_protocol = excluded.smtp_protocol,
@@ -360,6 +363,7 @@ def settings():
                     hosted_links_base_url = excluded.hosted_links_base_url,
                     collections_grid_columns = excluded.collections_grid_columns,
                     ra_show_description = excluded.ra_show_description,
+                    recs_show_description = excluded.recs_show_description,
                     exclude_inactive_days = excluded.exclude_inactive_days,
                     include_user_info = excluded.include_user_info,
                     email_size_warn_mb = excluded.email_size_warn_mb,
@@ -370,6 +374,8 @@ def settings():
                     email_layout = excluded.email_layout,
                     email_show_server_name = excluded.email_show_server_name,
                     email_header_bg = excluded.email_header_bg,
+                    email_eyebrow_text = excluded.email_eyebrow_text,
+                    email_auto_header_text = excluded.email_auto_header_text,
                     media_server_type = excluded.media_server_type,
                     jellyfin_url = excluded.jellyfin_url,
                     jellyfin_api_key = excluded.jellyfin_api_key,
@@ -381,7 +387,7 @@ def settings():
                   custom_logo_filename, login_toggle, nl_username, nl_password, default_intro_text, default_outro_text, hsts_enabled, scheduled_subject_prefix, logo_position,
                   hide_stat_play_counts, hide_graph_play_counts, stats_type, recently_added_mode, recently_added_sort, ra_grid_columns, recs_grid_columns, recs_item_count, stat_cover_art, send_mode, poster_max_height, discord_webhook_url,
                   sonarr_url, sonarr_api_key, radarr_url, radarr_api_key, ombi_url, ombi_api_key, seerr_url, seerr_api_key, coming_soon_days_ahead, coming_soon_grid_columns, hosted_enabled, hosted_base_url, hosted_images_enabled, hosted_image_retention_days, hosted_links_enabled, hosted_links_base_url,
-                  collections_grid_columns, ra_show_description, exclude_inactive_days, include_user_info, email_size_warn_mb, pride_flag, snapins_floating, ui_custom_light, ui_custom_dark, email_layout, email_show_server_name, email_header_bg,
+                  collections_grid_columns, ra_show_description, recs_show_description, exclude_inactive_days, include_user_info, email_size_warn_mb, pride_flag, snapins_floating, ui_custom_light, ui_custom_dark, email_layout, email_show_server_name, email_header_bg, email_eyebrow_text, email_auto_header_text,
                   media_server_type, jellyfin_url, jellyfin_api_key, jellyfin_web_url, jellywatch_url, jellywatch_api_key))
             conn.commit()
             cursor.execute("SELECT plex_token FROM settings WHERE id = 1")
@@ -436,6 +442,8 @@ def settings():
                 "email_layout": email_layout,
                 "email_show_server_name": email_show_server_name,
                 "email_header_bg": email_header_bg,
+                "email_eyebrow_text": email_eyebrow_text,
+                "email_auto_header_text": email_auto_header_text,
                 "stat_cover_art": stat_cover_art,
                 "send_mode": send_mode,
                 "poster_max_height": poster_max_height,
@@ -458,6 +466,7 @@ def settings():
                 "coming_soon_grid_columns": coming_soon_grid_columns,
                 "collections_grid_columns": collections_grid_columns,
                 "ra_show_description": ra_show_description,
+                "recs_show_description": recs_show_description,
                 "exclude_inactive_days": exclude_inactive_days,
                 "include_user_info": include_user_info,
                 "hosted_enabled": hosted_enabled,
@@ -559,6 +568,7 @@ def settings():
                 "coming_soon_grid_columns": request.form.get("coming_soon_grid_columns", "5"),
                 "collections_grid_columns": request.form.get("collections_grid_columns", "5"),
                 "ra_show_description": request.form.get("ra_show_description", "enabled"),
+                "recs_show_description": request.form.get("recs_show_description", "enabled"),
                 "exclude_inactive_days": request.form.get("exclude_inactive_days", "0"),
                 "include_user_info": request.form.get("include_user_info", "enabled"),
                 "recipient_display_name": request.form.get("recipient_display_name", "email"),
@@ -651,6 +661,8 @@ def settings():
     email_layout = s.get("email_layout")
     email_show_server_name = s.get("email_show_server_name")
     email_header_bg = s.get("email_header_bg")
+    email_eyebrow_text = s.get("email_eyebrow_text")
+    email_auto_header_text = s.get("email_auto_header_text")
     stat_cover_art = s.get("stat_cover_art")
     send_mode = s.get("send_mode")
     poster_max_height = s.get("poster_max_height")
@@ -673,6 +685,7 @@ def settings():
     coming_soon_grid_columns = s.get("coming_soon_grid_columns")
     collections_grid_columns = s.get("collections_grid_columns")
     ra_show_description = s.get("ra_show_description")
+    recs_show_description = s.get("recs_show_description")
     exclude_inactive_days = s.get("exclude_inactive_days")
     include_user_info = s.get("include_user_info")
     hosted_enabled = s.get("hosted_enabled")
@@ -736,6 +749,8 @@ def settings():
         "email_layout": email_layout or "classic",
         "email_show_server_name": email_show_server_name or "disabled",
         "email_header_bg": email_header_bg or "",
+        "email_eyebrow_text": email_eyebrow_text or "",
+        "email_auto_header_text": email_auto_header_text or "disabled",
         "stat_cover_art": stat_cover_art or "disabled",
         "send_mode": send_mode or "bcc",
         "poster_max_height": poster_max_height or "",
@@ -751,6 +766,7 @@ def settings():
         "coming_soon_grid_columns": coming_soon_grid_columns or "5",
         "collections_grid_columns": collections_grid_columns or "5",
         "ra_show_description": ra_show_description or "enabled",
+        "recs_show_description": recs_show_description or "enabled",
         "exclude_inactive_days": exclude_inactive_days if exclude_inactive_days is not None else "0",
         "include_user_info": include_user_info or "enabled",
         "hosted_enabled": hosted_enabled or "disabled",

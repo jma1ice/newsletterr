@@ -67,6 +67,20 @@ def test_pull_stats_without_tautulli_returns_400(csrf_client, seeded_settings):
     resp = _post_json(client, token, "/pull_stats", {})
     assert resp.status_code == 400  # was a 500 crash on None.rstrip
 
+def test_index_bootstrap_time_range_tolerates_empty_cache_info(app):
+    # only main.index backfills cache_info['graph_data']['params']; the pull
+    # routes re-render index.html with whatever get_cache_info returned, so an
+    # empty graph_data cache used to raise UndefinedError here and 500 the pull
+    from pathlib import Path
+    src = Path(app.root_path).parent / "templates" / "partials" / "_index_scripts.html"
+    line = next(ln for ln in src.read_text().splitlines() if "currentTimeRange:" in ln)
+    expr = app.jinja_env.from_string(line[line.index("{{"):line.rindex("}}") + 2])
+
+    assert expr.render() == "30"                                        # no cache_info at all
+    assert expr.render(cache_info={"graph_data": {"exists": False}}) == "30"
+    assert expr.render(cache_info={"graph_data": {"params": None}}) == "30"
+    assert expr.render(cache_info={"graph_data": {"params": {"time_range": 90}}}) == "90"
+
 def test_schedule_create_missing_fields_returns_400(csrf_client):
     client, token = csrf_client
     resp = _post_json(client, token, "/scheduling/create", {"name": "x"})

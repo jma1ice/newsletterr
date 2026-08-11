@@ -873,6 +873,17 @@
     min-width: 0;
     font-size: 0.9rem;
 }
+/* per-user recommendation counts, pinned to the right edge of the row like the
+   recently-added count input; --warning when conjurr returned nothing so an
+   empty pull is visible before the snap-in is added */
+.builder-page .snapin-row-count {
+    margin-left: auto;
+    flex-shrink: 0;
+    white-space: nowrap;
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+}
+.builder-page .snapin-row-count.is-empty { color: var(--warning); }
 .builder-page .snapin-row-actions {
     display: flex;
     align-items: center;

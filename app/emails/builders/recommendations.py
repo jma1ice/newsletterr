@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 from app.emails.builders.users import get_user_display_name
 
-def build_recommendations_html_with_cids(recs_data, msg_root, theme_colors, user_emails=None, base_url="", display_preference='email', users_full_data=None, recs_grid_columns=5, poster_max_height=0, hosted_images_enabled=False, hosted_base_url=""):
+def build_recommendations_html_with_cids(recs_data, msg_root, theme_colors, user_emails=None, base_url="", display_preference='email', users_full_data=None, recs_grid_columns=5, poster_max_height=0, hosted_images_enabled=False, hosted_base_url="", show_description=True):
     if not recs_data:
         return ""
     
@@ -40,7 +40,8 @@ def build_recommendations_html_with_cids(recs_data, msg_root, theme_colors, user
             recs_grid_columns=recs_grid_columns,
             poster_max_height=poster_max_height,
             hosted_images_enabled=hosted_images_enabled,
-            hosted_base_url=hosted_base_url
+            hosted_base_url=hosted_base_url,
+            show_description=show_description
         )
 
         shows_html = build_recommendations_section_with_cids(
@@ -54,7 +55,8 @@ def build_recommendations_html_with_cids(recs_data, msg_root, theme_colors, user
             recs_grid_columns=recs_grid_columns,
             poster_max_height=poster_max_height,
             hosted_images_enabled=hosted_images_enabled,
-            hosted_base_url=hosted_base_url
+            hosted_base_url=hosted_base_url,
+            show_description=show_description
         )
         
         if movies_html or shows_html:
@@ -206,7 +208,7 @@ def build_droppedneedle_server_stats_html_with_cids(server_data, msg_root, theme
         </div>
     """
 
-def build_recommendations_section_with_cids(available_items, unavailable_items, title, msg_root, section_prefix, theme_colors, base_url="", recs_grid_columns=5, poster_max_height=0, hosted_images_enabled=False, hosted_base_url=""):
+def build_recommendations_section_with_cids(available_items, unavailable_items, title, msg_root, section_prefix, theme_colors, base_url="", recs_grid_columns=5, poster_max_height=0, hosted_images_enabled=False, hosted_base_url="", show_description=True):
     if not available_items and not unavailable_items:
         return ""
 
@@ -244,7 +246,7 @@ def build_recommendations_section_with_cids(available_items, unavailable_items, 
             title_text = item.get('title', 'Unknown')
             year = item.get('year', '')
             vote = item.get('vote', '')
-            overview = item.get('overview', '')[:100] + "..." if item.get('overview') else ""
+            overview = item.get('overview', '')[:100] + "..." if (item.get('overview') and show_description) else ""
             runtime = item.get('runtime', '')
 
             if is_unavailable:

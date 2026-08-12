@@ -139,7 +139,11 @@ window.pullRunners.stats = async function ({ chained = false } = {}) {
 
         if (data.time_range) currentTimeRange = parseInt(data.time_range);
 
+        // Fresh data invalidates every chart already drawn or captured; the
+        // bump makes the next preview or send redraw #graph-N from the new
+        // graphDataList and re-capture it.
         renderedCharts.clear();
+        chartDataGeneration++;
         updatePreview();
 
         if (data.user_dict) {

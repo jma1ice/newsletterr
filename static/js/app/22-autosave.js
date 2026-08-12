@@ -8,22 +8,26 @@
     let baseline = null;
 
     function snapshot() {
+        // The captured chart PNG never goes in the draft: restoring one would
+        // put a picture of last session's data back in the builder, and a few
+        // base64 charts are enough to blow the localStorage quota. A restored
+        // graph re-captures from current data on the first preview.
+        const items = (typeof selectedItems !== 'undefined') ? selectedItems : [];
         return {
             subject: $('subject')?.value || '',
             header: $('email_header_title')?.value || '',
             customHtml: $('custom-html-editor')?.value || '',
-            items: (typeof selectedItems !== 'undefined') ? selectedItems : [],
+            items: items.map(({ chartImage, chartGen, ...rest }) => rest),
             ts: Date.now(),
         };
     }
 
     function signature(snap) {
-        const items = (snap.items || []).map(({ chartImage, ...rest }) => rest);
         return JSON.stringify({
             subject: snap.subject,
             header: snap.header,
             customHtml: snap.customHtml,
-            items,
+            items: snap.items || [],
         });
     }
 

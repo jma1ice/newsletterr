@@ -326,10 +326,7 @@ async function buildPreviewPayload() {
 
     if (!isCustomHtml) {
         for (const item of selectedItems) {
-            if (item.type === 'graph' && !item.chartImage) {
-                const chartImage = await captureChartAsBase64(item.id);
-                if (chartImage) item.chartImage = chartImage;
-            }
+            if (item.type === 'graph') await ensureChartImage(item);
         }
         selectedItems.forEach(item => {
             if (['textblock', 'titleblock', 'headerblock'].includes(item.type)) {

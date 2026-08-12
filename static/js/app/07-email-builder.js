@@ -433,6 +433,32 @@ function updateSelectedItemsDisplay() {
                         </div>` : ''}
                     </div>
                 `;
+            } else if (item.type === 'sonarr_coming_soon' || item.type === 'radarr_coming_soon') {
+                // The calendar and agenda views reflow to a stacked list on
+                // narrow screens; the poster grid keeps its own columns.
+                const csView = item.csView || '';
+
+                htmlContent += `
+                    <div class="selected-item d-flex flex-column p-2 mb-2 border rounded bg-light"
+                         data-index="${index}" draggable="false">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="item-name">${escapeHtml(item.name)}</span>
+                            <div>
+                                <span class="badge badge-secondary me-2">${item.type}</span>
+                                <button type="button" class="btn btn-sm btn-outline-danger remove-item-btn" data-index="${index}">x</button>
+                            </div>
+                        </div>
+                        <div class="d-flex gap-2 align-items-center flex-wrap mt-2">
+                            <label style="font-size: 0.8rem; white-space: nowrap;">Display:</label>
+                            <select class="form-select form-select-sm cs-view-select" data-index="${index}" style="width: auto;">
+                                <option value=""         ${csView === ''         ? 'selected' : ''}>Layout default</option>
+                                <option value="grid"     ${csView === 'grid'     ? 'selected' : ''}>Poster grid</option>
+                                <option value="calendar" ${csView === 'calendar' ? 'selected' : ''}>Calendar</option>
+                                <option value="agenda"   ${csView === 'agenda'   ? 'selected' : ''}>Agenda</option>
+                            </select>
+                        </div>
+                    </div>
+                `;
             } else {
                 htmlContent += `
                     <div class="selected-item d-flex justify-content-between align-items-center p-2 mb-2 border rounded bg-light"
@@ -585,6 +611,19 @@ function updateSelectedItemsDisplay() {
                     selectedItems[index].raOrientation = e.target.value;
                 } else {
                     delete selectedItems[index].raOrientation;
+                }
+                debouncedUpdatePreview();
+            });
+        });
+
+        document.querySelectorAll('.cs-view-select').forEach(sel => {
+            sel.addEventListener('change', (e) => {
+                const index = parseInt(e.target.dataset.index);
+                if (!selectedItems[index]) return;
+                if (e.target.value) {
+                    selectedItems[index].csView = e.target.value;
+                } else {
+                    delete selectedItems[index].csView;
                 }
                 debouncedUpdatePreview();
             });
@@ -743,6 +782,68 @@ function captureChartAsBase64(chartId) {
     }
 }
 
+// Single source for the builder's chart config. Called on add, on template
+// load, and again after every stats pull, so the instance in #graph-N always
+// reflects the current graphDataList rather than whatever it was first drawn
+// with. Returns false when the index has no data to draw.
+function renderGraphChart(id) {
+    const index = parseInt(id.split('-')[1], 10);
+    const graphData = graphDataList[index];
+    const commandInfo = graphCommands[index];
+
+    if (!graphData || !commandInfo) {
+        console.warn('No graph data available for', id);
+        return false;
+    }
+
+    try {
+        loadIBMPlexSans();
+
+        Highcharts.chart(id, {
+            chart: {
+                type: 'line',
+                style: {
+                    fontFamily: 'IBM Plex Sans, Segoe UI, Helvetica, Arial, sans-serif'
+                }
+            },
+            title: { text: commandInfo.name + ' - Last ' + currentTimeRange + ' days' },
+            exporting: { enabled: true },
+            xAxis: { categories: graphData.categories },
+            yAxis: { title: { text: hideGraphPlayCounts ? null : (statType === 'duration' ? 'Duration' : 'Plays') }, labels: { enabled: !hideGraphPlayCounts } },
+            tooltip: hideGraphPlayCounts ? { enabled: false } : {},
+            series: graphData.series
+        });
+
+        renderedCharts.add(id);
+        applyChartTheme(document.documentElement.classList.contains('dark'));
+        return true;
+    } catch (err) {
+        console.warn('Failed to render graph', id, err);
+        return false;
+    }
+}
+
+// Refresh item.chartImage when it is missing or was captured from older data.
+// That PNG is what actually ships (app/emails/blocks.py attaches it), so this
+// runs before every preview and every send instead of once at add time. The
+// generation check keeps a settled chart from being re-captured on each
+// keystroke while still guaranteeing a re-capture after a pull.
+async function ensureChartImage(item) {
+    if (item.chartImage && item.chartGen === chartDataGeneration) return;
+
+    if (!renderedCharts.has(item.id) || item.chartGen !== chartDataGeneration) {
+        if (!renderGraphChart(item.id)) return;
+        // Highcharts needs a beat before getSVG() reflects the new series
+        await new Promise(resolve => setTimeout(resolve, 500));
+    }
+
+    const chartImage = await captureChartAsBase64(item.id);
+    if (chartImage) {
+        item.chartImage = chartImage;
+        item.chartGen = chartDataGeneration;
+    }
+}
+
 function loadIBMPlexSans() {
     if (!document.querySelector('link[href*="IBM+Plex+Sans"]')) {
         const link = document.createElement('link');
@@ -767,42 +868,10 @@ async function addItemWithChartCapture(id, name, type, extra = {}) {
 
     if (type === 'graph') {
         console.log('Capturing chart for:', id);
-        
-        if (!renderedCharts.has(id)) {
-            try {
-                loadIBMPlexSans();
 
-                const index = parseInt(id.split('-')[1], 10);
-                const graphData = graphDataList[index];
+        await ensureChartImage(item);
 
-                Highcharts.chart(id, {
-                    chart: { 
-                        type: 'line',
-                        style: {
-                            fontFamily: 'IBM Plex Sans, Segoe UI, Helvetica, Arial, sans-serif'
-                        }
-                    },
-                    title: { text: graphCommands[index].name + ' - Last ' + currentTimeRange + ' days' },
-                    exporting: { enabled: true },
-                    xAxis: { categories: graphData.categories },
-                    yAxis: { title: { text: hideGraphPlayCounts ? null : (statType === 'duration' ? 'Duration' : 'Plays') }, labels: { enabled: !hideGraphPlayCounts } },
-                    tooltip: hideGraphPlayCounts ? { enabled: false } : {},
-                    series: graphData.series
-                });
-
-                renderedCharts.add(id);
-                const nowDark = document.documentElement.classList.contains('dark');
-                applyChartTheme(nowDark);
-            } catch (err) {
-                console.warn('Failed to render graph', id, err);
-            }
-        }
-        
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        const chartImage = await captureChartAsBase64(id);
-        if (chartImage) {
-            item.chartImage = chartImage;
+        if (item.chartImage) {
             console.log('Successfully captured chart image for:', id);
         } else {
             console.warn('Failed to capture chart image for:', id);
@@ -826,29 +895,10 @@ function addItem(id, name, type, extra = {}) {
         return false;
     }
 
+    // No capture here: the sync path leaves item.chartImage unset so the next
+    // preview or send fills it in from current data via ensureChartImage.
     if (type === 'graph' && !renderedCharts.has(id)) {
-        try {
-            const index = parseInt(id.split('-')[1], 10);
-            const graphData = graphDataList[index];
-
-            Highcharts.chart(id, {
-                chart: { type: 'line' },
-                title: { text: graphCommands[index].name },
-                exporting: { enabled: true },
-                xAxis: { categories: graphData.categories },
-                yAxis: { title: { text: hideGraphPlayCounts ? null : (statType === 'duration' ? 'Duration' : 'Plays') }, labels: { enabled: !hideGraphPlayCounts } },
-                tooltip: hideGraphPlayCounts ? { enabled: false } : {},
-                series: graphData.series
-            });
-
-            renderedCharts.add(id);
-
-            const nowDark = document.documentElement.classList.contains('dark');
-            applyChartTheme(nowDark);
-            console.log('Auto-rendered graph:', id);
-        } catch (err) {
-            console.warn('Failed to auto-render graph', id, err);
-        }
+        renderGraphChart(id);
     }
 
     const item = { id, name: name || id, type, ...extra };

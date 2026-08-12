@@ -36,8 +36,17 @@ def empty_state_html(theme_colors, message):
     </div>
     """
 
+MIN_AUTO_COLUMNS = 3
+
+def effective_columns(grid_columns, item_count):
+    """Columns to actually lay a snap-in out with."""
+    cols = max(1, int(grid_columns) if grid_columns else 5)
+    if not item_count:
+        return cols
+    return max(1, min(cols, max(item_count, MIN_AUTO_COLUMNS)))
+
 def build_calendar_grid_html(cards, msg_root, theme_colors, title, base_url, grid_columns):
-    items_per_row = max(1, int(grid_columns) if grid_columns else 5)
+    items_per_row = effective_columns(grid_columns, len(cards))
     cell_width_pct = f"{100 / items_per_row:.4f}%"
 
     rows_html = ""

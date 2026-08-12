@@ -16,12 +16,17 @@ from app.emails.builders.card_grid import (
     format_relative_date as _relative,
     empty_state_html as _empty_state_html,
     build_card_html as _build_card_html,
+    effective_columns as _effective_columns,
 )
 from app.emails.builders.coming_soon import (
     _poster_url as _arr_poster_url,
     _arr_poster_src,
     group_sonarr_episodes,
     filter_radarr_upcoming,
+    radarr_events,
+    render_view_html,
+    resolve_view,
+    sonarr_events,
     upcoming_release_date,
 )
 from app.emails.builders.most_watched import (
@@ -748,6 +753,7 @@ def render_recently_added(layout, recent_data, msg_root, theme, library_filter=N
 
     # The strip used to hard-stop at six posters in a single row; it now wraps
     # every item into rows of ra_grid_columns like the other grid layouts.
+    cols = _effective_columns(cols, len(items))
     poster_px = max(40, min(74, int(740 / cols) - 10))
     caption_len = max(10, int(120 / cols) + 6)
     cell_pct = f"{100 / cols:.4f}%"
@@ -777,6 +783,9 @@ def _relative_added(item):
     return f"added {rel}" if rel else ""
 
 def _grid(cards, cols):
+    # A snap-in with fewer cards than columns lays out across its own count so
+    # it fills the row instead of inheriting the widest snap-in's cell width.
+    cols = _effective_columns(cols, len(cards))
     rows_html = ""
     width_pct = f"{100 / cols:.4f}%"
     for i in range(0, len(cards), cols):
@@ -882,8 +891,25 @@ def render_random_pick(layout, pick, msg_root, theme, base_url="", library_label
 
 # ---------------------------------------------------------------- coming soon
 
-def render_sonarr_coming_soon(layout, episodes, msg_root, theme, base_url="", grid_columns=5, hosted_images_enabled=False, hosted_base_url=""):
+def _coming_soon_view_html(layout, theme, label, events, view):
+    """Calendar/agenda HTML inside this layout's section chrome, or None when
+    no event carried a date to place it on."""
+    def container(inner):
+        if layout == 'editorial':
+            return _shell(layout, theme, label, inner, overline="Mark the calendar")
+        return _shell(layout, theme, label, inner)
+    return render_view_html(events, theme, view, label, container=container)
+
+def render_sonarr_coming_soon(layout, episodes, msg_root, theme, base_url="", grid_columns=5, hosted_images_enabled=False, hosted_base_url="", view=""):
     if not episodes:
+        return _shell(layout, theme, "Coming Soon (TV)", _empty_state_html(theme, "No upcoming episodes found."))
+    view = resolve_view(view)
+    if view in ('calendar', 'agenda'):
+        events = sonarr_events(episodes, msg_root, view, base_url, cid_prefix=f"l-cs-tv-{view}",
+                               hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
+        html = _coming_soon_view_html(layout, theme, "Coming Soon (TV)", events, view)
+        if html:
+            return html
         return _shell(layout, theme, "Coming Soon (TV)", _empty_state_html(theme, "No upcoming episodes found."))
     groups = group_sonarr_episodes(episodes)
 
@@ -901,7 +927,7 @@ def render_sonarr_coming_soon(layout, episodes, msg_root, theme, base_url="", gr
         when = first.get('airDateUtc') or first.get('airDate')
         return title, sub, when, series, first
 
-    if layout in _CARD_LAYOUTS:
+    if view == 'grid' or layout in _CARD_LAYOUTS:
         cards = []
         for i, group in enumerate(groups):
             title, sub, when, series, first = entry(group)
@@ -923,12 +949,21 @@ def render_sonarr_coming_soon(layout, episodes, msg_root, theme, base_url="", gr
         return _shell(layout, theme, "Coming Soon (TV)", rows, overline="Mark the calendar")
     return _shell(layout, theme, "Coming Soon (TV)", rows)
 
-def render_radarr_coming_soon(layout, movies, msg_root, theme, base_url="", grid_columns=5, hosted_images_enabled=False, hosted_base_url=""):
+def render_radarr_coming_soon(layout, movies, msg_root, theme, base_url="", grid_columns=5, hosted_images_enabled=False, hosted_base_url="", view=""):
     upcoming = filter_radarr_upcoming(movies or [])
     if not upcoming:
         return _shell(layout, theme, "Coming Soon (Movies)", _empty_state_html(theme, "No upcoming movies found."))
 
-    if layout in _CARD_LAYOUTS:
+    view = resolve_view(view)
+    if view in ('calendar', 'agenda'):
+        events = radarr_events(movies, msg_root, view, base_url, cid_prefix=f"l-cs-mv-{view}",
+                               hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
+        html = _coming_soon_view_html(layout, theme, "Coming Soon (Movies)", events, view)
+        if html:
+            return html
+        return _shell(layout, theme, "Coming Soon (Movies)", _empty_state_html(theme, "No upcoming movies found."))
+
+    if view == 'grid' or layout in _CARD_LAYOUTS:
         cards = []
         for i, movie in enumerate(upcoming):
             rel = _relative(str(upcoming_release_date(movie) or ''))

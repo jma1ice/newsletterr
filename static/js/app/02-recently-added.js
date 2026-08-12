@@ -1,5 +1,10 @@
 let recentPayload = APP.recentPayload;
 const renderedCharts = new Set();
+// Graphs ship as a PNG captured from the live Highcharts instance, so a
+// capture is only valid for the data it was taken from. Pulling stats bumps
+// this counter (alongside clearing renderedCharts), which invalidates every
+// capture and forces a re-render before the next preview or send.
+let chartDataGeneration = 0;
 let graphDataList = APP.graphDataList;
 let graphCommands = APP.graphCommands;
 const themeSettings = (() => {

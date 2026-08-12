@@ -12,13 +12,8 @@ async function buildEmailPayload() {
     const previewDoc = previewFrame.contentDocument || previewFrame.contentWindow.document;
     const emailHTML = previewDoc.documentElement.outerHTML;
 
-    for (let item of selectedItems) {
-        if (item.type === 'graph' && !item.chartImage) {
-            const chartImage = await captureChartAsBase64(item.id);
-            if (chartImage) {
-                item.chartImage = chartImage;
-            }
-        }
+    for (const item of selectedItems) {
+        if (item.type === 'graph') await ensureChartImage(item);
     }
 
     selectedItems.forEach(item => {

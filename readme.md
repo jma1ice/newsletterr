@@ -310,6 +310,15 @@ Released under the **MIT License** - see [LICENSE](LICENSE.txt) for details.
 
 ## Recent Changes
 
+## v2026.4.3:
+
+#### New Features:
+* New options for how the coming soon calendar is displayed
+
+#### Fixed:
+* Cards with multiple rows were clamping all rows to one grid size
+* Templates were shipping old captured data
+
 ## v2026.4.2:
 
 #### New Features:

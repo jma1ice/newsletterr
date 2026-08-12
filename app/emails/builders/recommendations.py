@@ -2,6 +2,7 @@ from urllib.parse import quote_plus
 
 from app.config import DEFAULT_PLEX_WEB_URL
 from app.clients.plex import build_plex_web_link
+from app.emails.builders.card_grid import effective_columns
 from app.emails.images import fetch_and_attach_image
 from app.security import escape_html_output as esc
 
@@ -213,7 +214,7 @@ def build_recommendations_section_with_cids(available_items, unavailable_items, 
         return ""
 
     all_items = available_items + unavailable_items
-    items_per_row = max(1, int(recs_grid_columns) if recs_grid_columns else 5)
+    items_per_row = effective_columns(recs_grid_columns, len(all_items))
     cell_width_pct = f"{100 / items_per_row:.4f}%"
 
     # Uniform 2:3 poster box regardless of column count (see recently_added.py).

@@ -1,5 +1,6 @@
 from datetime import datetime, timezone, timedelta
 
+from app.emails.builders.card_grid import effective_columns
 from app.emails.images import fetch_and_attach_image, truncate_text
 from app.security import escape_html_output as esc
 
@@ -115,7 +116,7 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
     items_html = ""
     # orientation is the builder item's per-snap-in override: 'list' stacks the
     # items one per row, anything else keeps the poster grid.
-    items_per_row = 1 if orientation == 'list' else max(1, int(ra_grid_columns) if ra_grid_columns else 5)
+    items_per_row = 1 if orientation == 'list' else effective_columns(ra_grid_columns, len(items))
     cell_width_pct = f"{100 / items_per_row:.4f}%"
 
     if orientation == 'list':

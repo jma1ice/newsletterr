@@ -137,7 +137,7 @@ async function saveCurrentTemplate(name) {
             .map(item => _sentinelContent(item))
             .filter(content => content.trim().length > 0);
 
-        const itemsWithContent = selectedItems.map(item => {
+        const itemsWithContent = selectedItems.map(({ chartImage, chartGen, ...item }) => {
             if (item.type === 'textblock' || item.type === 'titleblock' || item.type === 'headerblock') {
                 return { ...item, content: _sentinelContent(item) };
             }
@@ -206,7 +206,10 @@ function loadTemplate(template) {
             btn.disabled = false;
         });
         
-        selectedItems = items.map(item => {
+        selectedItems = items.map(({ chartImage, chartGen, ...item }) => {
+            // chartImage is dropped on save now, but templates saved before
+            // that carry one; discarding it here heals those rows instead of
+            // mailing a chart captured months ago.
             const restored = { ...item };
             if (restored.type === 'textblock' || restored.type === 'titleblock' || restored.type === 'headerblock') {
                 const counter = parseInt(restored.id.split('-')[2]);
@@ -242,33 +245,7 @@ function loadTemplate(template) {
         
         selectedItems.forEach(item => {
             if (item.type === 'graph' && !renderedCharts.has(item.id)) {
-                try {
-                    const index = parseInt(item.id.split('-')[1]);
-                    const graphData = graphDataList[index];
-
-                    if (graphData && graphCommands[index]) {
-                        Highcharts.chart(item.id, {
-                            chart: { type: 'line' },
-                            title: { text: graphCommands[index].name },
-                            exporting: {
-                                enabled: true
-                            },
-                            xAxis: { categories: graphData.categories },
-                            yAxis: { title: { text: hideGraphPlayCounts ? null : (statType === 'duration' ? 'Duration' : 'Plays') }, labels: { enabled: !hideGraphPlayCounts } },
-                            tooltip: hideGraphPlayCounts ? { enabled: false } : {},
-                            series: graphData.series
-                        });
-
-                        renderedCharts.add(item.id);
-                        
-                        const nowDark = document.documentElement.classList.contains('dark');
-                        applyChartTheme(nowDark);
-                        
-                        console.log('Auto-rendered graph during template load:', item.id);
-                    }
-                } catch (error) {
-                    console.warn('Failed to auto-render graph during template load', item.id, error);
-                }
+                renderGraphChart(item.id);
             }
         });
         

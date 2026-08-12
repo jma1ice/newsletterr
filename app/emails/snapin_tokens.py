@@ -2,13 +2,16 @@
 #
 # Grammar: {{snapin:NAME}} and {{snapin:NAME:ARG}} (recently_added takes
 # optional trailing ARGs for the per-library count and the grid/list
-# orientation). Each supported name maps
+# orientation; the coming_soon names take an optional view word).
+# Each supported name maps
 # onto the assemble per-item dispatch; expansion synthesizes the equivalent
 # selected_item and renders it through the exact same code path, so tokens
 # are layout-aware and preview-mode aware for free. Graphs are excluded:
 # their images are captured client-side per builder item and custom HTML has
 # no items to carry them.
 import re
+
+from app.emails.builders.calendar_view import VIEWS as COMING_SOON_VIEWS
 
 import logging
 
@@ -87,7 +90,13 @@ def synthesize_snapin_item(name, args, stats):
         return None
 
     if name in SIMPLE_TOKEN_TYPES:
-        return {'id': f'token-{name}', 'type': SIMPLE_TOKEN_TYPES[name]}
+        item = {'id': f'token-{name}', 'type': SIMPLE_TOKEN_TYPES[name]}
+        # coming_soon_tv|coming_soon_movies:<grid|calendar|agenda> - the view
+        # word is the only argument these take; anything else is ignored so a
+        # typo falls back to the layout default rather than dropping the item.
+        if name.startswith('coming_soon') and args and args[0].lower() in COMING_SOON_VIEWS:
+            item['csView'] = args[0].lower()
+        return item
 
     return None
 

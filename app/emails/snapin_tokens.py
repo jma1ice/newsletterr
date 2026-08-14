@@ -49,6 +49,21 @@ def synthesize_snapin_item(name, args, stats):
                 item['raCount'] = arg
         return item
 
+    if name == 'recently_released':
+        # recently_released:<Library>[:count][:grid|list] - same grammar as
+        # recently_added, since it renders through the same builders.
+        item = {'id': 'token-recently-released', 'type': 'recently_released'}
+        if args and args[0]:
+            item['rrLibrary'] = args[0]
+        for arg in args[1:]:
+            if not arg:
+                continue
+            if arg.lower() in ('grid', 'list'):
+                item['rrOrientation'] = arg.lower()
+            else:
+                item['rrCount'] = arg
+        return item
+
     if name == 'most_watched':
         # most_watched:<Library>[:count][:recent] - 'recent' scopes plays to
         # the pull's time range instead of all-time counts. The scope word is

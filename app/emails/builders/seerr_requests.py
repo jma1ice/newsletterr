@@ -3,6 +3,7 @@
 # resolved at fetch time), so this builder only filters and renders.
 from datetime import datetime, timezone
 
+from app.emails import density
 from app.emails.builders.card_grid import empty_state_html as _empty_state_html, build_calendar_grid_html as _build_calendar_grid_html, build_card_html as _build_card_html, format_relative_date as _format_relative_date
 from app.emails.images import fetch_and_attach_image, truncate_text
 
@@ -63,6 +64,7 @@ def build_seerr_requests_html_with_cids(data, msg_root, theme_colors, base_url="
     if not entries:
         return _empty_state_html(theme_colors, "No pending or approved requests found.")
 
+    art_on = density.show_art(theme_colors)
     cards = []
     for i, entry in enumerate(entries):
         status = "Approved" if entry['approved'] else "Pending Approval"
@@ -71,10 +73,10 @@ def build_seerr_requests_html_with_cids(data, msg_root, theme_colors, base_url="
         extra_line = truncate_text(f"Requested by {entry['requested_by']}", 46) if include_user_info and entry.get('requested_by') else None
 
         poster_src = None
-        poster_url = _poster_src(entry['poster'])
+        poster_url = _poster_src(entry['poster']) if art_on else None
         if poster_url:
             poster_src = fetch_and_attach_image(poster_url, msg_root, f"seerr-{i}", base_url, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
 
-        cards.append(_build_card_html(theme_colors, truncate_text(entry['title'], 23), entry['year'], meta_text, poster_src, extra_line=extra_line))
+        cards.append(_build_card_html(theme_colors, truncate_text(entry['title'], 23), entry['year'], meta_text, poster_src, extra_line=extra_line, compact=not art_on))
 
     return _build_calendar_grid_html(cards, msg_root, theme_colors, "Recent Requests", base_url, grid_columns)

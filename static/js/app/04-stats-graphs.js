@@ -1326,7 +1326,7 @@ function buildCollectionPreviewHTMLForEmail(title, collections, stableGroupId = 
     let hasExpandedCollections = false;
     
     collections.forEach((collection, index) => {
-        const collectionId = `${stableGroupId}-${index}-${collection.key}`;
+        const collectionId = collectionExpansionKey(stableGroupId, collection.key);
         const expandedItems = window.expandedCollections[collectionId];
         
         if (expandedItems && Object.keys(expandedItems).length > 0) {

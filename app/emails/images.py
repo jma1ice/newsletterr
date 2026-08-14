@@ -192,10 +192,23 @@ def fetch_and_attach_image(image_url, msg_root, cid_name, base_url="", max_heigh
         logger.exception(f"Error processing image {image_url}: {e}")
         return None
 
+def blur_image_bytes(raw):
+    image = Image.open(io.BytesIO(raw))
+    if image.mode in ('RGBA', 'LA', 'P'):
+        image = image.convert('RGB')
+    darkened = ImageEnhance.Brightness(image.filter(ImageFilter.GaussianBlur(radius=30))).enhance(0.7)
+    out = io.BytesIO()
+    darkened.save(out, format='JPEG', quality=85)
+    return out.getvalue()
+
 def fetch_and_attach_blurred_image(image_url, msg_root, cid_name, base_url="", hosted_images_enabled=False, hosted_base_url=""):
     if is_preview(msg_root):
-        # preview shows the sharp source; the blur/darken pass is send-only
-        return _preview_url(image_url)
+        # Preview asks the proxy for the same blur/darken the send bakes in,
+        # so the card reads the way it will in the inbox.
+        url = _preview_url(image_url)
+        if url and url.startswith('/proxy-art'):
+            return f"{url}{'&' if '?' in url else '?'}blur=1"
+        return url
     if image_url.lower().endswith('.gif'):
         return fetch_and_attach_image(image_url, msg_root, cid_name, base_url, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
     try:
@@ -213,19 +226,7 @@ def fetch_and_attach_blurred_image(image_url, msg_root, cid_name, base_url="", h
         response = safe_get(full_url, timeout=10, headers=headers)
         response.raise_for_status()
         
-        image = Image.open(io.BytesIO(response.content))
-        
-        if image.mode in ('RGBA', 'LA', 'P'):
-            image = image.convert('RGB')
-        
-        blurred = image.filter(ImageFilter.GaussianBlur(radius=30))
-        
-        enhancer = ImageEnhance.Brightness(blurred)
-        darkened = enhancer.enhance(0.7)
-        
-        img_bytes = io.BytesIO()
-        darkened.save(img_bytes, format='JPEG', quality=85)
-        img_bytes.seek(0)
+        img_bytes = io.BytesIO(blur_image_bytes(response.content))
 
         if hosted_images_enabled and hosted_base_url:
             try:

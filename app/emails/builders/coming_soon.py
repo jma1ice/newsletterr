@@ -2,6 +2,7 @@
 # buildRadarrComingSoonPreviewHTML in static/js/app/04-stats-graphs.js.
 from datetime import datetime, timezone
 
+from app.emails import density
 from app.emails.builders.card_grid import format_relative_date as _format_relative_date, empty_state_html as _empty_state_html, build_calendar_grid_html as _build_calendar_grid_html, build_card_html as _build_card_html
 from app.emails.builders.calendar_view import (
     VIEWS,
@@ -112,6 +113,47 @@ def group_sonarr_episodes(episodes):
         groups.append(entry)
     return groups
 
+KINDS = ('all', 'premieres', 'new-series')
+
+def resolve_kind(kind):
+    kind = (kind or '').strip().lower()
+    return kind if kind in KINDS else 'all'
+
+def episode_kind(ep):
+    season = ep.get('seasonNumber')
+    number = ep.get('episodeNumber')
+    if number != 1:
+        return 'episode'
+    if season == 1:
+        return 'new-series'
+    if isinstance(season, int) and season > 1:
+        return 'premiere'
+    return 'episode'
+
+def filter_sonarr_by_kind(episodes, kind):
+    kind = resolve_kind(kind)
+    if kind == 'all':
+        return list(episodes or [])
+    wanted = {'new-series'} if kind == 'new-series' else {'new-series', 'premiere'}
+    return [ep for ep in (episodes or []) if episode_kind(ep) in wanted]
+
+def _coerce_limit(limit):
+    try:
+        value = int(limit or 0)
+    except (TypeError, ValueError):
+        return 0
+    return value if value > 0 else 0
+
+def sonarr_groups(episodes, kind='', limit=0):
+    groups = group_sonarr_episodes(filter_sonarr_by_kind(episodes, kind))
+    limit = _coerce_limit(limit)
+    return groups[:limit] if limit else groups
+
+def radarr_upcoming(movies, limit=0):
+    upcoming = filter_radarr_upcoming(movies or [])
+    limit = _coerce_limit(limit)
+    return upcoming[:limit] if limit else upcoming
+
 _CALENDAR_THUMB_HEIGHT = 120
 _AGENDA_THUMB_HEIGHT = 88
 
@@ -129,11 +171,12 @@ def _view_thumb(poster_url, msg_root, cid_name, base_url, view, hosted_images_en
                                             hosted_images_enabled=hosted_images_enabled,
                                             hosted_base_url=hosted_base_url)
 
-def sonarr_events(episodes, msg_root, view, base_url="", cid_prefix="cs-tv", hosted_images_enabled=False, hosted_base_url=""):
+def sonarr_events(episodes, msg_root, view, base_url="", cid_prefix="cs-tv", hosted_images_enabled=False, hosted_base_url="", with_posters=True, kind="", limit=0):
     """Normalized calendar entries for the Sonarr snap-in, one per grouped
-    season drop or single episode."""
+    season drop or single episode. with_posters=False (the compact densities)
+    skips the artwork fetch entirely rather than dropping it at render time."""
     events = []
-    for i, group in enumerate(group_sonarr_episodes(episodes or [])):
+    for i, group in enumerate(sonarr_groups(episodes, kind, limit)):
         series = group['series']
         eps = group['episodes']
         first_ep = eps[0]
@@ -149,22 +192,23 @@ def sonarr_events(episodes, msg_root, view, base_url="", cid_prefix="cs-tv", hos
             se_label = f"S{int(season):02d}E{int(episode_num):02d}" if season is not None and episode_num is not None else ""
             subtitle = ' - '.join(filter(None, [se_label, first_ep.get('title', '')]))
 
-        poster = _poster_url(series.get('images')) or _poster_url(first_ep.get('images'))
+        poster = _poster_url(series.get('images')) or _poster_url(first_ep.get('images')) if with_posters else None
         poster_src = _view_thumb(_arr_poster_src(poster, '/proxy-sonarr-art'), msg_root, f"{cid_prefix}-{i}",
-                                 base_url, view, hosted_images_enabled, hosted_base_url)
+                                 base_url, view, hosted_images_enabled, hosted_base_url) if with_posters else None
         events.append(make_event(day, truncate_text(title, 44), truncate_text(subtitle, 44), poster_src))
     return events
 
-def radarr_events(movies, msg_root, view, base_url="", cid_prefix="cs-mv", hosted_images_enabled=False, hosted_base_url=""):
-    """Normalized calendar entries for the Radarr snap-in."""
+def radarr_events(movies, msg_root, view, base_url="", cid_prefix="cs-mv", hosted_images_enabled=False, hosted_base_url="", with_posters=True, limit=0):
+    """Normalized calendar entries for the Radarr snap-in. with_posters=False
+    (the compact densities) skips the artwork fetch entirely."""
     events = []
-    for i, movie in enumerate(filter_radarr_upcoming(movies or [])):
+    for i, movie in enumerate(radarr_upcoming(movies, limit)):
         day = upcoming_release_date(movie)
         if day is None:
             continue
-        poster = _poster_url(movie.get('images'))
+        poster = _poster_url(movie.get('images')) if with_posters else None
         poster_src = _view_thumb(_arr_poster_src(poster, '/proxy-radarr-art'), msg_root, f"{cid_prefix}-{i}",
-                                 base_url, view, hosted_images_enabled, hosted_base_url)
+                                 base_url, view, hosted_images_enabled, hosted_base_url) if with_posters else None
         year = movie.get('year') or ''
         events.append(make_event(day, truncate_text(movie.get('title', 'Unknown'), 44), str(year), poster_src))
     return events
@@ -183,19 +227,23 @@ def render_view_html(events, theme_colors, view, title, container=None):
         return build_month_calendar_html(events, theme_colors, today, container)
     return build_agenda_html(events, theme_colors, today, container)
 
-def build_sonarr_coming_soon_html_with_cids(episodes, msg_root, theme_colors, base_url="", grid_columns=5, hosted_images_enabled=False, hosted_base_url="", view=""):
+def build_sonarr_coming_soon_html_with_cids(episodes, msg_root, theme_colors, base_url="", grid_columns=5, hosted_images_enabled=False, hosted_base_url="", view="", kind="", limit=0):
     if not episodes:
         return _empty_state_html(theme_colors, "No upcoming episodes found.")
 
     view = resolve_view(view)
     if view in ('calendar', 'agenda'):
-        events = sonarr_events(episodes, msg_root, view, base_url, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
+        events = sonarr_events(episodes, msg_root, view, base_url, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url,
+                               with_posters=density.show_art(theme_colors), kind=kind, limit=limit)
         html = render_view_html(events, theme_colors, view, "Coming Soon (TV)")
         if html:
             return html
         return _empty_state_html(theme_colors, "No upcoming episodes found.")
 
-    groups = group_sonarr_episodes(episodes)
+    _art_on = density.show_art(theme_colors)
+    groups = sonarr_groups(episodes, kind, limit)
+    if not groups:
+        return _empty_state_html(theme_colors, "No upcoming episodes found.")
     cards = []
     for i, group in enumerate(groups):
         series = group['series']
@@ -209,7 +257,7 @@ def build_sonarr_coming_soon_html_with_cids(episodes, msg_root, theme_colors, ba
 
         poster = _poster_url(series.get('images')) or _poster_url(first_ep.get('images'))
         poster_src = None
-        poster_url = _arr_poster_src(poster, '/proxy-sonarr-art')
+        poster_url = _arr_poster_src(poster, '/proxy-sonarr-art') if _art_on else None
         if poster_url:
             poster_src = fetch_and_attach_image(poster_url, msg_root, f"sonarr-{i}", base_url, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
 
@@ -225,23 +273,25 @@ def build_sonarr_coming_soon_html_with_cids(episodes, msg_root, theme_colors, ba
             subtitle = truncate_text(' • '.join(filter(None, [year_prefix, se_text])), 40)
         meta_text = truncate_text(' • '.join(filter(None, [f'Airs {relative}' if relative else ''])), 46)
 
-        cards.append(_build_card_html(theme_colors, truncate_text(series_title, 23), subtitle, meta_text, poster_src))
+        cards.append(_build_card_html(theme_colors, truncate_text(series_title, 23), subtitle, meta_text, poster_src, compact=not _art_on))
 
     return _build_calendar_grid_html(cards, msg_root, theme_colors, "Coming Soon (TV)", base_url, grid_columns)
 
-def build_radarr_coming_soon_html_with_cids(movies, msg_root, theme_colors, base_url="", grid_columns=5, hosted_images_enabled=False, hosted_base_url="", view=""):
+def build_radarr_coming_soon_html_with_cids(movies, msg_root, theme_colors, base_url="", grid_columns=5, hosted_images_enabled=False, hosted_base_url="", view="", limit=0):
     view = resolve_view(view)
     if view in ('calendar', 'agenda'):
-        events = radarr_events(movies, msg_root, view, base_url, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
+        events = radarr_events(movies, msg_root, view, base_url, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url,
+                               with_posters=density.show_art(theme_colors), limit=limit)
         html = render_view_html(events, theme_colors, view, "Coming Soon (Movies)")
         if html:
             return html
         return _empty_state_html(theme_colors, "No upcoming movies found.")
 
-    movies = filter_radarr_upcoming(movies)
+    movies = radarr_upcoming(movies, limit)
     if not movies:
         return _empty_state_html(theme_colors, "No upcoming movies found.")
 
+    _art_on = density.show_art(theme_colors)
     cards = []
     for i, movie in enumerate(movies):
         title = movie.get('title', 'Unknown')
@@ -251,13 +301,13 @@ def build_radarr_coming_soon_html_with_cids(movies, msg_root, theme_colors, base
 
         poster = _poster_url(movie.get('images'))
         poster_src = None
-        poster_url = _arr_poster_src(poster, '/proxy-radarr-art')
+        poster_url = _arr_poster_src(poster, '/proxy-radarr-art') if _art_on else None
         if poster_url:
             poster_src = fetch_and_attach_image(poster_url, msg_root, f"radarr-{i}", base_url, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
 
         subtitle = str(year) if year else ""
         meta_text = truncate_text(' • '.join(filter(None, [f'Releases {relative}' if relative else ''])), 46)
 
-        cards.append(_build_card_html(theme_colors, truncate_text(title, 23), subtitle, meta_text, poster_src))
+        cards.append(_build_card_html(theme_colors, truncate_text(title, 23), subtitle, meta_text, poster_src, compact=not _art_on))
 
     return _build_calendar_grid_html(cards, msg_root, theme_colors, "Coming Soon (Movies)", base_url, grid_columns)

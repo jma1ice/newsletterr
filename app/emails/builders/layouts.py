@@ -1,4 +1,4 @@
-"""Email layout variants (NEWS-30): classic (A), editorial (B), digest (C).
+"""Email layout variants: classic (A), editorial (B), digest (C).
 
 One renderer per section per layout, reached only through the assemble
 pipeline, so every surface (manual sends, scheduled sends, /preview_email,
@@ -21,12 +21,12 @@ from app.emails.builders.card_grid import (
 from app.emails.builders.coming_soon import (
     _poster_url as _arr_poster_url,
     _arr_poster_src,
-    group_sonarr_episodes,
-    filter_radarr_upcoming,
     radarr_events,
+    radarr_upcoming,
     render_view_html,
     resolve_view,
     sonarr_events,
+    sonarr_groups,
     upcoming_release_date,
 )
 from app.emails.builders.most_watched import (
@@ -55,6 +55,7 @@ from app.emails.images import (
     email_icon_img,
     truncate_text,
 )
+from app.emails import density, headings
 from app.security import escape_html_output as esc
 
 import logging
@@ -93,16 +94,19 @@ def spotlight_eyebrow(theme, text, size=11):
             f'text-transform: uppercase; color: {theme["accent"]}; font-family: {FONT};">{esc(text)}</div>')
 
 def _spotlight_row(theme, art_html, title_html, meta, value_html, last=False):
+    # spotlight-only helper, so the picker keys off that layout directly
+    p = density.picker(theme, 'spotlight')
+    pad = p('6px', '9px')
     border = "" if last else f" border-bottom: 1px solid {theme['border']};"
-    art_cell = f'<td width="52" valign="middle" style="padding: 9px 12px 9px 0;{border}">{art_html}</td>' if art_html else ''
-    value_cell = (f'<td align="right" valign="middle" style="padding: 9px 0;{border} white-space: nowrap; '
+    art_cell = f'<td width="52" valign="middle" style="padding: {pad} 12px {pad} 0;{border}">{art_html}</td>' if art_html else ''
+    value_cell = (f'<td align="right" valign="middle" style="padding: {pad} 0;{border} white-space: nowrap; '
                   f'font-family: {FONT};">{value_html}</td>') if value_html else ''
     return f"""
         <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
             {art_cell}
-            <td valign="middle" style="padding: 9px 0;{border} font-family: {FONT};">
-                <div style="font-size: 14px; font-weight: 700; color: #ffffff; line-height: 1.25;">{title_html}</div>
-                {f'<div style="padding-top: 3px; font-size: 11.5px; color: {theme["muted_text"]};">{meta}</div>' if meta else ''}
+            <td valign="middle" style="padding: {pad} 0;{border} font-family: {FONT};">
+                <div style="font-size: {p('13px', '14px')}; font-weight: 700; color: #ffffff; line-height: 1.25;">{title_html}</div>
+                {f'<div style="padding-top: {p("2px", "3px")}; font-size: {p("11px", "11.5px")}; color: {theme["muted_text"]};">{meta}</div>' if meta else ''}
             </td>
             {value_cell}
         </tr></table>
@@ -134,21 +138,33 @@ def _spotlight_value(theme, value, unit):
 # ---------------------------------------------------------------- shells
 
 def _shell(layout, theme, label, inner, range_text="", overline="", bg_src=""):
-    """Per-layout section chrome around a section's inner HTML.
+    """Per-layout section chrome around a section's inner HTML. Density only
+    moves the chrome when this render is the layout's newly authored variant;
+    p(variant, natural) is what guarantees the natural side stays untouched.
+
+    The label is the item's override when it set one; an empty
+    label means the heading is hidden and only the chrome is drawn.
     """
+    label = headings.resolve(theme, label)
+    p = density.picker(theme, layout)
+    if not density.show_art(theme, layout):
+        # compact variants carry no section artwork, background art included
+        bg_src = ""
+    if not label:
+        return _shell_headless(layout, theme, inner, bg_src, p)
     if layout == 'spotlight':
         range_html = (f'<td align="right" valign="middle" style="font-size: 11px; color: {theme["muted_text"]}; '
                       f'white-space: nowrap; font-family: {FONT};">{esc(range_text)}</td>') if range_text else ''
         art = f" background-image: url('{bg_src}'); background-size: cover; background-position: center; background-repeat: no-repeat;" if bg_src else ""
         return f"""
-            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: {theme['card_bg']};{art} border: 1px solid {theme['border']}; border-radius: 10px; border-collapse: separate; margin: 0 0 12px 0;">
-                <tr><td style="padding: 16px 18px 0 18px;">
+            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: {theme['card_bg']};{art} border: 1px solid {theme['border']}; border-radius: {p('8px', '10px')}; border-collapse: separate; margin: 0 0 {p('8px', '12px')} 0;">
+                <tr><td style="padding: {p('11px 14px 0 14px', '16px 18px 0 18px')};">
                     <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
                         <td valign="middle">{spotlight_eyebrow(theme, label)}</td>
                         {range_html}
                     </tr></table>
                 </td></tr>
-                <tr><td style="padding: 12px 18px 16px 18px;">{inner}</td></tr>
+                <tr><td style="padding: {p('8px 14px 12px 14px', '12px 18px 16px 18px')};">{inner}</td></tr>
             </table>
         """
     if layout == 'classic':
@@ -157,10 +173,10 @@ def _shell(layout, theme, label, inner, range_text="", overline="", bg_src=""):
         scrim_open = '<div style="background-color: rgba(28, 28, 28, 0.74);">' if bg_src else ''
         scrim_close = '</div>' if bg_src else ''
         return f"""
-            <div style="background-color: {theme['card_bg']};{art} border: 1px solid {theme['border']}; border-radius: 10px; margin: 0 0 16px 0; overflow: hidden; font-family: {FONT};">
+            <div style="background-color: {theme['card_bg']};{art} border: 1px solid {theme['border']}; border-radius: {p('8px', '10px')}; margin: 0 0 {p('10px', '16px')} 0; overflow: hidden; font-family: {FONT};">
                 {scrim_open}<table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
-                    <td style="padding: 10px 16px; font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: {theme['text']}; border-bottom: 1px solid {theme['border']}; font-family: {FONT};">{esc(label)}</td>
-                    <td align="right" style="padding: 10px 16px; border-bottom: 1px solid {theme['border']};">{range_html}</td>
+                    <td style="padding: {p('7px 12px', '10px 16px')}; font-size: {p('10.5px', '11px')}; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: {theme['text']}; border-bottom: 1px solid {theme['border']}; font-family: {FONT};">{esc(label)}</td>
+                    <td align="right" style="padding: {p('7px 12px', '10px 16px')}; border-bottom: 1px solid {theme['border']};">{range_html}</td>
                 </tr></table>
                 {inner}{scrim_close}
             </div>
@@ -169,26 +185,66 @@ def _shell(layout, theme, label, inner, range_text="", overline="", bg_src=""):
         over = overline or label
         head_range = f" &middot; {esc(range_text)}" if range_text else ""
         return f"""
-            <div style="padding: 20px 0 10px 0; border-bottom: 1px solid {theme['border']}; font-family: {FONT};">
-                <div style="font-size: 10.5px; letter-spacing: .18em; text-transform: uppercase; color: {theme['primary']}; font-weight: 700;">{esc(over)}{head_range}</div>
-                <div style="font-size: 19px; font-weight: 700; color: #ffffff; margin: 2px 0 12px 0;">{esc(label)}</div>
+            <div style="padding: {p('30px 0 16px 0', '20px 0 10px 0')}; border-bottom: 1px solid {theme['border']}; font-family: {FONT};">
+                <div style="font-size: {p('11.5px', '10.5px')}; letter-spacing: .18em; text-transform: uppercase; color: {theme['primary']}; font-weight: 700;">{esc(over)}{head_range}</div>
+                <div style="font-size: {p('25px', '19px')}; font-weight: 700; color: #ffffff; margin: {p('4px 0 18px 0', '2px 0 12px 0')};">{esc(label)}</div>
                 {inner}
             </div>
         """
     # digest
     range_html = f' &middot; {esc(range_text)}' if range_text else ''
     return f"""
-        <div style="margin: 0 0 14px 0; font-family: {FONT};">
-            <div style="font-size: 10.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: {theme['text']}; border-bottom: 1px solid {theme['border']}; padding-bottom: 5px; margin-bottom: 7px;">{esc(label)}{range_html}</div>
+        <div style="margin: 0 0 {p('22px', '14px')} 0; font-family: {FONT};">
+            <div style="font-size: {p('12.5px', '10.5px')}; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: {theme['text']}; border-bottom: 1px solid {theme['border']}; padding-bottom: {p('8px', '5px')}; margin-bottom: {p('12px', '7px')};">{esc(label)}{range_html}</div>
+            {inner}
+        </div>
+    """
+
+def _shell_headless(layout, theme, inner, bg_src, p):
+    """Section chrome with the heading suppressed (hideHeading on the item).
+
+    The card, its border and its outer spacing all stay: hiding the heading is
+    meant to drop a redundant label, not to strip the section out of the
+    layout. Each layout loses only the row that carried the text, so the top
+    padding takes over the space the heading used to hold open.
+    """
+    if layout == 'spotlight':
+        art = f" background-image: url('{bg_src}'); background-size: cover; background-position: center; background-repeat: no-repeat;" if bg_src else ""
+        return f"""
+            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: {theme['card_bg']};{art} border: 1px solid {theme['border']}; border-radius: {p('8px', '10px')}; border-collapse: separate; margin: 0 0 {p('8px', '12px')} 0;">
+                <tr><td style="padding: {p('11px 14px 12px 14px', '16px 18px 16px 18px')};">{inner}</td></tr>
+            </table>
+        """
+    if layout == 'classic':
+        art = f" background-image: url('{bg_src}'); background-size: cover; background-position: center; background-repeat: no-repeat;" if bg_src else ""
+        scrim_open = '<div style="background-color: rgba(28, 28, 28, 0.74);">' if bg_src else ''
+        scrim_close = '</div>' if bg_src else ''
+        return f"""
+            <div style="background-color: {theme['card_bg']};{art} border: 1px solid {theme['border']}; border-radius: {p('8px', '10px')}; margin: 0 0 {p('10px', '16px')} 0; overflow: hidden; font-family: {FONT};">
+                {scrim_open}{inner}{scrim_close}
+            </div>
+        """
+    if layout == 'editorial':
+        return f"""
+            <div style="padding: {p('30px 0 16px 0', '20px 0 10px 0')}; border-bottom: 1px solid {theme['border']}; font-family: {FONT};">
+                {inner}
+            </div>
+        """
+    # digest
+    return f"""
+        <div style="margin: 0 0 {p('22px', '14px')} 0; font-family: {FONT};">
             {inner}
         </div>
     """
 
 def _digest_row(theme, left_html, right_html):
+    # digest-only helper; its variant is the expanded (roomy) one
+    p = density.picker(theme, 'digest')
+    pad = p('9px', '5px')
     return f"""
         <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
-            <td style="padding: 5px 0; border-bottom: 1px dotted {theme['border']}; font-size: 12.5px; color: #ffffff; font-family: {FONT};">{left_html}</td>
-            <td align="right" style="padding: 5px 0; border-bottom: 1px dotted {theme['border']}; font-size: 12px; color: {theme['muted_text']}; white-space: nowrap; font-family: {FONT};">{right_html}</td>
+            <td style="padding: {pad} 0; border-bottom: 1px dotted {theme['border']}; font-size: {p('14px', '12.5px')}; color: #ffffff; font-family: {FONT};">{left_html}</td>
+            <td align="right" style="padding: {pad} 0; border-bottom: 1px dotted {theme['border']}; font-size: {p('13px', '12px')}; color: {theme['muted_text']}; white-space: nowrap; font-family: {FONT};">{right_html}</td>
         </tr></table>
     """
 
@@ -210,6 +266,7 @@ _COVER_ART_TITLES = frozenset({
 
 _STAT_THUMB_PX = {'classic': (26, 32), 'editorial': (30, 38), 'spotlight': (42, 36)}
 _STAT_THUMB_DIGEST = (18, 22)
+_STAT_THUMB_DIGEST_EXPANDED = (30, 34)
 
 # Aggregate stats key off a user/library/platform, but Tautulli still ships the
 # last-watched item on the row (title, year, plex_url, artwork). Naming those
@@ -297,9 +354,14 @@ def render_stats(layout, stat_data, msg_root, theme, base_url="", date_range="",
 
     range_text = "" if title == "Library Item Counts" else (f"Last {date_range} days" if date_range else "")
 
-    poster_w, avatar_px = _STAT_THUMB_PX.get(layout, _STAT_THUMB_DIGEST)
+    p = density.picker(theme, layout)
+    art_on = density.show_art(theme, layout)
+
+    poster_w, avatar_px = _STAT_THUMB_PX.get(layout, p(_STAT_THUMB_DIGEST_EXPANDED, _STAT_THUMB_DIGEST))
 
     def thumb(row, i):
+        if not art_on:
+            return ""
         return _stat_row_thumb(row, title, msg_root, f"l-stat-{layout}-{i}-{len(msg_root.get_payload())}",
                                base_url, poster_w, avatar_px, show_cover_art, include_user_info,
                                hosted_images_enabled, hosted_base_url)
@@ -323,7 +385,7 @@ def render_stats(layout, stat_data, msg_root, theme, base_url="", date_range="",
         return _shell(layout, theme, title, rows_html, range_text)
 
     if layout == 'classic':
-        bg_art = rows[0].get('art') or rows[0].get('grandparent_thumb') or ''
+        bg_art = (rows[0].get('art') or rows[0].get('grandparent_thumb') or '') if art_on else ''
         bg_src = ""
         if bg_art:
             bg_url = bg_art if bg_art.startswith('/proxy-art') else f"/proxy-art{bg_art}"
@@ -337,8 +399,8 @@ def render_stats(layout, stat_data, msg_root, theme, base_url="", date_range="",
             nums = ' &middot; '.join(esc(b) for b in meta if b != year)
             body_rows += f"""
                 <tr>
-                    <td style="padding: 8px 16px; border-top: 1px solid {theme['border']}; font-size: 12.5px; color: #ffffff; font-family: {FONT};">{thumb(row, i)}{_linked(_name(row), _row_url(row))}{f' <span style="color: {theme["muted_text"]};">({esc(year)})</span>' if year else ''}</td>
-                    <td align="right" style="padding: 8px 16px; border-top: 1px solid {theme['border']}; font-size: 12.5px; color: {theme['muted_text']}; white-space: nowrap; font-family: {FONT};">{nums}</td>
+                    <td style="padding: {p('5px 12px', '8px 16px')}; border-top: 1px solid {theme['border']}; font-size: {p('12px', '12.5px')}; color: #ffffff; font-family: {FONT};">{thumb(row, i)}{_linked(_name(row), _row_url(row))}{f' <span style="color: {theme["muted_text"]};">({esc(year)})</span>' if year else ''}</td>
+                    <td align="right" style="padding: {p('5px 12px', '8px 16px')}; border-top: 1px solid {theme['border']}; font-size: {p('12px', '12.5px')}; color: {theme['muted_text']}; white-space: nowrap; font-family: {FONT};">{nums}</td>
                 </tr>
             """
         inner = f'<table width="100%" cellpadding="0" cellspacing="0" border="0">{body_rows}</table>'
@@ -351,13 +413,14 @@ def render_stats(layout, stat_data, msg_root, theme, base_url="", date_range="",
             meta = ' &middot; '.join(esc(b) for b in _meta_bits(row))
             value = int(row.get('total_plays') or row.get('count') or 0)
             pct = int(value / max_plays * 100) if max_plays else 0
-            bar = f'<div style="height: 3px; background-color: {theme["border"]}; border-radius: 2px; margin-top: 4px;"><div style="height: 3px; width: {max(pct, 4)}%; background-color: {theme["primary"]}; border-radius: 2px; font-size: 0; line-height: 0;">&nbsp;</div></div>' if max_plays else ''
+            _bar_h = p('4px', '3px')
+            bar = f'<div style="height: {_bar_h}; background-color: {theme["border"]}; border-radius: 2px; margin-top: {p("6px", "4px")};"><div style="height: {_bar_h}; width: {max(pct, 4)}%; background-color: {theme["primary"]}; border-radius: 2px; font-size: 0; line-height: 0;">&nbsp;</div></div>' if max_plays else ''
             items += f"""
                 <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
-                    <td width="30" valign="top" align="right" style="padding: 7px 14px 7px 0; font-size: 20px; font-weight: 800; color: {theme['primary']}; font-family: {FONT};">{i}</td>
-                    <td style="padding: 7px 0; font-family: {FONT};">
-                        <span style="color: #ffffff; font-weight: 600; font-size: 13.5px;">{thumb(row, i)}{_linked(_name(row), _row_url(row))}</span>
-                        <span style="color: {theme['muted_text']}; font-size: 11.5px;"> {meta}</span>
+                    <td width="{p('36', '30')}" valign="top" align="right" style="padding: {p('11px 16px 11px 0', '7px 14px 7px 0')}; font-size: {p('25px', '20px')}; font-weight: 800; color: {theme['primary']}; font-family: {FONT};">{i}</td>
+                    <td style="padding: {p('11px 0', '7px 0')}; font-family: {FONT};">
+                        <span style="color: #ffffff; font-weight: 600; font-size: {p('15.5px', '13.5px')};">{thumb(row, i)}{_linked(_name(row), _row_url(row))}</span>
+                        <span style="color: {theme['muted_text']}; font-size: {p('12.5px', '11.5px')};"> {meta}</span>
                         {bar}
                     </td>
                 </tr></table>
@@ -396,10 +459,12 @@ def render_wrapped(layout, stats_data, msg_root, theme, year=None, base_url="", 
     def icon(name):
         return email_icon_img(name, msg_root, base_url, tint='white', size=12, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
 
-    art_w = 56 if layout == 'editorial' else 44
+    p = density.picker(theme, layout)
+    art_on = density.show_art(theme, layout)
+    art_w = p(76, 56) if layout == 'editorial' else 44
 
     def art(row, cid, round_=False):
-        if layout == 'digest' or not row:
+        if layout == 'digest' or not row or not art_on:
             return ""
         source = row.get('user_thumb') if round_ else (row.get('thumb') or row.get('grandparent_thumb'))
         if not source:
@@ -434,18 +499,18 @@ def render_wrapped(layout, stats_data, msg_root, theme, year=None, base_url="", 
 
     if layout == 'spotlight':
         cells = "".join(
-            f'<td align="center" valign="top" style="padding: 4px 12px; font-family: {FONT};">'
+            f'<td align="center" valign="top" style="padding: {p("3px 8px", "4px 12px")}; font-family: {FONT};">'
             f'<div style="font-size: 10px; font-weight: 800; letter-spacing: 1.2px; text-transform: uppercase; color: {theme["muted_text"]};">{_plain_label(label)}</div>'
-            f'{art_html}<div style="padding-top: 4px; font-size: 13.5px; font-weight: 700; color: #ffffff;">{esc(truncate_text(value, 22))}</div></td>'
+            f'{art_html}<div style="padding-top: {p("3px", "4px")}; font-size: {p("12.5px", "13.5px")}; font-weight: 700; color: #ffffff;">{esc(truncate_text(value, 22))}</div></td>'
             for label, value, art_html in highlights
         )
         plays_html = (f'<div style="padding-top: 6px; font-size: 13px; color: {theme["muted_text"]};">'
                       f'~{total_plays} plays this year</div>') if total_plays else ''
         return f"""
             <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: {theme['card_bg']}; border: 1px solid {theme['accent']}; border-radius: 10px; border-collapse: separate; margin: 0 0 12px 0;">
-                <tr><td align="center" style="padding: 22px 18px 18px 18px; font-family: {FONT};">
+                <tr><td align="center" style="padding: {p('15px 14px 13px 14px', '22px 18px 18px 18px')}; font-family: {FONT};">
                     {spotlight_eyebrow(theme, 'Year in review')}
-                    <div style="padding-top: 6px; font-size: 40px; line-height: 1; font-weight: 800; color: #ffffff;">{display_year}</div>
+                    <div style="padding-top: {p('4px', '6px')}; font-size: {p('30px', '40px')}; line-height: 1; font-weight: 800; color: #ffffff;">{display_year}</div>
                     {plays_html}
                     <table align="center" cellpadding="0" cellspacing="0" border="0" style="margin-top: 14px;"><tr>{cells}</tr></table>
                 </td></tr>
@@ -454,28 +519,28 @@ def render_wrapped(layout, stats_data, msg_root, theme, year=None, base_url="", 
 
     if layout == 'classic':
         cells = "".join(
-            f'<td align="center" valign="top" style="padding: 8px 10px; font-size: 11px; color: rgba(255,255,255,.92); font-family: {FONT};">{label}{art_html or "<br>"}<b style="font-size: 13px;">{esc(value)}</b></td>'
+            f'<td align="center" valign="top" style="padding: {p("5px 8px", "8px 10px")}; font-size: 11px; color: rgba(255,255,255,.92); font-family: {FONT};">{label}{art_html or "<br>"}<b style="font-size: {p("12.5px", "13px")};">{esc(value)}</b></td>'
             for label, value, art_html in highlights
         )
         inner = f"""
-            <div style="{gradient} color: #ffffff; text-align: center; padding: 18px 16px 14px 16px; font-family: {FONT};">
+            <div style="{gradient} color: #ffffff; text-align: center; padding: {p('12px 14px 10px 14px', '18px 16px 14px 16px')}; font-family: {FONT};">
                 <div style="font-size: 11px; letter-spacing: .18em; text-transform: uppercase; opacity: .85;">Year in Plex</div>
-                <div style="font-size: 26px; font-weight: 700;">{display_year} Wrapped</div>
+                <div style="font-size: {p('21px', '26px')}; font-weight: 700;">{display_year} Wrapped</div>
                 {f'<div style="font-size: 12px; opacity: .85;">~{total_plays} plays this year</div>' if total_plays else ''}
                 <table align="center" cellpadding="0" cellspacing="0" border="0" style="margin-top: 8px;"><tr>{cells}</tr></table>
             </div>
         """
-        return f'<div style="border-radius: 10px; overflow: hidden; margin: 0 0 16px 0; border: 1px solid {theme["border"]};">{inner}</div>'
+        return f'<div style="border-radius: {p("8px", "10px")}; overflow: hidden; margin: 0 0 {p("10px", "16px")} 0; border: 1px solid {theme["border"]};">{inner}</div>'
 
     if layout == 'editorial':
         cells = "".join(
-            f'<td align="center" valign="top" style="padding: 0 13px; font-size: 12px; color: rgba(255,255,255,.9); font-family: {FONT};">{label}{art_html or "<br>"}<b style="font-size: 13.5px;">{esc(value)}</b></td>'
+            f'<td align="center" valign="top" style="padding: {p("0 18px", "0 13px")}; font-size: {p("13px", "12px")}; color: rgba(255,255,255,.9); font-family: {FONT};">{label}{art_html or "<br>"}<b style="font-size: {p("15px", "13.5px")};">{esc(value)}</b></td>'
             for label, value, art_html in highlights
         )
         return f"""
-            <div style="{gradient} color: #ffffff; text-align: center; padding: 26px; margin: 18px 0 0 0; font-family: {FONT};">
+            <div style="{gradient} color: #ffffff; text-align: center; padding: {p('36px', '26px')}; margin: {p('24px 0 0 0', '18px 0 0 0')}; font-family: {FONT};">
                 <div style="font-size: 11px; letter-spacing: .2em; text-transform: uppercase; opacity: .8;">Year in Plex</div>
-                <div style="font-size: 44px; font-weight: 800; line-height: 1;">{display_year}</div>
+                <div style="font-size: {p('56px', '44px')}; font-weight: 800; line-height: 1;">{display_year}</div>
                 {f'<div style="font-size: 12.5px; opacity: .9; margin-top: 4px;">~{total_plays} plays and counting</div>' if total_plays else ''}
                 <table align="center" cellpadding="0" cellspacing="0" border="0" style="margin-top: 14px;"><tr>{cells}</tr></table>
             </div>
@@ -484,10 +549,10 @@ def render_wrapped(layout, stats_data, msg_root, theme, year=None, base_url="", 
     # digest: stat tile strip, gradient reserved for the plays tile
     tiles = ""
     if total_plays:
-        tiles += f'<td style="padding-right: 8px;"><div style="{gradient} border-radius: 8px; padding: 8px 10px; font-family: {FONT};"><div style="font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; color: #ffffff;">Plays</div><div style="color: #ffffff; font-weight: 700; font-size: 12.5px; margin-top: 2px;">~{total_plays}</div></div></td>'
+        tiles += f'<td style="padding-right: 8px;"><div style="{gradient} border-radius: 8px; padding: {p("13px 15px", "8px 10px")}; font-family: {FONT};"><div style="font-size: {p("10.5px", "9.5px")}; letter-spacing: .1em; text-transform: uppercase; color: #ffffff;">Plays</div><div style="color: #ffffff; font-weight: 700; font-size: {p("14.5px", "12.5px")}; margin-top: {p("4px", "2px")};">~{total_plays}</div></div></td>'
     for label, value, _art in highlights:
         plain_label = _plain_label(label)
-        tiles += f'<td style="padding-right: 8px;"><div style="background-color: {theme["card_bg"]}; border: 1px solid {theme["border"]}; border-radius: 8px; padding: 8px 10px; font-family: {FONT};"><div style="font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; color: {theme["muted_text"]};">{plain_label}</div><div style="color: #ffffff; font-weight: 700; font-size: 12.5px; margin-top: 2px;">{esc(truncate_text(value, 18))}</div></div></td>'
+        tiles += f'<td style="padding-right: 8px;"><div style="background-color: {theme["card_bg"]}; border: 1px solid {theme["border"]}; border-radius: 8px; padding: {p("13px 15px", "8px 10px")}; font-family: {FONT};"><div style="font-size: {p("10.5px", "9.5px")}; letter-spacing: .1em; text-transform: uppercase; color: {theme["muted_text"]};">{plain_label}</div><div style="color: #ffffff; font-weight: 700; font-size: {p("14.5px", "12.5px")}; margin-top: {p("4px", "2px")};">{esc(truncate_text(value, 18))}</div></div></td>'
     inner = f'<table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>{tiles}</tr></table>'
     return _shell(layout, theme, f'{display_year} Wrapped', inner)
 
@@ -501,11 +566,14 @@ def render_top_viewer(layout, row, msg_root, theme, base_url="", range_text="",
     if not metrics:
         return ""
 
+    p = density.picker(theme, layout)
     label = top_viewer_heading()
     name = row.get('user') or row.get('friendly_name') or ''
-    named = bool(include_user_info and name)
-    subject = name if named else ANONYMOUS_SUBJECT
-    avatar_px = 56 if layout != 'digest' else 30
+    subject = name if (include_user_info and name) else ANONYMOUS_SUBJECT
+    # the avatar is artwork, so it comes out in the compact densities; the
+    # name itself still follows the user-info setting
+    named = bool(include_user_info and name and density.show_art(theme, layout))
+    avatar_px = 56 if layout != 'digest' else p(44, 30)
     avatar_src = attach_top_viewer_avatar(
         row, msg_root, base_url, size=avatar_px,
         hosted_images_enabled=hosted_images_enabled,
@@ -526,8 +594,8 @@ def render_top_viewer(layout, row, msg_root, theme, base_url="", range_text="",
             <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
                 {f'<td width="{avatar_px}" valign="middle" style="padding-right: 14px;">{avatar_html}</td>' if avatar_html else ''}
                 <td valign="middle" style="font-family: {FONT};">
-                    <div style="font-size: 19px; font-weight: 800; color: #ffffff; line-height: 1.2;">{esc(subject)}</div>
-                    <div style="padding-top: 4px; font-size: 12px; color: {theme['muted_text']};">{metrics_html}</div>
+                    <div style="font-size: {p('16px', '19px')}; font-weight: 800; color: #ffffff; line-height: 1.2;">{esc(subject)}</div>
+                    <div style="padding-top: {p('3px', '4px')}; font-size: {p('11.5px', '12px')}; color: {theme['muted_text']};">{metrics_html}</div>
                 </td>
             </tr></table>
         """
@@ -538,8 +606,8 @@ def render_top_viewer(layout, row, msg_root, theme, base_url="", range_text="",
             <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
                 {f'<td width="{avatar_px}" valign="middle" style="padding-right: 16px;">{avatar_html}</td>' if avatar_html else ''}
                 <td valign="middle" style="font-family: {FONT};">
-                    <div style="font-size: 26px; font-weight: 800; color: #ffffff; line-height: 1.1;">{esc(subject)}</div>
-                    <div style="padding-top: 5px; font-size: 12px; color: {theme['muted_text']};">{metrics_html}</div>
+                    <div style="font-size: {p('33px', '26px')}; font-weight: 800; color: #ffffff; line-height: 1.1;">{esc(subject)}</div>
+                    <div style="padding-top: {p('8px', '5px')}; font-size: {p('13px', '12px')}; color: {theme['muted_text']};">{metrics_html}</div>
                 </td>
             </tr></table>
         """
@@ -548,12 +616,12 @@ def render_top_viewer(layout, row, msg_root, theme, base_url="", range_text="",
     # classic
     inner = f"""
         <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
-            <td style="padding: 14px 16px; font-family: {FONT};">
+            <td style="padding: {p('9px 12px', '14px 16px')}; font-family: {FONT};">
                 <table cellpadding="0" cellspacing="0" border="0"><tr>
                     {f'<td width="{avatar_px}" valign="middle" style="padding-right: 14px;">{avatar_html}</td>' if avatar_html else ''}
                     <td valign="middle" style="font-family: {FONT};">
-                        <div style="font-size: 18px; font-weight: 700; color: #ffffff; line-height: 1.2;">{esc(subject)}</div>
-                        <div style="padding-top: 4px; font-size: 12px; color: {theme['muted_text']};">{metrics_html}</div>
+                        <div style="font-size: {p('15px', '18px')}; font-weight: 700; color: #ffffff; line-height: 1.2;">{esc(subject)}</div>
+                        <div style="padding-top: {p('3px', '4px')}; font-size: {p('11.5px', '12px')}; color: {theme['muted_text']};">{metrics_html}</div>
                     </td>
                 </tr></table>
             </td>
@@ -619,17 +687,20 @@ def ra_hero_index(items, hero_key):
     return 0
 
 def _ra_stacked_row(theme, poster_html, title_html, meta, summary, poster_px, last=False):
-    """One recently-added item as a full-width row (list orientation)."""
+    """One recently-added item as a full-width row (list orientation). Only
+    the classic layout reaches this, so the picker keys off that layout."""
+    p = density.picker(theme, 'classic')
+    pad = p('6px', '10px')
     border = "" if last else f" border-bottom: 1px solid {theme['border']};"
-    poster_cell = (f'<td width="{poster_px}" valign="top" style="padding: 10px 14px 10px 0;{border}">{poster_html}</td>'
+    poster_cell = (f'<td width="{poster_px}" valign="top" style="padding: {pad} 14px {pad} 0;{border}">{poster_html}</td>'
                    if poster_html else '')
     return f"""
         <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
             {poster_cell}
-            <td valign="top" style="padding: 10px 0;{border} font-family: {FONT};">
-                <div style="font-size: 14px; font-weight: 700; color: #ffffff; line-height: 1.25;">{title_html}</div>
-                {f'<div style="padding-top: 3px; font-size: 11.5px; color: {theme["muted_text"]};">{meta}</div>' if meta else ''}
-                {f'<div style="padding-top: 6px; font-size: 12px; line-height: 1.45; color: {theme["text"]};">{esc(truncate_text(summary, 180))}</div>' if summary else ''}
+            <td valign="top" style="padding: {pad} 0;{border} font-family: {FONT};">
+                <div style="font-size: {p('13px', '14px')}; font-weight: 700; color: #ffffff; line-height: 1.25;">{title_html}</div>
+                {f'<div style="padding-top: {p("2px", "3px")}; font-size: {p("11px", "11.5px")}; color: {theme["muted_text"]};">{meta}</div>' if meta else ''}
+                {f'<div style="padding-top: {p("4px", "6px")}; font-size: {p("11.5px", "12px")}; line-height: 1.4; color: {theme["text"]};">{esc(truncate_text(summary, p(110, 180)))}</div>' if summary else ''}
             </td>
         </tr></table>
     """
@@ -640,8 +711,12 @@ def render_recently_added(layout, recent_data, msg_root, theme, library_filter=N
     if not items:
         return _shell(layout, theme, label, _empty_state_html(theme, f"No recently added items found{f' for {esc(library_filter)}' if library_filter else ''}."))
 
-    mode = ra_orientation(layout, orientation)
-    cols = max(1, int(ra_grid_columns) if ra_grid_columns else 5)
+    p = density.picker(theme, layout)
+    art_on = density.show_art(theme, layout)
+    # without posters a grid is just a list with borders, so the compact
+    # densities always take the row treatment
+    mode = ra_orientation(layout, orientation) if art_on else 'list'
+    cols = density.columns(theme, layout, max(1, int(ra_grid_columns) if ra_grid_columns else 5))
 
     if layout == 'spotlight':
         hero_i = ra_hero_index(items, hero_key)
@@ -651,17 +726,17 @@ def render_recently_added(layout, recent_data, msg_root, theme, library_filter=N
             str(hero.get('year') or ''), str(hero.get('content_rating') or ''),
             _ra_duration(hero), _relative_added(hero)] if b)
         hero_summary = (hero.get('tagline') or hero.get('summary') or '') if show_description else ''
-        hero_src = _ra_poster(hero, msg_root, "ld-ra-hero", base_url, hosted_images_enabled, hosted_base_url, target=(150, 225))
+        hero_src = _ra_poster(hero, msg_root, "ld-ra-hero", base_url, hosted_images_enabled, hosted_base_url, target=(150, 225)) if art_on else None
         hero_poster = f'<img src="{hero_src}" alt="{esc(hero_title)}" width="150" style="width: 150px; height: auto; border-radius: 8px; display: block;">' if hero_src else ''
         hero_html = f"""
             <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: {theme['card_bg']}; border: 1px solid {theme['accent']}; border-radius: 10px; border-collapse: separate; margin: 0 0 12px 0;">
                 <tr>
                     {f'<td width="150" valign="top" style="padding: 18px 0 18px 18px;">{hero_poster}</td>' if hero_poster else ''}
-                    <td valign="middle" style="padding: 18px; font-family: {FONT};">
+                    <td valign="middle" style="padding: {p('13px 14px', '18px')}; font-family: {FONT};">
                         {spotlight_eyebrow(theme, label)}
-                        <div style="padding-top: 7px; font-size: 21px; line-height: 1.2; font-weight: 800; color: #ffffff;">{_linked(hero_title, hero.get('plex_url'), underline=False)}</div>
-                        {f'<div style="padding-top: 6px; font-size: 12px; color: {theme["muted_text"]};">{hero_meta}</div>' if hero_meta else ''}
-                        {f'<div style="padding-top: 9px; font-size: 12.5px; line-height: 1.5; color: {theme["text"]};">{esc(truncate_text(hero_summary, 200))}</div>' if hero_summary else ''}
+                        <div style="padding-top: {p('5px', '7px')}; font-size: {p('17px', '21px')}; line-height: 1.2; font-weight: 800; color: #ffffff;">{_linked(hero_title, hero.get('plex_url'), underline=False)}</div>
+                        {f'<div style="padding-top: {p("4px", "6px")}; font-size: {p("11.5px", "12px")}; color: {theme["muted_text"]};">{hero_meta}</div>' if hero_meta else ''}
+                        {f'<div style="padding-top: {p("6px", "9px")}; font-size: {p("12px", "12.5px")}; line-height: 1.45; color: {theme["text"]};">{esc(truncate_text(hero_summary, p(140, 200)))}</div>' if hero_summary else ''}
                     </td>
                 </tr>
             </table>
@@ -678,7 +753,7 @@ def render_recently_added(layout, recent_data, msg_root, theme, library_filter=N
             inner = ""
             for i, item in enumerate(rest):
                 title = item.get('title') or item.get('grandparent_title') or '(untitled)'
-                src = _ra_poster(item, msg_root, f"ld-ra-{i}", base_url, hosted_images_enabled, hosted_base_url, target=(42, 63))
+                src = _ra_poster(item, msg_root, f"ld-ra-{i}", base_url, hosted_images_enabled, hosted_base_url, target=(42, 63)) if art_on else None
                 art = f'<img src="{src}" alt="{esc(title)}" width="42" style="width: 42px; height: auto; border-radius: 5px; display: block;">' if src else ''
                 meta = ' &middot; '.join(esc(b) for b in [
                     str(item.get('year') or ''), _ra_duration(item), _relative_added(item)] if b)
@@ -694,18 +769,18 @@ def render_recently_added(layout, recent_data, msg_root, theme, library_filter=N
                 title = item.get('title') or item.get('grandparent_title') or '(untitled)'
                 sub_bits = [str(item.get('year') or item.get('grandparent_title') or item.get('parent_title') or ''), _ra_duration(item)]
                 meta = _relative_added(item)
-                poster_src = _ra_poster(item, msg_root, f"la-ra-{i}", base_url, hosted_images_enabled, hosted_base_url)
-                cards.append(_build_card_html(theme, truncate_text(title, 23), truncate_text(' · '.join(b for b in sub_bits if b), 30), meta, poster_src))
+                poster_src = _ra_poster(item, msg_root, f"la-ra-{i}", base_url, hosted_images_enabled, hosted_base_url) if art_on else None
+                cards.append(_build_card_html(theme, truncate_text(title, 23), truncate_text(' · '.join(b for b in sub_bits if b), 30), meta, poster_src, compact=not art_on))
             inner = _grid(cards, cols)
         else:
-            inner = '<div style="padding: 4px 16px 10px 16px;">'
+            inner = f'<div style="padding: {p("3px 12px 7px 12px", "4px 16px 10px 16px")};">'
             for i, item in enumerate(items):
                 title = item.get('title') or item.get('grandparent_title') or '(untitled)'
                 meta = ' &middot; '.join(esc(b) for b in [
                     str(item.get('year') or ''), str(item.get('content_rating') or ''),
                     _ra_duration(item), _relative_added(item)] if b)
                 summary = (item.get('tagline') or item.get('summary') or '') if show_description else ''
-                poster_src = _ra_poster(item, msg_root, f"la-ra-{i}", base_url, hosted_images_enabled, hosted_base_url, target=(60, 90))
+                poster_src = _ra_poster(item, msg_root, f"la-ra-{i}", base_url, hosted_images_enabled, hosted_base_url, target=(60, 90)) if art_on else None
                 poster_html = f'<img src="{poster_src}" alt="{esc(title)}" width="60" style="width: 60px; height: auto; border-radius: 6px; display: block;">' if poster_src else ''
                 inner += _ra_stacked_row(theme, poster_html, _linked(title, item.get('plex_url'), underline=False),
                                          meta, summary, 60, last=(i == len(items) - 1))
@@ -718,23 +793,24 @@ def render_recently_added(layout, recent_data, msg_root, theme, library_filter=N
             for i, item in enumerate(items):
                 title = item.get('title') or item.get('grandparent_title') or '(untitled)'
                 sub_bits = [str(item.get('year') or item.get('grandparent_title') or item.get('parent_title') or ''), _ra_duration(item)]
-                poster_src = _ra_poster(item, msg_root, f"lb-ra-{i}", base_url, hosted_images_enabled, hosted_base_url)
-                cards.append(_build_card_html(theme, truncate_text(title, 23), truncate_text(' · '.join(b for b in sub_bits if b), 30), _relative_added(item), poster_src))
+                poster_src = _ra_poster(item, msg_root, f"lb-ra-{i}", base_url, hosted_images_enabled, hosted_base_url) if art_on else None
+                cards.append(_build_card_html(theme, truncate_text(title, 23), truncate_text(' · '.join(b for b in sub_bits if b), 30), _relative_added(item), poster_src, compact=not art_on))
             return _shell(layout, theme, label, _grid(cards, cols), overline="New on the shelf")
         rows = ""
         for i, item in enumerate(items):
             title = item.get('title') or item.get('grandparent_title') or '(untitled)'
             meta_bits = [str(item.get('content_rating') or ''), _ra_duration(item), _relative_added(item)]
             summary = (item.get('tagline') or item.get('summary') or '') if show_description else ''
-            poster_src = _ra_poster(item, msg_root, f"lb-ra-{i}", base_url, hosted_images_enabled, hosted_base_url, target=(96, 144))
-            poster_html = f'<img src="{poster_src}" alt="{esc(title)}" width="96" style="width: 96px; height: auto; border-radius: 6px; display: block;">' if poster_src else ''
+            _ra_w = p(132, 96)
+            poster_src = _ra_poster(item, msg_root, f"lb-ra-{i}", base_url, hosted_images_enabled, hosted_base_url, target=(_ra_w, int(_ra_w * 1.5))) if art_on else None
+            poster_html = f'<img src="{poster_src}" alt="{esc(title)}" width="{_ra_w}" style="width: {_ra_w}px; height: auto; border-radius: 6px; display: block;">' if poster_src else ''
             rows += f"""
                 <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
-                    <td width="96" valign="top" style="padding: 0 16px 12px 0;">{poster_html}</td>
-                    <td valign="top" style="padding-bottom: 12px; font-size: 12.5px; color: {theme['text']}; font-family: {FONT};">
-                        <b style="color: #ffffff; font-size: 14px;">{esc(title)}</b><br>
-                        <span style="color: {theme['muted_text']}; font-size: 11px;">{' &middot; '.join(esc(b) for b in meta_bits if b)}</span>
-                        {f'<div style="margin-top: 6px;">{esc(truncate_text(summary, 180))}</div>' if summary else ''}
+                    <td width="{_ra_w}" valign="top" style="padding: 0 {p('22px', '16px')} {p('20px', '12px')} 0;">{poster_html}</td>
+                    <td valign="top" style="padding-bottom: {p('20px', '12px')}; font-size: {p('13.5px', '12.5px')}; color: {theme['text']}; font-family: {FONT};">
+                        <b style="color: #ffffff; font-size: {p('17px', '14px')};">{esc(title)}</b><br>
+                        <span style="color: {theme['muted_text']}; font-size: {p('12px', '11px')};">{' &middot; '.join(esc(b) for b in meta_bits if b)}</span>
+                        {f'<div style="margin-top: {p("9px", "6px")};">{esc(truncate_text(summary, p(320, 180)))}</div>' if summary else ''}
                     </td>
                 </tr></table>
             """
@@ -754,8 +830,8 @@ def render_recently_added(layout, recent_data, msg_root, theme, library_filter=N
     # The strip used to hard-stop at six posters in a single row; it now wraps
     # every item into rows of ra_grid_columns like the other grid layouts.
     cols = _effective_columns(cols, len(items))
-    poster_px = max(40, min(74, int(740 / cols) - 10))
-    caption_len = max(10, int(120 / cols) + 6)
+    poster_px = max(40, min(p(112, 74), int(740 / cols) - 10))
+    caption_len = max(10, int(120 / cols) + p(12, 6))
     cell_pct = f"{100 / cols:.4f}%"
     rows_html = ""
     for start in range(0, len(items), cols):
@@ -798,6 +874,8 @@ def _grid(cards, cols):
 # ---------------------------------------------------------------- most watched
 
 def render_most_watched(layout, most_watched_data, msg_root, theme, library_filter=None, base_url="", grid_columns=5, item_cap=0, range_text="", hosted_images_enabled=False, hosted_base_url=""):
+    p = density.picker(theme, layout)
+    art_on = density.show_art(theme, layout)
     label = most_watched_heading(library_filter)
     items = most_watched_items(most_watched_data, library_filter, item_cap)
     if not items:
@@ -809,7 +887,7 @@ def render_most_watched(layout, most_watched_data, msg_root, theme, library_filt
             title = item.get('title', 'Unknown')
             src = most_watched_poster(item, msg_root, f"ld-mw-{i}", base_url,
                                       hosted_images_enabled=hosted_images_enabled,
-                                      hosted_base_url=hosted_base_url, target=(42, 63))
+                                      hosted_base_url=hosted_base_url, target=(42, 63)) if art_on else None
             art = f'<img src="{src}" alt="{esc(title)}" width="42" style="width: 42px; height: auto; border-radius: 5px; display: block;">' if src else ''
             plays = item.get('play_count') or 0
             rows_html += _spotlight_row(
@@ -820,27 +898,28 @@ def render_most_watched(layout, most_watched_data, msg_root, theme, library_filt
         return _shell(layout, theme, label, rows_html, range_text=range_text)
 
     if layout == 'classic':
-        cols = max(1, int(grid_columns) if grid_columns else 5)
+        cols = density.columns(theme, layout, max(1, int(grid_columns) if grid_columns else 5))
         cards = []
         for i, item in enumerate(items):
             title = item.get('title', 'Unknown')
-            poster_src = most_watched_poster(item, msg_root, f"la-mw-{i}", base_url, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
-            cards.append(_build_card_html(theme, truncate_text(title, 23), str(item.get('year') or ''), play_count_text(item), poster_src))
+            poster_src = most_watched_poster(item, msg_root, f"la-mw-{i}", base_url, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url) if art_on else None
+            cards.append(_build_card_html(theme, truncate_text(title, 23), str(item.get('year') or ''), play_count_text(item), poster_src, compact=not art_on))
         return _shell(layout, theme, label, _grid(cards, cols), range_text=range_text)
 
     if layout == 'editorial':
         rows = ""
         for i, item in enumerate(items):
             title = item.get('title', 'Unknown')
-            poster_src = most_watched_poster(item, msg_root, f"lb-mw-{i}", base_url, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url, target=(96, 144))
-            poster_html = f'<img src="{poster_src}" alt="{esc(title)}" width="96" style="width: 96px; height: auto; border-radius: 6px; display: block;">' if poster_src else ''
+            _mw_w = p(132, 96)
+            poster_src = most_watched_poster(item, msg_root, f"lb-mw-{i}", base_url, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url, target=(_mw_w, int(_mw_w * 1.5))) if art_on else None
+            poster_html = f'<img src="{poster_src}" alt="{esc(title)}" width="{_mw_w}" style="width: {_mw_w}px; height: auto; border-radius: 6px; display: block;">' if poster_src else ''
             meta_bits = [str(item.get('year') or ''), play_count_text(item)]
             rows += f"""
                 <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
-                    <td width="96" valign="top" style="padding: 0 16px 12px 0;">{poster_html}</td>
-                    <td valign="top" style="padding-bottom: 12px; font-size: 12.5px; color: {theme['text']}; font-family: {FONT};">
-                        <b style="color: #ffffff; font-size: 14px;">{_linked(title, item.get('plex_url', ''))}</b><br>
-                        <span style="color: {theme['muted_text']}; font-size: 11px;">{' &middot; '.join(esc(b) for b in meta_bits if b)}</span>
+                    <td width="{_mw_w}" valign="top" style="padding: 0 {p('22px', '16px')} {p('20px', '12px')} 0;">{poster_html}</td>
+                    <td valign="top" style="padding-bottom: {p('20px', '12px')}; font-size: {p('13.5px', '12.5px')}; color: {theme['text']}; font-family: {FONT};">
+                        <b style="color: #ffffff; font-size: {p('17px', '14px')};">{_linked(title, item.get('plex_url', ''))}</b><br>
+                        <span style="color: {theme['muted_text']}; font-size: {p('12px', '11px')};">{' &middot; '.join(esc(b) for b in meta_bits if b)}</span>
                     </td>
                 </tr></table>
             """
@@ -855,6 +934,8 @@ def render_most_watched(layout, most_watched_data, msg_root, theme, library_filt
 # ---------------------------------------------------------------- random pick
 
 def render_random_pick(layout, pick, msg_root, theme, base_url="", library_label="", genre_label="", hosted_images_enabled=False, hosted_base_url="", heading=None):
+    p = density.picker(theme, layout)
+    art_on = density.show_art(theme, layout)
     label = heading or random_pick_heading(library_label, genre_label)
     if not pick:
         return _shell(layout, theme, label, _empty_state_html(theme, f"No random pick available{f' for {esc(library_label)}' if library_label else ''}."))
@@ -868,19 +949,27 @@ def render_random_pick(layout, pick, msg_root, theme, base_url="", library_label
         right = esc(meta_text) if meta_text else ''
         return _shell(layout, theme, label, _digest_row(theme, _linked(title, plex_url), right))
 
-    poster_w = 140 if layout in _CARD_LAYOUTS else 110
-    poster_src = attach_random_pick_poster(pick, msg_root, base_url, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url, target=(poster_w, int(poster_w * 1.5)))
+    poster_w = 140 if layout in _CARD_LAYOUTS else p(150, 110)
+    poster_src = attach_random_pick_poster(pick, msg_root, base_url, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url, target=(poster_w, int(poster_w * 1.5))) if art_on else None
     poster_html = f'<img src="{poster_src}" alt="{esc(title)}" width="{poster_w}" style="width: {poster_w}px; height: auto; border-radius: 8px; display: block;">' if poster_src else ''
 
     open_link = f'<div style="margin-top: 8px;"><a href="{esc(plex_url)}" target="_blank" style="color: {theme["primary"]}; font-size: 12px; font-weight: 700; text-decoration: underline; font-family: {FONT};">Open in Plex</a></div>' if plex_url else ''
 
+    # This block serves classic, spotlight and editorial, whose variants pull
+    # in opposite directions (classic/spotlight tighten, editorial opens up),
+    # so the knobs are picked per layout rather than in one shared p() call.
+    if layout in _CARD_LAYOUTS:
+        cell_pad, title_px, body_px, meta_px, summary_cap = p(('9px 12px', '15px', '12px', '10.5px', 170), ('14px 16px', '17px', '12.5px', '11px', 300))
+    else:
+        cell_pad, title_px, body_px, meta_px, summary_cap = p(('0 0 18px 0', '21px', '13.5px', '12px', 420), ('0 0 12px 0', '17px', '12.5px', '11px', 300))
+
     inner = f"""
         <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
             {f'<td width="{poster_w}" valign="top" style="padding: {"14px 16px 14px 16px" if layout in _CARD_LAYOUTS else "0 16px 12px 0"};">{poster_html}</td>' if poster_html else ''}
-            <td valign="top" style="padding: {'14px 16px' if layout in _CARD_LAYOUTS else '0 0 12px 0'}; font-size: 12.5px; color: {theme['text']}; font-family: {FONT};">
-                <b style="color: #ffffff; font-size: 17px;">{_linked(title, plex_url)}</b><br>
-                {f'<span style="color: {theme["muted_text"]}; font-size: 11px;">{esc(meta_text)}</span>' if meta_text else ''}
-                {f'<div style="margin-top: 6px; line-height: 1.4;">{esc(truncate_text(summary, 300))}</div>' if summary else ''}
+            <td valign="top" style="padding: {cell_pad}; font-size: {body_px}; color: {theme['text']}; font-family: {FONT};">
+                <b style="color: #ffffff; font-size: {title_px};">{_linked(title, plex_url)}</b><br>
+                {f'<span style="color: {theme["muted_text"]}; font-size: {meta_px};">{esc(meta_text)}</span>' if meta_text else ''}
+                {f'<div style="margin-top: 6px; line-height: 1.4;">{esc(truncate_text(summary, summary_cap))}</div>' if summary else ''}
                 {open_link}
             </td>
         </tr></table>
@@ -900,18 +989,24 @@ def _coming_soon_view_html(layout, theme, label, events, view):
         return _shell(layout, theme, label, inner)
     return render_view_html(events, theme, view, label, container=container)
 
-def render_sonarr_coming_soon(layout, episodes, msg_root, theme, base_url="", grid_columns=5, hosted_images_enabled=False, hosted_base_url="", view=""):
+def render_sonarr_coming_soon(layout, episodes, msg_root, theme, base_url="", grid_columns=5, hosted_images_enabled=False, hosted_base_url="", view="", kind="", limit=0):
     if not episodes:
         return _shell(layout, theme, "Coming Soon (TV)", _empty_state_html(theme, "No upcoming episodes found."))
+    art_on = density.show_art(theme, layout)
     view = resolve_view(view)
     if view in ('calendar', 'agenda'):
         events = sonarr_events(episodes, msg_root, view, base_url, cid_prefix=f"l-cs-tv-{view}",
-                               hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
+                               hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url,
+                               with_posters=art_on, kind=kind, limit=limit)
         html = _coming_soon_view_html(layout, theme, "Coming Soon (TV)", events, view)
         if html:
             return html
         return _shell(layout, theme, "Coming Soon (TV)", _empty_state_html(theme, "No upcoming episodes found."))
-    groups = group_sonarr_episodes(episodes)
+    groups = sonarr_groups(episodes, kind, limit)
+    if not groups:
+        # Every episode was filtered out (NEWS-55), which is not the same as
+        # the calendar being empty, but reads the same to the reader.
+        return _shell(layout, theme, "Coming Soon (TV)", _empty_state_html(theme, "No upcoming episodes found."))
 
     def entry(group):
         series = group['series']
@@ -933,9 +1028,9 @@ def render_sonarr_coming_soon(layout, episodes, msg_root, theme, base_url="", gr
             title, sub, when, series, first = entry(group)
             rel = _relative(when)
             poster = _arr_poster_url(series.get('images')) or _arr_poster_url(first.get('images'))
-            src = fetch_and_attach_image(_arr_poster_src(poster, '/proxy-sonarr-art'), msg_root, f"la-tv-{i}", base_url, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url) if poster else None
-            cards.append(_build_card_html(theme, truncate_text(title, 23), truncate_text(sub, 30), f"Airs {rel}" if rel else "", src))
-        return _shell(layout, theme, "Coming Soon (TV)", _grid(cards, max(1, int(grid_columns or 5))))
+            src = fetch_and_attach_image(_arr_poster_src(poster, '/proxy-sonarr-art'), msg_root, f"la-tv-{i}", base_url, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url) if (poster and art_on) else None
+            cards.append(_build_card_html(theme, truncate_text(title, 23), truncate_text(sub, 30), f"Airs {rel}" if rel else "", src, compact=not art_on))
+        return _shell(layout, theme, "Coming Soon (TV)", _grid(cards, density.columns(theme, layout, max(1, int(grid_columns or 5)))))
 
     rows = ""
     for group in groups:
@@ -949,15 +1044,17 @@ def render_sonarr_coming_soon(layout, episodes, msg_root, theme, base_url="", gr
         return _shell(layout, theme, "Coming Soon (TV)", rows, overline="Mark the calendar")
     return _shell(layout, theme, "Coming Soon (TV)", rows)
 
-def render_radarr_coming_soon(layout, movies, msg_root, theme, base_url="", grid_columns=5, hosted_images_enabled=False, hosted_base_url="", view=""):
-    upcoming = filter_radarr_upcoming(movies or [])
+def render_radarr_coming_soon(layout, movies, msg_root, theme, base_url="", grid_columns=5, hosted_images_enabled=False, hosted_base_url="", view="", limit=0):
+    upcoming = radarr_upcoming(movies, limit)
     if not upcoming:
         return _shell(layout, theme, "Coming Soon (Movies)", _empty_state_html(theme, "No upcoming movies found."))
 
+    art_on = density.show_art(theme, layout)
     view = resolve_view(view)
     if view in ('calendar', 'agenda'):
         events = radarr_events(movies, msg_root, view, base_url, cid_prefix=f"l-cs-mv-{view}",
-                               hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
+                               hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url,
+                               with_posters=art_on, limit=limit)
         html = _coming_soon_view_html(layout, theme, "Coming Soon (Movies)", events, view)
         if html:
             return html
@@ -968,9 +1065,9 @@ def render_radarr_coming_soon(layout, movies, msg_root, theme, base_url="", grid
         for i, movie in enumerate(upcoming):
             rel = _relative(str(upcoming_release_date(movie) or ''))
             poster = _arr_poster_url(movie.get('images'))
-            src = fetch_and_attach_image(_arr_poster_src(poster, '/proxy-radarr-art'), msg_root, f"la-mv-{i}", base_url, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url) if poster else None
-            cards.append(_build_card_html(theme, truncate_text(movie.get('title', 'Unknown'), 23), str(movie.get('year') or ''), f"Releases {rel}" if rel else "", src))
-        return _shell(layout, theme, "Coming Soon (Movies)", _grid(cards, max(1, int(grid_columns or 5))))
+            src = fetch_and_attach_image(_arr_poster_src(poster, '/proxy-radarr-art'), msg_root, f"la-mv-{i}", base_url, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url) if (poster and art_on) else None
+            cards.append(_build_card_html(theme, truncate_text(movie.get('title', 'Unknown'), 23), str(movie.get('year') or ''), f"Releases {rel}" if rel else "", src, compact=not art_on))
+        return _shell(layout, theme, "Coming Soon (Movies)", _grid(cards, density.columns(theme, layout, max(1, int(grid_columns or 5)))))
 
     rows = ""
     for movie in upcoming:
@@ -995,10 +1092,16 @@ def _short_date(date_str):
         return ""
 
 def _dated_row(theme, date_label, title, sub):
+    # editorial-only helper; its variant is the expanded (roomy) one. The
+    # separator space lives inside the span: minify_email_html() collapses
+    # whitespace that sits between two tags, which used to jam the title
+    # against its meta text.
+    p = density.picker(theme, 'editorial')
+    pad = p('11px', '7px')
     return f"""
         <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
-            <td width="64" valign="top" align="right" style="padding: 7px 14px 7px 0; color: {theme['primary']}; font-weight: 700; font-size: 12px; white-space: nowrap; font-family: {FONT};">{esc(date_label)}</td>
-            <td style="padding: 7px 0; font-size: 13px; font-family: {FONT};"><b style="color: #ffffff; font-weight: 600;">{esc(title)}</b> <span style="color: {theme['muted_text']}; font-size: 11.5px;">{esc(sub)}</span></td>
+            <td width="64" valign="top" align="right" style="padding: {pad} 14px {pad} 0; color: {theme['primary']}; font-weight: 700; font-size: {p('13px', '12px')}; white-space: nowrap; font-family: {FONT};">{esc(date_label)}</td>
+            <td style="padding: {pad} 0; font-size: {p('14.5px', '13px')}; font-family: {FONT};"><b style="color: #ffffff; font-weight: 600;">{esc(title)}</b><span style="color: {theme['muted_text']}; font-size: {p('12.5px', '11.5px')};"> {esc(sub)}</span></td>
         </tr></table>
     """
 
@@ -1016,12 +1119,14 @@ def render_dn_server(layout, server_data, theme):
     year = server_data.get('year', '')
     label = f"Listening Stats{f' - {year}' if year else ''}"
 
+    p = density.picker(theme, layout)
+
     if layout in _CARD_LAYOUTS:
         def ledger(k, v):
             return f"""
                 <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
-                    <td style="padding: 8px 16px; font-size: 12.5px; color: {theme['text']}; border-top: 1px solid {theme['border']}; font-family: {FONT};">{esc(k)}</td>
-                    <td align="right" style="padding: 8px 16px; font-size: 12.5px; color: {theme['muted_text']}; border-top: 1px solid {theme['border']}; font-family: {FONT};">{v}</td>
+                    <td style="padding: {p('5px 12px', '8px 16px')}; font-size: {p('12px', '12.5px')}; color: {theme['text']}; border-top: 1px solid {theme['border']}; font-family: {FONT};">{esc(k)}</td>
+                    <td align="right" style="padding: {p('5px 12px', '8px 16px')}; font-size: {p('12px', '12.5px')}; color: {theme['muted_text']}; border-top: 1px solid {theme['border']}; font-family: {FONT};">{v}</td>
                 </tr></table>
             """
         inner = ""
@@ -1038,10 +1143,10 @@ def render_dn_server(layout, server_data, theme):
         board = ""
         for k, v in (("Top album", top_album.get('name', '')), ("Top listener", top_listener.get('display_name', '')), ("Server total", f"~{total} plays")):
             if v:
-                board += f'<td align="center" style="padding: 0 12px; font-size: 12px; color: {theme["muted_text"]}; font-family: {FONT};">{esc(k).upper()}<br><b style="color: {theme["text"]};">{esc(str(v))}</b></td>'
+                board += f'<td align="center" style="padding: {p("0 18px", "0 12px")}; font-size: {p("13px", "12px")}; color: {theme["muted_text"]}; font-family: {FONT};">{esc(k).upper()}<br><b style="color: {theme["text"]};">{esc(str(v))}</b></td>'
         centerpiece = f"""
-            <div style="text-align: center; padding: 6px 0 10px 0; font-family: {FONT};">
-                <div style="font-size: 22px; font-weight: 800; color: #ffffff;">{esc(top_artist.get('name', ''))}</div>
+            <div style="text-align: center; padding: {p('12px 0 16px 0', '6px 0 10px 0')}; font-family: {FONT};">
+                <div style="font-size: {p('28px', '22px')}; font-weight: 800; color: #ffffff;">{esc(top_artist.get('name', ''))}</div>
                 <div style="color: {theme['muted_text']}; font-size: 12px;">artist of the moment &middot; {top_artist.get('listen_count', 0)} plays across {listeners} listeners</div>
             </div>
         """ if top_artist else ""
@@ -1051,7 +1156,7 @@ def render_dn_server(layout, server_data, theme):
     # digest: two mini ledgers side by side
     def mini(rows):
         cells = "".join(_digest_row(theme, esc(k), esc(str(v))) for k, v in rows if v)
-        return f'<div style="background-color: {theme["card_bg"]}; border: 1px solid {theme["border"]}; border-radius: 8px; padding: 4px 12px;">{cells}</div>'
+        return f'<div style="background-color: {theme["card_bg"]}; border: 1px solid {theme["border"]}; border-radius: 8px; padding: {p("8px 16px", "4px 12px")};">{cells}</div>'
     left = mini([("Top artist", top_artist.get('name', '')), ("Top album", truncate_text(top_album.get('name', ''), 18))])
     right = mini([("Top listener", top_listener.get('display_name', '')), ("Server plays", f"~{total}")])
     inner = f'<table width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td valign="top" width="50%" style="padding-right: 6px;">{left}</td><td valign="top" width="50%" style="padding-left: 6px;">{right}</td></tr></table>'
@@ -1064,9 +1169,12 @@ def render_requests(layout, source, data, msg_root, theme, base_url="", grid_col
     if not entries:
         return _shell(layout, theme, "Recent Requests", _empty_state_html(theme, "No pending or approved requests found."))
 
+    p = density.picker(theme, layout)
+    art_on = density.show_art(theme, layout)
+
     def poster_src(entry, i):
         poster = entry.get('poster')
-        if not poster:
+        if not poster or not art_on:
             return None
         url = poster if poster.startswith('http') else f"{TMDB_POSTER_BASE}{poster}"
         return fetch_and_attach_image(url, msg_root, f"l-{source}-{i}", base_url, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
@@ -1078,8 +1186,8 @@ def render_requests(layout, source, data, msg_root, theme, base_url="", grid_col
             rel = _relative(entry['requested_date'])
             meta = truncate_text(' · '.join(b for b in [status, f'Requested {rel}' if rel else ''] if b), 46)
             extra = truncate_text(f"Requested by {entry['requested_by']}", 46) if include_user_info and entry.get('requested_by') else None
-            cards.append(_build_card_html(theme, truncate_text(entry['title'], 23), entry['year'], meta, poster_src(entry, i), extra_line=extra))
-        return _shell(layout, theme, "Recent Requests", _grid(cards, max(1, int(grid_columns or 5))))
+            cards.append(_build_card_html(theme, truncate_text(entry['title'], 23), entry['year'], meta, poster_src(entry, i), extra_line=extra, compact=not art_on))
+        return _shell(layout, theme, "Recent Requests", _grid(cards, density.columns(theme, layout, max(1, int(grid_columns or 5)))))
 
     rows = ""
     for entry in entries:
@@ -1089,8 +1197,8 @@ def render_requests(layout, source, data, msg_root, theme, base_url="", grid_col
         if layout == 'editorial':
             rows += f"""
                 <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
-                    <td width="82" valign="top" align="right" style="padding: 7px 14px 7px 0; color: {theme['primary']}; font-weight: 700; font-size: 11px; letter-spacing: .06em; font-family: {FONT};">{status}</td>
-                    <td style="padding: 7px 0; font-size: 13px; font-family: {FONT};"><b style="color: #ffffff; font-weight: 600;">{esc(entry['title'])}</b> <span style="color: {theme['muted_text']}; font-size: 11.5px;">{esc(by)}{f', {rel}' if rel else ''}</span></td>
+                    <td width="82" valign="top" align="right" style="padding: {p('11px', '7px')} 14px {p('11px', '7px')} 0; color: {theme['primary']}; font-weight: 700; font-size: {p('12px', '11px')}; letter-spacing: .06em; font-family: {FONT};">{status}</td>
+                    <td style="padding: {p('11px', '7px')} 0; font-size: {p('14.5px', '13px')}; font-family: {FONT};"><b style="color: #ffffff; font-weight: 600;">{esc(entry['title'])}</b><span style="color: {theme['muted_text']}; font-size: {p('12.5px', '11.5px')};"> {esc(by)}{f', {rel}' if rel else ''}</span></td>
                 </tr></table>
             """
         else:

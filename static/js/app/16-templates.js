@@ -69,14 +69,125 @@ function updateTemplateDropdown() {
     });
 }
 
+function openSaveTemplateDialog({ suggestedName = '', preselectId = null } = {}) {
+    return new Promise((resolve) => {
+        const modal = document.getElementById('saveTemplateModal');
+        if (!modal) {   // dialog not on this page: fall back to the old flow
+            const typed = prompt('Enter template name:');
+            resolve(typed && typed.trim() ? typed.trim() : null);
+            return;
+        }
+
+        const modeNew = document.getElementById('save_template_mode_new');
+        const modeOverwrite = document.getElementById('save_template_mode_overwrite');
+        const newPane = document.getElementById('save_template_new_pane');
+        const overwritePane = document.getElementById('save_template_overwrite_pane');
+        const nameInput = document.getElementById('save_template_name');
+        const warning = document.getElementById('save_template_name_warning');
+        const targetSelect = document.getElementById('save_template_target');
+        const confirmBtn = document.getElementById('save_template_confirm_btn');
+
+        targetSelect.innerHTML = '';
+        emailTemplates.forEach(t => {
+            const opt = document.createElement('option');
+            opt.value = String(t.id);
+            opt.textContent = t.name;
+            targetSelect.appendChild(opt);
+        });
+
+        // Default to overwriting whatever is currently loaded, since that is
+        // what someone editing a saved template almost always means.
+        const hasTemplates = emailTemplates.length > 0;
+        const preselect = preselectId != null && emailTemplates.some(t => String(t.id) === String(preselectId));
+        modeOverwrite.disabled = !hasTemplates;
+        modeOverwrite.checked = hasTemplates && preselect;
+        modeNew.checked = !modeOverwrite.checked;
+        if (preselect) targetSelect.value = String(preselectId);
+        nameInput.value = suggestedName;
+
+        function syncPanes() {
+            const overwriting = modeOverwrite.checked;
+            newPane.classList.toggle('d-none', overwriting);
+            overwritePane.classList.toggle('d-none', !overwriting);
+            confirmBtn.textContent = overwriting ? 'Overwrite' : 'Save';
+            syncNameWarning();
+        }
+
+        // A new-template name that collides still overwrites, because the POST
+        // upserts by name. Say so rather than letting it happen silently.
+        function syncNameWarning() {
+            if (modeOverwrite.checked) {
+                warning.classList.add('d-none');
+                return;
+            }
+            const typed = nameInput.value.trim().toLowerCase();
+            const clash = typed && emailTemplates.some(t => t.name.trim().toLowerCase() === typed);
+            warning.textContent = clash
+                ? 'A template with this name already exists and will be replaced.'
+                : '';
+            warning.classList.toggle('d-none', !clash);
+        }
+
+        function cleanup() {
+            modeNew.removeEventListener('change', syncPanes);
+            modeOverwrite.removeEventListener('change', syncPanes);
+            nameInput.removeEventListener('input', syncNameWarning);
+            nameInput.removeEventListener('keydown', onKeydown);
+            confirmBtn.removeEventListener('click', onConfirm);
+            modal.removeEventListener('nl-modal-cancel', onCancel);
+            document.removeEventListener('click', onDismiss, true);
+            document.removeEventListener('keydown', onEscape, true);
+        }
+
+        function finish(value) {
+            cleanup();
+            window.NLModal.hide('saveTemplateModal');
+            resolve(value);
+        }
+
+        function onConfirm() {
+            if (modeOverwrite.checked) {
+                const chosen = emailTemplates.find(t => String(t.id) === targetSelect.value);
+                if (!chosen) return;
+                finish(chosen.name);
+            } else {
+                const typed = nameInput.value.trim();
+                if (!typed) { nameInput.focus(); return; }
+                finish(typed);
+            }
+        }
+
+        function onCancel() { finish(null); }
+        function onKeydown(e) { if (e.key === 'Enter') { e.preventDefault(); onConfirm(); } }
+        function onEscape(e) { if (e.key === 'Escape' && modal.classList.contains('show')) finish(null); }
+        function onDismiss(e) {
+            const el = e.target.closest && e.target.closest('[data-bs-dismiss="modal"]');
+            if (el && modal.contains(el)) finish(null);
+            else if (e.target.classList && e.target.classList.contains('nl-modal-backdrop-el')) finish(null);
+        }
+
+        modeNew.addEventListener('change', syncPanes);
+        modeOverwrite.addEventListener('change', syncPanes);
+        nameInput.addEventListener('input', syncNameWarning);
+        nameInput.addEventListener('keydown', onKeydown);
+        confirmBtn.addEventListener('click', onConfirm);
+        document.addEventListener('click', onDismiss, true);
+        document.addEventListener('keydown', onEscape, true);
+
+        syncPanes();
+        window.NLModal.show('saveTemplateModal');
+    });
+}
+
 document.getElementById('template-selector').addEventListener('change', async function() {
     const value = this.value;
     const deleteBtn = document.getElementById('delete-template-btn');
-    
+
     if (value === 'save-template') {
-        const templateName = prompt('Enter template name:');
-        if (templateName && templateName.trim()) {
-            await saveCurrentTemplate(templateName.trim());
+        const loadedId = document.getElementById('delete-template-btn')?.dataset.templateId || null;
+        const templateName = await openSaveTemplateDialog({ preselectId: loadedId });
+        if (templateName) {
+            await saveCurrentTemplate(templateName);
         }
         this.value = '';
         deleteBtn.style.display = 'none';
@@ -101,7 +212,7 @@ document.getElementById('reset-template-btn').addEventListener('click', function
         
         document.getElementById('delete-template-btn').style.display = 'none';
         
-        document.querySelectorAll('.add-stat-btn, .add-graph-btn, .ra-add-btn, .mw-add-btn, .recs-add-btn, .droppedneedle-add-btn, .droppedneedle-server-add-btn, .yearly-wrapped-add-btn, .sonarr-coming-soon-add-btn, .radarr-coming-soon-add-btn, .ombi-requests-add-btn, .seerr-requests-add-btn, .top-viewer-add-btn').forEach(btn => {
+        document.querySelectorAll('.add-stat-btn, .add-graph-btn, .ra-add-btn, .rr-add-btn, .mw-add-btn, .recs-add-btn, .droppedneedle-add-btn, .droppedneedle-server-add-btn, .yearly-wrapped-add-btn, .sonarr-coming-soon-add-btn, .radarr-coming-soon-add-btn, .ombi-requests-add-btn, .seerr-requests-add-btn, .top-viewer-add-btn').forEach(btn => {
             btn.textContent = 'Add';
             btn.classList.remove('nl-btn--success');
             btn.classList.add('nl-btn--primary');
@@ -125,10 +236,17 @@ document.getElementById('reset-template-btn').addEventListener('click', function
 
 async function saveCurrentTemplate(name) {
     try {
+        const _isDefault = (raw, resolvedDefault) => {
+            if (raw === resolvedDefault) return true;
+            if (!resolvedDefault) return false;
+            const norm = (s) => textBlockPlainText(s).replace(/\s+/g, ' ').trim();
+            return norm(raw) === norm(resolvedDefault);
+        };
+
         const _sentinelContent = (item) => {
             const raw = getTextBlockContent(item.id) || '';
-            if (item.id.startsWith('intro-block-') && raw === _resolvedIntroDefault) return '__DEFAULT_INTRO__';
-            if (item.id.startsWith('outro-block-') && raw === _resolvedOutroDefault) return '__DEFAULT_OUTRO__';
+            if (item.id.startsWith('intro-block-') && _isDefault(raw, _resolvedIntroDefault)) return '__DEFAULT_INTRO__';
+            if (item.id.startsWith('outro-block-') && _isDefault(raw, _resolvedOutroDefault)) return '__DEFAULT_OUTRO__';
             return raw;
         };
 
@@ -144,7 +262,6 @@ async function saveCurrentTemplate(name) {
             return item;
         });
 
-        const expandedCollections = window.expandedCollections || {};
         const isCustomHtml = document.getElementById('custom-html-toggle')?.checked || false;
         const customHtml = isCustomHtml ? (document.getElementById('custom-html-editor')?.value || '') : '';
 
@@ -199,7 +316,7 @@ function loadTemplate(template) {
 
         selectedItems = [];
         
-        document.querySelectorAll('.add-stat-btn, .add-graph-btn, .ra-add-btn, .mw-add-btn, .recs-add-btn, .droppedneedle-add-btn, .droppedneedle-server-add-btn, .yearly-wrapped-add-btn, .sonarr-coming-soon-add-btn, .radarr-coming-soon-add-btn, .ombi-requests-add-btn, .seerr-requests-add-btn, .top-viewer-add-btn').forEach(btn => {
+        document.querySelectorAll('.add-stat-btn, .add-graph-btn, .ra-add-btn, .rr-add-btn, .mw-add-btn, .recs-add-btn, .droppedneedle-add-btn, .droppedneedle-server-add-btn, .yearly-wrapped-add-btn, .sonarr-coming-soon-add-btn, .radarr-coming-soon-add-btn, .ombi-requests-add-btn, .seerr-requests-add-btn, .top-viewer-add-btn').forEach(btn => {
             btn.textContent = 'Add';
             btn.classList.remove('nl-btn--success');
             btn.classList.add('nl-btn--primary');
@@ -228,16 +345,15 @@ function loadTemplate(template) {
             return restored;
         });
 
+        window.collapsedCollectionsUI = {};
         if (template.expanded_collections) {
             try {
-                const expandedCollections = JSON.parse(template.expanded_collections);
-                window.expandedCollections = expandedCollections;
-                console.log('Restored expansion state from template:', expandedCollections);
-                window.collapsedCollectionsUI = {};
+                window.expandedCollections = convertExpandedCollectionsFromBackend(
+                    JSON.parse(template.expanded_collections)
+                );
             } catch (e) {
                 console.warn('Failed to parse expanded collections from template:', e);
                 window.expandedCollections = {};
-                window.collapsedCollectionsUI = {};
             }
         } else {
             window.expandedCollections = {};
@@ -421,8 +537,10 @@ document.getElementById('import-html-input').addEventListener('change', async (e
         return;
     }
 
-    const templateName = prompt('Enter a name for this template:', file.name.replace('.html', ''));
-    if (!templateName?.trim()) {
+    const templateName = await openSaveTemplateDialog({
+        suggestedName: file.name.replace(/\.html?$/i, '')
+    });
+    if (!templateName) {
         e.target.value = '';
         return;
     }

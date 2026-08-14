@@ -134,60 +134,129 @@ document.getElementById('add-audio-collection-btn').addEventListener('click', fu
 
 let collectionGroupCounter = 0;
 
-document.getElementById('add-collection-group-btn').addEventListener('click', function() {
+function collectionGroups() {
+    return selectedItems.filter(item => item && item.type === 'collection_group');
+}
+
+function newCollectionGroup() {
     collectionGroupCounter++;
-    const groupId = `collection-group-${collectionGroupCounter}`;
-    
-    const newGroup = {
-        id: groupId,
+    return {
+        id: `collection-group-${collectionGroupCounter}`,
         name: 'Collection Group',
         type: 'collection_group',
         title: 'New Collection Group',
         collections: []
     };
-    
-    selectedItems.push(newGroup);
+}
+
+document.getElementById('add-collection-group-btn').addEventListener('click', function() {
+    const group = newCollectionGroup();
+    selectedItems.push(group);
     updateSelectedItemsDisplay();
+    // A brand new group is almost certainly what the next Add is meant for.
+    const target = document.getElementById('collection-target-group');
+    if (target) target.value = group.id;
 });
 
+function refreshCollectionTargetOptions() {
+    const row = document.getElementById('collection-target-row');
+    const select = document.getElementById('collection-target-group');
+    if (!row || !select) return;
+
+    const groups = collectionGroups();
+    const previous = select.value;
+
+    select.innerHTML = '';
+    groups.forEach(group => {
+        const option = document.createElement('option');
+        option.value = group.id;
+        option.textContent = group.title || 'Unnamed Collection Group';
+        select.appendChild(option);
+    });
+
+    // Hold the previous choice across re-renders; otherwise fall back to the
+    // last group, which is where Add always used to land.
+    if (groups.some(g => g.id === previous)) {
+        select.value = previous;
+    } else if (groups.length) {
+        select.value = groups[groups.length - 1].id;
+    }
+
+    // Toggle both: `d-flex` and `d-none` cannot coexist on one element,
+    // since utilities.css declares d-flex last and both are !important.
+    const hide = groups.length < 2;
+    row.classList.toggle('d-none', hide);
+    row.classList.toggle('d-flex', !hide);
+}
+
+function targetCollectionGroup() {
+    const select = document.getElementById('collection-target-group');
+    const chosen = select && selectedItems.find(
+        item => item && item.type === 'collection_group' && item.id === select.value
+    );
+    if (chosen) return chosen;
+
+    const groups = collectionGroups();
+    if (groups.length) return groups[groups.length - 1];
+
+    const created = newCollectionGroup();
+    selectedItems.push(created);
+    return created;
+}
+
 function addCollectionItem(collection) {
-    let targetGroup = null;
-    for (let i = selectedItems.length - 1; i >= 0; i--) {
-        if (selectedItems[i].type === 'collection_group') {
-            targetGroup = selectedItems[i];
-            break;
-        }
-    }
-    
-    if (!targetGroup) {
-        collectionGroupCounter++;
-        targetGroup = {
-            id: `collection-group-${collectionGroupCounter}`,
-            name: 'Collection Group',
-            type: 'collection_group',
-            title: 'New Collection Group',
-            collections: []
-        };
-        selectedItems.push(targetGroup);
-    }
-    
+    const targetGroup = targetCollectionGroup();
+
     const exists = targetGroup.collections.some(c => c.key === collection.key);
     if (exists) {
         console.log('Collection already in this group:', collection.title);
         return;
     }
-    
+
     targetGroup.collections.push(collection);
     updateSelectedItemsDisplay();
-    
+    if (typeof debouncedUpdatePreview === 'function') debouncedUpdatePreview();
+
     document.getElementById('movie-collections-dropdown').value = '';
     document.getElementById('show-collections-dropdown').value = '';
     document.getElementById('audio-collections-dropdown').value = '';
     document.getElementById('add-movie-collection-btn').disabled = true;
     document.getElementById('add-show-collection-btn').disabled = true;
     document.getElementById('add-audio-collection-btn').disabled = true;
-    
+
     console.log('Added collection to group:', collection.title);
+}
+
+function moveCollectionToGroup(fromGroupId, collectionIndex, toGroupId) {
+    if (fromGroupId === toGroupId) return true;
+
+    const from = selectedItems.find(i => i && i.type === 'collection_group' && i.id === fromGroupId);
+    const to = selectedItems.find(i => i && i.type === 'collection_group' && i.id === toGroupId);
+    if (!from || !to || !from.collections[collectionIndex]) return false;
+
+    const collection = from.collections[collectionIndex];
+    if (to.collections.some(c => c.key === collection.key)) {
+        // The destination already has it; leave both sides untouched.
+        return false;
+    }
+
+    const oldKey = collectionExpansionKey(fromGroupId, collection.key);
+    const newKey = collectionExpansionKey(toGroupId, collection.key);
+    if (window.expandedCollections[oldKey]) {
+        window.expandedCollections[newKey] = window.expandedCollections[oldKey];
+        delete window.expandedCollections[oldKey];
+    }
+    if (window.collapsedCollectionsUI[oldKey]) {
+        window.collapsedCollectionsUI[newKey] = window.collapsedCollectionsUI[oldKey];
+        delete window.collapsedCollectionsUI[oldKey];
+    }
+
+    from.collections.splice(collectionIndex, 1);
+    to.collections.push(collection);
+
+    updateSelectedItemsDisplay();
+    if (typeof debouncedUpdatePreview === 'function') debouncedUpdatePreview();
+    return true;
 }
 
 document.addEventListener('DOMContentLoaded', loadCollections);

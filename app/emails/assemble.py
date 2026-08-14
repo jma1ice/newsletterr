@@ -4,11 +4,12 @@ from datetime import datetime
 from html.parser import HTMLParser
 import html as _html_stdlib
 
-from app.cache import get_cache_info
+from app.cache import get_cache_info, get_cached_data, set_cached_data
 from app.emails.images import fetch_and_attach_image
 from app.emails.blocks import build_graph_html_with_frontend_image, build_text_block_html, build_separator_html, build_image_html_with_cid, build_emoji_html
 from app.emails.builders import build_stats_html_with_cid_background, build_recently_added_html_with_cids, build_recommendations_html_with_cids, build_droppedneedle_wrapped_html_with_cids, build_droppedneedle_server_stats_html_with_cids, build_collections_html_with_cids, build_yearly_wrapped_html_with_cids, build_sonarr_coming_soon_html_with_cids, build_radarr_coming_soon_html_with_cids, build_ombi_requests_html_with_cids, build_seerr_requests_html_with_cids
-from app.emails.builders import layouts
+from app.emails.builders import layouts, recently_released
+from app.emails import density, headings
 from app.emails.builders.most_watched import build_most_watched_html_with_cids
 from app.emails.builders.random_pick import build_random_pick_html
 from app.emails.builders.top_viewer import build_top_viewer_html, find_top_viewer
@@ -122,6 +123,24 @@ def attach_logo_image(msg_root, logo_filename, custom_logo_filename, base_url=""
         logo_url = f"/static/img/{logo_filename}"
     return fetch_and_attach_image(logo_url, msg_root, "logo", base_url, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
 
+def _featured_pick_cached(rating_key, title):
+    if not rating_key and not title:
+        return None
+
+    cache_key = f"featured_pick:{rating_key}:{title.lower()}"
+    cached = get_cached_data(cache_key, strict=False)
+    if cached is not None:
+        return cached or None
+
+    pick = fetch_library_item_by_rating_key(rating_key) if rating_key else None
+    if pick is None and title:
+        matches = search_library_items(title, limit=1)
+        if matches:
+            pick = fetch_library_item_by_rating_key(matches[0]['rating_key'])
+    set_cached_data(cache_key, pick or {})
+    return pick
+
+
 def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, display_preference, users_data, recommendations_data=None, user_dict=None, base_url="", target_user_key=None, is_scheduled=False, items_count=None, date_range="", expanded_collections=None, email_header_title=None, droppedneedle_wrapped_data=None, droppedneedle_server_data=None, yearly_wrapped_data=None, sonarr_coming_soon_data=None, radarr_coming_soon_data=None, ombi_requests_data=None, seerr_requests_data=None, unsubscribe_placeholder=None, hosted_base_url="", hosted_images_enabled=False, build_hosted_variant=False, hosted_enabled=False, links_base_url=""):
     """Returns (email_html, hosted_html). hosted_html is None unless
     build_hosted_variant=True, only the non-personalized 'single body for
@@ -149,6 +168,7 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, displ
     coming_soon_grid_columns = int(tautulli_data.get('settings', {}).get('coming_soon_grid_columns', 5) or 5)
     collections_grid_columns = int(tautulli_data.get('settings', {}).get('collections_grid_columns', 5) or 5)
     ra_show_description = tautulli_data.get('settings', {}).get('ra_show_description', 'enabled') != 'disabled'
+    released_since_days = tautulli_data.get('settings', {}).get('released_since_days') or ''
     recs_show_description = tautulli_data.get('settings', {}).get('recs_show_description', 'enabled') != 'disabled'
     include_user_info = tautulli_data.get('settings', {}).get('include_user_info', 'enabled') != 'disabled'
     # Email layout (NEWS-30): 'legacy' keeps every pre-v2026.4 builder path
@@ -156,6 +176,7 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, displ
     # app/emails/builders/layouts.py (single source for sends and previews).
     email_layout = tautulli_data.get('settings', {}).get('email_layout') or 'classic'
     use_layout = layouts.is_layout(email_layout)
+    email_density = tautulli_data.get('settings', {}).get('email_density') or ''
     _default_intro = tautulli_data.get('settings', {}).get('default_intro_text') or ''
     _default_outro = tautulli_data.get('settings', {}).get('default_outro_text') or ''
     _resolved_intro = _default_intro or f"You are receiving this email because you are a member of {server_name}."
@@ -163,7 +184,8 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, displ
     expanded_collections = expanded_collections or {}
     email_header_title = email_header_title or ''
     
-    theme_colors = layouts.apply_theme(email_layout, get_email_theme_colors())
+    theme_colors = density.stamp(layouts.apply_theme(email_layout, get_email_theme_colors()), email_layout, email_density)
+    outer_theme_colors = theme_colors
 
     def _render_item(item, group_index=0):
         """Single per-item dispatch shared by the selected-items loop and
@@ -172,6 +194,10 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, displ
         content_html = ""
         item_type = item.get('type', '')
 
+        theme_colors = headings.stamp(
+            outer_theme_colors, item.get('heading'), item.get('hideHeading')
+        )
+
         if item_type in ['textblock', 'titleblock', 'headerblock']:
             content = item.get('content', '').strip()
             if content == '__DEFAULT_INTRO__':
@@ -179,7 +205,7 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, displ
             elif content == '__DEFAULT_OUTRO__':
                 content = _resolved_outro
             if content:
-                content_html += build_text_block_html(content, item_type, theme_colors)
+                content_html += build_text_block_html(content, item_type, theme_colors, opts=item)
 
         elif item_type == 'separator':
             content_html += build_separator_html(theme_colors)
@@ -238,6 +264,42 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, displ
             else:
                 content_html += build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, library_filter, base_url, max_items, recently_added_mode=recently_added_mode, ra_grid_columns=ra_grid_columns, poster_max_height=poster_max_height, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url, show_description=ra_show_description, library_item_cap=library_item_cap, orientation=ra_orientation)
         
+        elif item_type == 'recently_released':
+            rr_library = item.get('rrLibrary')
+            rr_recent = tautulli_data.get('recent_data', [])
+
+            rr_pull_window = items_count if recently_added_mode == 'days' else None
+            if rr_pull_window is None and recently_added_mode == 'days':
+                cache_info = get_cache_info('recent_data')
+                if cache_info.get('params'):
+                    rr_pull_window = cache_info['params'].get('count')
+
+            try:
+                rr_cap = int(item.get('rrCount') or 0)
+            except (TypeError, ValueError):
+                rr_cap = 0
+
+            rr_items = recently_released.select(
+                rr_recent,
+                library_filter=rr_library,
+                released_since_days=released_since_days,
+                pull_window_days=rr_pull_window,
+                item_cap=rr_cap,
+            )
+            rr_data = recently_released.as_recent_data(rr_items)
+            rr_orientation = item.get('rrOrientation') or ''
+
+            rr_theme = headings.stamp(
+                outer_theme_colors,
+                item.get('heading') or recently_released.DEFAULT_TITLE,
+                item.get('hideHeading'),
+            )
+
+            if use_layout:
+                content_html += layouts.render_recently_added(email_layout, rr_data, msg_root, rr_theme, None, base_url, None, recently_added_mode='items', ra_grid_columns=ra_grid_columns, poster_max_height=poster_max_height, show_description=ra_show_description, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url, orientation=rr_orientation)
+            else:
+                content_html += build_recently_added_html_with_cids(rr_data, msg_root, rr_theme, None, base_url, None, recently_added_mode='items', ra_grid_columns=ra_grid_columns, poster_max_height=poster_max_height, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url, show_description=ra_show_description, orientation=rr_orientation)
+
         elif item_type == 'most_watched':
             mw_library = item.get('mwLibrary')
             # Scope (NEWS-17 follow-up): '' = all-time lifetime counts,
@@ -287,11 +349,7 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, displ
         elif item_type == 'featured_pick':
             fp_key = item.get('ratingKey') or item.get('rating_key') or ''
             fp_title = (item.get('title') or '').strip()
-            fp_pick = fetch_library_item_by_rating_key(fp_key) if fp_key else None
-            if fp_pick is None and fp_title:
-                matches = search_library_items(fp_title, limit=1)
-                if matches:
-                    fp_pick = fetch_library_item_by_rating_key(matches[0]['rating_key'])
+            fp_pick = _featured_pick_cached(fp_key, fp_title)
             fp_heading = item.get('heading') or 'Featured Pick'
             if use_layout:
                 content_html += layouts.render_random_pick(email_layout, fp_pick, msg_root, theme_colors, base_url, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url, heading=fp_heading)
@@ -345,18 +403,21 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, displ
         elif item_type == 'sonarr_coming_soon':
             if sonarr_coming_soon_data:
                 cs_view = item.get('csView') or ''
+                cs_kind = item.get('csKind') or ''
+                cs_limit = item.get('csCount') or 0
                 if use_layout:
-                    content_html += layouts.render_sonarr_coming_soon(email_layout, sonarr_coming_soon_data, msg_root, theme_colors, base_url, grid_columns=coming_soon_grid_columns, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url, view=cs_view)
+                    content_html += layouts.render_sonarr_coming_soon(email_layout, sonarr_coming_soon_data, msg_root, theme_colors, base_url, grid_columns=coming_soon_grid_columns, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url, view=cs_view, kind=cs_kind, limit=cs_limit)
                 else:
-                    content_html += build_sonarr_coming_soon_html_with_cids(sonarr_coming_soon_data, msg_root, theme_colors, base_url, grid_columns=coming_soon_grid_columns, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url, view=cs_view)
+                    content_html += build_sonarr_coming_soon_html_with_cids(sonarr_coming_soon_data, msg_root, theme_colors, base_url, grid_columns=coming_soon_grid_columns, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url, view=cs_view, kind=cs_kind, limit=cs_limit)
 
         elif item_type == 'radarr_coming_soon':
             if radarr_coming_soon_data:
                 cs_view = item.get('csView') or ''
+                cs_limit = item.get('csCount') or 0
                 if use_layout:
-                    content_html += layouts.render_radarr_coming_soon(email_layout, radarr_coming_soon_data, msg_root, theme_colors, base_url, grid_columns=coming_soon_grid_columns, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url, view=cs_view)
+                    content_html += layouts.render_radarr_coming_soon(email_layout, radarr_coming_soon_data, msg_root, theme_colors, base_url, grid_columns=coming_soon_grid_columns, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url, view=cs_view, limit=cs_limit)
                 else:
-                    content_html += build_radarr_coming_soon_html_with_cids(radarr_coming_soon_data, msg_root, theme_colors, base_url, grid_columns=coming_soon_grid_columns, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url, view=cs_view)
+                    content_html += build_radarr_coming_soon_html_with_cids(radarr_coming_soon_data, msg_root, theme_colors, base_url, grid_columns=coming_soon_grid_columns, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url, view=cs_view, limit=cs_limit)
 
         elif item_type == 'ombi_requests':
             if ombi_requests_data:
@@ -417,16 +478,17 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, displ
     for group_index, item in enumerate(selected_items):
         content_html += _render_item(item, group_index)
 
-    email_html = build_complete_email_html_with_cid_logo(content_html, server_name, subject, email_header_title, logo_src, logo_width, is_scheduled, logo_position=logo_position, unsubscribe_placeholder=unsubscribe_placeholder, hosted_base_url=hosted_base_url, hosted_enabled=hosted_enabled, links_base_url=links_base_url, layout=email_layout)
+    email_html = build_complete_email_html_with_cid_logo(content_html, server_name, subject, email_header_title, logo_src, logo_width, is_scheduled, logo_position=logo_position, unsubscribe_placeholder=unsubscribe_placeholder, hosted_base_url=hosted_base_url, hosted_enabled=hosted_enabled, links_base_url=links_base_url, layout=email_layout, email_density=email_density)
 
     hosted_html = None
     if build_hosted_variant:
-        hosted_html = build_complete_email_html_with_cid_logo(content_html, server_name, subject, email_header_title, logo_src, logo_width, is_scheduled, logo_position=logo_position, layout=email_layout)
+        hosted_html = build_complete_email_html_with_cid_logo(content_html, server_name, subject, email_header_title, logo_src, logo_width, is_scheduled, logo_position=logo_position, layout=email_layout, email_density=email_density)
 
     return email_html, hosted_html
 
-def build_complete_email_html_with_cid_logo(content_html, server_name, subject, email_header_title, logo_src, logo_width, is_scheduled=False, logo_position='center', unsubscribe_placeholder=None, hosted_base_url="", hosted_enabled=False, links_base_url="", layout='legacy'):
-    theme_colors = layouts.apply_theme(layout, get_email_theme_colors())
+def build_complete_email_html_with_cid_logo(content_html, server_name, subject, email_header_title, logo_src, logo_width, is_scheduled=False, logo_position='center', unsubscribe_placeholder=None, hosted_base_url="", hosted_enabled=False, links_base_url="", layout='legacy', email_density=''):
+    theme_colors = density.stamp(layouts.apply_theme(layout, get_email_theme_colors()), layout, email_density)
+    p = density.picker(theme_colors, layout)
     chrome = get_email_chrome_settings()
     show_server_name = chrome['show_server_name']
     header_bg = chrome['header_bg']
@@ -480,7 +542,7 @@ def build_complete_email_html_with_cid_logo(content_html, server_name, subject, 
     header_style = f"""
         {_header_bg_css}
         color: white;
-        padding: 10px 20px;
+        padding: {p('8px 14px', '10px 20px')};
         text-align: center;
         font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
     """
@@ -491,7 +553,7 @@ def build_complete_email_html_with_cid_logo(content_html, server_name, subject, 
         max-width: {logo_width}px;
         width: auto;
         height: auto;
-        margin-bottom: 15px;
+        margin-bottom: {p('8px', '15px')};
         border: 0;
         line-height: 100%;
         outline: none;
@@ -501,8 +563,8 @@ def build_complete_email_html_with_cid_logo(content_html, server_name, subject, 
         margin-right: {_logo_margin_right};
     """
     
-    title_style = """
-        font-size: 28px;
+    title_style = f"""
+        font-size: {p('22px', '28px')};
         font-weight: bold;
         margin: 0;
         text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
@@ -511,7 +573,7 @@ def build_complete_email_html_with_cid_logo(content_html, server_name, subject, 
     """
     
     content_style = f"""
-        padding: {'0' if layout == 'spotlight' else '10px 15px'};
+        padding: {'0' if layout == 'spotlight' else p('6px 10px', '10px 15px')};
         color: {theme_colors['text']};
         background-color: {'transparent' if layout == 'spotlight' else theme_colors['card_bg']};
         font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
@@ -519,7 +581,7 @@ def build_complete_email_html_with_cid_logo(content_html, server_name, subject, 
     
     footer_style = f"""
         background-color: {theme_colors['secondary']};
-        padding: 20px;
+        padding: {p('12px', '20px')};
         text-align: center;
         border-top: 3px solid {theme_colors['primary']};
         color: {theme_colors['muted_text']};
@@ -582,15 +644,15 @@ def build_complete_email_html_with_cid_logo(content_html, server_name, subject, 
         kicker = esc(eyebrow_text) or (esc(server_name) if show_server_name else _auto('Your server'))
         greeting = email_header_title or _auto('This week on the server')
         header_block = f"""
-            <div style="padding: 4px 20px 18px 20px; font-family: {_FONT};">
+            <div style="padding: {p('2px 16px 12px 16px', '4px 20px 18px 20px')}; font-family: {_FONT};">
                 {logo_html}
                 {f'<div style="font-size: 12px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; color: {theme_colors["accent"]};">{kicker}</div>' if kicker else ''}
-                {f'<div style="padding-top: 8px; font-size: 29px; line-height: 1.15; font-weight: 800; color: #ffffff;">{greeting}</div>' if greeting else ''}
+                {f'<div style="padding-top: {p("6px", "8px")}; font-size: {p("23px", "29px")}; line-height: 1.15; font-weight: 800; color: #ffffff;">{greeting}</div>' if greeting else ''}
             </div>"""
         cta_html = ""
         if chrome.get('server_url'):
             cta_html = f"""
-                <div style="text-align: center; padding: 6px 20px 20px 20px;">
+                <div style="text-align: center; padding: {p('4px 16px 14px 16px', '6px 20px 20px 20px')};">
                     <a href="{esc(chrome['server_url'])}" target="_blank" style="display: inline-block; background-color: {theme_colors['accent']}; color: #111111; text-decoration: none; font-size: 14px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; padding: 13px 26px; border-radius: 7px; font-family: {_FONT};">{esc(chrome.get('server_cta') or 'Open Plex')}</a>
                 </div>"""
         footer_block = cta_html + f"""
@@ -599,15 +661,15 @@ def build_complete_email_html_with_cid_logo(content_html, server_name, subject, 
                         </div>"""
     elif layout == 'classic':
         brand_line = f'<div style="font-weight: 700; letter-spacing: .06em; font-size: 13px; color: #ffffff; opacity: .9; text-transform: lowercase; font-family: {_FONT};">{esc(server_name)}</div>' if show_server_name else ''
-        classic_title = f'<div style="font-size: 24px; font-weight: 700; color: #ffffff; margin-top: 2px; text-shadow: 0 2px 4px rgba(0,0,0,.25); font-family: {_FONT};">{email_header_title}</div>' if email_header_title else ''
-        header_block = f'<div style="{header_style} padding: 18px 24px;">{logo_html}{brand_line}{classic_title}</div>'
+        classic_title = f'<div style="font-size: {p("19px", "24px")}; font-weight: 700; color: #ffffff; margin-top: 2px; text-shadow: 0 2px 4px rgba(0,0,0,.25); font-family: {_FONT};">{email_header_title}</div>' if email_header_title else ''
+        header_block = f'<div style="{header_style} padding: {p("11px 16px", "18px 24px")};">{logo_html}{brand_line}{classic_title}</div>'
     elif layout == 'editorial':
         kicker = esc(eyebrow_text) or email_header_title or _auto('Your server, this month')
         display_date = datetime.now().strftime('%B %Y')
         editorial_bg = header_bg or theme_colors['card_bg']
-        name_line = f'<div style="font-size: 30px; font-weight: 800; color: #ffffff; margin: 4px 0 2px 0; letter-spacing: -.01em;">{esc(str(server_name).upper())}</div>' if show_server_name else ''
+        name_line = f'<div style="font-size: {p("38px", "30px")}; font-weight: 800; color: #ffffff; margin: 4px 0 2px 0; letter-spacing: -.01em;">{esc(str(server_name).upper())}</div>' if show_server_name else ''
         header_block = f"""
-            <div style="padding: 26px 26px 18px 26px; text-align: center; border-bottom: 3px double {theme_colors['border']}; background-color: {editorial_bg}; font-family: {_FONT};">
+            <div style="padding: {p('36px 30px 26px 30px', '26px 26px 18px 26px')}; text-align: center; border-bottom: 3px double {theme_colors['border']}; background-color: {editorial_bg}; font-family: {_FONT};">
                 {logo_html}
                 {f'<div style="font-size: 10.5px; letter-spacing: .22em; text-transform: uppercase; color: {theme_colors["muted_text"]};">{kicker}</div>' if kicker else ''}
                 {name_line}
@@ -629,8 +691,8 @@ def build_complete_email_html_with_cid_logo(content_html, server_name, subject, 
         logo_cell = f'<img src="{logo_src}" alt="" class="email-logo" style="width: auto; border: 0; vertical-align: middle; margin-right: 8px;">' if logo_html else ''
         header_block = f"""
             <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: {digest_bg}; border-bottom: 2px solid {theme_colors['primary']};"><tr>
-                <td style="padding: 12px 18px; font-size: 14px; font-family: {_FONT};">{logo_cell}{name_span}{digest_title}</td>
-                <td align="right" style="padding: 12px 18px; font-size: 11px; color: {theme_colors['muted_text']}; white-space: nowrap; font-family: {_FONT};">{display_date}</td>
+                <td style="padding: {p('18px 22px', '12px 18px')}; font-size: {p('17px', '14px')}; font-family: {_FONT};">{logo_cell}{name_span}{digest_title}</td>
+                <td align="right" style="padding: {p('18px 22px', '12px 18px')}; font-size: {p('12.5px', '11px')}; color: {theme_colors['muted_text']}; white-space: nowrap; font-family: {_FONT};">{display_date}</td>
             </tr></table>"""
         footer_block = f"""
                         <div style="padding: 10px 18px 14px 18px; font-size: 10px; color: {theme_colors['muted_text']}; text-align: center; border-top: 1px solid {theme_colors['border']}; font-family: {_FONT};">

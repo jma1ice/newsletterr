@@ -2,6 +2,7 @@
 
 from datetime import timedelta
 
+from app.emails import headings
 from app.security import escape_html_output as esc
 
 import logging
@@ -213,12 +214,17 @@ def build_agenda_html(events, theme, today, container=None):
 def section_container_html(theme, title, inner):
     """The legacy (non-layout) section chrome, matching the poster grid's card
     so a view switch does not also change the surrounding frame."""
+    title = headings.resolve(theme, title)
+    title_html = (
+        f"""<h2 style="text-align: center; color: {theme['text']}; margin: 0 0 10px 0; padding-top: 12px;
+                font-size: 24px; font-weight: bold; font-family: {FONT};">{esc(title)}</h2>"""
+        if title else ''
+    )
     return f"""
         <div style="background-color: {theme['card_bg']}; padding: 0 10px 12px 10px; border-radius: 8px;
             margin: 20px 0; border: 1px solid {theme['border']}; font-family: {FONT};
             overflow: hidden; max-width: 100%;">
-            <h2 style="text-align: center; color: {theme['text']}; margin: 0 0 10px 0; padding-top: 12px;
-                font-size: 24px; font-weight: bold; font-family: {FONT};">{esc(title)}</h2>
+            {title_html}
             {inner}
         </div>
     """

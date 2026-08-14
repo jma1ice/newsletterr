@@ -1,5 +1,6 @@
 # Top Viewer snap-in: a callout for whoever streamed the most over
 # the pull's time range
+from app.emails import density, headings
 from app.emails.images import fetch_and_attach_small_thumbnail
 from app.security import escape_html_output as esc
 
@@ -68,10 +69,13 @@ def build_top_viewer_html(row, msg_root, theme_colors, base_url="", range_text="
         # nothing to say without at least one number
         return ""
 
+    p = density.picker(theme_colors)
     name = esc(row.get('user') or row.get('friendly_name') or '')
+    # the avatar is artwork, so the compact density drops it; the name still
+    # follows the user-info setting
     avatar_src = attach_top_viewer_avatar(
         row, msg_root, base_url,
-        hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url) if include_user_info else None
+        hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url) if (include_user_info and density.show_art(theme_colors)) else None
 
     avatar_html = ""
     if avatar_src:
@@ -81,16 +85,22 @@ def build_top_viewer_html(row, msg_root, theme_colors, base_url="", range_text="
 
     subject = name if (include_user_info and name) else ANONYMOUS_SUBJECT
 
+    heading = headings.resolve(theme_colors, heading)
+    heading_html = (
+        f"""<div style="background-color: {theme_colors['primary']}; color: white; padding: {p('8px 12px', '12px 15px')}; font-weight: bold; font-size: {p('13.5px', '16px')}; font-family: {FONT};">{esc(heading)}</div>"""
+        if heading else ''
+    )
+
     return f"""
-        <div style="margin: 20px 0; border-radius: 8px; overflow: hidden; border: 1px solid {theme_colors['border']}; background-color: {theme_colors['card_bg']}; font-family: {FONT};">
-            <div style="background-color: {theme_colors['primary']}; color: white; padding: 12px 15px; font-weight: bold; font-size: 16px; font-family: {FONT};">{esc(heading)}</div>
+        <div style="margin: {p('10px 0', '20px 0')}; border-radius: 8px; overflow: hidden; border: 1px solid {theme_colors['border']}; background-color: {theme_colors['card_bg']}; font-family: {FONT};">
+            {heading_html}
             <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
-                <td style="padding: 16px 15px; font-family: {FONT};">
+                <td style="padding: {p('10px 12px', '16px 15px')}; font-family: {FONT};">
                     <table cellpadding="0" cellspacing="0" border="0"><tr>
                         {avatar_html}
                         <td valign="middle" style="font-family: {FONT};">
-                            <div style="font-size: 20px; font-weight: bold; color: #ffffff; line-height: 1.2;">{esc(subject)}</div>
-                            <div style="padding-top: 5px; font-size: 13px; color: {theme_colors['muted_text']};">{' &middot; '.join(esc(bit) for bit in metrics)}</div>
+                            <div style="font-size: {p('16px', '20px')}; font-weight: bold; color: #ffffff; line-height: 1.2;">{esc(subject)}</div>
+                            <div style="padding-top: {p('3px', '5px')}; font-size: {p('12px', '13px')}; color: {theme_colors['muted_text']};">{' &middot; '.join(esc(bit) for bit in metrics)}</div>
                         </td>
                     </tr></table>
                 </td>

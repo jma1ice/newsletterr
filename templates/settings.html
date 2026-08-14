@@ -404,6 +404,15 @@
                                 </select>
                                 <p class="text-info mt-2 field-hint">Show or hide the summary/description text under each Recently Added item in emails.</p>
                             </div>
+                            <div class="settings-field">
+                                <label for="released_since_days">Recently Released Window (days):</label><br>
+                                <input type="number" id="released_since_days" name="released_since_days" min="1" max="3650"
+                                       value="{{ settings.get('released_since_days', '') }}" class="w-num-lg" placeholder="pull window">
+                                <p class="text-info mt-2 field-hint">
+                                    Used by the <strong>Recently Released</strong> snap-in, which selects items by their release or air date rather than the date they were added.
+                                    Leave blank to use the same window as the Recently Added pull.
+                                </p>
+                            </div>
                         </div>
                         </div>
 
@@ -610,6 +619,20 @@
                             pre-v2026.4 look unchanged. Applies to previews and all sends; graphs,
                             recommendations, and collections keep their standard look in every layout
                             for now.
+                        </p>
+
+                        <label for="email_density">Email Density:</label><br>
+                        <select id="email_density" name="email_density">
+                            <option value="expanded" {% if settings.get('email_density') != 'compact' %}selected{% endif %}>Expanded</option>
+                            <option value="compact" {% if settings.get('email_density') == 'compact' %}selected{% endif %}>Compact</option>
+                        </select><br>
+                        <p class="text-info mt-2 field-hint">
+                            How much room the layout takes, applied to whichever layout is selected
+                            above. Compact drops posters and thumbnails, stacks card grids into one
+                            column, and tightens padding and type for a short scroll. Expanded is the
+                            roomy version with full artwork. Each layout starts on the density it
+                            already rendered at: Editorial and Compact Digest start Compact, the rest
+                            start Expanded.
                         </p>
 
                         <label for="email_show_server_name">Server Name in Header:</label><br>

@@ -5,6 +5,7 @@ from email.utils import make_msgid
 
 from app.theme import get_email_theme_colors
 from app.emails.images import fetch_and_attach_image
+from app.emails.sanitize import sanitize_html
 from app.security import escape_html_output as esc
 from app.store import save_hosted_image
 
@@ -119,23 +120,59 @@ def build_graph_html_with_frontend_image(item, msg_root, hosted_images_enabled=F
     </div>
     """
 
-def build_text_block_html(content, block_type='textblock', theme_colors=None):
+TEXT_BLOCK_FONTS = {
+    'sans': "'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif",
+    'serif': "Georgia, 'Times New Roman', Times, serif",
+    'mono': "'Courier New', Courier, monospace",
+    'condensed': "'Arial Narrow', Arial, Helvetica, sans-serif",
+}
+
+TEXT_BLOCK_ALIGNMENTS = ('left', 'center', 'right', 'justify')
+
+
+def _text_block_overrides(opts):
+    if not opts:
+        return ''
+    parts = []
+
+    align = (opts.get('align') or '').strip().lower()
+    if align in TEXT_BLOCK_ALIGNMENTS:
+        parts.append(f"text-align: {align};")
+
+    raw_size = opts.get('fontSize') or opts.get('font_size') or ''
+    try:
+        size = int(str(raw_size).strip())
+    except (TypeError, ValueError):
+        size = 0
+    if 8 <= size <= 96:
+        parts.append(f"font-size: {size}px;")
+
+    family = (opts.get('fontFamily') or opts.get('font_family') or '').strip().lower()
+    if family in TEXT_BLOCK_FONTS:
+        parts.append(f"font-family: {TEXT_BLOCK_FONTS[family]};")
+
+    if not parts:
+        return ''
+    return "\n            " + "\n            ".join(parts) + "\n        "
+
+
+def build_text_block_html(content, block_type='textblock', theme_colors=None, opts=None):
     if not theme_colors:
         theme_colors = get_email_theme_colors()
-    
+
     if not content or not content.strip():
         logger.debug(f"Textblock called but no text present: {content}")
         return ""
-    
-    formatted_content = content.strip().replace('\n', '<br>')
-    
+
+    formatted_content = sanitize_html(content.strip()).replace('\n', '<br>')
+
     base_style = f"""
         margin-bottom: 20px;
         line-height: 1.6;
         color: {theme_colors['text']};
         font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
     """
-    
+
     if block_type == 'titleblock':
         style = base_style + """
             font-size: 2em;
@@ -153,7 +190,9 @@ def build_text_block_html(content, block_type='textblock', theme_colors=None):
             margin-bottom: 15px;
             text-align: center;
         """
-    
+
+    style += _text_block_overrides(opts)
+
     return f'<div style="{style}">{formatted_content}</div>'
 
 def build_separator_html(theme_colors=None):

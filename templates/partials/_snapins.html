@@ -54,6 +54,17 @@
                             </div>
                         </div>
 
+                        <div class="builder-card snapin-card" id="rr-card" style="{{ '' if recent_data else 'display:none;' }}">
+                            <div class="snapin-card-header">
+                                <button type="button" class="snapin-collapse-toggle" aria-expanded="true" aria-label="Collapse section">{{ icon('chevron-down') }}</button>
+                                <h2>recently released</h2>
+                            </div>
+                            <div class="snapin-card-body">
+                                <p class="field-hint mb-2">Items whose release or air date is recent, rather than the date they were added.</p>
+                                <div id="rr-lib-list" class="row"></div>
+                            </div>
+                        </div>
+
                         <div class="builder-card snapin-card" id="mw-card" style="{{ '' if most_watched_data else 'display:none;' }}">
                             <div class="snapin-card-header">
                                 <button type="button" class="snapin-collapse-toggle" aria-expanded="true" aria-label="Collapse section">{{ icon('chevron-down') }}</button>
@@ -233,6 +244,10 @@
                                 </div>
                             </div>
                             <div class="snapin-card-body">
+                                <div id="collection-target-row" class="align-items-center gap-2 mb-3 d-none">
+                                    <label for="collection-target-group" class="mb-0" style="white-space: nowrap;">Add to group:</label>
+                                    <select id="collection-target-group" class="form-select" style="max-width: 22em;"></select>
+                                </div>
                                 <div class="row">
                                     <div class="col-md-4">
                                         <h5 class="collection-heading">{{ icon('film') }} movie collections</h5>

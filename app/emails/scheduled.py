@@ -479,6 +479,7 @@ def send_scheduled_user_email_with_cids(ctx, settings, recipients, user_key):
         tautulli_data["settings"]["recs_show_description"] = settings.get("recs_show_description", "enabled")
         tautulli_data["settings"]["include_user_info"] = settings.get("include_user_info", "enabled")
         tautulli_data["settings"]["email_layout"] = settings.get("email_layout", "classic")
+        tautulli_data["settings"]["email_density"] = settings.get("email_density", "")
 
         template_data = {
             'selected_items': json.dumps(selected_items),
@@ -708,6 +709,7 @@ def send_scheduled_single_email_with_cids(ctx, settings, to_emails_list):
         tautulli_data["settings"]["recs_show_description"] = settings.get("recs_show_description", "enabled")
         tautulli_data["settings"]["include_user_info"] = settings.get("include_user_info", "enabled")
         tautulli_data["settings"]["email_layout"] = settings.get("email_layout", "classic")
+        tautulli_data["settings"]["email_density"] = settings.get("email_density", "")
 
         template_data = {
             'selected_items': json.dumps(selected_items),

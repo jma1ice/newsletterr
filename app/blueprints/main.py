@@ -2,7 +2,7 @@ import secrets
 import time
 
 from flask import Blueprint, Response, jsonify, redirect, render_template, request, session, url_for
-from urllib.parse import quote
+from urllib.parse import quote, urlencode
 import re
 
 from app import config, state
@@ -16,6 +16,7 @@ from app.security import require_csrf_for_json, requires_auth, safe_get
 from app.clients.jellyfin import get_jellyfin_headers
 from app.store import get_saved_email_lists
 from app.theme import get_theme_settings
+from app.emails.images import blur_image_bytes
 
 import logging
 
@@ -83,6 +84,7 @@ def index():
         "recently_added_mode": s["recently_added_mode"],
         "recently_added_sort": s["recently_added_sort"],
         "email_layout": s.get("email_layout") or "classic",
+        "email_density": s.get("email_density") or "",
         "ra_grid_columns": s["ra_grid_columns"],
         "recs_grid_columns": s["recs_grid_columns"],
         "stat_cover_art": s["stat_cover_art"],
@@ -220,6 +222,15 @@ def index():
                            csrf_token=session["csrf_token"], username=username, service_flags=service_flags
                         )
 
+def _maybe_blur(raw, content_type):
+    if request.args.get('blur') != '1':
+        return raw, content_type
+    try:
+        return blur_image_bytes(raw), 'image/jpeg'
+    except Exception:
+        logger.warning("proxy-art: blur pass failed, serving the source image", exc_info=True)
+        return raw, content_type
+
 @bp.route('/proxy-art/<path:art_path>')
 @requires_auth
 def proxy_art(art_path):
@@ -287,8 +298,9 @@ def proxy_art(art_path):
         
         content_type = r.headers.get('Content-Type', 'image/jpeg')
         logger.info(f"proxy-art: Success - Content-Type: {content_type}, Size: {r.headers.get('Content-Length', 'unknown')}")
-        
-        return Response(r.content, content_type=content_type, headers={
+
+        body, content_type = _maybe_blur(r.content, content_type)
+        return Response(body, content_type=content_type, headers={
             'Cache-Control': 'public, max-age=86400'
         })
     except Exception as e:
@@ -312,8 +324,9 @@ def _fetch_jellyfin_art(art_path, s):
 
     full_url = f"{jellyfin_url}/{art_path.lstrip('/')}"
     # image sizing params (maxWidth etc.) arrive as our query string; pass
-    # them through to Jellyfin untouched
-    query = request.query_string.decode()
+    # them through to Jellyfin untouched. blur is ours, not Jellyfin's, so it
+    # is applied here instead of forwarded.
+    query = urlencode([(k, v) for k, v in request.args.items(multi=True) if k != 'blur'])
     if query:
         full_url += ('&' if '?' in full_url else '?') + query
 
@@ -326,7 +339,8 @@ def _fetch_jellyfin_art(art_path, s):
         )
         r.raise_for_status()
         content_type = r.headers.get('Content-Type', 'image/jpeg')
-        return Response(r.content, content_type=content_type, headers={
+        body, content_type = _maybe_blur(r.content, content_type)
+        return Response(body, content_type=content_type, headers={
             'Cache-Control': 'public, max-age=86400'
         })
     except Exception as e:

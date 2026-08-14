@@ -1,0 +1,38 @@
+<div class="modal fade" id="saveTemplateModal" tabindex="-1" aria-labelledby="saveTemplateModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content theme-modal">
+            <div class="modal-header theme-modal-header">
+                <h5 class="modal-title" id="saveTemplateModalLabel">Save template</h5>
+                <button type="button" class="btn-close theme-btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="save_template_mode" id="save_template_mode_new" value="new" checked>
+                        <label class="form-check-label" for="save_template_mode_new">Save as a new template</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="save_template_mode" id="save_template_mode_overwrite" value="overwrite">
+                        <label class="form-check-label" for="save_template_mode_overwrite">Overwrite an existing template</label>
+                    </div>
+                </div>
+
+                <div id="save_template_new_pane" class="mb-2">
+                    <label for="save_template_name" class="form-label">Template name</label>
+                    <input type="text" id="save_template_name" class="form-control theme-input" placeholder="Weekly Digest" autocomplete="off">
+                    <p id="save_template_name_warning" class="field-hint text-warning mt-2 d-none"></p>
+                </div>
+
+                <div id="save_template_overwrite_pane" class="mb-2 d-none">
+                    <label for="save_template_target" class="form-label">Template to replace</label>
+                    <select id="save_template_target" class="form-select theme-input"></select>
+                    <p class="field-hint mt-2">Its contents are replaced with what is currently in the builder. This cannot be undone.</p>
+                </div>
+            </div>
+            <div class="modal-footer theme-modal-footer">
+                <button type="button" class="nl-btn nl-btn--ghost" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" id="save_template_confirm_btn" class="nl-btn nl-btn--primary">Save</button>
+            </div>
+        </div>
+    </div>
+</div>

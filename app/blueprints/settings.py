@@ -12,6 +12,7 @@ from app.crypto import encrypt, decrypt
 from werkzeug.security import generate_password_hash
 from app.hooks import refresh_hsts_setting
 from app.theme import CUSTOM_UI_KEYS, parse_custom_ui_colors, is_hex_color
+from app.emails.density import DENSITIES, resolve as resolve_density
 from app.security import require_csrf_for_json, requires_auth
 from app.blueprints.api import test_tautulli_connection, test_conjurr_connection, test_droppedneedle_connection, test_sonarr_connection, test_radarr_connection, test_ombi_connection, test_seerr_connection, test_jellyfin_connection, test_jellywatch_connection
 
@@ -216,6 +217,7 @@ def settings():
             if not (jellyfin_url or "").strip() and jellyfin_api_key:
                 jellyfin_url = DEFAULT_JELLYFIN_URL
             coming_soon_days_ahead = request.form.get("coming_soon_days_ahead", "14")
+            released_since_days = request.form.get("released_since_days", "")
             coming_soon_grid_columns = request.form.get("coming_soon_grid_columns", "5")
             collections_grid_columns = request.form.get("collections_grid_columns", "5")
             ra_show_description = request.form.get("ra_show_description", "enabled")
@@ -267,6 +269,9 @@ def settings():
             email_layout = request.form.get("email_layout", "classic")
             if email_layout not in ("legacy", "classic", "editorial", "digest", "spotlight"):
                 email_layout = "classic"
+            email_density = request.form.get("email_density", "")
+            if email_density not in DENSITIES:
+                email_density = ""
             email_show_server_name = "enabled" if request.form.get("email_show_server_name") == "enabled" else "disabled"
             email_header_bg = (request.form.get("email_header_bg") or "").strip()
             if request.form.get("email_header_bg_mode") != "solid" or not is_hex_color(email_header_bg):
@@ -325,8 +330,8 @@ def settings():
                 INSERT INTO settings
                 (id, from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, plex_url, plex_web_url, tautulli_url,
                     tautulli_api, conjurr_url, droppedneedle_url, droppedneedle_api_key, recipient_display_name, logo_filename, logo_width, email_theme, primary_color, secondary_color, accent_color, background_color,
-                    text_color, from_name, custom_logo_filename, login_toggle, nl_username, nl_password, default_intro_text, default_outro_text, hsts_enabled, scheduled_subject_prefix, logo_position, hide_stat_play_counts, hide_graph_play_counts, stats_type, recently_added_mode, recently_added_sort, ra_grid_columns, recs_grid_columns, recs_item_count, stat_cover_art, send_mode, poster_max_height, discord_webhook_url, sonarr_url, sonarr_api_key, radarr_url, radarr_api_key, ombi_url, ombi_api_key, seerr_url, seerr_api_key, coming_soon_days_ahead, coming_soon_grid_columns, hosted_enabled, hosted_base_url, hosted_images_enabled, hosted_image_retention_days, hosted_links_enabled, hosted_links_base_url, collections_grid_columns, ra_show_description, recs_show_description, exclude_inactive_days, include_user_info, email_size_warn_mb, pride_flag, snapins_floating, ui_custom_light, ui_custom_dark, email_layout, email_show_server_name, email_header_bg, email_eyebrow_text, email_auto_header_text, media_server_type, jellyfin_url, jellyfin_api_key, jellyfin_web_url, jellywatch_url, jellywatch_api_key)
-                VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    text_color, from_name, custom_logo_filename, login_toggle, nl_username, nl_password, default_intro_text, default_outro_text, hsts_enabled, scheduled_subject_prefix, logo_position, hide_stat_play_counts, hide_graph_play_counts, stats_type, recently_added_mode, recently_added_sort, ra_grid_columns, recs_grid_columns, recs_item_count, stat_cover_art, send_mode, poster_max_height, discord_webhook_url, sonarr_url, sonarr_api_key, radarr_url, radarr_api_key, ombi_url, ombi_api_key, seerr_url, seerr_api_key, coming_soon_days_ahead, released_since_days, coming_soon_grid_columns, hosted_enabled, hosted_base_url, hosted_images_enabled, hosted_image_retention_days, hosted_links_enabled, hosted_links_base_url, collections_grid_columns, ra_show_description, recs_show_description, exclude_inactive_days, include_user_info, email_size_warn_mb, pride_flag, snapins_floating, ui_custom_light, ui_custom_dark, email_layout, email_density, email_show_server_name, email_header_bg, email_eyebrow_text, email_auto_header_text, media_server_type, jellyfin_url, jellyfin_api_key, jellyfin_web_url, jellywatch_url, jellywatch_api_key)
+                VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT (id) DO UPDATE
                 SET from_email = excluded.from_email, alias_email = excluded.alias_email, reply_to_email = excluded.reply_to_email, password = excluded.password,
                     smtp_username = excluded.smtp_username, smtp_server = excluded.smtp_server, smtp_port = excluded.smtp_port, smtp_protocol = excluded.smtp_protocol,
@@ -353,7 +358,7 @@ def settings():
                     ombi_api_key = excluded.ombi_api_key,
                     seerr_url = excluded.seerr_url,
                     seerr_api_key = excluded.seerr_api_key,
-                    coming_soon_days_ahead = excluded.coming_soon_days_ahead,
+                    coming_soon_days_ahead = excluded.coming_soon_days_ahead, released_since_days = excluded.released_since_days,
                     coming_soon_grid_columns = excluded.coming_soon_grid_columns,
                     hosted_enabled = excluded.hosted_enabled,
                     hosted_base_url = excluded.hosted_base_url,
@@ -372,6 +377,7 @@ def settings():
                     ui_custom_light = excluded.ui_custom_light,
                     ui_custom_dark = excluded.ui_custom_dark,
                     email_layout = excluded.email_layout,
+                    email_density = excluded.email_density,
                     email_show_server_name = excluded.email_show_server_name,
                     email_header_bg = excluded.email_header_bg,
                     email_eyebrow_text = excluded.email_eyebrow_text,
@@ -386,8 +392,8 @@ def settings():
                   conjurr_url, droppedneedle_url, droppedneedle_api_key, recipient_display_name, logo_filename, logo_width, email_theme, primary_color, secondary_color, accent_color, background_color, text_color, from_name,
                   custom_logo_filename, login_toggle, nl_username, nl_password, default_intro_text, default_outro_text, hsts_enabled, scheduled_subject_prefix, logo_position,
                   hide_stat_play_counts, hide_graph_play_counts, stats_type, recently_added_mode, recently_added_sort, ra_grid_columns, recs_grid_columns, recs_item_count, stat_cover_art, send_mode, poster_max_height, discord_webhook_url,
-                  sonarr_url, sonarr_api_key, radarr_url, radarr_api_key, ombi_url, ombi_api_key, seerr_url, seerr_api_key, coming_soon_days_ahead, coming_soon_grid_columns, hosted_enabled, hosted_base_url, hosted_images_enabled, hosted_image_retention_days, hosted_links_enabled, hosted_links_base_url,
-                  collections_grid_columns, ra_show_description, recs_show_description, exclude_inactive_days, include_user_info, email_size_warn_mb, pride_flag, snapins_floating, ui_custom_light, ui_custom_dark, email_layout, email_show_server_name, email_header_bg, email_eyebrow_text, email_auto_header_text,
+                  sonarr_url, sonarr_api_key, radarr_url, radarr_api_key, ombi_url, ombi_api_key, seerr_url, seerr_api_key, coming_soon_days_ahead, released_since_days, coming_soon_grid_columns, hosted_enabled, hosted_base_url, hosted_images_enabled, hosted_image_retention_days, hosted_links_enabled, hosted_links_base_url,
+                  collections_grid_columns, ra_show_description, recs_show_description, exclude_inactive_days, include_user_info, email_size_warn_mb, pride_flag, snapins_floating, ui_custom_light, ui_custom_dark, email_layout, email_density, email_show_server_name, email_header_bg, email_eyebrow_text, email_auto_header_text,
                   media_server_type, jellyfin_url, jellyfin_api_key, jellyfin_web_url, jellywatch_url, jellywatch_api_key))
             conn.commit()
             cursor.execute("SELECT plex_token FROM settings WHERE id = 1")
@@ -440,6 +446,7 @@ def settings():
                 "recs_grid_columns": recs_grid_columns,
                 "recs_item_count": recs_item_count,
                 "email_layout": email_layout,
+                "email_density": email_density,
                 "email_show_server_name": email_show_server_name,
                 "email_header_bg": email_header_bg,
                 "email_eyebrow_text": email_eyebrow_text,
@@ -463,6 +470,7 @@ def settings():
                 "jellywatch_url": jellywatch_url,
                 "jellywatch_api_key": decrypt(jellywatch_api_key),
                 "coming_soon_days_ahead": coming_soon_days_ahead,
+                "released_since_days": released_since_days,
                 "coming_soon_grid_columns": coming_soon_grid_columns,
                 "collections_grid_columns": collections_grid_columns,
                 "ra_show_description": ra_show_description,
@@ -565,6 +573,7 @@ def settings():
                 "jellywatch_url": request.form.get("jellywatch_url", ""),
                 "jellywatch_api_key": request.form.get("jellywatch_api_key", ""),
                 "coming_soon_days_ahead": request.form.get("coming_soon_days_ahead", "14"),
+                "released_since_days": request.form.get("released_since_days", ""),
                 "coming_soon_grid_columns": request.form.get("coming_soon_grid_columns", "5"),
                 "collections_grid_columns": request.form.get("collections_grid_columns", "5"),
                 "ra_show_description": request.form.get("ra_show_description", "enabled"),
@@ -659,6 +668,7 @@ def settings():
     recs_grid_columns = s.get("recs_grid_columns")
     recs_item_count = s.get("recs_item_count")
     email_layout = s.get("email_layout")
+    email_density = resolve_density(email_layout or "classic", s.get("email_density"))
     email_show_server_name = s.get("email_show_server_name")
     email_header_bg = s.get("email_header_bg")
     email_eyebrow_text = s.get("email_eyebrow_text")
@@ -682,6 +692,7 @@ def settings():
     jellywatch_url = s.get("jellywatch_url")
     jellywatch_api_key = s.get("jellywatch_api_key")
     coming_soon_days_ahead = s.get("coming_soon_days_ahead")
+    released_since_days = s.get("released_since_days")
     coming_soon_grid_columns = s.get("coming_soon_grid_columns")
     collections_grid_columns = s.get("collections_grid_columns")
     ra_show_description = s.get("ra_show_description")
@@ -747,6 +758,7 @@ def settings():
         "recs_grid_columns": recs_grid_columns or "5",
         "recs_item_count": recs_item_count or "",
         "email_layout": email_layout or "classic",
+        "email_density": email_density,
         "email_show_server_name": email_show_server_name or "disabled",
         "email_header_bg": email_header_bg or "",
         "email_eyebrow_text": email_eyebrow_text or "",
@@ -763,6 +775,7 @@ def settings():
         "jellyfin_web_url": jellyfin_web_url or "",
         "jellywatch_url": jellywatch_url or "",
         "coming_soon_days_ahead": coming_soon_days_ahead or "14",
+        "released_since_days": released_since_days or "",
         "coming_soon_grid_columns": coming_soon_grid_columns or "5",
         "collections_grid_columns": collections_grid_columns or "5",
         "ra_show_description": ra_show_description or "enabled",

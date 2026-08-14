@@ -88,6 +88,17 @@ def scheduled_send_has_new_content(selected_items, tautulli_data):
                 return True
     return False
 
+def apply_chart_captures(selected_items, chart_images):
+    missing = []
+    for item in selected_items:
+        if item.get('type') != 'graph':
+            continue
+        captured = chart_images.get(item.get('id')) or {}
+        item['chartImage'] = captured.get('dataUrl', '')
+        if not item['chartImage']:
+            missing.append(item.get('id'))
+    return missing
+
 def send_scheduled_email(schedule_id, email_list_id, template_id):
     return send_scheduled_email_with_cids(schedule_id, email_list_id, template_id)
 
@@ -202,12 +213,9 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
             logger.warning("Chart capture unavailable; sending without chart images", exc_info=True)
             chart_images = {}
         logger.info(f"Captured {len(chart_images)} chart images")
-        
-        for item in selected_items:
-            if item.get('type') == 'graph' and item.get('id') in chart_images:
-                chart_data = chart_images[item['id']]
-                item['chartImage'] = chart_data.get('dataUrl', '')
-                item['chartSVG'] = chart_data.get('svg', '')
+
+        for missing_id in apply_chart_captures(selected_items, chart_images):
+            logger.error(f"No chart image captured for {missing_id}; it will render as a placeholder")
 
         has_recs = any(item.get('type') == 'recommendations' for item in selected_items)
         has_wrapped = any(item.get('type') == 'droppedneedle_wrapped' for item in selected_items)
@@ -471,6 +479,7 @@ def send_scheduled_user_email_with_cids(ctx, settings, recipients, user_key):
         tautulli_data["settings"]["recs_show_description"] = settings.get("recs_show_description", "enabled")
         tautulli_data["settings"]["include_user_info"] = settings.get("include_user_info", "enabled")
         tautulli_data["settings"]["email_layout"] = settings.get("email_layout", "classic")
+        tautulli_data["settings"]["email_density"] = settings.get("email_density", "")
 
         template_data = {
             'selected_items': json.dumps(selected_items),
@@ -700,6 +709,7 @@ def send_scheduled_single_email_with_cids(ctx, settings, to_emails_list):
         tautulli_data["settings"]["recs_show_description"] = settings.get("recs_show_description", "enabled")
         tautulli_data["settings"]["include_user_info"] = settings.get("include_user_info", "enabled")
         tautulli_data["settings"]["email_layout"] = settings.get("email_layout", "classic")
+        tautulli_data["settings"]["email_density"] = settings.get("email_density", "")
 
         template_data = {
             'selected_items': json.dumps(selected_items),

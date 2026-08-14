@@ -54,6 +54,14 @@
 .nl-btn .nl-icon { width: 16px; height: 16px; }
 .nl-btn--sm .nl-icon { width: 15px; height: 15px; }
 
+/* An icon inside a button is never the thing that was clicked. Without this,
+   a click on the middle of an icon-only button reports the <svg> as
+   event.target, which carries none of the button's data attributes, so any
+   handler reading e.target.dataset silently no-ops and only the padding
+   around the icon appears to work. */
+.nl-btn .nl-icon,
+.btn .nl-icon { pointer-events: none; }
+
 /* ---- icon action button (compact square, replaces emoji btn-groups) */
 .icon-btn {
     display: inline-flex;

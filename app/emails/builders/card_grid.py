@@ -2,6 +2,7 @@
 # Ombi Recent Requests snap-ins, which all render the same poster-card layout.
 from datetime import datetime, timezone
 
+from app.emails import density, headings
 from app.security import escape_html_output as esc
 
 import logging
@@ -36,8 +37,19 @@ def empty_state_html(theme_colors, message):
     </div>
     """
 
+MIN_AUTO_COLUMNS = 3
+
+def effective_columns(grid_columns, item_count):
+    """Columns to actually lay a snap-in out with."""
+    cols = max(1, int(grid_columns) if grid_columns else 5)
+    if not item_count:
+        return cols
+    return max(1, min(cols, max(item_count, MIN_AUTO_COLUMNS)))
+
 def build_calendar_grid_html(cards, msg_root, theme_colors, title, base_url, grid_columns):
-    items_per_row = max(1, int(grid_columns) if grid_columns else 5)
+    p3 = density.picker3(theme_colors)
+    art_on = density.show_art(theme_colors)
+    items_per_row = 1 if not art_on else effective_columns(grid_columns, len(cards))
     cell_width_pct = f"{100 / items_per_row:.4f}%"
 
     rows_html = ""
@@ -45,17 +57,17 @@ def build_calendar_grid_html(cards, msg_root, theme_colors, title, base_url, gri
         row_cards = cards[i:i + items_per_row]
         row_html = '<tr class="coming-soon-row">'
         for card_html in row_cards:
-            row_html += f'<td class="coming-soon-cell" style="width: {cell_width_pct}; padding: 8px; vertical-align: top; font-family: \'IBM Plex Sans\', \'Segoe UI\', Helvetica, Arial, sans-serif;">{card_html}</td>'
+            row_html += f'<td class="coming-soon-cell" style="width: {cell_width_pct}; padding: {p3("3px 0", "8px", "10px")}; vertical-align: top; font-family: \'IBM Plex Sans\', \'Segoe UI\', Helvetica, Arial, sans-serif;">{card_html}</td>'
         for _ in range(items_per_row - len(row_cards)):
-            row_html += f'<td class="coming-soon-cell" style="width: {cell_width_pct}; padding: 8px;"></td>'
+            row_html += f'<td class="coming-soon-cell" style="width: {cell_width_pct}; padding: {p3("3px 0", "8px", "10px")};"></td>'
         row_html += "</tr>"
         rows_html += row_html
 
     container_style = f"""
         background-color: {theme_colors['card_bg']};
-        padding-bottom: 10px;
+        padding-bottom: {p3('10px', '10px', '14px')};{' padding-left: 14px; padding-right: 14px;' if not art_on else ''}
         border-radius: 8px;
-        margin: 20px 0;
+        margin: {p3('10px 0', '20px 0', '28px 0')};
         border: 1px solid {theme_colors['border']};
         font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
         overflow: hidden;
@@ -64,8 +76,8 @@ def build_calendar_grid_html(cards, msg_root, theme_colors, title, base_url, gri
     title_style = f"""
         text-align: center;
         color: {theme_colors['text']};
-        margin: 0 0 10px 0;
-        font-size: 24px;
+        margin: {p3('6px 0', '0 0 10px 0', '0 0 14px 0')};
+        font-size: {p3('17px', '24px', '30px')};
         font-weight: bold;
         font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
     """
@@ -77,16 +89,19 @@ def build_calendar_grid_html(cards, msg_root, theme_colors, title, base_url, gri
         table-layout: fixed;
     """
 
+    title = headings.resolve(theme_colors, title)
+    title_html = f'<h2 style="{title_style}">{esc(title)}</h2>' if title else ''
+
     return f"""
         <div style="{container_style}">
-            <h2 style="{title_style}">{title}</h2>
+            {title_html}
             <table class="coming-soon-table" style="{table_style}">
                 {rows_html}
             </table>
         </div>
     """
 
-def build_card_html(theme_colors, title, subtitle, meta_text, poster_src, extra_line=None):
+def build_card_html(theme_colors, title, subtitle, meta_text, poster_src, extra_line=None, compact=False):
     title, subtitle, meta_text = esc(title), esc(subtitle), esc(meta_text)
     extra_line = esc(extra_line) if extra_line else None
     if poster_src:
@@ -97,23 +112,23 @@ def build_card_html(theme_colors, title, subtitle, meta_text, poster_src, extra_
     return f"""
         <div class="coming-soon-card" style="
             background-color: {theme_colors['card_bg']};
-            border-radius: 12px;
+            border-radius: {'8px' if compact else '12px'};
             overflow: hidden;
             border: 1px solid {theme_colors['border']};
             width: 100%;
             margin: 0 auto;
-            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.6);
+            box-shadow: {'none' if compact else '0 6px 18px rgba(0, 0, 0, 0.6)'};
         ">
             {poster_html}
             <div class="card-content" style="
-                padding: 6px;
+                padding: {'5px 9px' if compact else '6px'};
                 background-color: {theme_colors['card_bg']};
                 color: {theme_colors['text']};
-                min-height: 60px;
+                min-height: {'0' if compact else '60px'};
             ">
                 <div style="
                     font-weight: bold;
-                    font-size: 14px;
+                    font-size: {'13px' if compact else '14px'};
                     color: {theme_colors['text']};
                     margin-bottom: 1px;
                     line-height: 1.2;

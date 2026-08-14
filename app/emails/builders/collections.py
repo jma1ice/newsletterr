@@ -1,4 +1,6 @@
 
+from app.cache import get_cached_data, set_cached_data
+from app.emails import density, headings
 from app.settings_store import get_settings
 from app.clients.plex import get_collection_items_for_email
 from app.security import escape_html_output as esc
@@ -6,6 +8,16 @@ from app.security import escape_html_output as esc
 import logging
 
 logger = logging.getLogger(__name__)
+
+def _collection_items(collection_key, plex_settings):
+    cache_key = f"collection_items:{collection_key}"
+    cached = get_cached_data(cache_key, strict=False)
+    if cached is not None:
+        return cached
+
+    items = get_collection_items_for_email(collection_key, plex_settings)
+    set_cached_data(cache_key, items)
+    return items
 
 from app.emails.builders.cards import build_collection_card_html, build_individual_item_card_html
 
@@ -39,7 +51,7 @@ def build_collections_html_with_cids(all_collections, msg_root, theme_colors, ba
 
         if collection_id in expanded_collections and plex_settings:
             logger.debug(f"Collection {collection_id} is expanded, fetching individual items...")
-            individual_items = get_collection_items_for_email(collection_key, plex_settings)
+            individual_items = _collection_items(collection_key, plex_settings)
             
             for item in individual_items:
                 item['is_individual_item'] = True
@@ -56,14 +68,19 @@ def build_collections_html_with_cids(all_collections, msg_root, theme_colors, ba
             collection['is_individual_item'] = False
             all_items_to_display.append(collection)
     
+    p3 = density.picker3(theme_colors)
+    art_on = density.show_art(theme_colors)
+
     items_html = ""
+    if not art_on:
+        items_html = _compact_collection_rows_html(all_items_to_display, theme_colors)
     items_per_row = max(1, int(grid_columns) if grid_columns else 5)
     # Cards are fixed width; derive it from the column count so N=5 keeps the
     # historical 120px card and higher counts shrink to avoid row overflow.
     card_width = max(60, min(240, int(600 / items_per_row)))
     cell_width_pct = f"{100 / items_per_row:.4f}%"
 
-    for i in range(0, len(all_items_to_display), items_per_row):
+    for i in range(0, len(all_items_to_display) if art_on else 0, items_per_row):
         row_items = all_items_to_display[i:i + items_per_row]
         is_partial_row = len(row_items) < items_per_row
         
@@ -119,7 +136,7 @@ def build_collections_html_with_cids(all_collections, msg_root, theme_colors, ba
     container_style = f"""
         background-color: {theme_colors['card_bg']};
         border-radius: 8px;
-        margin: 20px 0;
+        margin: {p3('10px 0', '20px 0', '28px 0')};{' padding: 4px 14px 10px 14px;' if not art_on else ''}
         border: 1px solid {theme_colors['border']};
         font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
     """
@@ -127,8 +144,8 @@ def build_collections_html_with_cids(all_collections, msg_root, theme_colors, ba
     title_style = f"""
         text-align: center;
         color: {theme_colors['text']};
-        margin: 0 0 20px 0;
-        font-size: 24px;
+        margin: {p3('0 0 6px 0', '0 0 20px 0', '0 0 26px 0')};{' padding-top: 10px;' if not art_on else ''}
+        font-size: {p3('17px', '24px', '30px')};
         font-weight: bold;
         font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
     """
@@ -140,13 +157,34 @@ def build_collections_html_with_cids(all_collections, msg_root, theme_colors, ba
         padding: 0;
     """
 
-    display_title = custom_title if custom_title else "Collections"
-    
+    display_title = headings.resolve(theme_colors, custom_title if custom_title else "Collections")
+    title_html = f'<h2 style="{title_style}">{esc(display_title)}</h2>' if display_title else ''
+
     return f"""
         <div style="{container_style}">
-            <h2 style="{title_style}">{esc(display_title)}</h2>
+            {title_html}
             <table cellpadding="0" cellspacing="0" border="0" style="{table_style}">
                 {items_html}
             </table>
         </div>
     """
+
+def _compact_collection_rows_html(items, theme_colors):
+    _FONT = "'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif"
+    rows = ""
+    for i, item in enumerate(items):
+        title = item.get('title', 'Unknown')
+        if item.get('is_individual_item'):
+            meta_bits = [str(item.get('year') or ''), item.get('original_collection') or '']
+        else:
+            count = item.get('childCount', 0)
+            meta_bits = [f"{count} item" + ("s" if str(count) != "1" else "")]
+        meta = ' &middot; '.join(esc(str(b)) for b in meta_bits if b)
+        border = "" if i == len(items) - 1 else f" border-bottom: 1px solid {theme_colors['border']};"
+        rows += f"""
+            <tr>
+                <td style="padding: 6px 0;{border} font-size: 13px; font-weight: bold; color: {theme_colors['text']}; font-family: {_FONT};">{esc(title)}</td>
+                <td align="right" style="padding: 6px 0;{border} font-size: 11px; color: {theme_colors['muted_text']}; white-space: nowrap; font-family: {_FONT};">{meta}</td>
+            </tr>
+        """
+    return rows

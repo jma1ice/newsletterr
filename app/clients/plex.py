@@ -252,11 +252,15 @@ def group_recent_episodes_into_shows(metadata, cutoff_ts):
                 'media_type': 'show',
                 'type': 'show',
                 'new_episode_count': 0,
+                'originally_available_at': ep.get('originallyAvailableAt', ''),
                 '_latest': added,
             }
             shows[key] = entry
             order.append(key)
         entry['new_episode_count'] += 1
+        aired = ep.get('originallyAvailableAt', '')
+        if aired and aired > (entry.get('originally_available_at') or ''):
+            entry['originally_available_at'] = aired
         if added > entry['_latest']:
             entry['_latest'] = added
             entry['added_at'] = str(added)
@@ -421,6 +425,7 @@ def fetch_movies_from_plex_sdk(section_id, limit=10, machine_id=None, days=None)
                 'summary': video.get('summary', ''),
                 'added_at': str(video.get('addedAt', '')),
                 'updated_at': str(video.get('updatedAt', '')),
+                'originally_available_at': video.get('originallyAvailableAt', ''),
                 'content_rating': video.get('contentRating', ''),
                 'duration': str(video.get('duration', '')),
                 'guid': video.get('guid', ''),
@@ -496,6 +501,7 @@ def fetch_albums_from_plex_sdk(section_id, limit=10, machine_id=None, days=None)
                 'summary': album.get('summary', ''),
                 'added_at': str(album.get('addedAt', '')),
                 'updated_at': str(album.get('updatedAt', '')),
+                'originally_available_at': album.get('originallyAvailableAt', ''),
                 'duration': str(album.get('Genre', '')[0]['tag']) if album.get('Genre', '') else '',
                 'guid': album.get('guid', ''),
                 'key': album.get('key', ''),

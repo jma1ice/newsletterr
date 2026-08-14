@@ -90,11 +90,126 @@
     color: var(--accent);
 }
 
+/* Standalone cap for the modes where the pane is not a fixed-height flex
+   column (mid width, snapins-static). Inside the resizable pane the rules
+   further down hand this element the pane's height instead. */
 #selected-items-list {
     max-height: 400px;
     min-height: 100px;
     overflow-y: auto;
 }
+
+/* Rich text block editor. The editor is a contenteditable div, so
+   it needs the height, scrolling and placeholder a textarea gave for free. */
+.builder-page .text-block-editor {
+    min-height: 60px;
+    max-height: 240px;
+    overflow-y: auto;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+.builder-page .text-block-editor:empty::before {
+    content: attr(data-placeholder);
+    color: var(--text-faint);
+    pointer-events: none;
+}
+.builder-page .text-block-editor:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+/* Content is authored here and mailed elsewhere, so keep the editor's own
+   rendering close to the email's rather than the app's. */
+.builder-page .text-block-editor a { color: var(--accent); }
+
+.builder-page .rte-toolbar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1px;
+    margin-bottom: 2px;
+}
+.builder-page .rte-btn {
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    color: var(--text-muted);
+    padding: 2px 6px;
+    font-size: 0.8rem;
+    line-height: 1.2;
+    min-width: 24px;
+    cursor: pointer;
+}
+.builder-page .rte-btn:hover {
+    background: var(--surface-2);
+    color: var(--text);
+}
+.builder-page .rte-btn.is-active {
+    background: var(--surface-2);
+    border-color: var(--accent);
+    color: var(--accent);
+}
+.builder-page .rte-btn .nl-icon { width: 14px; height: 14px; }
+.builder-page .rte-btn:disabled {
+    opacity: 0.35;
+    cursor: default;
+}
+/* Color swatch: a native color input styled down to a toolbar-sized chip
+   with a letter over it, so it reads as "text color" rather than a form
+   field. The input stays clickable so the OS picker still opens. */
+.builder-page .rte-color-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 22px;
+    margin: 0;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+}
+.builder-page .rte-color-wrap:hover { background: var(--surface-2); }
+.builder-page .rte-color-glyph {
+    position: absolute;
+    top: 1px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    pointer-events: none;
+}
+.builder-page .rte-color {
+    position: absolute;
+    bottom: 2px;
+    left: 3px;
+    width: 18px;
+    height: 6px;
+    padding: 0;
+    border: none;
+    background: none;
+    cursor: pointer;
+}
+.builder-page .rte-color::-webkit-color-swatch-wrapper { padding: 0; }
+.builder-page .rte-color::-webkit-color-swatch { border: none; border-radius: 1px; }
+.builder-page .rte-color::-moz-color-swatch { border: none; border-radius: 1px; }
+
+/* Match the email's list treatment so the editor is not misleading: the
+   marker sits next to its text even though the block is centred. */
+.builder-page .text-block-editor ul,
+.builder-page .text-block-editor ol {
+    display: inline-block;
+    text-align: left;
+    margin: 0;
+    padding-left: 1.5em;
+}
+
+.builder-page .rte-sep {
+    width: 1px;
+    height: 16px;
+    background: var(--border);
+    margin: 0 4px;
+}
+.builder-page .text-block-style-row label { color: var(--text-muted); }
 
 .emoji-icon-btn {
     align-self: flex-start;
@@ -239,9 +354,35 @@
        the drag handle (resize: vertical) lets the user grow it toward this cap
        and the height is persisted in localStorage by 25-shell.js. */
     max-height: calc(100vh - 96px);
-    overflow-y: auto;
+    /* The pane itself never scrolls; it is a flex column whose scrollable
+       child (the snap-ins list, or the custom-HTML editor) absorbs the height.
+       Dragging the resize handle used to grow this card while the list stayed
+       pinned at its own 400px cap, so the new space became dead air below the
+       items (NEWS-61). overflow-y stays non-visible because `resize` requires
+       it. */
+    display: flex;
+    flex-direction: column;
+    overflow-y: hidden;
     resize: vertical;
     min-height: 160px;
+}
+/* Header row keeps its natural height; the list takes everything left over.
+   min-height: 0 is what lets a flex child scroll instead of forcing its
+   parent taller than the cap. */
+#selected-items-pane > .snapins-toolbar {
+    flex: 0 0 auto;
+}
+#selected-items-pane > #selected-items-list {
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: none;
+}
+/* Custom HTML mode keeps its own fixed-height, separately resizable editor;
+   the pane just gives it a scroll area rather than clipping it. */
+#selected-items-pane > #custom-html-pane {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
 }
 /* Snap-ins only sticks at full width; at mid and mobile widths it flows inline
    so it doesn't float over and cover too much of the narrower column. */
@@ -251,6 +392,16 @@
         max-height: none;
         overflow-y: visible;
         resize: none;
+    }
+    /* No pane height to hand down here, so the list goes back to capping and
+       scrolling itself instead of growing without bound. */
+    #selected-items-pane > #selected-items-list {
+        flex: 0 1 auto;
+        max-height: 400px;
+    }
+    #selected-items-pane > #custom-html-pane {
+        flex: 0 1 auto;
+        overflow-y: visible;
     }
 }
 /* Appearance toggle: floating snap-ins off -> the pane flows inline (same as the
@@ -262,6 +413,91 @@
     overflow-y: visible;
     resize: none;
     height: auto !important;
+}
+:root.snapins-static #selected-items-pane > #selected-items-list {
+    flex: 0 1 auto;
+    max-height: 400px;
+}
+:root.snapins-static #selected-items-pane > #custom-html-pane {
+    flex: 0 1 auto;
+    overflow-y: visible;
+}
+
+/* Per-collection "move to another group" control. On its own line
+   under the collection row: the snap-ins pane is narrow, and squeezing a
+   select in beside the title and the buttons wrapped into a ragged block.
+   Only rendered when a second group exists to move to. */
+.builder-page .collection-move-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin: 4px 0 0 12px;
+}
+.builder-page .collection-move-row label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+    margin: 0;
+}
+.builder-page .collection-move-row .move-collection-select {
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: 16em;
+    font-size: 0.75rem;
+    padding-top: 1px;
+    padding-bottom: 1px;
+}
+
+/* Collection group header: a text input plus a badge plus three buttons is a
+   lot for a narrow pane, and it used to wrap into a ragged two-line block.
+   The action cluster stays on one line and the name field takes what is left.
+   `collection group` is dropped as a badge here: the row already says it. */
+.builder-page .selected-item > .snapin-item-head {
+    gap: var(--space-2);
+    flex-wrap: nowrap;
+}
+.builder-page .selected-item .collection-group-title {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+/* Named for the selected-item row specifically: `.snapin-row-actions` is
+   already taken by the source rows in the add-content cards further down. */
+.builder-page .snapin-item-actions {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    flex: 0 0 auto;
+    white-space: nowrap;
+}
+.builder-page .snapin-item-actions .badge {
+    margin-right: var(--space-2);
+}
+
+/* Move-to-top / move-to-bottom arrows on each snap-in row. Kept
+   quiet until the row is hovered or the button is focused, so they read as an
+   escape hatch rather than competing with the remove button. They stay fully
+   visible on touch and reduced-motion setups, where hover never fires. */
+.builder-page .item-move-btn {
+    padding: 2px 4px;
+    border-color: transparent;
+    opacity: 0.35;
+    transition: opacity 120ms ease;
+    vertical-align: middle;
+}
+.builder-page .item-move-btn .nl-icon {
+    width: 13px;
+    height: 13px;
+}
+.builder-page .selected-item:hover .item-move-btn,
+.builder-page .item-move-btn:focus-visible {
+    opacity: 1;
+}
+.builder-page .item-move-btn:disabled {
+    opacity: 0.12;
+    cursor: default;
+}
+@media (hover: none) {
+    .builder-page .item-move-btn { opacity: 1; }
 }
 
 /* collection expand/collapse toggle: size the inline chevron to sit in the

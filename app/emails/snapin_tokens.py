@@ -2,13 +2,16 @@
 #
 # Grammar: {{snapin:NAME}} and {{snapin:NAME:ARG}} (recently_added takes
 # optional trailing ARGs for the per-library count and the grid/list
-# orientation). Each supported name maps
+# orientation; the coming_soon names take an optional view word).
+# Each supported name maps
 # onto the assemble per-item dispatch; expansion synthesizes the equivalent
 # selected_item and renders it through the exact same code path, so tokens
 # are layout-aware and preview-mode aware for free. Graphs are excluded:
 # their images are captured client-side per builder item and custom HTML has
 # no items to carry them.
 import re
+
+from app.emails.builders.calendar_view import VIEWS as COMING_SOON_VIEWS
 
 import logging
 
@@ -44,6 +47,21 @@ def synthesize_snapin_item(name, args, stats):
                 item['raOrientation'] = arg.lower()
             else:
                 item['raCount'] = arg
+        return item
+
+    if name == 'recently_released':
+        # recently_released:<Library>[:count][:grid|list] - same grammar as
+        # recently_added, since it renders through the same builders.
+        item = {'id': 'token-recently-released', 'type': 'recently_released'}
+        if args and args[0]:
+            item['rrLibrary'] = args[0]
+        for arg in args[1:]:
+            if not arg:
+                continue
+            if arg.lower() in ('grid', 'list'):
+                item['rrOrientation'] = arg.lower()
+            else:
+                item['rrCount'] = arg
         return item
 
     if name == 'most_watched':
@@ -87,7 +105,13 @@ def synthesize_snapin_item(name, args, stats):
         return None
 
     if name in SIMPLE_TOKEN_TYPES:
-        return {'id': f'token-{name}', 'type': SIMPLE_TOKEN_TYPES[name]}
+        item = {'id': f'token-{name}', 'type': SIMPLE_TOKEN_TYPES[name]}
+        # coming_soon_tv|coming_soon_movies:<grid|calendar|agenda> - the view
+        # word is the only argument these take; anything else is ignored so a
+        # typo falls back to the layout default rather than dropping the item.
+        if name.startswith('coming_soon') and args and args[0].lower() in COMING_SOON_VIEWS:
+            item['csView'] = args[0].lower()
+        return item
 
     return None
 

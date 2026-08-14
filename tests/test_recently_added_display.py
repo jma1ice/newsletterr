@@ -52,19 +52,32 @@ def test_digest_renders_every_item_not_just_the_first_six(render):
     assert len(_titles(render('digest', count=9))) == 9
 
 
-@pytest.mark.parametrize("cols,expected_rows", [(3, 3), (5, 2), (9, 1), (12, 1)])
-def test_digest_wraps_at_the_configured_column_count(render, cols, expected_rows):
+@pytest.mark.parametrize("cols,expected_rows,expected_cols", [(3, 3, 3), (5, 2, 5), (9, 1, 9), (12, 1, 9)])
+def test_digest_wraps_at_the_configured_column_count(render, cols, expected_rows, expected_cols):
     html = render('digest', count=9, ra_grid_columns=cols)
     assert html.count('<tr>') == expected_rows
-    # short rows are padded so the fixed table keeps its columns aligned
-    assert html.count('<td') == expected_rows * cols
+    # short rows are padded so the fixed table keeps its columns aligned, but a
+    # snap-in with fewer items than columns narrows to its own item count
+    assert html.count('<td') == expected_rows * expected_cols
 
 
 def test_digest_shrinks_posters_as_columns_grow(render):
-    wide = render('digest', count=9, ra_grid_columns=2)
-    narrow = render('digest', count=9, ra_grid_columns=10)
+    wide = render('digest', count=10, ra_grid_columns=2)
+    narrow = render('digest', count=10, ra_grid_columns=10)
     assert 'max-width: 74px' in wide
     assert 'max-width: 64px' in narrow
+
+
+@pytest.mark.parametrize("layout", ("classic", "editorial", "digest"))
+def test_grid_sizes_to_its_own_item_count_not_the_column_setting(render, layout):
+    """Two snap-ins under one column setting each fill their own row: a six
+    item library must not inherit the cell width of a ten item one."""
+    six = render(layout, count=6, ra_grid_columns=10, orientation='grid')
+    ten = render(layout, count=10, ra_grid_columns=10, orientation='grid')
+    assert 'width: 16.6667%' in six
+    assert 'width: 10.0000%' in ten
+    # no dead cells padding the six item row out to ten columns
+    assert 'width: 10.0000%' not in six
 
 
 # --- orientation override

@@ -19,6 +19,7 @@ Newsletterr is a lightweight Flask application that talks to **[Tautulli](https:
 * **Styled data tables** - Plex / Tautulli metrics rendered as clean, responsive tables prior to embedding.
 * **Live WYSIWYG preview** - side‑by‑side iframe updates instantly as you assemble the email.
 * **Five email layouts** - Polished Classic, Editorial, Compact Digest, Spotlight, and Legacy; pick one in Settings and every preview and send follows it.
+* **Compact or expanded density** - a second setting that applies to whichever layout you picked. Compact drops posters and thumbnails, stacks card grids into one column, and tightens padding and type; Expanded is the roomy version with full artwork.
 
 ### Templates & Reuse
 * **Email Templates** - save, load, clone, and delete custom templates (tracks chosen snap‑ins & layout) and re‑apply later.
@@ -197,6 +198,7 @@ The Settings page is split into sections: **Email Server**, **Connections**, **D
    * **Logo Width (optional)** - use this to adjust the size of your custom logo. A small logo should be ~20, medium ~40, and banner size ~80  
    * **Email Theme** - choose from one of our preset newsletterr blue or plex orange themes, or create your own custom theme! Preset themes use our newsletterr banners, so if you want a custom logo you must choose to use a custom theme  
    * **Email Layout** - the overall design of the email. Polished Classic tightens the classic look into one card system, Editorial is a magazine treatment, Compact Digest is a dense one-scroll digest, Spotlight is a dark stack of cards that leads with one featured title and ends with a button to your server, and Legacy is the pre-v2026.4 look unchanged
+   * **Email Density** - Compact or Expanded, applied to whichever layout is selected above. Compact drops posters, thumbnails and card backgrounds, stacks card grids into a single column, and tightens the padding and type for a short scroll; Expanded is the roomy version with full artwork. Each layout starts on the density it already rendered at, so nothing moves until you change it: Editorial and Compact Digest start on Compact, Polished Classic, Spotlight and Legacy start on Expanded
    * **Server Name in Header (optional)** - the Polished Classic, Editorial, Compact Digest, and Spotlight layouts can print your server name in the email header. Hidden by default, so the header shows just your logo and header title; set this to Show to add the name back  
    * **Header Eyebrow Text (optional)** - the small uppercase line above the header title in the Editorial and Spotlight layouts. Blank falls back to your server name when Server Name in Header is on, and otherwise prints nothing unless Auto Header Text is enabled  
    * **Auto Header Text (optional)** - off by default. When on, a blank header title or eyebrow falls back to newsletterr's stock wording ("Your server", "This week on the server", "Your server, this month") in the Editorial and Spotlight layouts. When off, a blank field simply leaves the line out  
@@ -309,6 +311,36 @@ Released under the **MIT License** - see [LICENSE](LICENSE.txt) for details.
 ---
 
 ## Recent Changes
+
+## v2026.4.3:
+
+#### New Features:
+* New options for how the coming soon calendar is displayed
+* Email Density setting for expanding/condensing layouts
+* Move to top and move to bottom arrows on every snap-in, for reordering without dragging
+* Save dialog for templates, with an explicit "overwrite an existing template" option
+* Pick which collection group an added collection goes to, and move collections between groups
+* Rename or hide the heading on any snap-in, including a custom Coming Soon title
+* Rich text editing on text snap-ins: bold, italic, underline, alignment, bulleted and numbered lists, links and text color from a toolbar
+* Links can have their underline removed
+* Per-block font and size on text snap-ins, without going to Settings
+* New Recently Released snap-in, showing library items by release or air date rather than date added
+* Limit how many entries a Coming Soon snap-in shows
+* Filter Coming Soon (TV) down to premieres only, or new series only
+
+#### Fixed:
+* Cards with multiple rows were clamping all rows to one grid size
+* Templates were shipping old captured data
+* Legacy stat posters were filling the screen
+* Lost blur on stat card backgrounds
+* Editorial titles were jammed against "requested by ..."
+* Dragging the snap-ins panel taller grew the panel but not the list inside it
+* Dragging a snap-in past the edge of the list did not scroll on macOS
+* Loading a template reopened its collections closed, losing the saved expansion
+* Overwriting a template meant retyping its name exactly, now there is a dropdown
+* Clicking the center of an icon button did nothing, only the edge worked
+* Year in Plex posters rendered full size in the legacy layout at expanded density
+* Live preview refetched expanded collections from Plex on every edit, making it lag seconds behind
 
 ## v2026.4.2:
 

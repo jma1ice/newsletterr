@@ -202,6 +202,7 @@ def _normalize_jellyfin_item(item, library_name, server_id, jellyfin_web_url, je
         'summary': item.get('Overview', '') or '',
         'added_at': _iso_to_epoch(item.get('DateCreated', '')),
         'updated_at': '',
+        'originally_available_at': (item.get('PremiereDate') or '')[:10],
         'content_rating': item.get('OfficialRating', '') or '',
         'duration': str(duration_ms) if duration_ms else '',
         'guid': '',
@@ -239,7 +240,7 @@ def fetch_jellyfin_latest_for_library(section_id, limit=10, days=None, server_id
         params = {
             'ParentId': section_id,
             'Limit': 500 if days else limit,
-            'Fields': 'Overview,DateCreated,ProductionYear,RunTimeTicks,OfficialRating,CommunityRating,ChildCount',
+            'Fields': 'Overview,DateCreated,PremiereDate,ProductionYear,RunTimeTicks,OfficialRating,CommunityRating,ChildCount',
             'GroupItems': 'true',
         }
         response = safe_get(

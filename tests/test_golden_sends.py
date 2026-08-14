@@ -8,6 +8,7 @@
 import datetime as datetime_module
 import email as email_lib
 import json
+import re
 import smtplib
 import sqlite3
 from pathlib import Path
@@ -336,10 +337,11 @@ def _fixed_tautulli_data_with_top_users(*args, **kwargs):
     data["stats"] = TOP_USERS_FIXTURE
     return data
 
-def _fixed_tautulli_data_for_layout(layout):
+def _fixed_tautulli_data_for_layout(layout, email_density=""):
     def _data(*args, **kwargs):
         data = _fixed_tautulli_data()
         data["settings"]["email_layout"] = layout
+        data["settings"]["email_density"] = email_density
         # defined later in this module; resolved at call time
         data["most_watched_data"] = MOST_WATCHED_FIXTURE
         return data
@@ -855,6 +857,178 @@ def test_manual_sonarr_coming_soon_email_golden(manual_send_env, monkeypatch):
     assert "S01E02" in normalized["html"]
     _assert_golden("manual_sonarr_coming_soon", normalized)
 
+def _send_coming_soon_item(client, monkeypatch, item_extra):
+    """One manual send of a single Coming Soon snap-in; returns its HTML.
+
+    Shared by the heading-override tests below, which assert on
+    behaviour rather than pinning new goldens.
+    """
+    from app.emails import send as send_mod
+    from app.emails.builders import coming_soon as coming_soon_mod
+
+    monkeypatch.setattr(send_mod, "get_sonarr_coming_soon_cached", lambda *a, **k: SONARR_EPISODES_FIXTURE)
+    monkeypatch.setattr(coming_soon_mod, "fetch_and_attach_image", lambda *a, **k: None)
+    _freeze_coming_soon_clock(monkeypatch, coming_soon_mod)
+
+    RecorderSMTP.instances.clear()
+    resp = _post_send(client, {
+        "to_emails": "a@b.c", "subject": "Heading test", "email_header_title": "The Header",
+        "selected_items": [
+            dict({"type": "sonarr_coming_soon", "id": "sonarr-coming-soon"}, **item_extra),
+        ],
+        "custom_html": "", "user_dict": {}, "expanded_collections": {},
+    })
+    assert resp.status_code == 200
+    sends = [s for inst in RecorderSMTP.instances for s in inst.sent]
+    assert len(sends) == 1
+    return _normalize(sends[0][2])["html"]
+
+
+def test_coming_soon_heading_defaults_to_the_builtin_label(manual_send_env, monkeypatch):
+    html = _send_coming_soon_item(manual_send_env, monkeypatch, {})
+    assert "Coming Soon (TV)" in html
+
+
+def test_coming_soon_heading_override_reaches_the_email(manual_send_env, monkeypatch):
+    """NEWS-54: the custom Coming Soon title, end to end through a real send."""
+    html = _send_coming_soon_item(manual_send_env, monkeypatch, {"heading": "On The Way"})
+    assert "On The Way" in html
+    assert "Coming Soon (TV)" not in html
+    assert "Test Show" in html          # the section itself still rendered
+
+
+def test_coming_soon_heading_can_be_hidden(manual_send_env, monkeypatch):
+    """NEWS-52: hiding the label must not take the section with it."""
+    html = _send_coming_soon_item(manual_send_env, monkeypatch, {"hideHeading": True})
+    assert "Coming Soon (TV)" not in html
+    assert "Test Show" in html
+    assert "S01E02" in html
+
+
+def test_heading_override_is_escaped_end_to_end(manual_send_env, monkeypatch):
+    html = _send_coming_soon_item(manual_send_env, monkeypatch,
+                                  {"heading": "<script>alert(1)</script>"})
+    assert "<script>alert(1)</script>" not in html
+    assert "&lt;script&gt;" in html
+
+
+def test_blank_heading_is_identical_to_no_heading_key(manual_send_env, monkeypatch):
+    """Guards the property the whole refactor rests on."""
+    plain = _send_coming_soon_item(manual_send_env, monkeypatch, {})
+    blank = _send_coming_soon_item(manual_send_env, monkeypatch, {"heading": "   "})
+    assert plain == blank
+
+
+def _send_grouped_coming_soon(client, monkeypatch, item_extra):
+    from app.emails import send as send_mod
+    from app.emails.builders import coming_soon as coming_soon_mod
+
+    monkeypatch.setattr(send_mod, "get_sonarr_coming_soon_cached", lambda *a, **k: SONARR_GROUPED_FIXTURE)
+    monkeypatch.setattr(coming_soon_mod, "fetch_and_attach_image", lambda *a, **k: None)
+    _freeze_coming_soon_clock(monkeypatch, coming_soon_mod)
+
+    RecorderSMTP.instances.clear()
+    resp = _post_send(client, {
+        "to_emails": "a@b.c", "subject": "Filter test", "email_header_title": "The Header",
+        "selected_items": [
+            dict({"type": "sonarr_coming_soon", "id": "sonarr-coming-soon"}, **item_extra),
+        ],
+        "custom_html": "", "user_dict": {}, "expanded_collections": {},
+    })
+    assert resp.status_code == 200
+    sends = [s for inst in RecorderSMTP.instances for s in inst.sent]
+    assert len(sends) == 1
+    return _normalize(sends[0][2])["html"]
+
+
+def test_coming_soon_shows_every_episode_by_default(manual_send_env, monkeypatch):
+    html = _send_grouped_coming_soon(manual_send_env, monkeypatch, {})
+    assert "Binge Show" in html
+    assert "Solo Show" in html
+
+
+def test_coming_soon_premieres_only_drops_mid_season(manual_send_env, monkeypatch):
+    html = _send_grouped_coming_soon(manual_send_env, monkeypatch, {"csKind": "premieres"})
+    assert "Binge Show" in html
+    assert "Solo Show" not in html
+
+
+def test_coming_soon_count_caps_the_entries(manual_send_env, monkeypatch):
+    html = _send_grouped_coming_soon(manual_send_env, monkeypatch, {"csCount": 1})
+    assert "Binge Show" in html
+    assert "Solo Show" not in html
+    assert "3 episodes" in html      # the drop was not truncated by the cap
+
+
+def test_blank_coming_soon_filters_are_identical_to_no_keys(manual_send_env, monkeypatch):
+    plain = _send_grouped_coming_soon(manual_send_env, monkeypatch, {})
+    blank = _send_grouped_coming_soon(manual_send_env, monkeypatch, {"csKind": "", "csCount": 0})
+    assert plain == blank
+
+
+RELEASED_FIXTURE = [{"recently_added": [
+    {"title": "Old Classic", "media_type": "movie", "library_name": "Movies",
+     "originally_available_at": "1994-09-23", "added_at": "1760000000",
+     "year": "1994", "duration": "8520000"},
+    {"title": "Brand New Film", "media_type": "movie", "library_name": "Movies",
+     "originally_available_at": "2026-08-01", "added_at": "1760000000",
+     "year": "2026", "duration": "7200000"},
+]}]
+
+
+def _send_recently_released(client, monkeypatch, item_extra, released_since=""):
+    from app.emails import send as send_mod
+
+    def _data(*args, **kwargs):
+        data = _fixed_tautulli_data()
+        data["recent_data"] = RELEASED_FIXTURE
+        data["settings"]["released_since_days"] = released_since
+        return data
+
+    monkeypatch.setattr(send_mod, "get_current_tautulli_data_for_email", _data)
+
+    RecorderSMTP.instances.clear()
+    resp = _post_send(client, {
+        "to_emails": "a@b.c", "subject": "Released", "email_header_title": "The Header",
+        "selected_items": [dict({"type": "recently_released", "id": "rr"}, **item_extra)],
+        "custom_html": "", "user_dict": {}, "expanded_collections": {},
+    })
+    assert resp.status_code == 200
+    sends = [s for inst in RecorderSMTP.instances for s in inst.sent]
+    assert len(sends) == 1
+    return _normalize(sends[0][2])["html"]
+
+
+def test_recently_released_renders_and_titles_itself(manual_send_env, monkeypatch):
+    html = _send_recently_released(manual_send_env, monkeypatch, {})
+    assert "Recently Released" in html
+    assert "Brand New Film" in html
+
+
+def test_recently_released_orders_by_release_date(manual_send_env, monkeypatch):
+    """Both were added at the same moment; the 1994 film must come second."""
+    html = _send_recently_released(manual_send_env, monkeypatch, {})
+    assert html.index("Brand New Film") < html.index("Old Classic")
+
+
+def test_released_since_setting_excludes_older_releases(manual_send_env, monkeypatch):
+    html = _send_recently_released(manual_send_env, monkeypatch, {}, released_since="3650")
+    assert "Brand New Film" in html
+    assert "Old Classic" not in html
+
+
+def test_recently_released_heading_is_still_overridable(manual_send_env, monkeypatch):
+    html = _send_recently_released(manual_send_env, monkeypatch, {"heading": "Just Out"})
+    assert "Just Out" in html
+    assert "Recently Released" not in html
+
+
+def test_recently_released_respects_its_item_cap(manual_send_env, monkeypatch):
+    html = _send_recently_released(manual_send_env, monkeypatch, {"rrCount": 1})
+    assert "Brand New Film" in html
+    assert "Old Classic" not in html
+
+
 def test_manual_sonarr_coming_soon_grouped_email_golden(manual_send_env, monkeypatch):
     from app.emails import send as send_mod
     from app.emails.builders import coming_soon as coming_soon_mod
@@ -1032,8 +1206,16 @@ def test_manual_seerr_requests_email_golden(manual_send_env, monkeypatch):
     assert "Seerr Fulfilled Show" not in normalized["html"]
     _assert_golden("manual_seerr_requests", normalized)
 
-@pytest.mark.parametrize("layout", ["classic", "editorial", "digest", "spotlight"])
-def test_manual_layout_email_golden(manual_send_env, monkeypatch, layout):
+# (layout, density). A blank density is the layout's natural one, whose
+# goldens must never move; the named ones are the authored variants added with
+# the email_density setting (compact for legacy/classic/spotlight, expanded for
+# editorial/digest, see app/emails/density.py).
+@pytest.mark.parametrize("layout,email_density", [
+    ("classic", ""), ("editorial", ""), ("digest", ""), ("spotlight", ""),
+    ("classic", "compact"), ("spotlight", "compact"), ("legacy", "compact"),
+    ("editorial", "expanded"), ("digest", "expanded"),
+])
+def test_manual_layout_email_golden(manual_send_env, monkeypatch, layout, email_density):
     # Email layouts (NEWS-30): one golden per variant over a representative
     # item mix. Legacy is pinned by every other golden in this file. The
     # email_layout column outlives send_env, so snapshot + restore.
@@ -1063,7 +1245,13 @@ def test_manual_layout_email_golden(manual_send_env, monkeypatch, layout):
     # the manual send path reads its settings from the fixed tautulli dict
     # (monkeypatched in manual_send_env), not the DB row, so the layout under
     # test is injected there
-    monkeypatch.setattr(send_mod, "get_current_tautulli_data_for_email", _fixed_tautulli_data_for_layout(layout))
+    monkeypatch.setattr(send_mod, "get_current_tautulli_data_for_email", _fixed_tautulli_data_for_layout(layout, email_density))
+    # the compact densities render the legacy builders too, which fetch through
+    # their own module-level imports
+    for _mod_name in ("coming_soon", "ombi_requests", "recently_added", "stats", "cards"):
+        _mod = __import__(f"app.emails.builders.{_mod_name}", fromlist=["x"])
+        if hasattr(_mod, "fetch_and_attach_image"):
+            monkeypatch.setattr(_mod, "fetch_and_attach_image", lambda *a, **k: None)
 
     conn = sqlite3.connect(config.DB_PATH)
     saved = conn.execute("SELECT email_layout FROM settings WHERE id = 1").fetchone()
@@ -1110,15 +1298,28 @@ def test_manual_layout_email_golden(manual_send_env, monkeypatch, layout):
             # classic's own header padding: the brand line that used to mark it
             # only renders when email_show_server_name is on, which is off by
             # default
-            "classic": "padding: 18px 24px",
-            "editorial": "3px double",
-            "digest": "border-bottom: 2px solid",
+            ("classic", ""): "padding: 18px 24px",
+            ("classic", "compact"): "padding: 11px 16px",
+            ("editorial", ""): "3px double",
+            ("editorial", "expanded"): "3px double",
+            ("digest", ""): "border-bottom: 2px solid",
+            ("digest", "expanded"): "border-bottom: 2px solid",
             # spotlight has no header band at all and is the one layout on the
             # narrow canvas
-            "spotlight": "max-width: 640px",
+            ("spotlight", ""): "max-width: 640px",
+            ("spotlight", "compact"): "max-width: 640px",
+            ("legacy", "compact"): "padding: 8px 14px",
         }
-        assert chrome_markers[layout] in normalized["html"]
-        _assert_golden(f"manual_layout_{layout}", normalized)
+        assert chrome_markers[(layout, email_density)] in normalized["html"]
+        # the compact densities carry no artwork in any section: no posters,
+        # thumbnails, avatars or blurred backgrounds. The header logo
+        # (branding) and the 12px inline label icons are not artwork and stay.
+        if email_density == "compact":
+            assert "background-image" not in normalized["html"]
+            for tag in re.findall(r"<img[^>]*>", normalized["html"]):
+                width = re.search(r'width="(\d+)"', tag)
+                assert "email-logo" in tag or (width and int(width.group(1)) <= 16), tag
+        _assert_golden(f"manual_layout_{layout}" + (f"_{email_density}" if email_density else ""), normalized)
     finally:
         conn = sqlite3.connect(config.DB_PATH)
         conn.execute("UPDATE settings SET email_layout = ? WHERE id = 1", (saved[0],))

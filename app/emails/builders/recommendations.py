@@ -2,6 +2,8 @@ from urllib.parse import quote_plus
 
 from app.config import DEFAULT_PLEX_WEB_URL
 from app.clients.plex import build_plex_web_link
+from app.emails import density, headings
+from app.emails.builders.card_grid import effective_columns
 from app.emails.images import fetch_and_attach_image
 from app.security import escape_html_output as esc
 
@@ -60,9 +62,10 @@ def build_recommendations_html_with_cids(recs_data, msg_root, theme_colors, user
         )
         
         if movies_html or shows_html:
+            p3 = density.picker3(theme_colors)
             container_style = f"""
-                margin: 30px 0;
-                padding: 20px;
+                margin: {p3('14px 0', '30px 0', '38px 0')};
+                padding: {p3('12px', '20px', '26px')};
                 background-color: {theme_colors['card_bg']};
                 border-radius: 8px;
                 border: 1px solid {theme_colors['border']};
@@ -72,15 +75,20 @@ def build_recommendations_html_with_cids(recs_data, msg_root, theme_colors, user
             user_title_style = f"""
                 text-align: center;
                 color: {theme_colors['text']};
-                margin: 0 0 20px 0;
-                font-size: 24px;
+                margin: {p3('0 0 10px 0', '0 0 20px 0', '0 0 26px 0')};
+                font-size: {p3('17px', '24px', '30px')};
                 font-weight: bold;
                 font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
             """
             
+            # Only the outer per-user heading takes the override; the inner
+            # "Recommended Movies"/"Recommended TV Shows" labels stay put.
+            user_heading = headings.resolve(theme_colors, f"Recommendations for {display_name}")
+            user_heading_html = f'<h2 style="{user_title_style}">{esc(user_heading)}</h2>' if user_heading else ''
+
             user_section = f"""
                 <div style="{container_style}" data-recs-user="{esc(str(user_id))}">
-                    <h2 style="{user_title_style}">Recommendations for {esc(display_name)}</h2>
+                    {user_heading_html}
                     {movies_html}
                     {shows_html}
                 </div>
@@ -149,9 +157,12 @@ def build_droppedneedle_wrapped_html_with_cids(wrapped_data, msg_root, theme_col
             font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
         """
 
+        wrapped_heading = headings.resolve(theme_colors, f"{display_name}'s {payload.get('year', '')} Wrapped")
+        wrapped_heading_html = f'<h2 style="{user_title_style}">{esc(wrapped_heading)}</h2>' if wrapped_heading else ''
+
         html_sections.append(f"""
             <div style="{container_style}" data-wrapped-user="{esc(str(user_id))}">
-                <h2 style="{user_title_style}">{esc(display_name)}'s {payload.get('year', '')} Wrapped</h2>
+                {wrapped_heading_html}
                 <p style="text-align: center; color: {theme_colors['muted_text']}; margin-bottom: 16px;">
                     ~{payload.get('total_listens_estimated', 0)} plays tracked &bull; {payload.get('loved_tracks_count', 0)} loved tracks
                 </p>
@@ -196,9 +207,12 @@ def build_droppedneedle_server_stats_html_with_cids(server_data, msg_root, theme
         font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
     """
 
+    dn_heading = headings.resolve(theme_colors, f"Server Stats - {server_data.get('year', '')}")
+    dn_heading_html = f'<h2 style="{title_style}">{esc(dn_heading)}</h2>' if dn_heading else ''
+
     return f"""
         <div style="{container_style}">
-            <h2 style="{title_style}">Server Stats - {server_data.get('year', '')}</h2>
+            {dn_heading_html}
             <p style="text-align: center; color: {theme_colors['muted_text']}; margin-bottom: 16px;">
                 ~{server_data.get('total_listens_estimated', 0)} plays across {server_data.get('total_users_tracked', 0)} listeners
             </p>
@@ -212,8 +226,14 @@ def build_recommendations_section_with_cids(available_items, unavailable_items, 
     if not available_items and not unavailable_items:
         return ""
 
+    # This section renders under every layout, so it needs the three-way
+    # picker: the same code is one layout's compact variant and another's
+    # expanded one.
+    p3 = density.picker3(theme_colors)
+    art_on = density.show_art(theme_colors)
+
     all_items = available_items + unavailable_items
-    items_per_row = max(1, int(recs_grid_columns) if recs_grid_columns else 5)
+    items_per_row = 1 if not art_on else effective_columns(recs_grid_columns, len(all_items))
     cell_width_pct = f"{100 / items_per_row:.4f}%"
 
     # Uniform 2:3 poster box regardless of column count (see recently_added.py).
@@ -232,7 +252,7 @@ def build_recommendations_section_with_cids(available_items, unavailable_items, 
             is_unavailable = (i + j) >= len(available_items)
             
             poster_src_result = None
-            if item.get('url'):
+            if item.get('url') and art_on:
                 poster_src_result = fetch_and_attach_image(
                     f"/proxy-img?u={item['url']}",
                     msg_root,
@@ -275,7 +295,22 @@ def build_recommendations_section_with_cids(available_items, unavailable_items, 
                 {'opacity: 0.7; filter: grayscale(30%);' if is_unavailable else ''}
             """
 
-            if poster_src_result:
+            if not art_on:
+                # compact: one full-width text row per recommendation
+                meta_line = " • ".join(filter(None, [
+                    str(year) if year else '', vote_text, runtime,
+                    'Unavailable' if is_unavailable else ''
+                ]))
+                _last = (i + j) == len(all_items) - 1
+                card_content = f"""
+                    <div style="padding: 6px 0;{'' if _last else f' border-bottom: 1px solid {theme_colors["border"]};'} font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;">
+                        <div style="font-weight: bold; font-size: 13px; color: {theme_colors['text']}; line-height: 1.25;">{esc(title_text)}</div>
+                        {f'<div style="font-size: 10.5px; color: {theme_colors["muted_text"]}; padding-top: 2px;">{esc(meta_line)}</div>' if meta_line else ''}
+                        {f'<div style="font-size: 11px; color: {theme_colors["text"]}; opacity: 0.8; line-height: 1.4; padding-top: 3px;">{esc(overview[:110])}{"..." if len(overview) > 110 else ""}</div>' if overview else ''}
+                    </div>
+                """
+                card_html = f'<a href="{esc(href)}" style="text-decoration: none; color: inherit; display: block;" target="_blank" title="{link_title}">{card_content}</a>'
+            elif poster_src_result:
                 poster_src = poster_src_result
 
                 img_attrs = f'width="{poster_px}"'
@@ -388,8 +423,8 @@ def build_recommendations_section_with_cids(available_items, unavailable_items, 
     
     section_title_style = f"""
         color: {theme_colors['text']};
-        margin: 0 0 15px 0;
-        font-size: 20px;
+        margin: {p3('0 0 8px 0', '0 0 15px 0', '0 0 20px 0')};
+        font-size: {p3('15px', '20px', '24px')};
         font-weight: bold;
         font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
     """
@@ -403,7 +438,7 @@ def build_recommendations_section_with_cids(available_items, unavailable_items, 
     """
 
     return f"""
-        <div style="margin: 20px 0;">
+        <div style="margin: {p3('10px 0', '20px 0', '26px 0')};">
             <h3 style="{section_title_style}">{title}</h3>
             <table class="recommendations-table" style="{table_style}">
                 {rows_html}

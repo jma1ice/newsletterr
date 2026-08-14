@@ -255,6 +255,79 @@ def build_email_css_from_theme(theme_colors, logo_width, container_width=800):
                     border-radius: 10px !important;
                     display: block !important;
                 }}
+
+                .cs-cal-table,
+                .cs-cal-table tbody,
+                .cs-cal-row {{
+                    display: block !important;
+                    width: 100% !important;
+                }}
+
+                .cs-cal-head {{
+                    display: none !important;
+                }}
+
+                .cs-cal-cell {{
+                    display: block !important;
+                    width: 100% !important;
+                    box-sizing: border-box !important;
+                    border-left: 0 !important;
+                    border-right: 0 !important;
+                    border-top: 0 !important;
+                    padding: 10px 12px !important;
+                }}
+
+                /* must follow .cs-cal-cell: same specificity, later wins */
+                .cs-cal-empty {{
+                    display: none !important;
+                }}
+
+                .cs-cal-daynum {{
+                    display: none !important;
+                }}
+
+                .cs-cal-daylong {{
+                    display: block !important;
+                }}
+
+                .cs-cal-event {{
+                    margin: 0 0 10px 0 !important;
+                }}
+
+                .cs-cal-poster {{
+                    width: 56px !important;
+                    display: inline-block !important;
+                    vertical-align: top !important;
+                    margin: 0 10px 0 0 !important;
+                }}
+
+                .cs-cal-event-text {{
+                    display: inline-block !important;
+                    vertical-align: top !important;
+                    max-width: 70% !important;
+                    text-align: left !important;
+                }}
+
+                /* Agenda view: the date column becomes a heading line above
+                   its items rather than a narrow left rail. */
+                .cs-agenda-table,
+                .cs-agenda-table tbody,
+                .cs-agenda-row {{
+                    display: block !important;
+                    width: 100% !important;
+                }}
+
+                .cs-agenda-date,
+                .cs-agenda-items {{
+                    display: block !important;
+                    width: 100% !important;
+                    box-sizing: border-box !important;
+                }}
+
+                .cs-agenda-items {{
+                    border-top: 0 !important;
+                    padding-top: 0 !important;
+                }}
             }}
         </style>
     """

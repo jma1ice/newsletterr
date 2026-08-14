@@ -2,7 +2,8 @@
 # poster card grid (not a stats table), reusing the shared card/grid helpers.
 # Scope is all-time: that is what Tautulli's get_library_media_info returns,
 # so headings intentionally carry no date range.
-from app.emails.builders.card_grid import build_card_html, build_calendar_grid_html, empty_state_html
+from app.emails import density
+from app.emails.builders.card_grid import build_card_html, build_calendar_grid_html, empty_state_html, effective_columns
 from app.emails.images import fetch_and_attach_image, truncate_text
 from app.security import escape_html_output as esc
 
@@ -47,21 +48,22 @@ def build_most_watched_html_with_cids(most_watched_data, msg_root, theme_colors,
     if not items:
         return empty_state_html(theme_colors, f"No most watched items found{f' for {esc(library_filter)}' if library_filter else ''}{f' ({range_text})' if range_text else ''}.")
 
-    cols = max(1, int(grid_columns) if grid_columns else 5)
+    cols = effective_columns(grid_columns, len(items))
     poster_px = max(60, int(760 / cols) - 16)
     if poster_max_height:
         poster_px = min(poster_px, max(40, int(int(poster_max_height) * 2 // 3)))
     poster_target = (poster_px, int(round(poster_px * 1.5)))
 
+    art_on = density.show_art(theme_colors)
     cards = []
     for i, item in enumerate(items):
         title = truncate_text(item.get('title', 'Unknown'), 23)
         year = str(item.get('year') or '')
-        poster_src = most_watched_poster(item, msg_root, f"mw-{i}", base_url, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url, target=poster_target)
-        card_html = build_card_html(theme_colors, title, year, play_count_text(item), poster_src)
+        poster_src = most_watched_poster(item, msg_root, f"mw-{i}", base_url, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url, target=poster_target) if art_on else None
+        card_html = build_card_html(theme_colors, title, year, play_count_text(item), poster_src, compact=not art_on)
         plex_url = item.get('plex_url', '')
         if plex_url:
             card_html = f'<a href="{esc(plex_url)}" style="text-decoration: none; color: inherit; display: block;" target="_blank" title="Open in Plex">{card_html}</a>'
         cards.append(card_html)
 
-    return build_calendar_grid_html(cards, msg_root, theme_colors, esc(heading), base_url, cols)
+    return build_calendar_grid_html(cards, msg_root, theme_colors, heading, base_url, cols)

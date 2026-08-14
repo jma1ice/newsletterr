@@ -113,19 +113,33 @@
     <h2>recent changes</h2>
     <p class="info-subhead">New Features:</p>
     <ul class="info-list">
-        <li>Recommendations snap-in rows show how many movies and shows were pulled for each user, and the Add button is disabled when conjurr returned nothing</li>
-        <li>Show/hide setting for recommendation descriptions, matching the Recently Added option</li>
-        <li>Recently Added and Most Watched snap-ins keep their per-library count editable after they are added to the email body</li>
-        <li>Recently Added snap-ins can be forced to a horizontal grid or a vertical list, per snap-in, in any layout</li>
-        <li>The Spotlight layout's featured title is selectable per Recently Added snap-in instead of always being the newest item</li>
-        <li>Header Eyebrow Text setting for the small uppercase line in the Editorial and Spotlight layouts</li>
-        <li>Auto Header Text setting (off by default) for whether a blank header title falls back to newsletterr's stock wording</li>
+        <li>New options for how the coming soon calendar is displayed</li>
+        <li>Email Density setting for expanding/condensing layouts</li>
+        <li>Move to top and move to bottom arrows on every snap-in, for reordering without dragging</li>
+        <li>Save dialog for templates, with an explicit "overwrite an existing template" option</li>
+        <li>Pick which collection group an added collection goes to, and move collections between groups</li>
+        <li>Rename or hide the heading on any snap-in, including a custom Coming Soon title</li>
+        <li>Rich text editing on text snap-ins: bold, italic, underline, alignment, bulleted and numbered lists, links and text color from a toolbar</li>
+        <li>Links can have their underline removed</li>
+        <li>Per-block font and size on text snap-ins, without going to Settings</li>
+        <li>New Recently Released snap-in, showing library items by release or air date rather than date added</li>
+        <li>Limit how many entries a Coming Soon snap-in shows</li>
+        <li>Filter Coming Soon (TV) down to premieres only, or new series only</li>
     </ul>
     <p class="info-subhead">Fixes:</p>
     <ul class="info-list mb-4">
-        <li>Jinja page issue was blocking recommendations list from pulling</li>
-        <li>Non-legacy layouts were using last streamed in place of user name in most active users stat card</li>
-        <li>Compact Digest capped Recently Added at six posters in a single row and ignored the grid column setting</li>
+        <li>Cards with multiple rows were clamping all rows to one grid size</li>
+        <li>Templates were shipping old captured data</li>
+        <li>Legacy stat posters were filling the screen</li>
+        <li>Lost blur on stat card backgrounds</li>
+        <li>Editorial titles were jammed against "requested by ..."</li>
+        <li>Dragging the snap-ins panel taller grew the panel but not the list inside it</li>
+        <li>Dragging a snap-in past the edge of the list did not scroll on macOS</li>
+        <li>Loading a template reopened its collections closed, losing the saved expansion</li>
+        <li>Overwriting a template meant retyping its name exactly, now there is a dropdown</li>
+        <li>Clicking the center of an icon button did nothing, only the edge worked</li>
+        <li>Year in Plex posters rendered full size in the legacy layout at expanded density</li>
+        <li>Live preview refetched expanded collections from Plex on every edit, making it lag seconds behind</li>
     </ul>
 </div>
 {% endblock %}

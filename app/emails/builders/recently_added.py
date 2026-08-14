@@ -1,5 +1,7 @@
 from datetime import datetime, timezone, timedelta
 
+from app.emails import density, headings
+from app.emails.builders.card_grid import effective_columns
 from app.emails.images import fetch_and_attach_image, truncate_text
 from app.security import escape_html_output as esc
 
@@ -114,11 +116,14 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
     
     items_html = ""
     # orientation is the builder item's per-snap-in override: 'list' stacks the
-    # items one per row, anything else keeps the poster grid.
-    items_per_row = 1 if orientation == 'list' else max(1, int(ra_grid_columns) if ra_grid_columns else 5)
+    # items one per row, anything else keeps the poster grid. The compact
+    # density has no posters, so its grid would be an empty box per item: it
+    # always takes the row treatment instead.
+    stacked = orientation == 'list' or not density.show_art(theme_colors)
+    items_per_row = 1 if stacked else effective_columns(ra_grid_columns, len(items))
     cell_width_pct = f"{100 / items_per_row:.4f}%"
 
-    if orientation == 'list':
+    if stacked:
         return _build_recently_added_list_html(
             items, msg_root, theme_colors, base_url,
             recently_added_title(library_filter, recently_added_mode, max_items),
@@ -367,11 +372,12 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
         table-layout: fixed;
     """
     
-    ra_title = recently_added_title(library_filter, recently_added_mode, max_items)
+    ra_title = headings.resolve(theme_colors, recently_added_title(library_filter, recently_added_mode, max_items))
+    ra_title_html = f'<h2 style="{title_style}">{esc(ra_title)}</h2>' if ra_title else ''
 
     return f"""
         <div style="{container_style}">
-            <h2 style="{title_style}">{esc(ra_title)}</h2>
+            {ra_title_html}
             <table class="recently-added-table" style="{table_style}">
                 {items_html}
             </table>
@@ -379,7 +385,11 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
     """
 
 def _build_recently_added_list_html(items, msg_root, theme_colors, base_url, ra_title, poster_max_height, hosted_images_enabled, hosted_base_url, show_description):
-    """Vertical orientation: one item per row, poster left, details right."""
+    """Vertical orientation: one item per row, poster left, details right.
+    Also the compact density's treatment for this snap-in, with the poster
+    column dropped."""
+    p = density.picker(theme_colors)
+    art_on = density.show_art(theme_colors)
     poster_px = 80
     if poster_max_height:
         poster_px = min(poster_px, max(40, int(int(poster_max_height) * 2 // 3)))
@@ -401,7 +411,7 @@ def _build_recently_added_list_html(items, msg_root, theme_colors, base_url, ra_
             poster_candidates = [item.get('thumb'), item.get('art'), item.get('parent_thumb'), item.get('grandparent_thumb')]
 
         poster_src = None
-        for candidate in poster_candidates:
+        for candidate in (poster_candidates if art_on else []):
             if candidate:
                 poster_url = f"/proxy-art{candidate}" if not candidate.startswith('/proxy-art') else candidate
                 poster_src = fetch_and_attach_image(poster_url, msg_root, f"recent-{i}", base_url, target=poster_target,
@@ -426,22 +436,23 @@ def _build_recently_added_list_html(items, msg_root, theme_colors, base_url, ra_
             title_html = f'<a href="{esc(plex_url)}" target="_blank" style="color: inherit; text-decoration: none;" title="Open in Plex">{title_html}</a>'
 
         border = "" if i == len(items) - 1 else f" border-bottom: 1px solid {theme_colors['border']};"
+        _pad = p('6px', '10px')
         rows_html += f"""
             <tr class="recently-added-row">
-                {f'<td class="recently-added-cell" width="{poster_px}" valign="top" style="padding: 10px 14px 10px 0;{border}">{poster_html}</td>' if poster_html else ''}
-                <td class="recently-added-cell" valign="top" style="padding: 10px 0;{border} font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;">
-                    <div style="font-weight: bold; font-size: 15px; color: {theme_colors['text']}; line-height: 1.25;">{title_html}</div>
-                    {f'<div style="font-size: 11px; color: {theme_colors["muted_text"]}; padding-top: 3px;">{esc(meta_text)}</div>' if meta_text else ''}
-                    {f'<div style="font-size: 12px; color: {theme_colors["text"]}; opacity: 0.8; line-height: 1.4; padding-top: 6px;">{esc(truncate_text(summary, 220))}</div>' if (summary and show_description) else ''}
+                {f'<td class="recently-added-cell" width="{poster_px}" valign="top" style="padding: {_pad} 14px {_pad} 0;{border}">{poster_html}</td>' if poster_html else ''}
+                <td class="recently-added-cell" valign="top" style="padding: {_pad} 0;{border} font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;">
+                    <div style="font-weight: bold; font-size: {p('13.5px', '15px')}; color: {theme_colors['text']}; line-height: 1.25;">{title_html}</div>
+                    {f'<div style="font-size: {p("10.5px", "11px")}; color: {theme_colors["muted_text"]}; padding-top: {p("2px", "3px")};">{esc(meta_text)}</div>' if meta_text else ''}
+                    {f'<div style="font-size: {p("11.5px", "12px")}; color: {theme_colors["text"]}; opacity: 0.8; line-height: 1.4; padding-top: {p("4px", "6px")};">{esc(truncate_text(summary, p(130, 220)))}</div>' if (summary and show_description) else ''}
                 </td>
             </tr>
         """
 
     container_style = f"""
         background-color: {theme_colors['card_bg']};
-        padding: 0 15px 10px 15px;
+        padding: {p('0 12px 6px 12px', '0 15px 10px 15px')};
         border-radius: 8px;
-        margin: 20px 0;
+        margin: {p('10px 0', '20px 0')};
         border: 1px solid {theme_colors['border']};
         font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
         overflow: hidden;
@@ -450,15 +461,17 @@ def _build_recently_added_list_html(items, msg_root, theme_colors, base_url, ra_
     title_style = f"""
         text-align: center;
         color: {theme_colors['text']};
-        margin: 0 0 10px 0;
-        padding-top: 10px;
-        font-size: 24px;
+        margin: {p('0 0 6px 0', '0 0 10px 0')};
+        padding-top: {p('8px', '10px')};
+        font-size: {p('17px', '24px')};
         font-weight: bold;
         font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
     """
+    ra_title = headings.resolve(theme_colors, ra_title)
+    ra_title_html = f'<h2 style="{title_style}">{esc(ra_title)}</h2>' if ra_title else ''
     return f"""
         <div style="{container_style}">
-            <h2 style="{title_style}">{esc(ra_title)}</h2>
+            {ra_title_html}
             <table class="recently-added-table" width="100%" cellpadding="0" cellspacing="0" border="0" style="width: 100%; border-collapse: collapse;">
                 {rows_html}
             </table>

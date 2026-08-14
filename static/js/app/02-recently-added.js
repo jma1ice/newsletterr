@@ -1,5 +1,10 @@
 let recentPayload = APP.recentPayload;
 const renderedCharts = new Set();
+// Graphs ship as a PNG captured from the live Highcharts instance, so a
+// capture is only valid for the data it was taken from. Pulling stats bumps
+// this counter (alongside clearing renderedCharts), which invalidates every
+// capture and forces a re-render before the next preview or send.
+let chartDataGeneration = 0;
 let graphDataList = APP.graphDataList;
 let graphCommands = APP.graphCommands;
 const themeSettings = (() => {
@@ -152,6 +157,36 @@ function buildRALibraryRows() {
                 <span class="snapin-row-label" title="${escapeHtml(lib)}">${escapeHtml(lib)}</span>
                 <input type="number" class="ra-count-input" min="1" max="99" placeholder="all"
                        title="Max items shown for ${escapeHtml(lib)} (blank = the pulled item count). Editable again on the added snap-in."
+                       style="width: 4em; margin-left: auto; flex-shrink: 0; font-size: .8rem; padding: .15rem .3rem;">
+            </div>`;
+        host.appendChild(row);
+    });
+
+    buildRRLibraryRows(libs);
+}
+
+function buildRRLibraryRows(libs) {
+    const host = document.getElementById('rr-lib-list');
+    if (!host) return;
+    host.innerHTML = '';
+
+    libs.forEach(lib => {
+        const row = document.createElement('div');
+        row.className = 'col-12 mb-2';
+        const id = `rr-lib-${slug(lib)}`;
+
+        row.innerHTML = `
+            <div class="snapin-row p-2 border rounded">
+                <div class="snapin-row-actions">
+                    <button type="button" class="nl-btn nl-btn--primary nl-btn--sm rr-add-btn"
+                            data-type="recently_released" data-lib="${escapeHtml(lib)}" data-id="${id}" data-name="Recently Released: ${escapeHtml(lib)}"
+                            style="font-size: .8rem; padding: .25rem .5rem;">
+                    Add
+                    </button>
+                </div>
+                <span class="snapin-row-label" title="${escapeHtml(lib)}">${escapeHtml(lib)}</span>
+                <input type="number" class="rr-count-input" min="1" max="99" placeholder="all"
+                       title="Max items shown for ${escapeHtml(lib)} (blank = every item released in the window). Editable again on the added snap-in."
                        style="width: 4em; margin-left: auto; flex-shrink: 0; font-size: .8rem; padding: .15rem .3rem;">
             </div>`;
         host.appendChild(row);

@@ -170,6 +170,7 @@ def build_collections_html_with_cids(all_collections, msg_root, theme_colors, ba
     """
 
 def _compact_collection_rows_html(items, theme_colors):
+    _FONT = "'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif"
     rows = ""
     for i, item in enumerate(items):
         title = item.get('title', 'Unknown')

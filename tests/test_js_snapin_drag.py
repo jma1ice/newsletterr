@@ -90,3 +90,46 @@ def test_move_handler_reads_the_button_not_the_click_target():
     assert "btn.dataset.index" in body
     assert "btn.dataset.edge" in body
     assert "e.target.dataset" not in body
+
+
+BUILDER_CSS = REPO_ROOT / "static/css/pages/builder.css"
+
+
+def _css():
+    return BUILDER_CSS.read_text(encoding="utf-8")
+
+
+def test_dragging_style_outranks_the_hover_style():
+    css = _css()
+    hover = css.index(".selected-item:hover {")
+    dragging = css.index(".selected-item.dragging")
+    assert dragging > hover, ".dragging moved back above :hover"
+    assert ".selected-item.dragging:hover" in css
+
+
+def test_dragging_class_is_also_applied_from_the_drag_event():
+    """Safari can hold the dragstart setTimeout until the drag session ends."""
+    source = _source()
+    assert "const markDragging" in source
+    assert "addEventListener('drag', markDragging)" in source
+    assert "setTimeout(markDragging, 0)" in source
+
+
+def test_list_scroll_position_survives_a_rebuild():
+    """A drop rebuilds the list from innerHTML; without this the user is
+    thrown back to the first snap-in instead of where they dropped."""
+    source = _source()
+    start = source.index("function updateSelectedItemsDisplay()")
+    body = source[start:source.index("\nfunction ", start + 1)]
+    assert "prevScrollTop = container ? container.scrollTop : 0" in body
+    assert "container.scrollTop = prevScrollTop" in body
+
+
+def test_floating_pane_list_carries_its_own_height_cap():
+    """WebKit does not reliably shrink the flex child when the only limit is
+    the pane's max-height, which let the pane grow with every item added."""
+    css = _css()
+    start = css.index("#selected-items-pane > #selected-items-list {")
+    body = css[start:css.index("}", start)]
+    assert "max-height: calc(" in body, "cap is back to max-height: none"
+    assert "overflow-y: auto" in body

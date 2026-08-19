@@ -289,6 +289,12 @@ async function expandCollection(expandedDiv, collectionKey, collectionType, butt
 
 function updateSelectedItemsDisplay() {
     const container = document.getElementById('selected-items-list');
+    // The list is rebuilt from innerHTML on every change, which parks the
+    // scroll position back at the top. After a drag-and-drop reorder that
+    // threw the user back to the first snap-in instead of leaving them where
+    // they dropped, so the offset is carried across the rebuild (the browser
+    // clamps it if the list got shorter).
+    const prevScrollTop = container ? container.scrollTop : 0;
     
     if (selectedItems.length === 0) {
         container.innerHTML = '<div id="selected-items-empty" class="text-muted text-center py-3">No items selected. Use the buttons below to add items to your email.</div>';
@@ -971,6 +977,8 @@ function updateSelectedItemsDisplay() {
         setupDragAndDrop();
     }
 
+    if (prevScrollTop && container) container.scrollTop = prevScrollTop;
+
     if (typeof refreshCollectionTargetOptions === 'function') refreshCollectionTargetOptions();
 
     updatePreview();
@@ -1259,16 +1267,25 @@ function setupDragAndDrop() {
             item.draggable = false;
         });
 
+        // The dragging class is deferred: applying it inside dragstart would
+        // bake the tilt and the 0.6 opacity into the drag image the browser
+        // snapshots when the handler returns. Safari can hold timers until the
+        // drag session ends, so the first `drag` event (which does fire during
+        // the drag, in every browser) marks it too.
+        const markDragging = () => {
+            if (draggedElement === item) item.classList.add('dragging');
+        };
+
         item.addEventListener('dragstart', (e) => {
             draggedElement = item;
             e.dataTransfer.setData('text/plain', index);
             e.dataTransfer.effectAllowed = 'move';
             dragScroller.start(item);
 
-            setTimeout(() => {
-                item.classList.add('dragging');
-            }, 0);
+            setTimeout(markDragging, 0);
         });
+
+        item.addEventListener('drag', markDragging);
 
         item.addEventListener('dragend', () => {
             item.draggable = false;

@@ -31,7 +31,8 @@ def test_collection_type_map_covers_core_sections():
 def test_media_server_type_defaults_to_plex():
     assert get_media_server_type({}) == "plex"
     assert get_media_server_type({"media_server_type": "jellyfin"}) == "jellyfin"
-    assert get_media_server_type({"media_server_type": "emby"}) == "plex"
+    assert get_media_server_type({"media_server_type": "emby"}) == "emby"
+    assert get_media_server_type({"media_server_type": "nonsense"}) == "plex"
 
 def test_artwork_proxy_prefix_dispatch():
     assert artwork_proxy_prefix({"media_server_type": "plex"}) == "/proxy-art"
@@ -160,9 +161,18 @@ def test_pull_stats_jellyfin_branch(csrf_client):
     conn.close()
     try:
         fake_recent = [{'recently_added': [{'title': 'X', 'rating_key': '1', 'thumb': '', 'library_name': 'Movies'}]}]
+        fake_users = [
+            {'user_id': 'u1', 'username': 'Ann', 'friendly_name': 'Ann',
+             'email': 'ann@example.com', 'is_active': True},
+            {'user_id': 'u2', 'username': 'Bob', 'friendly_name': 'Bob',
+             'email': None, 'is_active': True},
+            {'user_id': 'u3', 'username': 'Cat', 'friendly_name': 'Cat',
+             'email': 'cat@example.com', 'is_active': False},
+        ]
         with patch("app.blueprints.stats.fetch_jellyfin_library_counts", return_value=[{'section_name': 'Movies', 'count': 5}]), \
              patch("app.blueprints.stats.fetch_recently_added_using_jellyfin", return_value=fake_recent), \
              patch("app.blueprints.stats.fetch_jellywatch_home_stats", return_value=[]), \
+             patch("app.blueprints.stats.fetch_jellyfin_users", return_value=fake_users), \
              patch("app.blueprints.stats.get_jellyfin_server_id", return_value="srv1"):
             resp = client.post("/pull_stats", json={"time_range": 30, "count": 10},
                                headers={"X-CSRF-Token": token})
@@ -173,6 +183,10 @@ def test_pull_stats_jellyfin_branch(csrf_client):
         assert data["stats"][0]["stat_id"] == "library_item_counts"
         assert data["graph_commands"] == []
         assert data["plex_unavailable"] is False
+        # only mapped AND active users become addressable, matching how the
+        # Plex path has always filtered its user list
+        assert data["user_dict"] == {"u1": "ann@example.com"}
+        assert len(data["users_full_data"]) == 3
     finally:
         conn = sqlite3.connect(config.DB_PATH)
         conn.execute("UPDATE settings SET media_server_type = 'plex', jellyfin_url = '', jellyfin_api_key = '' WHERE id = 1")
@@ -206,9 +220,48 @@ def test_fetch_jellyfin_users_normalized(app, seeded_settings):
         users = fetch_jellyfin_users()
 
     assert users == [
-        {"user_id": "u1", "friendly_name": "Ann", "email": None, "is_active": True},
-        {"user_id": "u2", "friendly_name": "Bob", "email": None, "is_active": False},
+        {"user_id": "u1", "username": "Ann", "friendly_name": "Ann", "email": None,
+         "is_active": True, "last_seen": ""},
+        {"user_id": "u2", "username": "Bob", "friendly_name": "Bob", "email": None,
+         "is_active": False, "last_seen": ""},
     ]
+
+def test_fetch_jellyfin_users_fills_email_from_the_local_mapping(app, seeded_settings):
+    import sqlite3
+    from app import config
+    from app.crypto import encrypt
+    from app.store import set_media_user_email
+
+    conn = sqlite3.connect(config.DB_PATH)
+    conn.execute(
+        "UPDATE settings SET jellyfin_url = ?, jellyfin_api_key = ? WHERE id = 1",
+        ("http://localhost:8096", encrypt("k")),
+    )
+    conn.commit()
+    conn.close()
+
+    class FakeResponse:
+        status_code = 200
+        def raise_for_status(self):
+            pass
+        def json(self):
+            return [
+                {"Id": "u1", "Name": "Ann", "Policy": {"IsDisabled": False}},
+                {"Id": "u2", "Name": "Bob", "Policy": {"IsDisabled": False}},
+            ]
+
+    set_media_user_email("u1", "Ann@Example.COM")
+    try:
+        with patch("app.clients.jellyfin.safe_get", return_value=FakeResponse()):
+            from app.clients.jellyfin import fetch_jellyfin_users
+            users = {u["user_id"]: u["email"] for u in fetch_jellyfin_users()}
+        assert users["u1"] == "ann@example.com"   # stored lowercased
+        assert users["u2"] is None                # unmapped users stay unaddressed
+    finally:
+        conn = sqlite3.connect(config.DB_PATH)
+        conn.execute("DELETE FROM media_user_emails")
+        conn.commit()
+        conn.close()
 
 def test_proxy_jf_art_unconfigured_400(client):
     import sqlite3

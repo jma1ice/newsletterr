@@ -47,7 +47,11 @@ def fetch_tautulli_data_for_email(tautulli_base_url, tautulli_api_key, date_rang
         {'command': 'get_stream_type_by_top_10_users', 'name': 'Stream Type by Top Users'}
     ]
     
-    jellyfin_active = get_media_server_type() == 'jellyfin'
+    server_type = get_media_server_type()
+    if server_type == 'none':
+        return data
+
+    jellyfin_active = server_type in ('jellyfin', 'emby')
 
     try:
         if jellyfin_active:
@@ -398,7 +402,11 @@ def get_yearly_wrapped_cached(use_cache=True):
 
         _s = get_settings(decrypt_secrets=False)
 
-        if get_media_server_type(_s) == 'jellyfin':
+        _server_type = get_media_server_type(_s)
+        if _server_type == 'none':
+            return None  # standalone mode has no watch history to wrap up
+
+        if _server_type in ('jellyfin', 'emby'):
             stats_data = fetch_jellywatch_home_stats(days=days_since_year_start()) or None
             if use_cache and stats_data:
                 set_cached_data('yearly_wrapped_json', stats_data, {'timestamp': time.time(), 'manual_fetch': True})

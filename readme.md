@@ -170,7 +170,7 @@ On first visit you will be asked to create a login (username and password), then
 | `NEWSLETTERR_SECRET_KEY` | Session signing key; auto-generated into `env/.env` so sessions survive restarts | generated |
 | `INTERNAL_TOKEN` | Token for the app's internal self-requests | generated per boot |
 | `PUID` / `PGID` | When the Docker container is started as root, the uid/gid to chown volumes to and drop privileges into (linuxserver.io convention) | container's built-in `app` user |
-| `DEMO_MODE` | Set to `1` for a public read-only showcase: auth is bypassed, changes are blocked with a banner, and the caches are seeded with sample data | `0` |
+| `DEMO_MODE` | Set to `1` for a public showcase: auth is bypassed (no login or logout), the app runs on a sample library so every page and the live preview have content, appearance/layout/email options apply to the visitor's session instead of being saved, and sends are answered with a notice | `0` |
 
 ---
 
@@ -246,6 +246,20 @@ When the **Custom HTML** toggle is on, you write the whole email yourself, but y
 
 Library names and stat titles are matched case-insensitively and may contain spaces (but not colons). Sections render from the data cached by the pull buttons, so pull first. A misspelled token never breaks the email; it is replaced with an HTML comment you can spot in the output source. Graph snap-ins are not available as tokens because their images are captured client-side per builder item.
 
+### Personalization tokens
+
+A second, unrelated kind of token that fills in the recipient's own details rather than a whole section. These work anywhere you can type: a text block, the message body, or custom HTML.
+
+| Token | Becomes |
+|---|---|
+| `{{name}}` | The recipient's saved name, e.g. "Ada Lovelace" |
+| `{{first_name}}` | Just the first word of it, e.g. "Ada" |
+| `{{email}}` | The address the email is going to |
+
+Names come from your saved contacts, which the CSV import fills in. A recipient with no saved name is greeted as "there", so `Hi {{name}},` reads as "Hi there," rather than "Hi ,".
+
+**A template using one of these sends individually to each recipient rather than as one BCC message**, because the content is no longer the same for everyone. That is slower on a large list, and the builder tells you when a token is in play. Snap-in tokens above do not do this: they render the same section for everyone.
+
 ---
 
 ## Development
@@ -253,7 +267,7 @@ Library names and stat titles are matched case-insensitively and may contain spa
 ```bash
 pip install -r requirements-dev.txt
 ruff check app/ newsletterr.py tests/   # lint
-pytest                                  # test suite, about two minutes
+pytest                                  # test suite, about six minutes
 ```
 
 The email pipeline is covered by golden-master tests: full MIME output is compared against fixtures in `tests/goldens/`. After an intentional change to email output, regenerate them with `UPDATE_GOLDENS=1 pytest tests/test_golden_sends.py` and review the diff.
@@ -294,15 +308,6 @@ Released under the **MIT License** - see [LICENSE](LICENSE.txt) for details.
 * GitHub webhook to pull submitted issues to Discord channel
 * Ko-fi -> Discord integration for contributor role
 * Servarr PR
-* Embed the demo on the website (the app-side DEMO_MODE flag ships in v2026.4)
-
-### Misc.
-* Finish jellyfin/emby integration
-* Pull more/different info on dn/wrapped
-* Appearance options: default landing page after login, calendar week-start day (Sun/Mon), date/time format (12/24h, MDY/DMY)
-* Layout coverage: classic/editorial/digest/spotlight treatments for the sections that still render legacy inside the variant layouts (recommendations, collections, graph chrome, per-user DroppedNeedle wrapped)
-* Single-renderer cleanup: remove the legacy client-side email preview builders in static/js/app/04-stats-graphs.js and their hand-mirrored copies in templates/schedule_preview.html now that /preview_email renders previews server-side (needs a browser pass over every snap-in preview first)
-* Skip-on-no-new needs to have more triggers
 
 ### Blocked on upstream
 * Email click for recently added/available recommendations is going to browser on mobile instead of Plex app - this is an issue with the new Plex client, have not seen a fix yet and no info released by Plex at this time
@@ -311,6 +316,39 @@ Released under the **MIT License** - see [LICENSE](LICENSE.txt) for details.
 ---
 
 ## Recent Changes
+
+## v2026.4.4:
+
+#### New Features:
+* Standalone mode: run newsletterr with no media server at all, as a plain mailing list tool. Setup now asks which you want, and the media snap-ins stay out of the builder
+* Import recipient lists from a CSV or by pasting addresses, with names picked up alongside them. Accepts a header row or none, tabs or commas, and the "Name &lt;address&gt;" form mail clients produce
+* Every rejected row from an import is reported with its line number, and addresses that have unsubscribed cannot come back in through a file
+* Export any saved list as a CSV
+* Link Jellyfin users to email addresses. Jellyfin does not store them, so importing a list with names links what it can automatically, and Settings has a table to fill in or correct the rest
+* Once linked, per-user recommendations, per-user DroppedNeedle wrapped and personalized sends work on Jellyfin the same way they do on Plex
+* Default landing page after login
+* Calendar week can start on Sunday or Monday, in the scheduling calendar and in the Coming Soon calendar view
+* Date and time format settings (month/day/year, day/month/year or year/month/day, and 12 or 24 hour), applied everywhere a date is shown to a reader including sent emails
+* Skip-on-no-new now lets you pick which sections count as new content, across recently added, most watched, recently released, both Coming Soon snap-ins and both request snap-ins
+* Skip-on-no-new also takes a minimum item count, so a schedule can wait for a week worth mailing about rather than firing on a single item
+* Album art on the DroppedNeedle wrapped card, matched from the music database
+* Choose which DroppedNeedle lists appear (artists, tracks, albums, genres) and how many rows each one shows
+* Extra Year in Review highlights: popular movie, popular show, top platform, top library and peak streams
+* Year in Review can show the top 1, 3 or 5 of each highlight instead of just the winner
+* **Emby support, untested.** Jellyfin forked from Emby, so they speak nearly the same API and share one client here, but this was written against Emby's documentation rather than verified against a real server. Pick it in Settings under Media Server and use the Jellyfin fields for the URL and API key. Reports of what breaks are very welcome
+* Graphs on Jellyfin and Emby, via the Playback Reporting plugin. Jellywatch keeps no history over time, so graphs need that plugin installed on your server; it reuses the URL and API key you already entered. Offers Plays by Date, by Day, by Hour, by Top Users and by Top Platforms. The other Plex graphs have no equivalent in the plugin and are not offered, and if the plugin is missing the graph list simply stays empty
+* Most Watched now works on Jellyfin, via Jellywatch. Note it groups by media type (Movies, TV Shows, Music) rather than per library, because Jellywatch reports play counts by type; the counts are server-wide, which is what the section means on Plex
+* The inactive-recipient filter now works on Jellyfin too, using each account's last activity date. It still fails open everywhere: if the server cannot be asked, nobody is filtered out of a send
+* Personalization tokens: `{{name}}`, `{{first_name}}` and `{{email}}` in any text block or custom HTML, filled in per recipient from your saved contacts. A template using one sends individually rather than as one BCC message, and the builder says so while you write it
+* New scheduling option: skip the send when the email would come out empty. A catch-all next to the per-section triggers, for when every section returns nothing. Headers, footers and text blocks do not count as content, and a section showing "no items found" counts as empty rather than as content
+* Demo mode is now an actual demo: it runs on a sample library (recently added, stats, graphs, recommendations, wrapped, coming soon and requests, with placeholder artwork), the builder opens with a newsletter already assembled, and the live preview renders it for real. Appearance, UI theme, email theme, layout and density can all be switched on the Settings page and take effect immediately for that visitor without saving anything
+
+#### Fixed:
+* The per-user DroppedNeedle wrapped card ignored the email layout, rendering the same plain lists under editorial, digest and spotlight instead of matching the rest of the email
+* Recommendations, collections and graphs also ignored the email layout, so a classic, editorial, digest or spotlight email had sections that did not match the rest of it. Every data section now follows the layout you picked
+* Jellyfin never loaded a user list, so recipients could not be pulled from the server and no per-user section had anyone to address
+* The wrapped card fell back to a numeric user id when there was no Tautulli user list to read a name from, which was every Jellyfin install
+* Demo mode showed a logout button that emptied the session and dropped the visitor into first-run setup, and the live preview came back empty because the render request was blocked as a write
 
 ## v2026.4.3:
 
@@ -341,35 +379,6 @@ Released under the **MIT License** - see [LICENSE](LICENSE.txt) for details.
 * Clicking the center of an icon button did nothing, only the edge worked
 * Year in Plex posters rendered full size in the legacy layout at expanded density
 * Live preview refetched expanded collections from Plex on every edit, making it lag seconds behind
-
-## v2026.4.2:
-
-#### New Features:
-* Recommendations snap-in rows show how many movies and shows were pulled for each user, and the Add button is disabled when conjurr returned nothing
-* Show/hide setting for recommendation descriptions, matching the Recently Added option
-* Recently Added and Most Watched snap-ins keep their per-library count editable after they are added to the email body
-* Recently Added snap-ins can be forced to a horizontal grid or a vertical list, per snap-in, in any layout
-* The Spotlight layout's featured title is selectable per Recently Added snap-in instead of always being the newest item
-* Header Eyebrow Text setting for the small uppercase line in the Editorial and Spotlight layouts
-* Auto Header Text setting (off by default) for whether a blank header title falls back to newsletterr's stock wording
-
-#### Fixed:
-* Jinja page issue was blocking recommendations list from pulling
-* Non-legacy layouts were using last streamed in place of user name in most active users stat card
-* Compact Digest capped Recently Added at six posters in a single row and ignored the grid column setting
-
-## v2026.4.1:
-
-#### New Features:
-* Option in settings for solid or gradient email header background
-* New simple stylized Spotlight email layout
-* New 'Top Viewer' snap-in
-* New 'Featured Pick' snap-in
-
-#### Fixed:
-* Images were missing in new layouts
-* Cache Badge status was only updating on refresh
-* Text was moving to title of snap-in on reload
 
 ---
 

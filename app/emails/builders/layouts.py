@@ -12,6 +12,7 @@ All markup is email-safe: tables, inline styles, no flex/grid.
 """
 from datetime import datetime
 
+from app import dates
 from app.emails.builders.card_grid import (
     format_relative_date as _relative,
     empty_state_html as _empty_state_html,
@@ -41,7 +42,19 @@ from app.emails.builders.random_pick import (
     random_pick_meta_text,
     attach_random_pick_poster,
 )
-from app.emails.builders.seerr_requests import filter_seerr_pending, TMDB_POSTER_BASE
+from app.emails.builders.users import get_user_display_name
+from app.emails.builders.recommendations import (
+    wrapped_album_art_fn,
+    wrapped_display_name,
+    wrapped_lists,
+)
+from app.emails.builders.seerr_requests import filter_seerr_pending, _poster_src as _request_poster_src
+from app.emails.builders.stats import (
+    WRAPPED_EXTRA_STATS,
+    _row_label,
+    parse_wrapped_extras,
+    ranked_value,
+)
 from app.emails.builders.top_viewer import (
     ANONYMOUS_SUBJECT,
     attach_top_viewer_avatar,
@@ -450,7 +463,7 @@ def _wrapped_tops(stats_data):
                 total += int(row.get('total_plays', 0) or 0)
     return first_row('Most Watched Movies'), first_row('Most Watched TV Shows'), first_row('Most Played Artists'), first_row('Most Active Users'), total
 
-def render_wrapped(layout, stats_data, msg_root, theme, year=None, base_url="", include_user_info=True, hosted_images_enabled=False, hosted_base_url=""):
+def render_wrapped(layout, stats_data, msg_root, theme, year=None, base_url="", include_user_info=True, hosted_images_enabled=False, hosted_base_url="", extra_stats=(), rank_depth=1):
     if not stats_data:
         return ""
     top_movie, top_show, top_artist, top_user, total_plays = _wrapped_tops(stats_data)
@@ -483,15 +496,28 @@ def render_wrapped(layout, stats_data, msg_root, theme, year=None, base_url="", 
         return (f'<img src="{src}" alt="" width="{art_w}" style="width: {art_w}px; height: auto; '
                 f'border-radius: 4px; display: block; margin: 4px auto 5px auto;">')
 
+    def ranked(stat_title, fallback):
+        return ranked_value(stats_data, stat_title, fallback, rank_depth)
+
     highlights = []
     if top_movie:
-        highlights.append((f"{icon('film')} Top Movie", top_movie.get('title', ''), art(top_movie, 'l-wrapped-movie')))
+        highlights.append((f"{icon('film')} Top Movie", ranked('Most Watched Movies', top_movie.get('title', '')), art(top_movie, 'l-wrapped-movie')))
     if top_show:
-        highlights.append((f"{icon('tv')} Top Show", top_show.get('title', ''), art(top_show, 'l-wrapped-show')))
+        highlights.append((f"{icon('tv')} Top Show", ranked('Most Watched TV Shows', top_show.get('title', '')), art(top_show, 'l-wrapped-show')))
     if top_artist:
-        highlights.append((f"{icon('music')} Top Artist", top_artist.get('title', ''), art(top_artist, 'l-wrapped-artist')))
+        highlights.append((f"{icon('music')} Top Artist", ranked('Most Played Artists', top_artist.get('title', '')), art(top_artist, 'l-wrapped-artist')))
     if top_user and include_user_info:
-        highlights.append((f"{icon('users')} Most Active", top_user.get('user', ''), art(top_user, 'l-wrapped-user', round_=True)))
+        highlights.append((f"{icon('users')} Most Active", ranked('Most Active Users', top_user.get('user', '')), art(top_user, 'l-wrapped-user', round_=True)))
+
+    for key in parse_wrapped_extras(extra_stats):
+        stat_title, label, icon_name = WRAPPED_EXTRA_STATS[key]
+        rows = next((s['rows'] for s in stats_data or []
+                     if s.get('stat_title') == stat_title and s.get('rows')), [])
+        first = _row_label(rows[0]) if rows else ''
+        if not first:
+            continue
+        highlights.append((f"{icon(icon_name)} {label}", ranked(stat_title, first), art(rows[0], f'l-wrapped-{key}')))
+
     if not highlights and not total_plays:
         return ""
 
@@ -1035,7 +1061,7 @@ def render_sonarr_coming_soon(layout, episodes, msg_root, theme, base_url="", gr
     rows = ""
     for group in groups:
         title, sub, when, _series, _first = entry(group)
-        date_label = _short_date(when)
+        date_label = _short_date(when, dates.date_format_of(theme))
         if layout == 'editorial':
             rows += _dated_row(theme, date_label, title, sub)
         else:
@@ -1071,7 +1097,7 @@ def render_radarr_coming_soon(layout, movies, msg_root, theme, base_url="", grid
 
     rows = ""
     for movie in upcoming:
-        date_label = _short_date(str(upcoming_release_date(movie) or ''))
+        date_label = _short_date(str(upcoming_release_date(movie) or ''), dates.date_format_of(theme))
         title = movie.get('title', 'Unknown')
         sub = str(movie.get('year') or '')
         if layout == 'editorial':
@@ -1082,12 +1108,12 @@ def render_radarr_coming_soon(layout, movies, msg_root, theme, base_url="", grid
         return _shell(layout, theme, "Coming Soon (Movies)", rows, overline="Mark the calendar")
     return _shell(layout, theme, "Coming Soon (Movies)", rows)
 
-def _short_date(date_str):
+def _short_date(date_str, fmt=dates.DEFAULT_DATE_FORMAT):
     if not date_str:
         return ""
     try:
         dt = datetime.fromisoformat(str(date_str).replace('Z', '+00:00'))
-        return dt.strftime('%b %-d')
+        return dates.fmt_month_day(dt, fmt)
     except Exception:
         return ""
 
@@ -1162,6 +1188,250 @@ def render_dn_server(layout, server_data, theme):
     inner = f'<table width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td valign="top" width="50%" style="padding-right: 6px;">{left}</td><td valign="top" width="50%" style="padding-left: 6px;">{right}</td></tr></table>'
     return _shell(layout, theme, "Listening &middot; DroppedNeedle", inner)
 
+def render_dn_wrapped(layout, wrapped_data, msg_root, theme, user_emails=None, display_preference='email', users_full_data=None, options=None, base_url="", hosted_images_enabled=False, hosted_base_url=""):
+    if not wrapped_data:
+        return ""
+
+    options = dict(options or {})
+    p = density.picker(theme, layout)
+    art_on = density.show_art(theme, layout) and options.get('cover_art')
+    variant_cap = density.picker3(theme, layout)(3, 5, 5)
+    configured = options.get('item_count') or 0
+    options['item_count'] = min(configured, variant_cap) if configured else variant_cap
+    options['cover_art'] = bool(art_on)
+
+    out = ""
+    for user_id, payload in wrapped_data.items():
+        if user_emails and str(user_id) not in {str(k) for k in user_emails}:
+            continue
+        if not payload or not payload.get('has_data'):
+            continue
+
+        display_name = wrapped_display_name(user_id, payload, user_emails, display_preference, users_full_data)
+        year = payload.get('year', '')
+        label = f"{display_name}'s {year} Wrapped".replace("  ", " ").strip()
+        summary = (f"~{payload.get('total_listens_estimated', 0)} plays tracked &middot; "
+                   f"{payload.get('loved_tracks_count', 0)} loved tracks")
+
+        art_fn = None
+        if art_on:
+            art_fn = wrapped_album_art_fn(msg_root, base_url, user_id, hosted_images_enabled, hosted_base_url)
+
+        inner = ""
+        for title, items, label_fn, is_album in wrapped_lists(payload, options):
+            if not items:
+                continue
+            if layout == 'digest':
+                rows = "".join(
+                    _digest_row(theme, esc(label_fn(item)), f'{item.get("listen_count", 0)}')
+                    for item in items
+                )
+                inner += (f'<div style="padding: {p("8px 0 2px 0", "4px 0 0 0")}; font-size: 11px; '
+                          f'letter-spacing: .1em; text-transform: uppercase; '
+                          f'color: {theme["muted_text"]}; font-family: {FONT};">{esc(title)}</div>{rows}')
+                continue
+
+            rows = ""
+            for i, item in enumerate(items):
+                src = art_fn(item, i) if (is_album and art_fn) else None
+                thumb = (f'<td width="34" valign="middle" style="padding-right: 10px;">'
+                         f'<img src="{src}" alt="" width="34" style="width: 34px; height: auto; '
+                         f'display: block; border-radius: 3px;"></td>') if src else ''
+                rows += f"""
+                    <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+                        {thumb}
+                        <td valign="middle" style="padding: {p('4px 0', '6px 0')}; font-size: {p('12px', '13px')};
+                            color: {theme['text']}; font-family: {FONT};">
+                            <span style="color: {theme['muted_text']};">{i + 1}</span>
+                            &nbsp;{esc(label_fn(item))}
+                        </td>
+                        <td align="right" valign="middle" style="padding: {p('4px 0', '6px 0')};
+                            font-size: {p('11px', '12px')}; color: {theme['muted_text']}; font-family: {FONT};">
+                            {item.get('listen_count', 0)}
+                        </td>
+                    </tr></table>
+                """
+            inner += (f'<div style="padding: {p("8px 0 2px 0", "10px 0 2px 0")}; font-size: 11px; '
+                      f'letter-spacing: .1em; text-transform: uppercase; '
+                      f'color: {theme["muted_text"]}; font-family: {FONT};">{esc(title)}</div>{rows}')
+
+        if not inner:
+            continue
+
+        inner = (f'<div style="padding-bottom: {p("4px", "8px")}; font-size: {p("11.5px", "12px")}; '
+                 f'color: {theme["muted_text"]}; font-family: {FONT};">{summary}</div>{inner}')
+
+        if layout == 'editorial':
+            out += _shell(layout, theme, label, inner, overline="Liner notes &middot; DroppedNeedle")
+        else:
+            out += _shell(layout, theme, label, inner, "DroppedNeedle" if layout in _CARD_LAYOUTS else "")
+
+    return out
+
+# ------------------------------------------------- recommendations
+
+def render_recommendations(layout, recs_data, msg_root, theme, user_emails=None, base_url="",
+                           display_preference='email', users_full_data=None, recs_grid_columns=5,
+                           poster_max_height=0, hosted_images_enabled=False, hosted_base_url="",
+                           show_description=True):
+    if not recs_data:
+        return ""
+
+    p = density.picker(theme, layout)
+    art_on = density.show_art(theme, layout)
+    out = ""
+
+    for user_id, user_recs in (recs_data or {}).items():
+        if user_emails and str(user_id) not in {str(k) for k in user_emails}:
+            continue
+
+        if users_full_data:
+            display_name = get_user_display_name(user_id, users_full_data, display_preference)
+        elif user_emails:
+            display_name = user_emails.get(str(user_id), str(user_id))
+        else:
+            display_name = str(user_id)
+
+        groups = [
+            ("Recommended Movies", user_recs.get('movie_posters') or [],
+             user_recs.get('movie_posters_unavailable') or [], 'mv'),
+            ("Recommended TV Shows", user_recs.get('show_posters') or [],
+             user_recs.get('show_posters_unavailable') or [], 'tv'),
+        ]
+        if not any(available or unavailable for _t, available, unavailable, _k in groups):
+            continue
+
+        inner = ""
+        for title, available, unavailable, kind in groups:
+            items = list(available) + list(unavailable)
+            if not items:
+                continue
+            available_count = len(available)
+
+            def _meta(index, item):
+                bits = []
+                if item.get('vote'):
+                    bits.append(f"{item['vote']}")
+                if index >= available_count:
+                    bits.append("not on the server")
+                return ' · '.join(bits)
+
+            if layout == 'digest':
+                rows = "".join(
+                    _digest_row(theme, esc(item.get('title', 'Unknown')),
+                                esc(_meta(i, item) or str(item.get('year') or '')))
+                    for i, item in enumerate(items)
+                )
+                inner += (f'<div style="padding: {p("8px 0 2px 0", "4px 0 0 0")}; font-size: 11px; '
+                          f'letter-spacing: .1em; text-transform: uppercase; '
+                          f'color: {theme["muted_text"]}; font-family: {FONT};">{esc(title)}</div>{rows}')
+                continue
+
+            if layout in _CARD_LAYOUTS:
+                cards = []
+                for i, item in enumerate(items):
+                    src = None
+                    if item.get('url') and art_on:
+                        src = fetch_and_attach_image(
+                            item['url'], msg_root, f"l-recs-{kind}-{user_id}-{i}", base_url,
+                            hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
+                    overview = (item.get('overview') or '')[:60] if show_description else ''
+                    cards.append(_build_card_html(
+                        theme, truncate_text(item.get('title', 'Unknown'), 23),
+                        str(item.get('year') or ''), truncate_text(_meta(i, item), 46),
+                        src, extra_line=truncate_text(overview, 46) if overview else None,
+                        compact=not art_on))
+                inner += _shell(layout, theme, title,
+                                _grid(cards, density.columns(theme, layout, max(1, int(recs_grid_columns or 5)))))
+                continue
+
+            # editorial: dated-row treatment, the same one its coming-soon uses
+            rows = ""
+            for i, item in enumerate(items):
+                rows += _dated_row(theme, str(item.get('year') or ''),
+                                   item.get('title', 'Unknown'), _meta(i, item))
+            inner += _shell(layout, theme, title, rows, overline="Picked for you")
+
+        if not inner:
+            continue
+
+        label = f"{display_name}'s Recommendations"
+        if layout in _CARD_LAYOUTS:
+            # the per-group shells already carry their own chrome here, so the
+            # user heading is a lead-in rather than a second nested card
+            out += (f'<div style="padding: {p("10px 0 2px 0", "14px 0 4px 0")}; font-size: 12px; '
+                    f'letter-spacing: .08em; text-transform: uppercase; '
+                    f'color: {theme["muted_text"]}; font-family: {FONT};">{esc(label)}</div>{inner}')
+        elif layout == 'editorial':
+            out += inner
+        else:
+            out += _shell(layout, theme, label, inner)
+
+    return out
+
+# ----------------------------------------------------- collections
+
+def render_collections(layout, all_collections, msg_root, theme, base_url="", custom_title=None,
+                       expanded_collections=None, group_index=0, poster_max_height=0,
+                       grid_columns=5, hosted_images_enabled=False, hosted_base_url=""):
+    from app.emails.builders.collections import resolve_collection_items
+
+    items = resolve_collection_items(all_collections, expanded_collections, group_index)
+    label = custom_title or "Collections"
+    if not items:
+        return _shell(layout, theme, label, _empty_state_html(theme, "No collections available."))
+
+    p = density.picker(theme, layout)
+    art_on = density.show_art(theme, layout)
+
+    def _title(item):
+        return item.get('title') or 'Unknown'
+
+    def _sub(item):
+        if item.get('is_individual_item'):
+            return item.get('original_collection') or ''
+        count = item.get('childCount') or item.get('size') or ''
+        return f"{count} items" if count else ''
+
+    if layout == 'digest':
+        rows = "".join(_digest_row(theme, esc(_title(i)), esc(_sub(i))) for i in items)
+        return _shell(layout, theme, label, rows)
+
+    if layout in _CARD_LAYOUTS:
+        cards = []
+        for i, item in enumerate(items):
+            src = None
+            thumb = item.get('thumb')
+            if thumb and art_on:
+                path = thumb if str(thumb).startswith('/proxy-art') else f"/proxy-art{thumb}"
+                src = fetch_and_attach_image(
+                    path, msg_root, f"l-coll-{group_index}-{i}", base_url,
+                    hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
+            cards.append(_build_card_html(
+                theme, truncate_text(_title(item), 23), truncate_text(_sub(item), 30),
+                str(item.get('year') or ''), src, compact=not art_on))
+        return _shell(layout, theme, label,
+                      _grid(cards, density.columns(theme, layout, max(1, int(grid_columns or 5)))))
+
+    rows = ""
+    for item in items:
+        rows += _dated_row(theme, str(item.get('year') or ''), _title(item), _sub(item))
+    return _shell(layout, theme, label, rows, overline="From the shelves")
+
+# ---------------------------------------------------------- graph
+
+def render_graph(layout, item, msg_root, theme, hosted_images_enabled=False, hosted_base_url=""):
+    from app.emails.blocks import build_graph_html_with_frontend_image
+
+    inner = build_graph_html_with_frontend_image(
+        item, msg_root, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
+    if not inner.strip():
+        return ""
+    label = item.get('name') or 'Graph'
+    if layout == 'editorial':
+        return _shell(layout, theme, label, inner, overline="By the numbers")
+    return _shell(layout, theme, label, inner)
+
 # ---------------------------------------------------------------- requests
 
 def render_requests(layout, source, data, msg_root, theme, base_url="", grid_columns=5, include_user_info=True, hosted_images_enabled=False, hosted_base_url=""):
@@ -1173,10 +1443,11 @@ def render_requests(layout, source, data, msg_root, theme, base_url="", grid_col
     art_on = density.show_art(theme, layout)
 
     def poster_src(entry, i):
-        poster = entry.get('poster')
-        if not poster or not art_on:
+        # one TMDB resolution for both request builders and both layouts paths,
+        # so the demo's local poster paths are not re-prefixed here
+        url = _request_poster_src(entry.get('poster')) if art_on else None
+        if not url:
             return None
-        url = poster if poster.startswith('http') else f"{TMDB_POSTER_BASE}{poster}"
         return fetch_and_attach_image(url, msg_root, f"l-{source}-{i}", base_url, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
 
     if layout in _CARD_LAYOUTS:

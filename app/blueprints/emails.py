@@ -1,12 +1,17 @@
+import re
 import secrets
 
 from datetime import datetime, timezone
 from flask import Blueprint, Response, jsonify, redirect, render_template, request, session, url_for
 
+from app import dates
 from app.db import db_connect
 from app.settings_store import get_settings
 from app.security import require_csrf_for_json, requires_auth, json_body
-from app.store import get_saved_email_lists, save_email_list, delete_email_list, get_suppressed_emails, remove_suppressed
+from app.store import get_saved_email_lists, save_email_list, delete_email_list, get_suppressed_emails, remove_suppressed, get_contacts, add_contacts, delete_contact, get_media_user_emails, set_media_user_emails
+from app.contacts_import import contacts_to_csv, is_email, match_contacts_to_users, normalize_email, parse_contacts
+from app.clients.jellyfin import fetch_jellyfin_users
+from app.clients.mediaserver import get_media_server_type, is_jellyfin_like, media_user_scope
 from app.emails.send import SendRequest, send_standard_email_with_cids, send_recommendations_email_with_cids, resend_email_from_history
 from app.emails.preview import render_preview_email
 from app.emails.pdf import render_html_to_pdf, render_history_email_to_pdf, pdf_filename
@@ -151,12 +156,17 @@ def email_history():
         emails = cursor.fetchall()
         conn.close()
 
+        _time_format = dates.resolve_time_format(get_settings(decrypt_secrets=False).get('time_format'))
+
         email_list = []
         for email in emails:
             try:
                 utc_dt = datetime.fromisoformat(email[5].replace('Z', '+00:00'))
                 local_dt = utc_dt.replace(tzinfo=timezone.utc).astimezone()
-                formatted_time = local_dt.strftime('%Y-%m-%d %I:%M:%S %p')
+                # The date half stays ISO on purpose: this is a sortable log
+                # column, so it follows the clock setting but not the date-order
+                # one, the same way filenames and API parameters do.
+                formatted_time = f"{dates.fmt_iso_date(local_dt)} {dates.fmt_time(local_dt, _time_format, seconds=True)}"
             except:
                 logger.debug("suppressed exception; using fallback", exc_info=True)
                 formatted_time = email[5]
@@ -271,6 +281,194 @@ def delete_email_list_route(list_id):
         delete_email_list(list_id)
         return jsonify({"status": "success", "message": "List deleted successfully"})
     except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+MAX_IMPORT_BYTES = 2 * 1024 * 1024
+
+def _import_payload():
+    upload = request.files.get('file')
+    require_csrf_for_json()
+    if upload is not None:
+        raw = upload.read(MAX_IMPORT_BYTES + 1)
+        if len(raw) > MAX_IMPORT_BYTES:
+            return None, (jsonify({"status": "error", "message": "File is too large (2 MB limit)"}), 413)
+        text = raw.decode('utf-8', errors='replace')
+    else:
+        data = request.get_json(silent=True) or {}
+        text = (data.get('text') or '')[:MAX_IMPORT_BYTES]
+
+    if not text.strip():
+        return None, (jsonify({"status": "error", "message": "Nothing to import"}), 400)
+    return text, None
+
+@bp.route('/email_lists/import', methods=['POST'])
+@requires_auth
+def import_into_new_email_list():
+    try:
+        name = ((request.form.get('name') if request.files.get('file') is not None
+                 else (request.get_json(silent=True) or {}).get('name')) or '').strip()
+        if not name:
+            return jsonify({"status": "error", "message": "A list name is required"}), 400
+
+        text, err = _import_payload()
+        if err:
+            return err
+
+        conn = db_connect()
+        row = conn.execute("SELECT id FROM email_lists WHERE name = ?", (name,)).fetchone()
+        conn.close()
+        if row:
+            list_id = row[0]
+        else:
+            # created empty, then filled: add_contacts rewrites the address
+            # column from the contact rows, so the two cannot drift
+            save_email_list(name, '')
+            conn = db_connect()
+            created = conn.execute("SELECT id FROM email_lists WHERE name = ?", (name,)).fetchone()
+            conn.close()
+            if not created:
+                return jsonify({"status": "error", "message": f"Could not create list '{name}'"}), 500
+            list_id = created[0]
+
+        payload = _run_import(list_id, text)
+        payload['list_id'] = list_id
+        payload['list_name'] = name
+        return jsonify(payload)
+    except Exception as e:
+        logger.error(f"Error importing into a new list: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@bp.route('/email_lists/<int:list_id>/import', methods=['POST'])
+@requires_auth
+def import_email_list(list_id):
+    try:
+        conn = db_connect()
+        row = conn.execute("SELECT id FROM email_lists WHERE id = ?", (list_id,)).fetchone()
+        conn.close()
+        if not row:
+            return jsonify({"status": "error", "message": "List not found"}), 404
+
+        text, err = _import_payload()
+        if err:
+            return err
+
+        return jsonify(_run_import(list_id, text))
+    except Exception as e:
+        logger.error(f"Error importing contacts: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+def _run_import(list_id, text):
+    existing = [c['email'] for c in get_contacts(list_id)]
+    suppressed = [r['email'] for r in (get_suppressed_emails() or [])]
+
+    result = parse_contacts(text, existing=existing, suppressed=suppressed)
+    added = add_contacts(list_id, result['contacts']) if result['contacts'] else 0
+
+    linked = 0
+    if result['contacts'] and get_media_server_type() in ('jellyfin', 'emby'):
+        try:
+            # keyed by the active server: Jellyfin and Emby user ids are
+            # unrelated, so a mapping made on one must not be read on the other
+            scope = media_user_scope()
+            mapping = match_contacts_to_users(
+                result['contacts'], fetch_jellyfin_users(),
+                existing=get_media_user_emails(scope))
+            linked = set_media_user_emails(mapping, scope)
+        except Exception:
+            logger.warning("Jellyfin auto-link after import failed", exc_info=True)
+
+    return {
+        "status": "success",
+        "added": added,
+        "duplicate": len(result['duplicate']),
+        "suppressed": len(result['suppressed']),
+        "linked": linked,
+        "invalid": [{"line": line, "text": text_} for line, text_ in result['invalid'][:20]],
+        "invalid_count": len(result['invalid']),
+    }
+
+@bp.route('/email_lists/<int:list_id>/export', methods=['GET'])
+@requires_auth
+def export_email_list(list_id):
+    try:
+        conn = db_connect()
+        row = conn.execute("SELECT name FROM email_lists WHERE id = ?", (list_id,)).fetchone()
+        conn.close()
+        if not row:
+            return jsonify({"status": "error", "message": "List not found"}), 404
+
+        safe_name = re.sub(r'[^A-Za-z0-9._-]+', '-', row[0] or 'list').strip('-') or 'list'
+        return Response(
+            contacts_to_csv(get_contacts(list_id)),
+            mimetype='text/csv',
+            headers={'Content-Disposition': f'attachment; filename="{safe_name}-contacts.csv"'},
+        )
+    except Exception as e:
+        logger.error(f"Error exporting contacts: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@bp.route('/email_lists/<int:list_id>/contacts', methods=['GET'])
+@requires_auth
+def list_contacts(list_id):
+    try:
+        return jsonify({"status": "success", "contacts": get_contacts(list_id)})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@bp.route('/contacts/<int:contact_id>', methods=['DELETE'])
+@requires_auth
+def delete_contact_route(contact_id):
+    require_csrf_for_json()
+    try:
+        if delete_contact(contact_id):
+            return jsonify({"status": "success"})
+        return jsonify({"status": "error", "message": "Contact not found"}), 404
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@bp.route('/media_user_emails', methods=['GET'])
+@requires_auth
+def get_media_user_email_map():
+    try:
+        if not is_jellyfin_like():
+            return jsonify({"status": "success", "users": []})
+        mapped = get_media_user_emails(media_user_scope())
+        users = [
+            {
+                'user_id': u['user_id'],
+                'username': u.get('username') or u.get('friendly_name') or u['user_id'],
+                'email': mapped.get(u['user_id'], ''),
+                'is_active': u.get('is_active', True),
+            }
+            for u in (fetch_jellyfin_users() or [])
+        ]
+        return jsonify({"status": "success", "users": users})
+    except Exception as e:
+        logger.error(f"Error listing media user emails: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@bp.route('/media_user_emails', methods=['POST'])
+@requires_auth
+def save_media_user_email_map():
+    require_csrf_for_json()
+    try:
+        data = request.get_json(silent=True) or {}
+        mapping = data.get('mapping')
+        if not isinstance(mapping, dict):
+            return jsonify({"status": "error", "message": "Expected a mapping object"}), 400
+
+        cleaned = {}
+        for user_id, email in mapping.items():
+            email = (email or '').strip()
+            if email and not is_email(normalize_email(email)):
+                return jsonify({"status": "error",
+                                "message": f"'{email}' is not a valid email address"}), 400
+            cleaned[str(user_id)] = normalize_email(email) if email else ''
+
+        set_media_user_emails(cleaned, media_user_scope())
+        return jsonify({"status": "success", "linked": sum(1 for v in cleaned.values() if v)})
+    except Exception as e:
+        logger.error(f"Error saving media user emails: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @bp.route('/suppressed_emails', methods=['GET'])

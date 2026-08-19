@@ -34,6 +34,8 @@ async function buildEmailPayload() {
 }
 
 function describeSendResult(data, fallbackCount) {
+    // demo mode answers 200 with a notice instead of sending anything
+    if (data.demo) return data.message;
     if (Array.isArray(data.sent_groups)) {
         const n = data.sent_groups.length;
         return `Email sent to ${n} user group${n !== 1 ? 's' : ''}.`;

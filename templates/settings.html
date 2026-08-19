@@ -164,10 +164,13 @@
                             <h6 class="text-uppercase">Media Server</h6>
                             <label for="media_server_type">Active media server (drives stats, recently added, artwork, and deep links):</label><br>
                             <select id="media_server_type" name="media_server_type" class="w-field">
-                                <option value="plex" {% if settings.media_server_type != 'jellyfin' %}selected{% endif %}>Plex</option>
+                                <option value="plex" {% if settings.media_server_type not in ('jellyfin', 'none') %}selected{% endif %}>Plex</option>
                                 <option value="jellyfin" {% if settings.media_server_type == 'jellyfin' %}selected{% endif %}>Jellyfin</option>
+                                <option value="emby" {% if settings.media_server_type == 'emby' %}selected{% endif %}>Emby</option>
+                                <option value="none" {% if settings.media_server_type == 'none' %}selected{% endif %}>None (standalone mailing list)</option>
                             </select><br>
-                            <small class="form-text text-muted">Plex pairs with Tautulli for stats; Jellyfin pairs with Jellywatch. Requests via Jellyseerr work through the Seerr connection below.</small>
+                            <small class="form-text text-muted">Plex pairs with Tautulli for stats; Jellyfin pairs with Jellywatch. Requests via Jellyseerr work through the Seerr connection below. Choosing None turns newsletterr into a plain mailing-list tool: the media snap-ins disappear from the builder and nothing is pulled from a server.
+                            <br><br><strong>Emby is untested.</strong> Jellyfin forked from Emby, so they speak nearly the same API and share one client here, but this has been written against Emby's documentation rather than verified against a real server. Use the Jellyfin fields below for its URL and API key. Please report what breaks.</small>
                         </div>
 
                         <div class="settings-field-group settings-group-card">
@@ -197,7 +200,7 @@
                         </div>
 
                         <div class="settings-field-group settings-group-card">
-                            <h6 class="text-uppercase">Jellyfin</h6>
+                            <h6 class="text-uppercase">Jellyfin / Emby</h6>
                             <label for="jellyfin_url">Jellyfin Base URL (for stats, recently added, artwork when Jellyfin is the media server):</label><br>
                             <input type="text" id="jellyfin_url" name="jellyfin_url"
                                 {% if settings.jellyfin_url != "" %}value="{{ settings.jellyfin_url }}"{% endif %}
@@ -212,11 +215,45 @@
                             <input type="text" id="jellyfin_web_url" name="jellyfin_web_url"
                                 {% if settings.jellyfin_web_url != "" %}value="{{ settings.jellyfin_web_url }}"{% endif %}
                                 placeholder="https://your-jellyfin-domain" class="w-field"><br>
-                            <p class="text-info mt-2 field-hint">Jellyfin does not store user email addresses, so per-user sends and recommendations stay Plex-only; manage Jellyfin recipient lists manually under Email Lists. Requests are handled through Jellyseerr in the Seerr card below.</p>
+                            <p class="text-info mt-2 field-hint">Jellyfin does not store user email addresses. Link them below and per-user sends, recommendations and wrapped cards work the same way they do on Plex. Requests are handled through Jellyseerr in the Seerr card below.</p>
                             <div class="svc-test">
                                 <button type="button" id="test_jellyfin" class="nl-btn nl-btn--primary nl-btn--sm">Test Connection</button>
                                 <span id="jellyfin_test_result"></span>
                             </div>
+                        </div>
+
+                        <div class="settings-field-group settings-group-card" id="jf-user-emails-card"
+                             {% if settings.media_server_type != 'jellyfin' %}style="display:none;"{% endif %}>
+                            <h6 class="text-uppercase">Jellyfin User Emails</h6>
+                            <p class="text-info field-hint">
+                                One address per Jellyfin account. Importing a recipient list that carries
+                                names fills these in automatically where a name matches an account exactly;
+                                anything it could not match, or matched wrongly, you can fix here. Clearing
+                                an address unlinks that user, who is then simply left out of per-user sections.
+                            </p>
+                            <div id="jf-user-emails-list" class="mt-2"></div>
+                            <div class="mt-2">
+                                <button type="button" id="jf-user-emails-save" class="nl-btn nl-btn--primary nl-btn--sm">Save Links</button>
+                                <button type="button" id="jf-user-emails-reload" class="nl-btn nl-btn--ghost nl-btn--sm">Reload</button>
+                                <span id="jf-user-emails-status" class="field-hint"></span>
+                            </div>
+                        </div>
+
+                        <div class="settings-field-group settings-group-card">
+                            <h6 class="text-uppercase">Playback Reporting</h6>
+                            <label for="playback_reporting_enabled">Graphs from the Playback Reporting plugin:</label><br>
+                            <select id="playback_reporting_enabled" name="playback_reporting_enabled" class="w-field">
+                                <option value="disabled" {% if settings.get('playback_reporting_enabled', 'disabled') != 'enabled' %}selected{% endif %}>Off</option>
+                                <option value="enabled" {% if settings.get('playback_reporting_enabled', 'disabled') == 'enabled' %}selected{% endif %}>On</option>
+                            </select><br>
+                            <p class="text-info mt-2 field-hint">
+                                Jellywatch reports what was watched but keeps no history over time, so graphs need
+                                the Playback Reporting plugin installed on your Jellyfin or Emby server. It uses the
+                                same URL and API key you entered above, so there is nothing else to fill in.
+                                Turning it on offers Plays by Date, by Day, by Hour, by Top Users and by Top Platforms.
+                                The remaining Plex graphs have no equivalent in the plugin and are not offered.
+                                If the plugin is missing or answers differently, the graph list simply stays empty.
+                            </p>
                         </div>
 
                         <div class="settings-field-grid">
@@ -438,6 +475,57 @@
                                 <input type="number" id="recs_item_count" name="recs_item_count" min="1" max="20"
                                        value="{{ settings.get('recs_item_count', '') }}" class="w-num" placeholder="all">
                                 <p class="text-info mt-2 field-hint">Max recommended movies and shows per user (1-20). Blank shows everything conjurr returns. Applies on the next pull.</p>
+                            </div>
+                        </div>
+                        </div>
+
+                        <div class="settings-group-card">
+                        <h6 class="text-uppercase">Wrapped</h6>
+                        <div class="settings-fields">
+                            <div class="settings-field">
+                                <label for="dn_item_count">DroppedNeedle Items Per List:</label><br>
+                                <input type="number" id="dn_item_count" name="dn_item_count" min="1" max="10"
+                                       value="{{ settings.get('dn_item_count', '') }}" class="w-num" placeholder="all">
+                                <p class="text-info mt-2 field-hint">Rows per list on the music wrapped card (1-10). Blank shows everything DroppedNeedle returns, which is ten of each, so four full lists is forty rows in one email.</p>
+                            </div>
+                            <div class="settings-field">
+                                <label for="dn_cover_art">DroppedNeedle Album Art:</label><br>
+                                <select id="dn_cover_art" name="dn_cover_art">
+                                    <option value="disabled" {% if settings.get('dn_cover_art', 'disabled') != 'enabled' %}selected{% endif %}>Off</option>
+                                    <option value="enabled"  {% if settings.get('dn_cover_art', 'disabled') == 'enabled' %}selected{% endif %}>On</option>
+                                </select>
+                                <p class="text-info mt-2 field-hint">Pulls album covers from the Cover Art Archive using the MusicBrainz ids DroppedNeedle already sends. Albums with no cover on file stay text, and only the album list gets art since MusicBrainz has no artist images.</p>
+                            </div>
+                            <div class="settings-field-group">
+                                <label>DroppedNeedle Lists:</label><br>
+                                {% for key, label in [('dn_show_artists', 'Top Artists'), ('dn_show_tracks', 'Top Tracks'), ('dn_show_albums', 'Top Albums'), ('dn_show_genres', 'Top Genres')] %}
+                                <label class="d-block">
+                                    <input type="checkbox" name="{{ key }}" value="enabled"
+                                           {% if settings.get(key, 'enabled') != 'disabled' %}checked{% endif %}> {{ label }}
+                                </label>
+                                <input type="hidden" name="{{ key }}" value="disabled">
+                                {% endfor %}
+                                <p class="text-info mt-2 field-hint">Which ranked lists appear on the music wrapped card.</p>
+                            </div>
+                            <div class="settings-field-group">
+                                <label>Extra Year in Review Stats:</label><br>
+                                {% set _extras = settings.get('wrapped_extra_stats', []) %}
+                                {% for key, label in [('popular_movies', 'Popular Movie'), ('popular_tv', 'Popular Show'), ('top_platforms', 'Top Platform'), ('top_libraries', 'Top Library'), ('most_concurrent', 'Peak Streams')] %}
+                                <label class="d-block">
+                                    <input type="checkbox" name="wrapped_extra_stats" value="{{ key }}"
+                                           {% if key in _extras %}checked{% endif %}> {{ label }}
+                                </label>
+                                {% endfor %}
+                                <p class="text-info mt-2 field-hint">Extra highlight cells on the yearly wrapped card. Tautulli answers all of these; Jellywatch only reports movies, shows and users, so anything it cannot answer simply does not appear.</p>
+                            </div>
+                            <div class="settings-field">
+                                <label for="wrapped_rank_depth">Year in Review Depth:</label><br>
+                                <select id="wrapped_rank_depth" name="wrapped_rank_depth">
+                                    <option value="1" {% if settings.get('wrapped_rank_depth', '1') == '1' %}selected{% endif %}>Top 1</option>
+                                    <option value="3" {% if settings.get('wrapped_rank_depth', '1') == '3' %}selected{% endif %}>Top 3</option>
+                                    <option value="5" {% if settings.get('wrapped_rank_depth', '1') == '5' %}selected{% endif %}>Top 5</option>
+                                </select>
+                                <p class="text-info mt-2 field-hint">How many names each highlight cell lists. Deeper ranks read as one line per cell, so Top 3 suits a wide card better than Top 5.</p>
                             </div>
                         </div>
                         </div>
@@ -936,6 +1024,56 @@
                                 <span class="field-hint">Refills all pickers (light and dark) from the palette you switched away from. Your first visit to Custom starts from it automatically. Changes apply live; Apply Settings saves them.</span>
                             </div>
                         </div>
+                        </div>
+
+                        <div class="settings-group-card">
+                        <h6 class="text-uppercase">Startup</h6>
+                        {% set _landing = settings.get('default_landing_page', 'builder') %}
+                        <label for="default_landing_page">Default landing page:</label><br>
+                        <select id="default_landing_page" name="default_landing_page">
+                            <option value="builder" {% if _landing == 'builder' %}selected{% endif %}>Email Builder</option>
+                            <option value="scheduling" {% if _landing == 'scheduling' %}selected{% endif %}>Scheduling</option>
+                            <option value="history" {% if _landing == 'history' %}selected{% endif %}>Email History</option>
+                            <option value="logs" {% if _landing == 'logs' %}selected{% endif %}>Logs</option>
+                            <option value="settings" {% if _landing == 'settings' %}selected{% endif %}>Settings</option>
+                        </select><br>
+                        <p class="text-info mt-2 field-hint">
+                            Where you land right after signing in. First-run setup always finishes on
+                            the builder, since a fresh install has nothing to show anywhere else.
+                        </p>
+                        </div>
+
+                        <div class="settings-group-card">
+                        <h6 class="text-uppercase">Dates and Times</h6>
+                        {% set _wstart = settings.get('week_start_day', 'sunday') %}
+                        {% set _dfmt = settings.get('date_format', 'mdy') %}
+                        {% set _tfmt = settings.get('time_format', '12') %}
+                        <label for="week_start_day">Calendars start the week on:</label><br>
+                        <select id="week_start_day" name="week_start_day">
+                            <option value="sunday" {% if _wstart == 'sunday' %}selected{% endif %}>Sunday</option>
+                            <option value="monday" {% if _wstart == 'monday' %}selected{% endif %}>Monday</option>
+                        </select><br>
+                        <p class="text-info mt-2 field-hint">
+                            Applies to the scheduling calendar and to the Coming Soon calendar view in emails.
+                        </p>
+
+                        <label for="date_format" class="mt-3 d-inline-block">Date order:</label><br>
+                        <select id="date_format" name="date_format">
+                            <option value="mdy" {% if _dfmt == 'mdy' %}selected{% endif %}>Month Day Year (9/5/26, September 5, 2026)</option>
+                            <option value="dmy" {% if _dfmt == 'dmy' %}selected{% endif %}>Day Month Year (5/9/26, 5 September 2026)</option>
+                            <option value="ymd" {% if _dfmt == 'ymd' %}selected{% endif %}>Year Month Day (26/9/5, 2026 September 5)</option>
+                        </select><br>
+
+                        <label for="time_format" class="mt-3 d-inline-block">Clock:</label><br>
+                        <select id="time_format" name="time_format">
+                            <option value="12" {% if _tfmt == '12' %}selected{% endif %}>12 hour (9:05 AM)</option>
+                            <option value="24" {% if _tfmt == '24' %}selected{% endif %}>24 hour (09:05)</option>
+                        </select><br>
+                        <p class="text-info mt-2 field-hint">
+                            Applies everywhere a date or time is shown to a reader, in the app and in
+                            sent emails. Dates that are part of a filename or an API call are unaffected,
+                            and the email history column keeps its sortable year-first date.
+                        </p>
                         </div>
 
                         <div class="settings-group-card">
@@ -2038,6 +2176,75 @@
         }
         btn.disabled = false;
     });
+
+    (function () {
+        const card = document.getElementById('jf-user-emails-card');
+        if (!card) return;
+        const list = document.getElementById('jf-user-emails-list');
+        const status = document.getElementById('jf-user-emails-status');
+        const saveBtn = document.getElementById('jf-user-emails-save');
+        const reloadBtn = document.getElementById('jf-user-emails-reload');
+
+        function esc(s) {
+            const d = document.createElement('div');
+            d.textContent = s == null ? '' : String(s);
+            return d.innerHTML;
+        }
+
+        async function load() {
+            status.textContent = 'Loading...';
+            try {
+                const resp = await fetch('/media_user_emails');
+                const data = await resp.json();
+                if (data.status !== 'success') {
+                    status.textContent = data.message || 'Could not load Jellyfin users';
+                    return;
+                }
+                if (!data.users.length) {
+                    list.innerHTML = '<p class="field-hint">No Jellyfin users found. Check the connection above.</p>';
+                    status.textContent = '';
+                    return;
+                }
+                list.innerHTML = data.users.map(u => `
+                    <div class="d-flex gap-2 align-items-center mb-1">
+                        <span style="min-width: 12rem;">${esc(u.username)}${u.is_active ? '' : ' <em>(disabled)</em>'}</span>
+                        <input type="email" class="form-control form-control-sm jf-user-email"
+                               data-user-id="${esc(u.user_id)}" value="${esc(u.email)}"
+                               placeholder="no address linked">
+                    </div>`).join('');
+                status.textContent = '';
+            } catch (e) {
+                status.textContent = 'Could not load Jellyfin users';
+            }
+        }
+
+        async function save() {
+            const mapping = {};
+            document.querySelectorAll('.jf-user-email').forEach(input => {
+                mapping[input.dataset.userId] = input.value.trim();
+            });
+            saveBtn.disabled = true;
+            status.textContent = 'Saving...';
+            try {
+                const resp = await fetch('/media_user_emails', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-CSRF-Token': '{{ csrf_token }}'},
+                    body: JSON.stringify({ mapping: mapping }),
+                });
+                const data = await resp.json();
+                status.textContent = data.status === 'success'
+                    ? `${data.linked} user(s) linked.`
+                    : (data.message || 'Save failed');
+            } catch (e) {
+                status.textContent = 'Save failed';
+            }
+            saveBtn.disabled = false;
+        }
+
+        saveBtn.addEventListener('click', save);
+        reloadBtn.addEventListener('click', load);
+        load();
+    })();
 </script>
 
 <script nonce="{{ nonce }}">

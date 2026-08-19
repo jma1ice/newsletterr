@@ -99,7 +99,8 @@ window.pullRunners.droppedneedle = async function ({ chained = false } = {}) {
     }
 };
 
-document.getElementById('pullDroppedNeedleBtn').addEventListener('click', (e) => {
+const _pullDroppedNeedleBtn = document.getElementById('pullDroppedNeedleBtn');
+if (_pullDroppedNeedleBtn) _pullDroppedNeedleBtn.addEventListener('click', (e) => {
     if (!confirmFreshRepull(e.currentTarget, 'droppedneedle')) return;
     window.pullRunners.droppedneedle({ chained: false });
 });

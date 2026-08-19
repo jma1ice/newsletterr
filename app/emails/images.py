@@ -248,7 +248,7 @@ def fetch_and_attach_blurred_image(image_url, msg_root, cid_name, base_url="", h
         logger.error(f"Error processing blurred image {image_url}: {e}")
         return fetch_and_attach_image(image_url, msg_root, cid_name, base_url, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
 
-def fetch_and_attach_small_thumbnail(image_url, msg_root, cid_name, base_url="", height=40, hosted_images_enabled=False, hosted_base_url=""):
+def fetch_and_attach_small_thumbnail(image_url, msg_root, cid_name, base_url="", height=40, hosted_images_enabled=False, hosted_base_url="", quiet=False):
     if is_preview(msg_root):
         return _preview_url(image_url)
     try:
@@ -301,7 +301,10 @@ def fetch_and_attach_small_thumbnail(image_url, msg_root, cid_name, base_url="",
         return f"cid:{cid}"
 
     except Exception as e:
-        logger.error(f"Error fetching small thumbnail {image_url}: {e}")
+        if quiet:
+            logger.debug(f"No small thumbnail for {image_url}: {e}")
+        else:
+            logger.error(f"Error fetching small thumbnail {image_url}: {e}")
         return None
 
 def truncate_text(text, max_chars=28):

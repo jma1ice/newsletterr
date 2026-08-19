@@ -2,6 +2,7 @@
 # random item from a chosen library. The pick itself is drawn at render time
 # in assemble.py, so previews and every send get a fresh item.
 from app.emails import density, headings
+from app.emails.builders.card_grid import EMPTY_STATE_MARKER
 from app.emails.images import fetch_and_attach_image, truncate_text
 from app.security import escape_html_output as esc
 
@@ -60,7 +61,7 @@ def build_random_pick_html(pick, msg_root, theme_colors, base_url="", library_la
 
     if not pick:
         return f"""
-        <div style="background-color: {theme_colors['card_bg']}; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid {theme_colors['border']}; font-family: {FONT};">
+        <div {EMPTY_STATE_MARKER} style="background-color: {theme_colors['card_bg']}; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid {theme_colors['border']}; font-family: {FONT};">
             <p style="text-align: center; color: {theme_colors['muted_text']}; padding: 20px; margin: 0; font-family: {FONT};">No random pick available{f' for {esc(library_label)}' if library_label else ''}.</p>
         </div>
         """

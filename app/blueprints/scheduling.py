@@ -4,6 +4,7 @@ import calendar, json
 from datetime import datetime, timedelta
 from flask import Blueprint, jsonify, render_template, request, session
 
+from app import dates
 from app.db import db_connect
 from app.settings_store import get_settings
 from app.cache import can_use_cached_data_for_preview, get_cached_data
@@ -13,7 +14,7 @@ from app.theme import get_theme_settings
 from app.clients.tautulli import run_tautulli_command
 from app.clients.conjurr import run_conjurr_command
 from app.emails.fetchers import fetch_tautulli_data_for_email
-from app.emails.scheduled import send_scheduled_email
+from app.emails.scheduled import SKIP_TRIGGER_LABELS, SKIP_TRIGGER_TYPES, send_scheduled_email
 
 import logging
 
@@ -39,11 +40,26 @@ def scheduling():
 
         _s = get_settings(decrypt_secrets=False)
         recently_added_mode = (_s.get("recently_added_mode") or "items") if "id" in _s else "items"
+        week_start = dates.resolve_week_start(_s.get("week_start_day"))
 
-        return render_template('scheduling.html', schedules=schedules, email_lists=email_lists, templates=templates, csrf_token=session["csrf_token"], recently_added_mode=recently_added_mode)
+        return render_template('scheduling.html', schedules=schedules, email_lists=email_lists, templates=templates, csrf_token=session["csrf_token"], recently_added_mode=recently_added_mode, week_start=week_start, skip_trigger_labels=SKIP_TRIGGER_LABELS)
     except Exception as e:
         logger.error(f"Error loading scheduling page: {e}")
-        return render_template('scheduling.html', schedules=[], email_lists=[], templates=[])
+        return render_template('scheduling.html', schedules=[], email_lists=[], templates=[], week_start=dates.DEFAULT_WEEK_START, skip_trigger_labels=SKIP_TRIGGER_LABELS)
+
+def _normalize_skip_options(data):
+    raw = data.get('skip_triggers')
+    if isinstance(raw, str):
+        try:
+            raw = json.loads(raw) if raw.strip() else []
+        except ValueError:
+            raw = []
+    kept = [t for t in (raw or []) if t in SKIP_TRIGGER_TYPES]
+    try:
+        threshold = max(1, int(data.get('skip_min_items') or 1))
+    except (TypeError, ValueError):
+        threshold = 1
+    return (json.dumps(kept) if kept else ''), threshold
 
 @bp.route('/scheduling/create', methods=['POST'])
 @requires_auth
@@ -62,6 +78,8 @@ def create_schedule():
         date_range = int(data.get('date_range', 7))
         items_count = int(data.get('items_count', 10))
         skip_if_no_new = 1 if data.get('skip_if_no_new') else 0
+        skip_triggers, skip_min_items = _normalize_skip_options(data)
+        skip_if_empty = 1 if data.get('skip_if_empty') else 0
 
         if email_list_id == 'ALL':
             list_id = 'ALL'
@@ -71,7 +89,7 @@ def create_schedule():
             except (ValueError, TypeError):
                 return jsonify({"status": "error", "message": "Invalid email list ID"}), 400
 
-        success = create_email_schedule(name, list_id, template_id, frequency, start_date, send_time, date_range, items_count, skip_if_no_new)
+        success = create_email_schedule(name, list_id, template_id, frequency, start_date, send_time, date_range, items_count, skip_if_no_new, skip_triggers, skip_min_items, skip_if_empty)
         if success:
             return jsonify({"status": "success", "message": f"Schedule '{name}' created successfully"})
         else:
@@ -96,6 +114,8 @@ def update_schedule(schedule_id):
         date_range = int(data.get('date_range', 7))
         items_count = int(data.get('items_count', 10))
         skip_if_no_new = 1 if data.get('skip_if_no_new') else 0
+        skip_triggers, skip_min_items = _normalize_skip_options(data)
+        skip_if_empty = 1 if data.get('skip_if_empty') else 0
 
         if email_list_id == 'ALL':
             list_id = 'ALL'
@@ -105,7 +125,7 @@ def update_schedule(schedule_id):
             except (ValueError, TypeError):
                 return jsonify({"status": "error", "message": "Invalid email list ID"}), 400
 
-        success = update_email_schedule(schedule_id, name, list_id, template_id, frequency, start_date, send_time, date_range, items_count, skip_if_no_new)
+        success = update_email_schedule(schedule_id, name, list_id, template_id, frequency, start_date, send_time, date_range, items_count, skip_if_no_new, skip_triggers, skip_min_items, skip_if_empty)
         if success:
             return jsonify({"status": "success", "message": f"Schedule '{name}' updated successfully"})
         else:

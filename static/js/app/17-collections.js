@@ -2,6 +2,7 @@ let movieCollections = [];
 let showCollections = [];
 
 async function loadCollections() {
+    if (window.APP && APP.serviceFlags && APP.serviceFlags.standalone) return;
     try {
         document.getElementById('movie-collections-loading').classList.remove('d-none');
         const movieResponse = await fetch('/fetch_collections/movie');

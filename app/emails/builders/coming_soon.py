@@ -1,5 +1,6 @@
-# Kept in sync by hand with buildSonarrComingSoonPreviewHTML/
-# buildRadarrComingSoonPreviewHTML in static/js/app/04-stats-graphs.js.
+# This is the only implementation of these rules. The hand-mirrored JS copies
+# that used to shadow it were deleted in v2026.4.4 once instrumentation
+# confirmed they never ran, so there is nothing left to keep in sync.
 from datetime import datetime, timezone
 
 from app.emails import density
@@ -57,9 +58,9 @@ def _parse_release_date(date_str):
 
 def upcoming_release_date(movie, today=None):
     """Earliest of inCinemas/digitalRelease/physicalRelease that is today or
-    later, as a date. None if the movie has no upcoming date. Mirrored by
-    _comingSoonUpcomingReleaseDate in 04-stats-graphs.js (which uses browser-local
-    time, so a UTC-midnight release can differ by a day between preview and email)."""
+    later, as a date. None if the movie has no upcoming date. Renders in preview and in
+    email from this one implementation, so a UTC-midnight release can no longer
+    differ by a day between the two."""
     if today is None:
         today = datetime.now(timezone.utc).date()
     candidates = []
@@ -92,8 +93,7 @@ def group_sonarr_episodes(episodes):
     """Collapse full-season drops (2+ episodes of the same series/season airing
     the same day) into a single group entry, preserving first-appearance order.
     Episodes with seasonNumber None are never grouped. Returns a list of dicts:
-    {'series', 'season', 'episodes', 'air_date'}. Mirrored by _groupSonarrEpisodes
-    in static/js/app/04-stats-graphs.js."""
+    {'series', 'season', 'episodes', 'air_date'}.."""
     groups = []
     index_by_key = {}
     for ep in episodes:

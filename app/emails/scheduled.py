@@ -8,7 +8,8 @@ from email.utils import formataddr
 from app import config
 from app.db import db_connect
 from app.settings_store import get_settings
-from app.store import filter_suppressed, record_email_history
+from app.store import filter_suppressed, get_saved_email_lists, record_email_history
+from app.clients.mediaserver import get_media_server_type
 from app.render import capture_chart_images_via_headless
 from app.clients.tautulli import run_tautulli_command, days_since_year_start
 from app.clients.conjurr import run_conjurr_command
@@ -21,8 +22,14 @@ from app.clients.seerr import fetch_seerr_requests
 from datetime import datetime, timedelta
 from app.tokens import make_unsubscribe_placeholder
 from app.emails.assemble import convert_html_to_plain_text, build_email_html_with_all_cids
-from app.emails.fetchers import fetch_tautulli_data_for_email
-from app.emails.send import group_recipients_by_user, send_personalized_per_recipient, filter_inactive
+from app.emails.fetchers import (
+    fetch_tautulli_data_for_email,
+    get_ombi_requests_cached,
+    get_radarr_coming_soon_cached,
+    get_seerr_requests_cached,
+    get_sonarr_coming_soon_cached,
+)
+from app.emails.send import NO_PERSONAL_DATA, group_recipients_by_user, per_recipient_reasons, send_personalized_per_recipient, filter_inactive
 
 import logging
 
@@ -51,42 +58,110 @@ class ScheduleContext:
     ombi_requests_data: dict = None
     seerr_requests_data: dict = None
     email_text: str = ""
+    skip_if_empty: bool = False
 
-# Item types that represent "new content" for the skip_if_no_new option: the
-# recently-added grid and the most-watched grid. A template with none of these
-# has nothing that could be "new", so the toggle is a no-op there.
-SKIP_SENSITIVE_ITEM_TYPES = ('recently added', 'most_watched')
+# Item types that can be watched by the skip_if_no_new option.
+LEGACY_SKIP_TRIGGERS = ('recently added', 'most_watched')
+
+SKIP_TRIGGER_LABELS = {
+    'recently added': 'Recently Added',
+    'most_watched': 'Most Watched',
+    'recently_released': 'Recently Released',
+    'sonarr_coming_soon': 'Coming Soon (TV)',
+    'radarr_coming_soon': 'Coming Soon (Movies)',
+    'ombi_requests': 'Recent Requests (Ombi)',
+    'seerr_requests': 'Recent Requests (Seerr)',
+}
+SKIP_TRIGGER_TYPES = tuple(SKIP_TRIGGER_LABELS)
+
+SKIP_TRIGGER_SOURCES = {
+    'recently added': 'tautulli',
+    'most_watched': 'tautulli',
+    'recently_released': 'tautulli',
+    'sonarr_coming_soon': 'sonarr',
+    'radarr_coming_soon': 'radarr',
+    'ombi_requests': 'ombi',
+    'seerr_requests': 'seerr',
+}
+
+def parse_skip_triggers(raw):
+    if not raw:
+        return LEGACY_SKIP_TRIGGERS
+    try:
+        parsed = json.loads(raw) if isinstance(raw, str) else raw
+    except (ValueError, TypeError):
+        logger.debug("suppressed exception; falling back to the legacy skip triggers", exc_info=True)
+        return LEGACY_SKIP_TRIGGERS
+    if not isinstance(parsed, (list, tuple)):
+        return LEGACY_SKIP_TRIGGERS
+    kept = tuple(t for t in parsed if t in SKIP_TRIGGER_TYPES)
+    return kept or LEGACY_SKIP_TRIGGERS
+
+def skip_probe_sources(selected_items, watched_types):
+    """The set of probe fetches this template and watched set actually need."""
+    present = {item.get('type') for item in selected_items or []}
+    return {SKIP_TRIGGER_SOURCES[t] for t in watched_types
+            if t in SKIP_TRIGGER_SOURCES and t in present}
+
+def _library_items(sections, inner_key, lib):
+    """Items across a section list, honoring the section's per-library filter."""
+    want = (lib or '').lower()
+    count = 0
+    for section in sections or []:
+        for item in (section.get(inner_key) or []):
+            if not want or (item.get('library_name') or '').lower() == want:
+                count += 1
+    return count
+
+def count_new_content(selected_items, data, watched_types=LEGACY_SKIP_TRIGGERS):
+    from app.emails.builders import recently_released
+    from app.emails.builders.coming_soon import filter_radarr_upcoming, group_sonarr_episodes, filter_sonarr_by_kind
+    from app.emails.builders.ombi_requests import filter_ombi_pending
+    from app.emails.builders.seerr_requests import filter_seerr_pending
+
+    data = data or {}
+    watched = set(watched_types or LEGACY_SKIP_TRIGGERS)
+    recent_data = data.get('recent_data') or []
+    total = 0
+
+    for item in selected_items or []:
+        item_type = item.get('type')
+        if item_type not in watched:
+            continue
+
+        if item_type == 'recently added':
+            total += _library_items(recent_data, 'recently_added', item.get('raLibrary'))
+        elif item_type == 'most_watched':
+            source = (data.get('most_watched_recent_data') if item.get('mwScope') == 'recent'
+                      else data.get('most_watched_data')) or []
+            total += _library_items(source, 'most_watched', item.get('mwLibrary'))
+        elif item_type == 'recently_released':
+            try:
+                rr_cap = int(item.get('rrCount') or 0)
+            except (TypeError, ValueError):
+                rr_cap = 0
+            total += len(recently_released.select(
+                recent_data,
+                library_filter=item.get('rrLibrary'),
+                released_since_days=data.get('released_since_days'),
+                item_cap=rr_cap,
+            ))
+        elif item_type == 'sonarr_coming_soon':
+            episodes = filter_sonarr_by_kind(data.get('sonarr_coming_soon') or [], item.get('csKind') or '')
+            total += len(group_sonarr_episodes(episodes))
+        elif item_type == 'radarr_coming_soon':
+            total += len(filter_radarr_upcoming(data.get('radarr_coming_soon') or []))
+        elif item_type == 'ombi_requests':
+            total += len(filter_ombi_pending(data.get('ombi_requests')))
+        elif item_type == 'seerr_requests':
+            total += len(filter_seerr_pending(data.get('seerr_requests')))
+
+    return total
 
 def scheduled_send_has_new_content(selected_items, tautulli_data):
-    """True when at least one recently-added or most-watched section in the
-    template resolves to one or more items for the pulled data, honoring each
-    section's per-library filter. Backs the skip_if_no_new schedule option: a
-    quiet week (days mode with no new items) yields False so the send can be
-    skipped. Pure and side-effect free for unit testing. The caller is
-    responsible for the "template has no RA-type sections at all" case, where the
-    toggle does not apply."""
-    recent_data = tautulli_data.get('recent_data') or []
-    mw_all = tautulli_data.get('most_watched_data') or []
-    mw_recent = tautulli_data.get('most_watched_recent_data') or []
+    return count_new_content(selected_items, tautulli_data, LEGACY_SKIP_TRIGGERS) > 0
 
-    def _any_item(sections, inner_key, lib):
-        want = (lib or '').lower()
-        for section in sections:
-            for item in (section.get(inner_key) or []):
-                if not want or (item.get('library_name') or '').lower() == want:
-                    return True
-        return False
-
-    for item in selected_items:
-        item_type = item.get('type')
-        if item_type == 'recently added':
-            if _any_item(recent_data, 'recently_added', item.get('raLibrary')):
-                return True
-        elif item_type == 'most_watched':
-            source = mw_recent if item.get('mwScope') == 'recent' else mw_all
-            if _any_item(source, 'most_watched', item.get('mwLibrary')):
-                return True
-    return False
+SKIP_SENSITIVE_ITEM_TYPES = SKIP_TRIGGER_TYPES
 
 def apply_chart_captures(selected_items, chart_images):
     missing = []
@@ -106,7 +181,7 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
     try:
         schedule_conn = db_connect()
         schedule_cursor = schedule_conn.cursor()
-        schedule_cursor.execute("SELECT date_range, items_count, skip_if_no_new FROM email_schedules WHERE id = ?", (schedule_id,))
+        schedule_cursor.execute("SELECT date_range, items_count, skip_if_no_new, skip_triggers, skip_min_items, skip_if_empty FROM email_schedules WHERE id = ?", (schedule_id,))
         schedule_result = schedule_cursor.fetchone()
         schedule_conn.close()
 
@@ -117,9 +192,25 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
         date_range = schedule_result[0] if schedule_result else 7
         items_count = schedule_result[1] if schedule_result else 10
         skip_if_no_new = bool(schedule_result[2]) if schedule_result else False
+        skip_triggers = parse_skip_triggers(schedule_result[3] if schedule_result else None)
+        try:
+            skip_min_items = max(1, int((schedule_result[4] if schedule_result else 1) or 1))
+        except (TypeError, ValueError):
+            skip_min_items = 1
+        skip_if_empty = bool(schedule_result[5]) if schedule_result else False
 
         if email_list_id == 0 or email_list_id == 'ALL':
-            if s.get("tautulli_url") and s.get("tautulli_api"):
+            if get_media_server_type(s) == 'none':
+                to_emails_list = sorted({
+                    address.strip()
+                    for saved in (get_saved_email_lists() or [])
+                    for address in (saved.get('emails') or '').split(',')
+                    if address.strip()
+                })
+                if not to_emails_list:
+                    logger.info("Standalone ALL list resolved to no recipients; skipping send")
+                    return False
+            elif s.get("tautulli_url") and s.get("tautulli_api"):
                 tautulli_url = s["tautulli_url"].rstrip('/')
                 tautulli_api = s["tautulli_api"]
                 users_data, _ = run_tautulli_command(tautulli_url, tautulli_api, 'get_users', 'Users', None)
@@ -179,25 +270,39 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
             logger.error("SMTP settings not found in database")
             return False
 
-        # skip_if_no_new (GH 105): when the template has recently-added or
-        # most-watched sections and the schedule opted in, probe the pull once up
-        # front and skip the whole send when nothing new landed in the window.
-        # Templates without RA-type sections ignore the toggle. The skip is
-        # recorded in history and counts as the schedule having fired (next_send
-        # already advanced in the scheduler), so it is a success, not a failure.
-        if skip_if_no_new and any(item.get('type') in SKIP_SENSITIVE_ITEM_TYPES for item in selected_items):
-            probe_data = fetch_tautulli_data_for_email(
-                s.get("tautulli_url"), s.get("tautulli_api"), date_range, s.get("server_name"), items_count,
-                stats_type=s.get("stats_type") or "plays",
-                recently_added_mode=s.get("recently_added_mode") or "items",
-                recently_added_sort=s.get("recently_added_sort") or "date",
-            )
-            if not scheduled_send_has_new_content(selected_items, probe_data):
-                logger.info(f"skip_if_no_new: schedule {schedule_id} found no new recently-added/most-watched items; skipping send")
+        probe_sources = skip_probe_sources(selected_items, skip_triggers)
+        if skip_if_no_new and probe_sources:
+            probe_data = {}
+            if 'tautulli' in probe_sources:
+                probe_data.update(fetch_tautulli_data_for_email(
+                    s.get("tautulli_url"), s.get("tautulli_api"), date_range, s.get("server_name"), items_count,
+                    stats_type=s.get("stats_type") or "plays",
+                    recently_added_mode=s.get("recently_added_mode") or "items",
+                    recently_added_sort=s.get("recently_added_sort") or "date",
+                ))
+                probe_data['released_since_days'] = s.get("released_since_days")
+            if 'sonarr' in probe_sources:
+                probe_data['sonarr_coming_soon'] = get_sonarr_coming_soon_cached(
+                    use_cache=True, days_ahead=int(s.get("coming_soon_days_ahead") or 14))
+            if 'radarr' in probe_sources:
+                probe_data['radarr_coming_soon'] = get_radarr_coming_soon_cached(
+                    use_cache=True, days_ahead=int(s.get("coming_soon_days_ahead") or 14))
+            if 'ombi' in probe_sources:
+                probe_data['ombi_requests'] = get_ombi_requests_cached(use_cache=True)
+            if 'seerr' in probe_sources:
+                probe_data['seerr_requests'] = get_seerr_requests_cached(use_cache=True)
+
+            found = count_new_content(selected_items, probe_data, skip_triggers)
+            if found < skip_min_items:
+                watched_label = ', '.join(SKIP_TRIGGER_LABELS.get(t, t) for t in skip_triggers)
+                logger.info(
+                    f"skip_if_no_new: schedule {schedule_id} found {found} item(s) across "
+                    f"[{watched_label}], below the threshold of {skip_min_items}; skipping send"
+                )
                 record_email_history(
                     f"[SCHEDULED] {subject}", ', '.join(to_emails_list), '', 0,
                     len(to_emails_list), template_name, status='skipped',
-                    error='No new recently-added or most-watched items in the window',
+                    error=f"Found {found} new item(s) across {watched_label}, below the threshold of {skip_min_items}",
                 )
                 return True
 
@@ -282,6 +387,7 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
             radarr_coming_soon_data=radarr_coming_soon_data,
             ombi_requests_data=ombi_requests_data,
             seerr_requests_data=seerr_requests_data,
+            skip_if_empty=skip_if_empty,
         )
 
         if has_recs or has_wrapped:
@@ -345,8 +451,8 @@ def send_scheduled_email_with_cids(schedule_id, email_list_id, template_id):
 
             for user_key, recipients in groups.items():
                 if user_key is None or str(user_key) not in personalized_user_keys:
-                    logger.info(f"Skipping recipients without recommendations or wrapped stats: {recipients}")
-                    continue
+                    logger.info(f"Sending shared content only (no personalized data) to: {recipients}")
+                    user_key = NO_PERSONAL_DATA
 
                 success = send_scheduled_user_email_with_cids(ctx, s, recipients, user_key)
 
@@ -500,6 +606,7 @@ def send_scheduled_user_email_with_cids(ctx, settings, recipients, user_key):
         unsub_placeholder = make_unsubscribe_placeholder() if use_personalized_send else None
 
         user_dict = {user_key: recipients[0]} if recipients else {}
+        render_stats = {}
 
         # never build_hosted_variant here: this is a personalized per-user
         # scheduled send, and the hosted newsletter page is public/
@@ -530,10 +637,19 @@ def send_scheduled_user_email_with_cids(ctx, settings, recipients, user_key):
             hosted_base_url=hosted_base_url,
             hosted_images_enabled=hosted_images_enabled,
             hosted_enabled=hosted_enabled,
-            links_base_url=links_base_url
+            links_base_url=links_base_url,
+            render_stats=render_stats,
         )
 
+        if ctx.skip_if_empty and not render_stats.get('content_items'):
+            logger.info(
+                f"skip_if_empty: schedule {ctx.schedule_id} rendered no content for user "
+                f"{user_key}; skipping that recipient"
+            )
+            return False
+
         plain_text = convert_html_to_plain_text(email_html)
+        fan_out_reasons = per_recipient_reasons(None, settings, None, email_html, plain_text)
         if not use_personalized_send:
             msg_alternative.attach(MIMEText(plain_text, 'plain', 'utf-8'))
             msg_alternative.attach(MIMEText(email_html, 'html', 'utf-8'))
@@ -558,18 +674,13 @@ def send_scheduled_user_email_with_cids(ctx, settings, recipients, user_key):
         logger.info("Sending email...")
 
         from_addr = alias_email if alias_email else from_email
-        if use_personalized_send:
+        if fan_out_reasons:
+            logger.info(f"Sending per recipient ({', '.join(sorted(fan_out_reasons))})")
             all_recipients = recipients if send_mode == 'to' else [from_addr] + recipients
             email_content = send_personalized_per_recipient(
                 server, msg_root, from_addr, all_recipients, email_html, plain_text,
                 unsub_placeholder, links_base_url, send_mode
             )
-        elif send_mode == 'to':
-            email_content = msg_root.as_string()
-            for recipient in recipients:
-                msg_root.replace_header('To', recipient)
-                server.sendmail(from_addr, [recipient], msg_root.as_string())
-            all_recipients = recipients
         else:
             email_content = msg_root.as_string()
             server.sendmail(from_addr, [from_addr] + recipients, email_content)
@@ -729,6 +840,7 @@ def send_scheduled_single_email_with_cids(ctx, settings, to_emails_list):
         use_personalized_send = hosted_enabled and bool(hosted_base_url)
         unsub_placeholder = make_unsubscribe_placeholder() if use_personalized_send else None
 
+        render_stats = {}
         email_html, hosted_html = build_email_html_with_all_cids(
             template_data,
             tautulli_data,
@@ -755,10 +867,21 @@ def send_scheduled_single_email_with_cids(ctx, settings, to_emails_list):
             hosted_images_enabled=hosted_images_enabled,
             build_hosted_variant=use_personalized_send,
             hosted_enabled=hosted_enabled,
-            links_base_url=links_base_url
+            links_base_url=links_base_url,
+            render_stats=render_stats,
         )
 
+        if ctx.skip_if_empty and not render_stats.get('content_items'):
+            logger.info(f"skip_if_empty: schedule {ctx.schedule_id} rendered no content sections; skipping send")
+            record_email_history(
+                f"[SCHEDULED] {subject}", ', '.join(to_emails_list), '', 0,
+                len(to_emails_list), template_name, status='skipped',
+                error='No section rendered any content',
+            )
+            return True
+
         plain_text = convert_html_to_plain_text(email_html)
+        fan_out_reasons = per_recipient_reasons(ctx.selected_items, settings, None, email_html, plain_text)
         if not use_personalized_send:
             msg_alternative.attach(MIMEText(plain_text, 'plain', 'utf-8'))
             msg_alternative.attach(MIMEText(email_html, 'html', 'utf-8'))
@@ -783,18 +906,13 @@ def send_scheduled_single_email_with_cids(ctx, settings, to_emails_list):
         logger.info("Sending email...")
 
         from_addr = alias_email if alias_email else from_email
-        if use_personalized_send:
+        if fan_out_reasons:
+            logger.info(f"Sending per recipient ({', '.join(sorted(fan_out_reasons))})")
             all_recipients = to_emails_list if send_mode == 'to' else [from_addr] + to_emails_list
             email_content = send_personalized_per_recipient(
                 server, msg_root, from_addr, all_recipients, email_html, plain_text,
                 unsub_placeholder, links_base_url, send_mode
             )
-        elif send_mode == 'to':
-            email_content = msg_root.as_string()
-            for recipient in to_emails_list:
-                msg_root.replace_header('To', recipient)
-                server.sendmail(from_addr, [recipient], msg_root.as_string())
-            all_recipients = to_emails_list
         else:
             email_content = msg_root.as_string()
             server.sendmail(from_addr, [from_addr] + to_emails_list, email_content)

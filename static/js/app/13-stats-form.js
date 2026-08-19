@@ -187,7 +187,8 @@ window.pullRunners.stats = async function ({ chained = false } = {}) {
     }
 };
 
-document.getElementById('stats_form').addEventListener('submit', (e) => {
+const _stats_form = document.getElementById('stats_form');
+if (_stats_form) _stats_form.addEventListener('submit', (e) => {
     e.preventDefault();
     if (!confirmFreshRepull(e.target.querySelector('button[type="submit"]'), 'stats')) return;
     window.pullRunners.stats({ chained: false });

@@ -4,11 +4,14 @@ from datetime import datetime
 from html.parser import HTMLParser
 import html as _html_stdlib
 
+from app import dates
 from app.cache import get_cache_info, get_cached_data, set_cached_data
 from app.emails.images import fetch_and_attach_image
 from app.emails.blocks import build_graph_html_with_frontend_image, build_text_block_html, build_separator_html, build_image_html_with_cid, build_emoji_html
 from app.emails.builders import build_stats_html_with_cid_background, build_recently_added_html_with_cids, build_recommendations_html_with_cids, build_droppedneedle_wrapped_html_with_cids, build_droppedneedle_server_stats_html_with_cids, build_collections_html_with_cids, build_yearly_wrapped_html_with_cids, build_sonarr_coming_soon_html_with_cids, build_radarr_coming_soon_html_with_cids, build_ombi_requests_html_with_cids, build_seerr_requests_html_with_cids
 from app.emails.builders import layouts, recently_released
+from app.emails.builders.card_grid import EMPTY_STATE_MARKER
+from app.emails.builders.recommendations import dn_options_from_settings
 from app.emails import density, headings
 from app.emails.builders.most_watched import build_most_watched_html_with_cids
 from app.emails.builders.random_pick import build_random_pick_html
@@ -141,15 +144,18 @@ def _featured_pick_cached(rating_key, title):
     return pick
 
 
-def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, display_preference, users_data, recommendations_data=None, user_dict=None, base_url="", target_user_key=None, is_scheduled=False, items_count=None, date_range="", expanded_collections=None, email_header_title=None, droppedneedle_wrapped_data=None, droppedneedle_server_data=None, yearly_wrapped_data=None, sonarr_coming_soon_data=None, radarr_coming_soon_data=None, ombi_requests_data=None, seerr_requests_data=None, unsubscribe_placeholder=None, hosted_base_url="", hosted_images_enabled=False, build_hosted_variant=False, hosted_enabled=False, links_base_url=""):
-    """Returns (email_html, hosted_html). hosted_html is None unless
-    build_hosted_variant=True, only the non-personalized 'single body for
-    everyone' senders should ever pass that, since the hosted newsletter
-    page is public and unauthenticated (see send.py/scheduled.py)."""
-    # Custom HTML mode no longer returns immediately: snap-in tokens (NEWS-32)
-    # are expanded through the same per-item dispatch below, so the settings
-    # and theme locals must be computed first. The custom path still returns
-    # before the logo attach (custom emails never carried a logo part).
+CHROME_ITEM_TYPES = frozenset({
+    'textblock', 'titleblock', 'headerblock', 'separator', 'image', 'gif', 'emoji',
+})
+
+def item_rendered_content(item, html):
+    if not (html or '').strip():
+        return False
+    if item.get('type', '') in CHROME_ITEM_TYPES:
+        return False
+    return EMPTY_STATE_MARKER not in html
+
+def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, display_preference, users_data, recommendations_data=None, user_dict=None, base_url="", target_user_key=None, is_scheduled=False, items_count=None, date_range="", expanded_collections=None, email_header_title=None, droppedneedle_wrapped_data=None, droppedneedle_server_data=None, yearly_wrapped_data=None, sonarr_coming_soon_data=None, radarr_coming_soon_data=None, ombi_requests_data=None, seerr_requests_data=None, unsubscribe_placeholder=None, hosted_base_url="", hosted_images_enabled=False, build_hosted_variant=False, hosted_enabled=False, links_base_url="", render_stats=None):
     custom_html = template_data.get('custom_html', '').strip()
     selected_items = json.loads(template_data.get('selected_items') or '[]') if not custom_html else []
     email_text = template_data.get('email_text', '')
@@ -171,6 +177,9 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, displ
     released_since_days = tautulli_data.get('settings', {}).get('released_since_days') or ''
     recs_show_description = tautulli_data.get('settings', {}).get('recs_show_description', 'enabled') != 'disabled'
     include_user_info = tautulli_data.get('settings', {}).get('include_user_info', 'enabled') != 'disabled'
+    dn_wrapped_options = dn_options_from_settings(tautulli_data.get('settings', {}))
+    wrapped_extra_stats = tautulli_data.get('settings', {}).get('wrapped_extra_stats') or ''
+    wrapped_rank_depth = tautulli_data.get('settings', {}).get('wrapped_rank_depth') or 1
     # Email layout (NEWS-30): 'legacy' keeps every pre-v2026.4 builder path
     # untouched; classic/editorial/digest route the restyled sections through
     # app/emails/builders/layouts.py (single source for sends and previews).
@@ -184,13 +193,25 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, displ
     expanded_collections = expanded_collections or {}
     email_header_title = email_header_title or ''
     
-    theme_colors = density.stamp(layouts.apply_theme(email_layout, get_email_theme_colors()), email_layout, email_density)
+    _s_all = tautulli_data.get('settings', {}) or {}
+    theme_colors = dates.stamp(
+        density.stamp(layouts.apply_theme(email_layout, get_email_theme_colors()), email_layout, email_density),
+        _s_all.get('date_format'), _s_all.get('time_format'), _s_all.get('week_start_day'),
+    )
     outer_theme_colors = theme_colors
+
+    _content_count = []
 
     def _render_item(item, group_index=0):
         """Single per-item dispatch shared by the selected-items loop and
-        snap-in token expansion in custom HTML (NEWS-32). Returns the item's
+        snap-in token expansion in custom HTML. Returns the item's
         section HTML ('' when the item has nothing to render)."""
+        content_html = _dispatch_item(item, group_index)
+        if item_rendered_content(item, content_html):
+            _content_count.append(1)
+        return content_html
+
+    def _dispatch_item(item, group_index=0):
         content_html = ""
         item_type = item.get('type', '')
 
@@ -231,7 +252,10 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, displ
             # them server-side regardless of what the template selected
             if not include_user_info and item.get('name') in ('Plays by Top Users', 'Stream Type by Top Users'):
                 return ""
-            content_html += build_graph_html_with_frontend_image(item, msg_root, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
+            if use_layout:
+                content_html += layouts.render_graph(email_layout, item, msg_root, theme_colors, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
+            else:
+                content_html += build_graph_html_with_frontend_image(item, msg_root, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
         
         elif item_type == 'recently added':
             library_filter = item.get('raLibrary')
@@ -367,24 +391,48 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, displ
                     content_html += build_top_viewer_html(champ, msg_root, theme_colors, base_url, range_text=_tv_range_text, include_user_info=include_user_info, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
 
         elif item_type == 'recommendations':
+            def _render_recs(data, users):
+                if use_layout:
+                    return layouts.render_recommendations(
+                        email_layout, data, msg_root, theme_colors, users, base_url,
+                        display_preference, users_data, recs_grid_columns=recs_grid_columns,
+                        poster_max_height=poster_max_height, hosted_images_enabled=hosted_images_enabled,
+                        hosted_base_url=hosted_base_url, show_description=recs_show_description)
+                return build_recommendations_html_with_cids(
+                    data, msg_root, theme_colors, users, base_url, display_preference, users_data,
+                    recs_grid_columns=recs_grid_columns, poster_max_height=poster_max_height,
+                    hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url,
+                    show_description=recs_show_description)
+
             if recommendations_data:
                 if target_user_key:
                     if item.get('userKey') == str(target_user_key):
                         filtered_recommendations = {target_user_key: recommendations_data.get(target_user_key, {})}
                         filtered_user_dict = {target_user_key: user_dict.get(target_user_key, target_user_key)} if user_dict else {target_user_key: target_user_key}
-                        content_html += build_recommendations_html_with_cids(filtered_recommendations, msg_root, theme_colors, filtered_user_dict, base_url, display_preference, users_data, recs_grid_columns=recs_grid_columns, poster_max_height=poster_max_height, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url, show_description=recs_show_description)
+                        content_html += _render_recs(filtered_recommendations, filtered_user_dict)
                 else:
-                    content_html += build_recommendations_html_with_cids(recommendations_data, msg_root, theme_colors, user_dict, base_url, display_preference, users_data, recs_grid_columns=recs_grid_columns, poster_max_height=poster_max_height, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url, show_description=recs_show_description)
+                    content_html += _render_recs(recommendations_data, user_dict)
 
         elif item_type == 'droppedneedle_wrapped':
             if droppedneedle_wrapped_data:
+                def _render_dn(data, users):
+                    if use_layout:
+                        return layouts.render_dn_wrapped(
+                            email_layout, data, msg_root, theme_colors, users, display_preference, users_data,
+                            options=dn_wrapped_options, base_url=base_url,
+                            hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
+                    return build_droppedneedle_wrapped_html_with_cids(
+                        data, msg_root, theme_colors, users, display_preference, users_data,
+                        options=dn_wrapped_options, base_url=base_url,
+                        hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
+
                 if target_user_key:
                     if item.get('userKey') == str(target_user_key):
                         filtered_wrapped = {target_user_key: droppedneedle_wrapped_data.get(target_user_key, {})}
                         filtered_user_dict = {target_user_key: user_dict.get(target_user_key, target_user_key)} if user_dict else {target_user_key: target_user_key}
-                        content_html += build_droppedneedle_wrapped_html_with_cids(filtered_wrapped, msg_root, theme_colors, filtered_user_dict, display_preference, users_data)
+                        content_html += _render_dn(filtered_wrapped, filtered_user_dict)
                 else:
-                    content_html += build_droppedneedle_wrapped_html_with_cids(droppedneedle_wrapped_data, msg_root, theme_colors, user_dict, display_preference, users_data)
+                    content_html += _render_dn(droppedneedle_wrapped_data, user_dict)
 
         elif item_type == 'droppedneedle_server_stats':
             if droppedneedle_server_data:
@@ -396,9 +444,9 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, displ
         elif item_type == 'yearly_wrapped':
             if yearly_wrapped_data:
                 if use_layout:
-                    content_html += layouts.render_wrapped(email_layout, yearly_wrapped_data, msg_root, theme_colors, base_url=base_url, include_user_info=include_user_info, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
+                    content_html += layouts.render_wrapped(email_layout, yearly_wrapped_data, msg_root, theme_colors, base_url=base_url, include_user_info=include_user_info, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url, extra_stats=wrapped_extra_stats, rank_depth=wrapped_rank_depth)
                 else:
-                    content_html += build_yearly_wrapped_html_with_cids(yearly_wrapped_data, msg_root, theme_colors, base_url=base_url, include_user_info=include_user_info, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
+                    content_html += build_yearly_wrapped_html_with_cids(yearly_wrapped_data, msg_root, theme_colors, base_url=base_url, include_user_info=include_user_info, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url, extra_stats=wrapped_extra_stats, rank_depth=wrapped_rank_depth)
 
         elif item_type == 'sonarr_coming_soon':
             if sonarr_coming_soon_data:
@@ -437,7 +485,10 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, displ
             group_title = item.get('title', 'Collections')
             group_collections = item.get('collections', [])
             if group_collections:
-                content_html += build_collections_html_with_cids(group_collections, msg_root, theme_colors, base_url, group_title, expanded_collections, group_index, poster_max_height=poster_max_height, grid_columns=collections_grid_columns, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
+                if use_layout:
+                    content_html += layouts.render_collections(email_layout, group_collections, msg_root, theme_colors, base_url, group_title, expanded_collections, group_index, poster_max_height=poster_max_height, grid_columns=collections_grid_columns, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
+                else:
+                    content_html += build_collections_html_with_cids(group_collections, msg_root, theme_colors, base_url, group_title, expanded_collections, group_index, poster_max_height=poster_max_height, grid_columns=collections_grid_columns, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
 
         return content_html
 
@@ -447,6 +498,8 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, displ
         # The raw HTML around the tokens is the author's and passes through
         # untouched; unknown tokens become inline HTML comments.
         expanded_html = expand_snapin_tokens(custom_html, _render_item, tautulli_data.get('stats') or [])
+        if render_stats is not None:
+            render_stats['content_items'] = len(_content_count) or (1 if custom_html.strip() else 0)
         return expanded_html, (expanded_html if build_hosted_variant else None)
 
     if logo_filename == '' or logo_filename is None:
@@ -478,6 +531,9 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, displ
     for group_index, item in enumerate(selected_items):
         content_html += _render_item(item, group_index)
 
+    if render_stats is not None:
+        render_stats['content_items'] = len(_content_count)
+
     email_html = build_complete_email_html_with_cid_logo(content_html, server_name, subject, email_header_title, logo_src, logo_width, is_scheduled, logo_position=logo_position, unsubscribe_placeholder=unsubscribe_placeholder, hosted_base_url=hosted_base_url, hosted_enabled=hosted_enabled, links_base_url=links_base_url, layout=email_layout, email_density=email_density)
 
     hosted_html = None
@@ -487,9 +543,12 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, displ
     return email_html, hosted_html
 
 def build_complete_email_html_with_cid_logo(content_html, server_name, subject, email_header_title, logo_src, logo_width, is_scheduled=False, logo_position='center', unsubscribe_placeholder=None, hosted_base_url="", hosted_enabled=False, links_base_url="", layout='legacy', email_density=''):
-    theme_colors = density.stamp(layouts.apply_theme(layout, get_email_theme_colors()), layout, email_density)
-    p = density.picker(theme_colors, layout)
     chrome = get_email_chrome_settings()
+    theme_colors = dates.stamp(
+        density.stamp(layouts.apply_theme(layout, get_email_theme_colors()), layout, email_density),
+        chrome['date_format'], chrome['time_format'], chrome['week_start'],
+    )
+    p = density.picker(theme_colors, layout)
     show_server_name = chrome['show_server_name']
     header_bg = chrome['header_bg']
     eyebrow_text = chrome['eyebrow_text']
@@ -665,7 +724,7 @@ def build_complete_email_html_with_cid_logo(content_html, server_name, subject, 
         header_block = f'<div style="{header_style} padding: {p("11px 16px", "18px 24px")};">{logo_html}{brand_line}{classic_title}</div>'
     elif layout == 'editorial':
         kicker = esc(eyebrow_text) or email_header_title or _auto('Your server, this month')
-        display_date = datetime.now().strftime('%B %Y')
+        display_date = dates.fmt_month_year(datetime.now())
         editorial_bg = header_bg or theme_colors['card_bg']
         name_line = f'<div style="font-size: {p("38px", "30px")}; font-weight: 800; color: #ffffff; margin: 4px 0 2px 0; letter-spacing: -.01em;">{esc(str(server_name).upper())}</div>' if show_server_name else ''
         header_block = f"""
@@ -680,7 +739,7 @@ def build_complete_email_html_with_cid_logo(content_html, server_name, subject, 
                             Generated by <a href="https://github.com/jma1ice/newsletterr" style="{footer_link_style}">newsletterr</a> &middot; not affiliated with Plex, Inc.{unsubscribe_footer_html}
                         </div>"""
     elif layout == 'digest':
-        display_date = datetime.now().strftime('%B %-d, %Y')
+        display_date = dates.fmt_long_date(datetime.now(), chrome['date_format'])
         _title_lead = '/ ' if show_server_name else ''
         digest_title = f' <span style="color: {theme_colors["primary"]}; font-weight: 700;">{_title_lead}{email_header_title}</span>' if email_header_title else ''
         digest_bg = header_bg or theme_colors['card_bg']

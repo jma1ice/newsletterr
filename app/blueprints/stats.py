@@ -10,8 +10,9 @@ from app.crypto import decrypt
 from app.security import require_csrf_for_json, requires_auth, safe_get, json_body
 from app.theme import get_theme_settings
 from app.clients.plex import get_plex_headers, get_plex_machine_id, build_plex_web_link, reset_plex_health, plex_call_failed, fetch_library_sections_with_genres, search_library_items
-from app.clients.jellyfin import reset_jellyfin_health, jellyfin_call_failed, fetch_recently_added_using_jellyfin, fetch_jellyfin_library_counts, get_jellyfin_server_id, build_jellyfin_web_link
-from app.clients.jellywatch import fetch_jellywatch_home_stats
+from app.clients.jellyfin import reset_jellyfin_health, jellyfin_call_failed, fetch_recently_added_using_jellyfin, fetch_jellyfin_library_counts, get_jellyfin_server_id, build_jellyfin_web_link, fetch_jellyfin_users
+from app.clients.jellywatch import fetch_jellywatch_home_stats, fetch_jellywatch_most_watched
+from app.clients.playback_reporting import fetch_playback_reporting_graphs
 from app.clients.mediaserver import get_media_server_type
 from app.clients.tautulli import run_tautulli_command, days_since_year_start
 from app.progress import progress_start, progress_step, progress_done
@@ -43,8 +44,11 @@ def pull_stats():
 
     _s = get_settings(decrypt_secrets=False)
 
-    if get_media_server_type(_s) == 'jellyfin':
+    _server_type = get_media_server_type(_s)
+    if _server_type in ('jellyfin', 'emby'):
         return _pull_stats_jellyfin(_s, time_range, count)
+    if _server_type == 'none':
+        return jsonify({"error": "No media server is configured. Standalone mode has no stats to pull."}), 400
 
     row = (_s.get("tautulli_url"), _s.get("tautulli_api"), _s.get("server_name"), _s.get("stats_type"), _s.get("recently_added_mode"), _s.get("recently_added_sort")) if "id" in _s else None
 
@@ -247,10 +251,8 @@ def _pull_stats_jellyfin(_s, time_range, count):
         })
     set_cached_data('stats', stats, cache_params)
 
-    # Jellywatch has no graph endpoints in this cycle; the graph list stays
-    # empty and no graph snap-ins are offered (server-type aware, per plan).
-    graph_data = []
-    graph_commands = []
+    progress_step('pull_stats', 'Pulling graphs...')
+    graph_data, graph_commands = fetch_playback_reporting_graphs(days=int(time_range or 30))
     set_cached_data('graph_data', graph_data, cache_params)
 
     # Year-in-review off the same Jellywatch stats over a full-year window;
@@ -261,16 +263,23 @@ def _pull_stats_jellyfin(_s, time_range, count):
         set_cached_data('yearly_wrapped_json', yearly_wrapped_data, cache_params)
 
     progress_step('pull_stats', 'Pulling users...')
-    users = None
+    users = fetch_jellyfin_users() or None
     set_cached_data('users', users, cache_params)
+
+    user_dict = {}
+    users_full_data = users
+    for user in (users or []):
+        if user.get('email') and user.get('is_active'):
+            user_dict[user['user_id']] = user['email']
 
     progress_step('pull_stats', 'Pulling recently added...')
     recent_data = fetch_recently_added_using_jellyfin(count, recently_added_mode=recently_added_mode, recently_added_sort=recently_added_sort)
     set_cached_data('recent_data', recent_data, cache_params)
 
-    most_watched_data = []
+    progress_step('pull_stats', 'Pulling most watched...')
+    most_watched_data = fetch_jellywatch_most_watched()
     set_cached_data('most_watched_data', most_watched_data, cache_params)
-    set_cached_data('most_watched_recent_data', [], cache_params)
+    set_cached_data('most_watched_recent_data', fetch_jellywatch_most_watched(days=time_range), cache_params)
 
     jellyfin_unavailable = jellyfin_call_failed()
     progress_done('pull_stats')
@@ -284,8 +293,8 @@ def _pull_stats_jellyfin(_s, time_range, count):
         "graph_commands": graph_commands,
         "recent_data": recent_data,
         "most_watched_data": most_watched_data,
-        "user_dict": {},
-        "users_full_data": None,
+        "user_dict": user_dict,
+        "users_full_data": users_full_data,
         "cache_info": {
             "stats": get_cache_info('stats'),
             "users": get_cache_info('users'),
@@ -357,7 +366,7 @@ def pull_recommendations():
             progress_done('pull_recommendations')
             if state.recommendations_cancel.is_set():
                 state.recommendations_cancel.clear()
-                alert = "Recommendations pull canceled. Partial results kept."
+                alert = "Recommendations pull cancelled. Partial results kept."
                 error = None
             elif error:
                 alert = None
@@ -743,6 +752,9 @@ def featured_pick_search():
 def fetch_collections(collection_type):
     try:
         _s = get_settings(decrypt_secrets=False)
+        if get_media_server_type(_s) == 'none':
+            return jsonify({"status": "success", "collections": []})
+
         row = (_s.get("plex_url"), _s.get("plex_token")) if "id" in _s else None
 
         if not row or not row[0] or not row[1]:

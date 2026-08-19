@@ -1,5 +1,6 @@
 
 from app.cache import get_cached_data, set_cached_data
+from app.emails.builders.card_grid import EMPTY_STATE_MARKER
 from app.emails import density, headings
 from app.settings_store import get_settings
 from app.clients.plex import get_collection_items_for_email
@@ -21,52 +22,46 @@ def _collection_items(collection_key, plex_settings):
 
 from app.emails.builders.cards import build_collection_card_html, build_individual_item_card_html
 
-def build_collections_html_with_cids(all_collections, msg_root, theme_colors, base_url="", custom_title=None, expanded_collections=None, group_index=0, poster_max_height=0, grid_columns=5, hosted_images_enabled=False, hosted_base_url=""):
-    if not all_collections:
-        return f"""
-        <div style="background-color: {theme_colors['card_bg']}; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid {theme_colors['border']}; font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;">
-            <p style="text-align: center; color: {theme_colors['muted_text']}; padding: 20px; margin: 0; font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;">No collections available.</p>
-        </div>
-        """
-    
+def resolve_collection_items(all_collections, expanded_collections=None, group_index=0):
     expanded_collections = expanded_collections or {}
     all_items_to_display = []
-    
+
     _s = get_settings(decrypt_secrets=False)
     row = (_s.get("plex_url"), _s.get("plex_token")) if "id" in _s else None
-    
-    plex_settings = {}
+
+    plex_settings = None
     if row and row[0] and row[1]:
         plex_settings = {
             'plex_url': row[0],
             'plex_token': row[1],
             'plex_web_url': _s.get("plex_web_url")
         }
-    else:
-        plex_settings = None
 
-    for collection_index, collection in enumerate(all_collections):
+    for collection_index, collection in enumerate(all_collections or []):
         collection_key = collection.get('key')
         collection_id = f"{group_index}-{collection_index}-{collection_key}"
 
         if collection_id in expanded_collections and plex_settings:
             logger.debug(f"Collection {collection_id} is expanded, fetching individual items...")
-            individual_items = _collection_items(collection_key, plex_settings)
-            
-            for item in individual_items:
+            for item in _collection_items(collection_key, plex_settings):
                 item['is_individual_item'] = True
                 item['original_collection'] = collection.get('title', 'Unknown Collection')
                 all_items_to_display.append(item)
         else:
-            logger.debug(f"  No match for {collection_id}")
-            if not (collection_id in expanded_collections):
-                logger.debug(f"     Reason: Collection ID not in expanded_collections")
-                if expanded_collections:
-                    logger.debug(f"     Available expanded IDs: {list(expanded_collections.keys())}")
-            if not plex_settings:
-                logger.debug(f"     Reason: No plex_settings available")
             collection['is_individual_item'] = False
             all_items_to_display.append(collection)
+
+    return all_items_to_display
+
+def build_collections_html_with_cids(all_collections, msg_root, theme_colors, base_url="", custom_title=None, expanded_collections=None, group_index=0, poster_max_height=0, grid_columns=5, hosted_images_enabled=False, hosted_base_url=""):
+    if not all_collections:
+        return f"""
+        <div {EMPTY_STATE_MARKER} style="background-color: {theme_colors['card_bg']}; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid {theme_colors['border']}; font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;">
+            <p style="text-align: center; color: {theme_colors['muted_text']}; padding: 20px; margin: 0; font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;">No collections available.</p>
+        </div>
+        """
+    
+    all_items_to_display = resolve_collection_items(all_collections, expanded_collections, group_index)
     
     p3 = density.picker3(theme_colors)
     art_on = density.show_art(theme_colors)

@@ -35,21 +35,6 @@
 
 /* drag-and-drop selected items list */
 .selected-item {
-    cursor: move;
-    transition: background-color 0.2s;
-}
-
-.selected-item.dragging {
-    opacity: 0.6;
-    transform: rotate(2deg) scale(1.02);
-    box-shadow: var(--shadow-3);
-    border: 2px solid var(--accent);
-    z-index: 1000;
-    cursor: grabbing !important;
-    transition: none;
-}
-
-.selected-item {
     cursor: grab;
     transition: all 0.2s ease;
     position: relative;
@@ -64,6 +49,23 @@
 .selected-item.drag-over {
     border-top: 3px solid var(--accent);
     transform: translateY(2px);
+}
+
+/* The lift-and-tilt of the item being dragged. It has to come after the
+   :hover and .drag-over rules and to name :hover itself: WebKit keeps the
+   hover state stuck on the element the drag started from, so an equal
+   specificity `.selected-item:hover` earlier in the file used to win and
+   replace the tilt with the flat hover lift (no tilt at all in Safari, and
+   the transition never turned off anywhere). */
+.selected-item.dragging,
+.selected-item.dragging:hover {
+    opacity: 0.6;
+    transform: rotate(2deg) scale(1.02);
+    box-shadow: var(--shadow-3);
+    border: 2px solid var(--accent);
+    z-index: 1000;
+    cursor: grabbing !important;
+    transition: none;
 }
 
 .selected-item::before {
@@ -194,7 +196,7 @@
 .builder-page .rte-color::-moz-color-swatch { border: none; border-radius: 1px; }
 
 /* Match the email's list treatment so the editor is not misleading: the
-   marker sits next to its text even though the block is centred. */
+   marker sits next to its text even though the block is centered. */
 .builder-page .text-block-editor ul,
 .builder-page .text-block-editor ol {
     display: inline-block;
@@ -372,10 +374,18 @@
 #selected-items-pane > .snapins-toolbar {
     flex: 0 0 auto;
 }
+/* The list absorbs the pane's leftover height and scrolls inside it. The
+   viewport-based cap is a second, non-flex constraint on purpose: WebKit does
+   not reliably shrink a flex child when the only limit on the column is the
+   parent's max-height, so on Safari the list kept growing with every snap-in
+   added and pushed the pane to fill the whole column instead of scrolling.
+   The cap is looser than the pane's own (96px there, 160px here for the
+   toolbar row), so in browsers that do shrink the flex sizing still wins. */
 #selected-items-pane > #selected-items-list {
     flex: 1 1 auto;
     min-height: 0;
-    max-height: none;
+    max-height: calc(100vh - 160px);
+    overflow-y: auto;
 }
 /* Custom HTML mode keeps its own fixed-height, separately resizable editor;
    the pane just gives it a scroll area rather than clipping it. */

@@ -75,7 +75,12 @@ def background_scheduler():
             
             if due_schedules:
                 logger.info(f"Found {len(due_schedules)} schedules due for sending")
-            
+
+            # Demo mode never sends: a public showcase has no business talking
+            # to an SMTP server. The schedules still tick over in the UI.
+            if config.DEMO_MODE:
+                due_schedules = []
+
             for schedule in due_schedules:
                 schedule_id, name, email_list_id, template_id, frequency = schedule
                 logger.info(f"Processing schedule: {name} (ID: {schedule_id})")
@@ -99,6 +104,13 @@ def background_scheduler():
         time.sleep(60)
 
 def refresh_daily_cache():
+    if config.DEMO_MODE:
+        # There is no upstream to refresh from in demo mode, and the sample
+        # settings point at hosts that do not exist. Re-seed instead, so the
+        # showcase never degrades into empty sections.
+        from app.demo import seed_demo_cache
+        seed_demo_cache()
+        return
     if not state._REFRESH_LOCK.acquire(blocking=False):
         logger.info("Cache refresh already in progress, skipping.")
         return

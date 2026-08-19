@@ -51,12 +51,46 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
+    const importBtn = document.getElementById('import_list_btn');
+    const exportBtn = document.getElementById('export_list_btn');
+    const importContainer = document.getElementById('import_list_container');
+    const importFile = document.getElementById('import_list_file');
+    const importText = document.getElementById('import_list_text');
+    const importNameRow = document.getElementById('import_list_name_row');
+    const importName = document.getElementById('import_list_name');
+    const doImportBtn = document.getElementById('do_import_btn');
+    const cancelImportBtn = document.getElementById('cancel_import_btn');
+    const importResult = document.getElementById('import_result');
+
+    function selectedListId() {
+        const value = selector.value;
+        return (value && !isNaN(Number(value))) ? value : null;
+    }
+
+    function hideImportUI() {
+        if (!importContainer) return;
+        importContainer.classList.add('d-none');
+        if (importResult) importResult.textContent = '';
+        if (importText) importText.value = '';
+        if (importFile) importFile.value = '';
+    }
+
+    // With a saved list selected the import appends to it; otherwise it names a
+    // list to create, which is the only way to import your first one.
+    function syncImportMode() {
+        if (!importNameRow) return;
+        importNameRow.classList.toggle('d-none', !!selectedListId());
+    }
+
     selector.addEventListener('change', async () => {
         const selectedValue = selector.value;
-        
+
         deleteBtn.classList.add('d-none');
         saveContainer.classList.add('d-none');
-        
+        if (exportBtn) exportBtn.classList.add('d-none');
+        hideImportUI();
+        syncImportMode();
+
         if (selectedValue === 'Custom') {
             setReadOnlyMode(false);
         } else if (selectedValue === 'ALL') {
@@ -74,10 +108,117 @@ document.addEventListener('DOMContentLoaded', () => {
                 clearAllChips();
                 sortEmails(emails.split(', ').map(e => e.trim())).forEach(email => addEmailChip(email));
                 deleteBtn.classList.remove('d-none');
+                if (exportBtn) {
+                    exportBtn.classList.remove('d-none');
+                    exportBtn.href = `/email_lists/${encodeURIComponent(selectedValue)}/export`;
+                }
                 setReadOnlyMode(false);
             }
         }
     });
+
+    if (importBtn) {
+        importBtn.addEventListener('click', () => {
+            importContainer.classList.toggle('d-none');
+            syncImportMode();
+            if (!importContainer.classList.contains('d-none') && importText) importText.focus();
+        });
+    }
+    if (cancelImportBtn) {
+        cancelImportBtn.addEventListener('click', hideImportUI);
+    }
+    if (doImportBtn) {
+        doImportBtn.addEventListener('click', async () => {
+            const listId = selectedListId();
+            const newName = importName ? importName.value.trim() : '';
+            if (!listId && !newName) {
+                alert('Enter a name for the new list');
+                return;
+            }
+            const file = importFile && importFile.files && importFile.files[0];
+            const pasted = importText ? importText.value.trim() : '';
+            if (!file && !pasted) {
+                alert('Choose a file or paste some addresses');
+                return;
+            }
+            const url = listId ? `/email_lists/${listId}/import` : '/email_lists/import';
+
+            doImportBtn.disabled = true;
+            try {
+                let response;
+                if (file) {
+                    const body = new FormData();
+                    body.append('file', file);
+                    if (!listId) body.append('name', newName);
+                    response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'X-CSRF-Token': APP.csrfToken },
+                        body: body,
+                    });
+                } else {
+                    const payload = { text: pasted };
+                    if (!listId) payload.name = newName;
+                    response = await fetch(url, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-Token': APP.csrfToken,
+                        },
+                        body: JSON.stringify(payload),
+                    });
+                }
+                const result = await response.json();
+                if (result.status !== 'success') {
+                    importResult.textContent = result.message || 'Import failed';
+                    return;
+                }
+                // Every category is reported, so a partly rejected file is
+                // visible rather than silently lossy.
+                const parts = [`${result.added} added`];
+                if (result.duplicate) parts.push(`${result.duplicate} already on the list`);
+                if (result.suppressed) parts.push(`${result.suppressed} unsubscribed`);
+                if (result.invalid_count) parts.push(`${result.invalid_count} unreadable`);
+                if (result.linked) parts.push(`${result.linked} linked to Jellyfin users`);
+                importResult.textContent = parts.join(', ') + '.';
+
+                // A freshly created list is not in the dropdown yet, so add it
+                // and select it: landing back on Custom would leave the list you
+                // just built invisible.
+                const targetId = listId || result.list_id;
+                if (!listId && targetId) {
+                    let option = selector.querySelector(`option[value="${targetId}"]`);
+                    if (!option) {
+                        option = document.createElement('option');
+                        option.value = targetId;
+                        option.textContent = result.list_name || newName;
+                        selector.appendChild(option);
+                    }
+                    selector.value = String(targetId);
+                    deleteBtn.classList.remove('d-none');
+                    if (exportBtn) {
+                        exportBtn.classList.remove('d-none');
+                        exportBtn.href = `/email_lists/${targetId}/export`;
+                    }
+                    syncImportMode();
+                }
+
+                // Refresh the chips and the option's cached addresses so the
+                // selector does not go stale against what was just imported.
+                const contacts = await (await fetch(`/email_lists/${targetId}/contacts`)).json();
+                if (contacts.status === 'success') {
+                    const emails = contacts.contacts.map(c => c.email);
+                    const option = selector.querySelector(`option[value="${targetId}"]`);
+                    if (option) option.dataset.emails = emails.join(', ');
+                    clearAllChips();
+                    sortEmails(emails).forEach(email => addEmailChip(email));
+                }
+            } catch (e) {
+                importResult.textContent = 'Import failed';
+            } finally {
+                doImportBtn.disabled = false;
+            }
+        });
+    }
     
     saveBtn.addEventListener('click', async () => {
         const name = newListNameInput.value.trim();

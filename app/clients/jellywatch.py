@@ -112,6 +112,43 @@ def _fetch_users(url, api_key, days):
         payload = payload.get('items') or payload.get('data') or []
     return _normalize_user_rows(payload)
 
+MOST_WATCHED_GROUPS = (
+    ('movie', 'Movies'),
+    ('show', 'TV Shows'),
+    ('music', 'Music'),
+)
+
+def fetch_jellywatch_most_watched(days=None, per_group=25):
+    """Most Watched in the shape the snap-in consumes, [{'most_watched': [...]}],
+    one entry per media type."""
+    url, api_key = _jellywatch_connection()
+    if not url:
+        return []
+
+    grouped = []
+    for media_type, label in MOST_WATCHED_GROUPS:
+        rows = _fetch_watched(url, api_key, media_type, days)
+        if not rows:
+            continue
+        items = []
+        for row in rows[:per_group]:
+            items.append({
+                'title': row.get('title', 'Unknown'),
+                'year': row.get('year', ''),
+                'thumb': f"/proxy-art{row['thumb']}" if row.get('thumb') else '',
+                'play_count': row.get('total_plays', 0),
+                # the group label, so the snap-in's library filter still works
+                # even though these are media types rather than real libraries
+                'library_name': label,
+                # no deep link: Jellywatch reports the item id, but building a
+                # web link needs the server id, and a wrong link is worse than
+                # none. The Jellyfin recently-added path owns that enrichment.
+                'plex_url': '',
+            })
+        if items:
+            grouped.append({'most_watched': items})
+    return grouped
+
 def fetch_jellywatch_home_stats(days=None, include_user_info=True):
     """Home stats in the Tautulli get_home_stats shape:
     [{stat_id, stat_title, rows: [...]}]. Only stats Jellywatch can answer are

@@ -31,10 +31,11 @@ from app.emails.builders.coming_soon import (
     upcoming_release_date,
 )
 from app.emails.builders.most_watched import (
+    metric_text as most_watched_metric_text,
     most_watched_heading,
     most_watched_items,
     most_watched_poster,
-    play_count_text,
+    watch_time_text as most_watched_time_text,
 )
 from app.emails.builders.ombi_requests import filter_ombi_pending
 from app.emails.builders.random_pick import (
@@ -899,7 +900,7 @@ def _grid(cards, cols):
 
 # ---------------------------------------------------------------- most watched
 
-def render_most_watched(layout, most_watched_data, msg_root, theme, library_filter=None, base_url="", grid_columns=5, item_cap=0, range_text="", hosted_images_enabled=False, hosted_base_url=""):
+def render_most_watched(layout, most_watched_data, msg_root, theme, library_filter=None, base_url="", grid_columns=5, item_cap=0, range_text="", hosted_images_enabled=False, hosted_base_url="", metric="plays"):
     p = density.picker(theme, layout)
     art_on = density.show_art(theme, layout)
     label = most_watched_heading(library_filter)
@@ -915,11 +916,16 @@ def render_most_watched(layout, most_watched_data, msg_root, theme, library_filt
                                       hosted_images_enabled=hosted_images_enabled,
                                       hosted_base_url=hosted_base_url, target=(42, 63)) if art_on else None
             art = f'<img src="{src}" alt="{esc(title)}" width="42" style="width: 42px; height: auto; border-radius: 5px; display: block;">' if src else ''
-            plays = item.get('play_count') or 0
+            watched = most_watched_time_text(item) if metric == 'duration' else ''
+            if watched:
+                value, unit = watched, 'watched'
+            else:
+                plays = item.get('play_count') or 0
+                value, unit = plays, 'play' if plays == 1 else 'plays'
             rows_html += _spotlight_row(
                 theme, art, _linked(title, item.get('plex_url', ''), underline=False),
                 esc(str(item.get('year') or '')),
-                _spotlight_value(theme, plays, 'play' if plays == 1 else 'plays'),
+                _spotlight_value(theme, value, unit),
                 last=(i == len(items) - 1))
         return _shell(layout, theme, label, rows_html, range_text=range_text)
 
@@ -929,7 +935,7 @@ def render_most_watched(layout, most_watched_data, msg_root, theme, library_filt
         for i, item in enumerate(items):
             title = item.get('title', 'Unknown')
             poster_src = most_watched_poster(item, msg_root, f"la-mw-{i}", base_url, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url) if art_on else None
-            cards.append(_build_card_html(theme, truncate_text(title, 23), str(item.get('year') or ''), play_count_text(item), poster_src, compact=not art_on))
+            cards.append(_build_card_html(theme, truncate_text(title, 23), str(item.get('year') or ''), most_watched_metric_text(item, metric), poster_src, compact=not art_on))
         return _shell(layout, theme, label, _grid(cards, cols), range_text=range_text)
 
     if layout == 'editorial':
@@ -939,7 +945,7 @@ def render_most_watched(layout, most_watched_data, msg_root, theme, library_filt
             _mw_w = p(132, 96)
             poster_src = most_watched_poster(item, msg_root, f"lb-mw-{i}", base_url, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url, target=(_mw_w, int(_mw_w * 1.5))) if art_on else None
             poster_html = f'<img src="{poster_src}" alt="{esc(title)}" width="{_mw_w}" style="width: {_mw_w}px; height: auto; border-radius: 6px; display: block;">' if poster_src else ''
-            meta_bits = [str(item.get('year') or ''), play_count_text(item)]
+            meta_bits = [str(item.get('year') or ''), most_watched_metric_text(item, metric)]
             rows += f"""
                 <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
                     <td width="{_mw_w}" valign="top" style="padding: 0 {p('22px', '16px')} {p('20px', '12px')} 0;">{poster_html}</td>
@@ -954,7 +960,7 @@ def render_most_watched(layout, most_watched_data, msg_root, theme, library_filt
     # digest: ranked rows, title left / plays right
     rows = ""
     for item in items:
-        rows += _digest_row(theme, _linked(item.get('title', 'Unknown'), item.get('plex_url', '')), esc(play_count_text(item)))
+        rows += _digest_row(theme, _linked(item.get('title', 'Unknown'), item.get('plex_url', '')), esc(most_watched_metric_text(item, metric)))
     return _shell(layout, theme, label, rows, range_text=range_text)
 
 # ---------------------------------------------------------------- random pick

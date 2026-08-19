@@ -470,23 +470,19 @@ def demo_recent_data():
     return [{"recently_added": movies}, {"recently_added": shows}, {"recently_added": albums}]
 
 def demo_most_watched():
+    """The snap-in shape: one {'most_watched': [...]} entry per library, each
+    item carrying its library name, play count and watch time (the duration
+    metric labels cards from total_duration)."""
+    def _entries(source, library_name, top_plays, step, seconds_per_play):
+        return {"most_watched": [
+            {"title": title, "year": year, "play_count": top_plays - index * step,
+             "total_duration": (top_plays - index * step) * seconds_per_play,
+             "thumb": _art(slug), "library_name": library_name, "plex_url": ""}
+            for index, (title, slug, year, _r, _s, _sum) in enumerate(source[:4])
+        ]}
     return [
-        {
-            "library_name": "Movies",
-            "items": [
-                {"title": title, "year": year, "play_count": 44 - index * 7,
-                 "thumb": _art(slug), "plex_url": ""}
-                for index, (title, slug, year, _r, _s, _sum) in enumerate(_MOVIES[:4])
-            ],
-        },
-        {
-            "library_name": "TV Shows",
-            "items": [
-                {"title": title, "year": year, "play_count": 73 - index * 12,
-                 "thumb": _art(slug), "plex_url": ""}
-                for index, (title, slug, year, _r, _s, _sum) in enumerate(_SHOWS[:4])
-            ],
-        },
+        _entries(_MOVIES, "Movies", 44, 7, 6900),
+        _entries(_SHOWS, "TV Shows", 73, 12, 2700),
     ]
 
 def demo_recommendations():

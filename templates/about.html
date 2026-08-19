@@ -143,6 +143,8 @@
         <li>Jellyfin never loaded a user list, so recipients could not be pulled from the server and no per-user section had anyone to address</li>
         <li>The wrapped card fell back to a numeric user id when there was no Tautulli user list to read a name from, which was every Jellyfin install</li>
         <li>Demo mode showed a logout button that emptied the session and dropped the visitor into first-run setup, and the live preview came back empty because the render request was blocked as a write</li>
+        <li>The Most Watched snap-in ignored the Stats and Graphs metric setting: it always ranked and labelled by play count, even with Duration picked. It now ranks by time watched and labels cards with it. Tautulli reports no watch time in its per-library media list, so an all-time section on Duration is aggregated from that library's history, which covers its most recent 1000 plays</li>
+        <li>Demo mode's Most Watched section listed no libraries, because the sample data was built in the wrong shape for the snap-in</li>
     </ul>
 </div>
 {% endblock %}

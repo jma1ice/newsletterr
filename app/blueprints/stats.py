@@ -155,11 +155,11 @@ def pull_stats():
     set_cached_data('recent_data', recent_data, cache_params)
 
     progress_step('pull_stats', 'Pulling most watched...')
-    most_watched_data = fetch_most_watched_data(tautulli_base_url, tautulli_api_key)
+    most_watched_data = fetch_most_watched_data(tautulli_base_url, tautulli_api_key, metric=stats_type)
     set_cached_data('most_watched_data', most_watched_data, cache_params)
 
     progress_step('pull_stats', 'Pulling most watched (pull range)...')
-    most_watched_recent_data = fetch_most_watched_data(tautulli_base_url, tautulli_api_key, days=time_range)
+    most_watched_recent_data = fetch_most_watched_data(tautulli_base_url, tautulli_api_key, days=time_range, metric=stats_type)
     set_cached_data('most_watched_recent_data', most_watched_recent_data, cache_params)
 
     user_dict = {}
@@ -209,6 +209,7 @@ def _pull_stats_jellyfin(_s, time_range, count):
 
     recently_added_mode = _s.get('recently_added_mode') or 'items'
     recently_added_sort = _s.get('recently_added_sort') or 'date'
+    stats_type = _s.get('stats_type') or 'plays'
 
     cache_params = {
         'time_range': time_range,
@@ -277,9 +278,9 @@ def _pull_stats_jellyfin(_s, time_range, count):
     set_cached_data('recent_data', recent_data, cache_params)
 
     progress_step('pull_stats', 'Pulling most watched...')
-    most_watched_data = fetch_jellywatch_most_watched()
+    most_watched_data = fetch_jellywatch_most_watched(metric=stats_type)
     set_cached_data('most_watched_data', most_watched_data, cache_params)
-    set_cached_data('most_watched_recent_data', fetch_jellywatch_most_watched(days=time_range), cache_params)
+    set_cached_data('most_watched_recent_data', fetch_jellywatch_most_watched(days=time_range, metric=stats_type), cache_params)
 
     jellyfin_unavailable = jellyfin_call_failed()
     progress_done('pull_stats')

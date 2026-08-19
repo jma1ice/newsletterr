@@ -168,6 +168,7 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, displ
     hide_stat_play_counts = tautulli_data.get('settings', {}).get('hide_stat_play_counts', 'disabled') == 'enabled'
     show_cover_art = tautulli_data.get('settings', {}).get('stat_cover_art', 'disabled') == 'enabled'
     recently_added_mode = tautulli_data.get('settings', {}).get('recently_added_mode', 'items')
+    stats_metric = tautulli_data.get('settings', {}).get('stats_type') or 'plays'
     ra_grid_columns = int(tautulli_data.get('settings', {}).get('ra_grid_columns', 5) or 5)
     recs_grid_columns = int(tautulli_data.get('settings', {}).get('recs_grid_columns', 5) or 5)
     poster_max_height = int(tautulli_data.get('settings', {}).get('poster_max_height') or 0)
@@ -180,9 +181,6 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, displ
     dn_wrapped_options = dn_options_from_settings(tautulli_data.get('settings', {}))
     wrapped_extra_stats = tautulli_data.get('settings', {}).get('wrapped_extra_stats') or ''
     wrapped_rank_depth = tautulli_data.get('settings', {}).get('wrapped_rank_depth') or 1
-    # Email layout (NEWS-30): 'legacy' keeps every pre-v2026.4 builder path
-    # untouched; classic/editorial/digest route the restyled sections through
-    # app/emails/builders/layouts.py (single source for sends and previews).
     email_layout = tautulli_data.get('settings', {}).get('email_layout') or 'classic'
     use_layout = layouts.is_layout(email_layout)
     email_density = tautulli_data.get('settings', {}).get('email_density') or ''
@@ -344,9 +342,9 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, displ
             except (TypeError, ValueError):
                 mw_cap = 0
             if use_layout:
-                content_html += layouts.render_most_watched(email_layout, mw_data, msg_root, theme_colors, mw_library, base_url, grid_columns=ra_grid_columns, item_cap=mw_cap, range_text=mw_range_text, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
+                content_html += layouts.render_most_watched(email_layout, mw_data, msg_root, theme_colors, mw_library, base_url, grid_columns=ra_grid_columns, item_cap=mw_cap, range_text=mw_range_text, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url, metric=stats_metric)
             else:
-                content_html += build_most_watched_html_with_cids(mw_data, msg_root, theme_colors, mw_library, base_url, grid_columns=ra_grid_columns, poster_max_height=poster_max_height, item_cap=mw_cap, range_text=mw_range_text, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
+                content_html += build_most_watched_html_with_cids(mw_data, msg_root, theme_colors, mw_library, base_url, grid_columns=ra_grid_columns, poster_max_height=poster_max_height, item_cap=mw_cap, range_text=mw_range_text, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url, metric=stats_metric)
 
         elif item_type == 'random_pick':
             # The pick is drawn per render on purpose: previews and every send

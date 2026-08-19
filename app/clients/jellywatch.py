@@ -118,9 +118,11 @@ MOST_WATCHED_GROUPS = (
     ('music', 'Music'),
 )
 
-def fetch_jellywatch_most_watched(days=None, per_group=25):
+def fetch_jellywatch_most_watched(days=None, per_group=25, metric='plays'):
     """Most Watched in the shape the snap-in consumes, [{'most_watched': [...]}],
-    one entry per media type."""
+    one entry per media type. metric is the Stats & Graph Metric setting
+    'duration' ranks by watch time, which Jellywatch reports
+    alongside the play count."""
     url, api_key = _jellywatch_connection()
     if not url:
         return []
@@ -130,6 +132,8 @@ def fetch_jellywatch_most_watched(days=None, per_group=25):
         rows = _fetch_watched(url, api_key, media_type, days)
         if not rows:
             continue
+        if metric == 'duration':
+            rows = sorted(rows, key=lambda r: r.get('total_duration') or 0, reverse=True)
         items = []
         for row in rows[:per_group]:
             items.append({
@@ -137,6 +141,7 @@ def fetch_jellywatch_most_watched(days=None, per_group=25):
                 'year': row.get('year', ''),
                 'thumb': f"/proxy-art{row['thumb']}" if row.get('thumb') else '',
                 'play_count': row.get('total_plays', 0),
+                'total_duration': row.get('total_duration', 0),
                 # the group label, so the snap-in's library filter still works
                 # even though these are media types rather than real libraries
                 'library_name': label,

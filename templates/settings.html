@@ -539,6 +539,7 @@
                                     <option value="plays"    {% if settings.stats_type != 'duration' %}selected{% endif %}>Plays</option>
                                     <option value="duration" {% if settings.stats_type == 'duration' %}selected{% endif %}>Duration</option>
                                 </select>
+                                <p class="text-info mt-2 field-hint">What stats, graphs and the Most Watched snap-in rank and label by: play count or time watched. Pull fresh data after changing it, since the ranking is decided at pull time.</p>
                             </div>
                             <div class="settings-field">
                                 <label for="stat_cover_art">Show Cover Art in Stat Tables:</label><br>

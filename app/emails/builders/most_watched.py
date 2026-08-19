@@ -40,7 +40,26 @@ def play_count_text(item):
     count = item.get('play_count') or 0
     return f"{count} play{'s' if count != 1 else ''}"
 
-def build_most_watched_html_with_cids(most_watched_data, msg_root, theme_colors, library_filter=None, base_url="", grid_columns=5, poster_max_height=0, item_cap=0, range_text="", hosted_images_enabled=False, hosted_base_url=""):
+def watch_time_text(item):
+    try:
+        seconds = int(item.get('total_duration') or 0)
+    except (TypeError, ValueError):
+        seconds = 0
+    if seconds <= 0:
+        return ""
+    hours, minutes = seconds // 3600, (seconds % 3600) // 60
+    if hours and minutes:
+        return f"{hours}h {minutes}m"
+    if hours:
+        return f"{hours}h"
+    return f"{max(1, minutes)}m"
+
+def metric_text(item, metric='plays'):
+    if metric == 'duration':
+        return watch_time_text(item) or play_count_text(item)
+    return play_count_text(item)
+
+def build_most_watched_html_with_cids(most_watched_data, msg_root, theme_colors, library_filter=None, base_url="", grid_columns=5, poster_max_height=0, item_cap=0, range_text="", hosted_images_enabled=False, hosted_base_url="", metric="plays"):
     heading = most_watched_heading(library_filter)
     if range_text:
         heading += f" ({range_text})"
@@ -60,7 +79,7 @@ def build_most_watched_html_with_cids(most_watched_data, msg_root, theme_colors,
         title = truncate_text(item.get('title', 'Unknown'), 23)
         year = str(item.get('year') or '')
         poster_src = most_watched_poster(item, msg_root, f"mw-{i}", base_url, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url, target=poster_target) if art_on else None
-        card_html = build_card_html(theme_colors, title, year, play_count_text(item), poster_src, compact=not art_on)
+        card_html = build_card_html(theme_colors, title, year, metric_text(item, metric), poster_src, compact=not art_on)
         plex_url = item.get('plex_url', '')
         if plex_url:
             card_html = f'<a href="{esc(plex_url)}" style="text-decoration: none; color: inherit; display: block;" target="_blank" title="Open in Plex">{card_html}</a>'

@@ -1,3 +1,5 @@
+import json
+
 from datetime import datetime
 
 from app.cache import get_cache_info
@@ -228,15 +230,72 @@ def build_stats_html_with_cid_background(stat_data, msg_root, theme_colors, base
         </div>
     """
 
-def build_yearly_wrapped_html_with_cids(stats_data, msg_root, theme_colors, year=None, base_url="", include_user_info=True, hosted_images_enabled=False, hosted_base_url=""):
+WRAPPED_EXTRA_STATS = {
+    'popular_movies': ('Most Popular Movies', 'Popular Movie', 'film'),
+    'popular_tv': ('Most Popular TV Shows', 'Popular Show', 'tv'),
+    'top_platforms': ('Most Active Platforms', 'Top Platform', 'users'),
+    'top_libraries': ('Most Active Libraries', 'Top Library', 'film'),
+    'most_concurrent': ('Most Concurrent Streams', 'Peak Streams', 'users'),
+}
+
+def parse_wrapped_extras(raw):
+    if not raw:
+        return ()
+    if isinstance(raw, str):
+        try:
+            parsed = json.loads(raw) if raw.strip().startswith('[') else raw.split(',')
+        except ValueError:
+            return ()
+    else:
+        parsed = raw
+    if not isinstance(parsed, (list, tuple)):
+        return ()
+    return tuple(k for k in (str(x).strip() for x in parsed) if k in WRAPPED_EXTRA_STATS)
+
+def _row_label(row):
+    for key in ('title', 'user', 'friendly_name', 'platform', 'section_name'):
+        value = (row or {}).get(key)
+        if value:
+            return str(value)
+    count = (row or {}).get('count')
+    return str(count) if count is not None else ''
+
+RANK_SEPARATOR = ' · '
+
+def ranked_value(stats_data, stat_title, fallback, rank_depth=1):
+    try:
+        rank_depth = max(1, int(rank_depth or 1))
+    except (TypeError, ValueError):
+        rank_depth = 1
+    if rank_depth <= 1:
+        return fallback
+    for stat in stats_data or []:
+        if stat.get('stat_title') == stat_title and stat.get('rows'):
+            names = [_row_label(r) for r in stat['rows'][:rank_depth]]
+            joined = RANK_SEPARATOR.join(n for n in names if n)
+            return joined or fallback
+    return fallback
+
+def build_yearly_wrapped_html_with_cids(stats_data, msg_root, theme_colors, year=None, base_url="", include_user_info=True, hosted_images_enabled=False, hosted_base_url="", extra_stats=(), rank_depth=1):
     if not stats_data:
         return ""
+
+    try:
+        rank_depth = max(1, int(rank_depth or 1))
+    except (TypeError, ValueError):
+        rank_depth = 1
 
     def _first_row(title):
         for stat in stats_data:
             if stat.get('stat_title') == title and stat.get('rows'):
                 return stat['rows'][0]
         return None
+
+    def _rows(title, depth):
+        for stat in stats_data:
+            if stat.get('stat_title') == title and stat.get('rows'):
+                return stat['rows'][:max(1, depth)]
+        return []
 
     top_movie = _first_row('Most Watched Movies')
     top_show = _first_row('Most Watched TV Shows')
@@ -265,17 +324,25 @@ def build_yearly_wrapped_html_with_cids(stats_data, msg_root, theme_colors, year
 
     highlights = []
     if top_movie:
-        highlights.append((f"{_hl_icon('film')} Top Movie", top_movie.get('title', ''), _thumb_src(top_movie, 'wrapped-movie'), False))
+        highlights.append((f"{_hl_icon('film')} Top Movie", ranked_value(stats_data, 'Most Watched Movies', top_movie.get('title', ''), rank_depth), _thumb_src(top_movie, 'wrapped-movie'), False))
     if top_show:
-        highlights.append((f"{_hl_icon('tv')} Top Show", top_show.get('title', ''), _thumb_src(top_show, 'wrapped-show'), False))
+        highlights.append((f"{_hl_icon('tv')} Top Show", ranked_value(stats_data, 'Most Watched TV Shows', top_show.get('title', ''), rank_depth), _thumb_src(top_show, 'wrapped-show'), False))
     if top_artist:
-        highlights.append((f"{_hl_icon('music')} Top Artist", top_artist.get('title', ''), _thumb_src(top_artist, 'wrapped-artist'), False))
+        highlights.append((f"{_hl_icon('music')} Top Artist", ranked_value(stats_data, 'Most Played Artists', top_artist.get('title', ''), rank_depth), _thumb_src(top_artist, 'wrapped-artist'), False))
     if top_user and include_user_info:
         # user_thumb is an absolute plex.tv avatar URL; small-thumbnail fetch
         # handles http URLs directly (round style variant)
         user_thumb = (top_user.get('user_thumb') or '') if art_on else ''
         user_avatar = fetch_and_attach_small_thumbnail(user_thumb, msg_root, 'wrapped-user', base_url, height=60, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url) if user_thumb else None
-        highlights.append((f"{_hl_icon('users')} Most Active", top_user.get('user', ''), user_avatar, True))
+        highlights.append((f"{_hl_icon('users')} Most Active", ranked_value(stats_data, 'Most Active Users', top_user.get('user', ''), rank_depth), user_avatar, True))
+
+    for key in parse_wrapped_extras(extra_stats):
+        stat_title, label, icon = WRAPPED_EXTRA_STATS[key]
+        rows = _rows(stat_title, rank_depth)
+        first = _row_label(rows[0]) if rows else ''
+        if not first:
+            continue
+        highlights.append((f"{_hl_icon(icon)} {label}", ranked_value(stats_data, stat_title, first, rank_depth), _thumb_src(rows[0], f'wrapped-{key}'), False))
 
     if not highlights and not total_plays:
         return ""

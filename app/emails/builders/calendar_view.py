@@ -2,6 +2,7 @@
 
 from datetime import timedelta
 
+from app import dates
 from app.emails import headings
 from app.security import escape_html_output as esc
 
@@ -13,7 +14,9 @@ FONT = "'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif"
 
 VIEWS = ('grid', 'calendar', 'agenda')
 
-# Sunday-first, matching the *arr calendars' default week start.
+# Sunday-first, matching the *arr calendars' default week start. v2026.4.4 lets
+# the reader move it to Monday; dates.weekday_labels() is the rotated form and
+# this stays as the default.
 WEEKDAY_LABELS = ('Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat')
 
 # A wide days-ahead window (the setting allows up to 90) would otherwise emit a
@@ -26,9 +29,9 @@ def make_event(date, title, subtitle="", poster_src=None):
     without a date are dropped by both views since neither can place them."""
     return {'date': date, 'title': title or '', 'subtitle': subtitle or '', 'poster_src': poster_src}
 
-def _week_start(day):
-    """The Sunday on or before day."""
-    return day - timedelta(days=(day.weekday() + 1) % 7)
+def _week_start(day, week_start=dates.DEFAULT_WEEK_START):
+    """The Sunday (or Monday, per the week_start_day setting) on or before day."""
+    return dates.start_of_week(day, week_start)
 
 def group_events_by_day(events):
     """{date: [event, ...]} for events carrying a date, insertion order kept
@@ -40,16 +43,16 @@ def group_events_by_day(events):
         by_day.setdefault(event['date'], []).append(event)
     return by_day
 
-def calendar_span(by_day, today):
+def calendar_span(by_day, today, week_start=dates.DEFAULT_WEEK_START):
     """(first_cell_day, last_day, overflow_days) for the month grid.
 
-    Starts at the Sunday of the current week so the reader sees where today
+    Starts at the first day of the current week so the reader sees where today
     sits, and runs to the last day holding an event. overflow_days lists the
     event days past MAX_CALENDAR_WEEKS, which the caller footnotes."""
     if not by_day:
         return None, None, []
     days = sorted(by_day)
-    start = _week_start(min(today, days[0]))
+    start = _week_start(min(today, days[0]), week_start)
     last_cell = start + timedelta(days=MAX_CALENDAR_WEEKS * 7 - 1)
     overflow = [d for d in days if d > last_cell]
     end = min(days[-1], last_cell)
@@ -96,7 +99,7 @@ def _day_cell_html(day, events, theme, today, cell_width_pct):
     body = "".join(_event_html(event, theme) for event in events)
     # Both date labels ship in every cell; the media rules swap which one shows,
     # because a bare "15" reads fine under a weekday header but not in a list.
-    long_label = day.strftime('%a, %b ') + str(day.day)
+    long_label = dates.fmt_weekday_date(day, dates.date_format_of(theme))
     return f"""
         <td class="{classes}" valign="top" style="width: {cell_width_pct}; padding: 6px 5px;
             background-color: {bg}; border: 1px solid {theme['border']};
@@ -111,8 +114,9 @@ def _day_cell_html(day, events, theme, today, cell_width_pct):
 
 def build_month_calendar_html(events, theme, today, container=None):
     """Month-style grid: a weekday header row and one row per week."""
+    week_start = dates.week_start_of(theme)
     by_day = group_events_by_day(events)
-    start, end, overflow = calendar_span(by_day, today)
+    start, end, overflow = calendar_span(by_day, today, week_start)
     if start is None:
         return None
 
@@ -121,7 +125,7 @@ def build_month_calendar_html(events, theme, today, container=None):
         f'<td align="center" style="width: {cell_width_pct}; padding: 5px 2px; font-size: 10px; '
         f'font-weight: 700; letter-spacing: .06em; text-transform: uppercase; '
         f'color: {theme["muted_text"]}; font-family: {FONT};">{label}</td>'
-        for label in WEEKDAY_LABELS
+        for label in dates.weekday_labels(week_start)
     )
     rows_html = (f'<tr class="cs-cal-head">{head_cells}</tr>')
 
@@ -140,7 +144,7 @@ def build_month_calendar_html(events, theme, today, container=None):
         label = "item" if count == 1 else "items"
         footnote = (f'<div style="padding: 8px 10px 0 10px; font-size: 11px; '
                     f'color: {theme["muted_text"]}; font-family: {FONT};">'
-                    f'Plus {count} more {label} after {end.strftime("%b ")}{end.day}.</div>')
+                    f'Plus {count} more {label} after {dates.fmt_month_day(end, dates.date_format_of(theme))}.</div>')
 
     inner = f"""
         <table class="cs-cal-table" width="100%" cellpadding="0" cellspacing="0" border="0"
@@ -191,7 +195,7 @@ def build_agenda_html(events, theme, today, container=None):
         elif day == today + timedelta(days=1):
             date_label = "Tomorrow"
         else:
-            date_label = day.strftime('%a, %b ') + str(day.day)
+            date_label = dates.fmt_weekday_date(day, dates.date_format_of(theme))
         items = "".join(_agenda_item_html(event, theme) for event in by_day[day])
         rows_html += f"""
             <tr class="cs-agenda-row">

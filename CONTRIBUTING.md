@@ -38,7 +38,7 @@ Run the same three checks CI runs. All of them must pass.
 
 ```bash
 ruff check app/ newsletterr.py tests/                     # lint (E9 and F rules only)
-pytest                                                    # full suite, about two minutes
+pytest                                                    # full suite, about six minutes
 for f in static/js/app/*.js; do node --check "$f"; done   # JS syntax
 ```
 

@@ -1,4 +1,5 @@
                         {% from '_icons.html' import icon %}
+                        {% if not service_flags.standalone %}
                         <div class="builder-card rail-card">
                             <h3 class="rail-heading">pull data</h3>
                             <form method="POST" id="stats_form">
@@ -44,6 +45,7 @@
                             <button id="pullSeerrRequestsBtn" class="nl-btn nl-btn--ghost"{% if not service_flags.seerr %} disabled title="Configure Seerr in settings"{% endif %}>Get Seerr Requests</button>
                             <p class="rail-note">Pending and approved movie/TV requests from Seerr (or Overseerr/Jellyseerr), if configured in settings.</p>
                         </div>
+                        {% endif %}
 
                         <div class="builder-card rail-card">
                             <h3 class="rail-heading">cache</h3>

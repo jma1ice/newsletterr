@@ -1,5 +1,6 @@
 import sqlite3
 
+from app import config
 from app.config import DEFAULT_PLEX_WEB_URL
 from app.db import db_connect
 from app.crypto import decrypt
@@ -67,6 +68,19 @@ DEFAULTS = {
     "appearance_theme": "dark",
     "pride_flag": "off",
     "snapins_floating": "1",
+    "default_landing_page": "builder",
+    "week_start_day": "sunday",
+    "date_format": "mdy",
+    "time_format": "12",
+    "dn_item_count": "",
+    "dn_show_artists": "enabled",
+    "dn_show_tracks": "enabled",
+    "dn_show_albums": "enabled",
+    "dn_show_genres": "enabled",
+    "dn_cover_art": "disabled",
+    "wrapped_extra_stats": "",
+    "wrapped_rank_depth": "1",
+    "playback_reporting_enabled": "disabled",
     "plex_web_url": DEFAULT_PLEX_WEB_URL,
     "media_server_type": "plex",
     "jellyfin_url": "",
@@ -110,13 +124,34 @@ def get_settings(decrypt_secrets=True):
             s[col] = int(s.get(col) or default)
         except (TypeError, ValueError):
             s[col] = default
+
+    if config.DEMO_MODE:
+        # Demo mode never writes settings: the sample install and whatever the
+        # visitor picked this session are layered on here, at the one place
+        # every page, builder and layout reads settings from. Imported lazily
+        # so the layering stays one-way (demo sits above this module).
+        from app.demo import apply_settings_overlay
+        s = apply_settings_overlay(s)
+
     return s
 
 def get_service_flags(s):
     """Booleans only (no URLs/keys leak to the client): which pull-data
-    services are configured, so the frontend can grey out buttons that
-    would just fail. `s` is a settings dict as returned by get_settings()."""
+    services are configured, so the frontend can gray out buttons that
+    would just fail. `s` is a settings dict as returned by get_settings().
+
+    Standalone mode reports every pull service as unconfigured whatever the
+    stored credentials say. This is the single chokepoint that makes the
+    builder degrade: the pull buttons disable themselves and the snap-in cards,
+    which already gate on having data, stay hidden."""
+    if (s.get("media_server_type") or "plex") == "none":
+        return {
+            "tautulli": False, "conjurr": False, "droppedneedle": False,
+            "calendar": False, "ombi": False, "seerr": False,
+            "jellyfin": False, "jellywatch": False, "standalone": True,
+        }
     return {
+        "standalone": False,
         "tautulli": bool(s.get("tautulli_url") and s.get("tautulli_api")),
         "conjurr": bool(s.get("conjurr_url")),
         "droppedneedle": bool(s.get("droppedneedle_url") and s.get("droppedneedle_api_key")),

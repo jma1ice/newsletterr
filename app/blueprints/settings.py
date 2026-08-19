@@ -5,7 +5,8 @@ import os, time
 from flask import Blueprint, abort, current_app, jsonify, redirect, render_template, request, session, url_for
 from PIL import Image
 
-from app.config import DEFAULT_RADARR_URL, DEFAULT_SONARR_URL, DEFAULT_OMBI_URL, DEFAULT_SEERR_URL, DEFAULT_PLEX_WEB_URL, DEFAULT_TAUTULLI_URL, DEFAULT_DROPPEDNEEDLE_URL, DEFAULT_JELLYFIN_URL
+from app.config import DEFAULT_RADARR_URL, DEFAULT_SONARR_URL, DEFAULT_OMBI_URL, DEFAULT_SEERR_URL, DEFAULT_PLEX_WEB_URL, DEFAULT_TAUTULLI_URL, DEFAULT_DROPPEDNEEDLE_URL, DEFAULT_JELLYFIN_URL, LANDING_PAGES
+from app import dates
 from app.db import db_connect
 from app.settings_store import get_settings
 from app.crypto import encrypt, decrypt
@@ -13,6 +14,8 @@ from werkzeug.security import generate_password_hash
 from app.hooks import refresh_hsts_setting
 from app.theme import CUSTOM_UI_KEYS, parse_custom_ui_colors, is_hex_color
 from app.emails.density import DENSITIES, resolve as resolve_density
+from app.emails.builders.stats import WRAPPED_EXTRA_STATS, parse_wrapped_extras
+from app.clients.mediaserver import MEDIA_SERVER_TYPES
 from app.security import require_csrf_for_json, requires_auth
 from app.blueprints.api import test_tautulli_connection, test_conjurr_connection, test_droppedneedle_connection, test_sonarr_connection, test_radarr_connection, test_ombi_connection, test_seerr_connection, test_jellyfin_connection, test_jellywatch_connection
 
@@ -22,6 +25,101 @@ logger = logging.getLogger(__name__)
 
 bp = Blueprint('settings', __name__)
 
+# Email color presets, module level so the settings route and demo mode
+# (app/demo.py, which applies a settings POST to a session overlay instead of
+# the database) resolve a theme name to the same colors.
+THEME_PRESETS = {
+    "newsletterr_blue": {
+        "primary_color": "#8acbd4",
+        "secondary_color": "#222222",
+        "accent_color": "#62a1a4",
+        "background_color": "#333333",
+        "text_color": "#62a1a4",
+        "logo_filename": "Asset_94x.png"
+    },
+    "plex_orange": {
+        "primary_color": "#e5a00d",
+        "secondary_color": "#222222",
+        "accent_color": "#cc7b19",
+        "background_color": "#333333",
+        "text_color": "#cc7b19",
+        "logo_filename": "Asset_45x.png"
+    },
+    "pride_rainbow": {
+        "primary_color": "#ff8c00",
+        "secondary_color": "#222222",
+        "accent_color": "#e40303",
+        "background_color": "#333333",
+        "text_color": "#ffb163",
+        "logo_filename": "Asset_51.png"
+    },
+    "pride_trans": {
+        "primary_color": "#5bcefa",
+        "secondary_color": "#222222",
+        "accent_color": "#f5a9b8",
+        "background_color": "#333333",
+        "text_color": "#9bd7f2",
+        "logo_filename": "Asset_51.png"
+    },
+    "pride_bi": {
+        "primary_color": "#d60270",
+        "secondary_color": "#222222",
+        "accent_color": "#9b4f96",
+        "background_color": "#333333",
+        "text_color": "#e07db4",
+        "logo_filename": "Asset_51.png"
+    },
+    "pride_pan": {
+        "primary_color": "#ff218c",
+        "secondary_color": "#222222",
+        "accent_color": "#21b1ff",
+        "background_color": "#333333",
+        "text_color": "#6ec8ff",
+        "logo_filename": "Asset_51.png"
+    },
+    "pride_lesbian": {
+        "primary_color": "#ff9a56",
+        "secondary_color": "#222222",
+        "accent_color": "#d52d00",
+        "background_color": "#333333",
+        "text_color": "#ffb185",
+        "logo_filename": "Asset_51.png"
+    },
+    "pride_nonbinary": {
+        "primary_color": "#9c59d1",
+        "secondary_color": "#222222",
+        "accent_color": "#7a3fb0",
+        "background_color": "#333333",
+        "text_color": "#c9a2e8",
+        "logo_filename": "Asset_51.png"
+    },
+    "pride_ace": {
+        "primary_color": "#800080",
+        "secondary_color": "#222222",
+        "accent_color": "#a3a3a3",
+        "background_color": "#333333",
+        "text_color": "#c79fc7",
+        "logo_filename": "Asset_51.png"
+    },
+    "pride_progress": {
+        "primary_color": "#ff8c00",
+        "secondary_color": "#222222",
+        "accent_color": "#5bcefa",
+        "background_color": "#333333",
+        "text_color": "#ffb163",
+        "logo_filename": "Asset_51.png"
+    }
+}
+
+PRESET_LOGO_FILES = {
+    "newsletterr_blue_small": "Asset_54x.png",
+    "newsletterr_orange_small": "Asset_46x.png",
+    "newsletterr_pride_small": "Asset_50.png",
+    "newsletterr_blue_banner": "Asset_94x.png",
+    "newsletterr_orange_banner": "Asset_45x.png",
+    "newsletterr_pride_banner": "Asset_51.png"
+}
+
 @bp.route('/settings', methods=['GET', 'POST'])
 @requires_auth
 def settings():
@@ -29,110 +127,14 @@ def settings():
     cursor = conn.cursor()
 
     alert = request.args.get('alert')
-    # Audit results ride in the session, not the query string: the full audit
-    # JSON (plus the settings dict this route used to pass) overflowed
-    # gunicorn's request-line limit (4094 bytes) and 400'd the redirect after a
-    # successful save. Keep the ?audit= fallback for any in-flight old links.
     audit_raw = session.pop('settings_audit', None) or request.args.get('audit')
     try:
         audit_results = json.loads(audit_raw or 'null')
     except (TypeError, ValueError):
         audit_results = None
 
-    theme_presets = {
-        "newsletterr_blue": {
-            "primary_color": "#8acbd4",
-            "secondary_color": "#222222",
-            "accent_color": "#62a1a4",
-            "background_color": "#333333",
-            "text_color": "#62a1a4",
-            "logo_filename": "Asset_94x.png"
-        },
-        "plex_orange": {
-            "primary_color": "#e5a00d",
-            "secondary_color": "#222222",
-            "accent_color": "#cc7b19",
-            "background_color": "#333333",
-            "text_color": "#cc7b19",
-            "logo_filename": "Asset_45x.png"
-        },
-        # Pride presets (NEWS-30): flag signature colors on the same dark
-        # chassis as the base presets so card text contrast holds. The header
-        # gradient runs accent -> primary; all use the pride banner logo.
-        "pride_rainbow": {
-            "primary_color": "#ff8c00",
-            "secondary_color": "#222222",
-            "accent_color": "#e40303",
-            "background_color": "#333333",
-            "text_color": "#ffb163",
-            "logo_filename": "Asset_51.png"
-        },
-        "pride_trans": {
-            "primary_color": "#5bcefa",
-            "secondary_color": "#222222",
-            "accent_color": "#f5a9b8",
-            "background_color": "#333333",
-            "text_color": "#9bd7f2",
-            "logo_filename": "Asset_51.png"
-        },
-        "pride_bi": {
-            "primary_color": "#d60270",
-            "secondary_color": "#222222",
-            "accent_color": "#9b4f96",
-            "background_color": "#333333",
-            "text_color": "#e07db4",
-            "logo_filename": "Asset_51.png"
-        },
-        "pride_pan": {
-            "primary_color": "#ff218c",
-            "secondary_color": "#222222",
-            "accent_color": "#21b1ff",
-            "background_color": "#333333",
-            "text_color": "#6ec8ff",
-            "logo_filename": "Asset_51.png"
-        },
-        "pride_lesbian": {
-            "primary_color": "#ff9a56",
-            "secondary_color": "#222222",
-            "accent_color": "#d52d00",
-            "background_color": "#333333",
-            "text_color": "#ffb185",
-            "logo_filename": "Asset_51.png"
-        },
-        "pride_nonbinary": {
-            "primary_color": "#9c59d1",
-            "secondary_color": "#222222",
-            "accent_color": "#7a3fb0",
-            "background_color": "#333333",
-            "text_color": "#c9a2e8",
-            "logo_filename": "Asset_51.png"
-        },
-        "pride_ace": {
-            "primary_color": "#800080",
-            "secondary_color": "#222222",
-            "accent_color": "#a3a3a3",
-            "background_color": "#333333",
-            "text_color": "#c79fc7",
-            "logo_filename": "Asset_51.png"
-        },
-        "pride_progress": {
-            "primary_color": "#ff8c00",
-            "secondary_color": "#222222",
-            "accent_color": "#5bcefa",
-            "background_color": "#333333",
-            "text_color": "#ffb163",
-            "logo_filename": "Asset_51.png"
-        }
-    }
-
-    preset_logo_name_to_file = {
-        "newsletterr_blue_small": "Asset_54x.png",
-        "newsletterr_orange_small": "Asset_46x.png",
-        "newsletterr_pride_small": "Asset_50.png",
-        "newsletterr_blue_banner": "Asset_94x.png",
-        "newsletterr_orange_banner": "Asset_45x.png",
-        "newsletterr_pride_banner": "Asset_51.png"
-    }
+    theme_presets = THEME_PRESETS
+    preset_logo_name_to_file = PRESET_LOGO_FILES
 
     if request.method == "POST":
         token = request.form.get("csrf_token", "").strip()
@@ -192,7 +194,7 @@ def settings():
             seerr_url = request.form.get("seerr_url")
             seerr_api_key = _secret("seerr_api_key", existing_seerr_api_key)
             media_server_type = request.form.get("media_server_type", "plex")
-            if media_server_type not in ("plex", "jellyfin"):
+            if media_server_type not in MEDIA_SERVER_TYPES:
                 media_server_type = "plex"
             jellyfin_url = request.form.get("jellyfin_url")
             jellyfin_api_key = _secret("jellyfin_api_key", existing_jellyfin_api_key)
@@ -286,6 +288,27 @@ def settings():
             # /api/appearance; pride and floating round-trip through this form.
             pride_flag = request.form.get("pride_flag", "off")
             snapins_floating = "0" if request.form.get("snapins_floating") == "0" else "1"
+            default_landing_page = request.form.get("default_landing_page", "builder")
+            if default_landing_page not in LANDING_PAGES:
+                default_landing_page = "builder"
+            week_start_day = dates.resolve_week_start(request.form.get("week_start_day"))
+            date_format = dates.resolve_date_format(request.form.get("date_format"))
+            time_format = dates.resolve_time_format(request.form.get("time_format"))
+            dn_item_count = (request.form.get("dn_item_count") or "").strip()
+            if dn_item_count and not dn_item_count.isdigit():
+                dn_item_count = ""
+            dn_show_artists = "disabled" if request.form.get("dn_show_artists") == "disabled" else "enabled"
+            dn_show_tracks = "disabled" if request.form.get("dn_show_tracks") == "disabled" else "enabled"
+            dn_show_albums = "disabled" if request.form.get("dn_show_albums") == "disabled" else "enabled"
+            dn_show_genres = "disabled" if request.form.get("dn_show_genres") == "disabled" else "enabled"
+            dn_cover_art = "enabled" if request.form.get("dn_cover_art") == "enabled" else "disabled"
+            wrapped_extra_stats = json.dumps([
+                k for k in request.form.getlist("wrapped_extra_stats") if k in WRAPPED_EXTRA_STATS
+            ]) if request.form.getlist("wrapped_extra_stats") else ""
+            wrapped_rank_depth = request.form.get("wrapped_rank_depth", "1")
+            if wrapped_rank_depth not in ("1", "3", "5"):
+                wrapped_rank_depth = "1"
+            playback_reporting_enabled = "enabled" if request.form.get("playback_reporting_enabled") == "enabled" else "disabled"
             # Custom UI theme colors: stored as JSON per mode; blank when the
             # pickers were never touched. Values are validated (hex-only) at
             # render time in app/theme.py, so raw form input is safe to store.
@@ -330,8 +353,8 @@ def settings():
                 INSERT INTO settings
                 (id, from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, plex_url, plex_web_url, tautulli_url,
                     tautulli_api, conjurr_url, droppedneedle_url, droppedneedle_api_key, recipient_display_name, logo_filename, logo_width, email_theme, primary_color, secondary_color, accent_color, background_color,
-                    text_color, from_name, custom_logo_filename, login_toggle, nl_username, nl_password, default_intro_text, default_outro_text, hsts_enabled, scheduled_subject_prefix, logo_position, hide_stat_play_counts, hide_graph_play_counts, stats_type, recently_added_mode, recently_added_sort, ra_grid_columns, recs_grid_columns, recs_item_count, stat_cover_art, send_mode, poster_max_height, discord_webhook_url, sonarr_url, sonarr_api_key, radarr_url, radarr_api_key, ombi_url, ombi_api_key, seerr_url, seerr_api_key, coming_soon_days_ahead, released_since_days, coming_soon_grid_columns, hosted_enabled, hosted_base_url, hosted_images_enabled, hosted_image_retention_days, hosted_links_enabled, hosted_links_base_url, collections_grid_columns, ra_show_description, recs_show_description, exclude_inactive_days, include_user_info, email_size_warn_mb, pride_flag, snapins_floating, ui_custom_light, ui_custom_dark, email_layout, email_density, email_show_server_name, email_header_bg, email_eyebrow_text, email_auto_header_text, media_server_type, jellyfin_url, jellyfin_api_key, jellyfin_web_url, jellywatch_url, jellywatch_api_key)
-                VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    text_color, from_name, custom_logo_filename, login_toggle, nl_username, nl_password, default_intro_text, default_outro_text, hsts_enabled, scheduled_subject_prefix, logo_position, hide_stat_play_counts, hide_graph_play_counts, stats_type, recently_added_mode, recently_added_sort, ra_grid_columns, recs_grid_columns, recs_item_count, stat_cover_art, send_mode, poster_max_height, discord_webhook_url, sonarr_url, sonarr_api_key, radarr_url, radarr_api_key, ombi_url, ombi_api_key, seerr_url, seerr_api_key, coming_soon_days_ahead, released_since_days, coming_soon_grid_columns, hosted_enabled, hosted_base_url, hosted_images_enabled, hosted_image_retention_days, hosted_links_enabled, hosted_links_base_url, collections_grid_columns, ra_show_description, recs_show_description, exclude_inactive_days, include_user_info, email_size_warn_mb, pride_flag, snapins_floating, ui_custom_light, ui_custom_dark, email_layout, email_density, email_show_server_name, email_header_bg, email_eyebrow_text, email_auto_header_text, media_server_type, jellyfin_url, jellyfin_api_key, jellyfin_web_url, jellywatch_url, jellywatch_api_key, default_landing_page, week_start_day, date_format, time_format, dn_item_count, dn_show_artists, dn_show_tracks, dn_show_albums, dn_show_genres, dn_cover_art, wrapped_extra_stats, wrapped_rank_depth, playback_reporting_enabled)
+                VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT (id) DO UPDATE
                 SET from_email = excluded.from_email, alias_email = excluded.alias_email, reply_to_email = excluded.reply_to_email, password = excluded.password,
                     smtp_username = excluded.smtp_username, smtp_server = excluded.smtp_server, smtp_port = excluded.smtp_port, smtp_protocol = excluded.smtp_protocol,
@@ -387,14 +410,30 @@ def settings():
                     jellyfin_api_key = excluded.jellyfin_api_key,
                     jellyfin_web_url = excluded.jellyfin_web_url,
                     jellywatch_url = excluded.jellywatch_url,
-                    jellywatch_api_key = excluded.jellywatch_api_key
+                    jellywatch_api_key = excluded.jellywatch_api_key,
+                    default_landing_page = excluded.default_landing_page,
+                    week_start_day = excluded.week_start_day,
+                    date_format = excluded.date_format,
+                    time_format = excluded.time_format,
+                    dn_item_count = excluded.dn_item_count,
+                    dn_show_artists = excluded.dn_show_artists,
+                    dn_show_tracks = excluded.dn_show_tracks,
+                    dn_show_albums = excluded.dn_show_albums,
+                    dn_show_genres = excluded.dn_show_genres,
+                    dn_cover_art = excluded.dn_cover_art,
+                    wrapped_extra_stats = excluded.wrapped_extra_stats,
+                    wrapped_rank_depth = excluded.wrapped_rank_depth,
+                    playback_reporting_enabled = excluded.playback_reporting_enabled
             """, (from_email, alias_email, reply_to_email, password, smtp_username, smtp_server, smtp_port, smtp_protocol, server_name, plex_url, plex_web_url, tautulli_url, tautulli_api,
                   conjurr_url, droppedneedle_url, droppedneedle_api_key, recipient_display_name, logo_filename, logo_width, email_theme, primary_color, secondary_color, accent_color, background_color, text_color, from_name,
                   custom_logo_filename, login_toggle, nl_username, nl_password, default_intro_text, default_outro_text, hsts_enabled, scheduled_subject_prefix, logo_position,
                   hide_stat_play_counts, hide_graph_play_counts, stats_type, recently_added_mode, recently_added_sort, ra_grid_columns, recs_grid_columns, recs_item_count, stat_cover_art, send_mode, poster_max_height, discord_webhook_url,
                   sonarr_url, sonarr_api_key, radarr_url, radarr_api_key, ombi_url, ombi_api_key, seerr_url, seerr_api_key, coming_soon_days_ahead, released_since_days, coming_soon_grid_columns, hosted_enabled, hosted_base_url, hosted_images_enabled, hosted_image_retention_days, hosted_links_enabled, hosted_links_base_url,
                   collections_grid_columns, ra_show_description, recs_show_description, exclude_inactive_days, include_user_info, email_size_warn_mb, pride_flag, snapins_floating, ui_custom_light, ui_custom_dark, email_layout, email_density, email_show_server_name, email_header_bg, email_eyebrow_text, email_auto_header_text,
-                  media_server_type, jellyfin_url, jellyfin_api_key, jellyfin_web_url, jellywatch_url, jellywatch_api_key))
+                  media_server_type, jellyfin_url, jellyfin_api_key, jellyfin_web_url, jellywatch_url, jellywatch_api_key,
+                  default_landing_page, week_start_day, date_format, time_format,
+                  dn_item_count, dn_show_artists, dn_show_tracks, dn_show_albums, dn_show_genres, dn_cover_art,
+                  wrapped_extra_stats, wrapped_rank_depth, playback_reporting_enabled))
             conn.commit()
             cursor.execute("SELECT plex_token FROM settings WHERE id = 1")
             plex_token = cursor.fetchone()[0]
@@ -791,6 +830,19 @@ def settings():
         "email_size_warn_mb": email_size_warn_mb if email_size_warn_mb is not None else "10",
         "pride_flag": pride_flag or "off",
         "snapins_floating": snapins_floating if snapins_floating not in (None, "") else "1",
+        "default_landing_page": s.get("default_landing_page") or "builder",
+        "week_start_day": dates.resolve_week_start(s.get("week_start_day")),
+        "date_format": dates.resolve_date_format(s.get("date_format")),
+        "time_format": dates.resolve_time_format(s.get("time_format")),
+        "dn_item_count": s.get("dn_item_count") or "",
+        "dn_show_artists": s.get("dn_show_artists") or "enabled",
+        "dn_show_tracks": s.get("dn_show_tracks") or "enabled",
+        "dn_show_albums": s.get("dn_show_albums") or "enabled",
+        "dn_show_genres": s.get("dn_show_genres") or "enabled",
+        "dn_cover_art": s.get("dn_cover_art") or "disabled",
+        "wrapped_extra_stats": list(parse_wrapped_extras(s.get("wrapped_extra_stats"))),
+        "wrapped_rank_depth": str(s.get("wrapped_rank_depth") or "1"),
+        "playback_reporting_enabled": s.get("playback_reporting_enabled") or "disabled",
     }
     # Effective custom UI theme colors for the appearance pickers (validated,
     # with per-key fallbacks, so the inputs always hold a usable value)

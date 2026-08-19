@@ -59,6 +59,19 @@ DEFAULT_JELLYFIN_URL = "http://localhost:8096"
 # The DDL default in db.py and the migration in __init__.py must match this.
 DEFAULT_PLEX_WEB_URL = "https://app.plex.tv/desktop"
 
+# Default landing page. The stored setting is one of these keys, never
+# an endpoint name: url_for() on an unknown endpoint raises BuildError, which
+# would 500 the login, so the lookup goes through this dict and falls back.
+LANDING_ENDPOINTS = {
+    "builder": "main.index",
+    "scheduling": "scheduling.scheduling",
+    "history": "emails.email_history",
+    "logs": "logs.logs_page",
+    "settings": "settings.settings",
+}
+LANDING_PAGES = tuple(LANDING_ENDPOINTS)
+DEFAULT_LANDING_PAGE = "builder"
+
 CACHE_DURATION = 86400
 CACHE_EXTENDED_DURATION = 86400 * 7
 

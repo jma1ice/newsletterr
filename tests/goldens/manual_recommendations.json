@@ -30,7 +30,8 @@
   "plain": "Manual Picks\n\n[TestPlex]\n\nThe Header\n\nManual personal intro\n\nGenerated for Plex Media Server by newsletterr (https://github.com/jma1ice/newsletterr)\n\nnewsletterr is not affiliated with or a product of Plex, Inc.",
   "response": {
     "sent_groups": [
-      "a@b.c"
+      "a@b.c",
+      "d@e.f"
     ],
     "success": true
   }

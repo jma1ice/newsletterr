@@ -27,7 +27,7 @@ function buildMWLibraryRows() {
                 </div>
                 <span class="snapin-row-label" title="${escapeHtml(lib)}">${escapeHtml(lib)}</span>
                 <select class="mw-scope-select"
-                        title="Time scope for ${escapeHtml(lib)}: all-time play counts, or plays within the pulled time range. Set before clicking Add."
+                        title="Time scope for ${escapeHtml(lib)}: all-time totals, or the pulled time range. Ranked by the Stats &amp; Graph Metric setting. Set before clicking Add."
                         style="width: 8em; margin-left: auto; flex-shrink: 0; font-size: .8rem; padding: .15rem .3rem;">
                     <option value="">All-time</option>
                     <option value="recent">Pull range</option>

@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 # same brace-matching extractor the preview parity guards use
-from tests.test_js_preview_parity import _extract_js_function
+from tests.js_helpers import _extract_js_function
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 RECS_JS = REPO_ROOT / "static/js/app/09-recs-wrapped.js"

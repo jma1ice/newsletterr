@@ -24,7 +24,7 @@ from pathlib import Path
 import pytest
 
 from app.emails.scheduled import apply_chart_captures
-from tests.test_js_preview_parity import _extract_js_function
+from tests.js_helpers import _extract_js_function
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 

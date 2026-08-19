@@ -10,6 +10,7 @@ from datetime import datetime, timedelta, timezone
 from app.settings_store import get_settings
 from app.crypto import decrypt
 from app.security import safe_get
+from app.store import get_media_user_emails
 
 import logging
 
@@ -67,16 +68,19 @@ def get_jellyfin_server_id():
         mark_jellyfin_failed()
         return None
 
-def build_jellyfin_web_link(item_id, server_id, jellyfin_web_url=None, jellyfin_url=None):
-    """Jellyfin web deep link. Single fallback chokepoint mirroring
-    build_plex_web_link: jellyfin_web_url when set, else the server URL
-    itself (the bundled web client lives under /web on every install)."""
+_WEB_DETAIL_ROUTE = {'jellyfin': 'details', 'emby': 'item'}
+
+def build_jellyfin_web_link(item_id, server_id, jellyfin_web_url=None, jellyfin_url=None, server_type='jellyfin'):
+    """Jellyfin or Emby web deep link. Single fallback chokepoint mirroring
+    build_plex_web_link: the web URL when set, else the server URL itself (the
+    bundled web client lives under /web on both)."""
     if not item_id:
         return ""
     base = (jellyfin_web_url or jellyfin_url or '').rstrip('/')
     if not base:
         return ""
-    link = f"{base}/web/index.html#!/details?id={item_id}"
+    route = _WEB_DETAIL_ROUTE.get(server_type, 'details')
+    link = f"{base}/web/index.html#!/{route}?id={item_id}"
     if server_id:
         link += f"&serverId={server_id}"
     return link
@@ -164,10 +168,7 @@ def get_jellyfin_admin_user_id():
 
 def fetch_jellyfin_users():
     """Jellyfin users normalized to the Tautulli get_users subset the app
-    consumes: [{user_id, friendly_name, email, is_active}]. Honest limitation:
-    Jellyfin does not store user emails, so 'email' is always None and
-    recipient lists are managed manually (the email-lists feature covers
-    this). [] on failure or when unconfigured."""
+    consumes: [{user_id, username, friendly_name, email, is_active}]."""
     url, api_key = _jellyfin_connection()
     if not url:
         return []
@@ -179,13 +180,26 @@ def fetch_jellyfin_users():
         logger.exception(f"Error fetching Jellyfin users: {e}")
         mark_jellyfin_failed()
         return []
+
+    # Keyed by the active server, because Jellyfin and Emby user ids are
+    # unrelated and a mapping made on one must not be read back on the other.
+    # Falls back to 'jellyfin' when the active server is neither: this client
+    # can be called while Plex is selected but Jellyfin is still configured,
+    # and looking the mapping up under 'plex' would silently find nothing.
+    from app.clients.mediaserver import media_user_scope
+    mapped = get_media_user_emails(media_user_scope())
+
     normalized = []
     for user in users:
+        user_id = str(user.get('Id', ''))
+        name = user.get('Name', '')
         normalized.append({
-            'user_id': str(user.get('Id', '')),
-            'friendly_name': user.get('Name', ''),
-            'email': None,  # Jellyfin has no user email field
+            'user_id': user_id,
+            'username': name,
+            'friendly_name': name,
+            'email': mapped.get(user_id) or None,
             'is_active': not (user.get('Policy') or {}).get('IsDisabled', False),
+            'last_seen': _iso_to_epoch(user.get('LastActivityDate')),
         })
     return normalized
 

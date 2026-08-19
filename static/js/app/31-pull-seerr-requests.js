@@ -69,7 +69,8 @@ window.pullRunners.seerr = async function ({ chained = false } = {}) {
     }
 };
 
-document.getElementById('pullSeerrRequestsBtn').addEventListener('click', (e) => {
+const _pullSeerrRequestsBtn = document.getElementById('pullSeerrRequestsBtn');
+if (_pullSeerrRequestsBtn) _pullSeerrRequestsBtn.addEventListener('click', (e) => {
     if (!confirmFreshRepull(e.currentTarget, 'seerr')) return;
     window.pullRunners.seerr({ chained: false });
 });

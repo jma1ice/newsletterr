@@ -41,6 +41,51 @@
                     <button type="submit" class="btn btn-primary btn-login w-100">Continue</button>
                 </form>
 
+            {% elif step == 'mode' %}
+                <h5 class="step-title">What are you sending?</h5>
+                <p class="step-subtitle">This decides how much of the wizard is left. You can change it later in Settings.</p>
+                <form method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+                    <div class="mb-3">
+                        <label class="setup-mode-option d-block mb-3">
+                            <input type="radio" name="setup_mode" value="media" checked>
+                            <strong>Media server newsletter</strong>
+                            <small class="form-text text-muted d-block">Pulls recently added, stats, requests and artwork from Plex or Jellyfin. The rest of the wizard connects those services, all of them optional.</small>
+                        </label>
+                        <label class="setup-mode-option d-block">
+                            <input type="radio" name="setup_mode" value="standalone">
+                            <strong>Standalone mailing list</strong>
+                            <small class="form-text text-muted d-block">No media server. Just your own content, your own recipient lists, and the scheduler. The media snap-ins stay out of the builder and nothing is pulled from a server.</small>
+                        </label>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-login w-100">Continue</button>
+                </form>
+
+            {% elif step == 'contacts' %}
+                <h5 class="step-title">Recipients (optional)</h5>
+                <p class="step-subtitle">Seed your first list now, or add one later from the builder.</p>
+                <form method="POST" enctype="multipart/form-data">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+                    <div class="mb-3">
+                        <label for="list_name" class="form-label">List name</label>
+                        <input type="text" class="form-control" id="list_name" name="list_name" value="Subscribers">
+                    </div>
+                    <div class="mb-3">
+                        <label for="contacts_file" class="form-label">CSV file</label>
+                        <input type="file" class="form-control" id="contacts_file" name="contacts_file" accept=".csv,.txt,text/csv,text/plain">
+                        <small class="form-text text-muted">A header row naming an email and an optional name column, or just one address per line. A file replaces anything pasted below.</small>
+                    </div>
+                    <div class="mb-3">
+                        <label for="contacts_text" class="form-label">Or paste addresses</label>
+                        <textarea class="form-control" id="contacts_text" name="contacts_text" rows="5" placeholder="ada@example.com, Ada Lovelace&#10;grace@example.com, Grace Hopper"></textarea>
+                    </div>
+                    <div class="d-flex gap-2 mt-4">
+                        <a href="{{ url_for('main.index') }}" class="btn btn-outline-secondary w-100">Skip &amp; Finish</a>
+                        <button type="submit" class="btn btn-primary btn-login w-100">Finish</button>
+                    </div>
+                </form>
+                <p class="text-center mt-3"><a href="{{ url_for('auth.setup_email') }}">&larr; Back</a></p>
+
             {% elif step == 'email' %}
                 <h5 class="step-title">Email server</h5>
                 <p class="step-subtitle">Required to send newsletters and to unlock the rest of the app.</p>
@@ -128,12 +173,20 @@
                 <p class="text-center mt-3"><a href="{{ url_for('auth.setup_email') }}">&larr; Back</a></p>
 
             {% elif step == 'jellyfin' %}
-                <h5 class="step-title">Jellyfin (optional)</h5>
+                <h5 class="step-title">Jellyfin or Emby (optional)</h5>
                 <p class="step-subtitle">Using Jellyfin instead of Plex? Connect it here; filling this in makes Jellyfin your media server. Jellywatch fills the stats role Tautulli plays for Plex. Jellyfin has no user emails, so manage recipient lists manually; requests still work through Jellyseerr in the Seerr step.</p>
                 <form method="POST" id="jellyfin-form">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
                     <div class="mb-3">
-                        <label for="jellyfin_url" class="form-label">Jellyfin URL</label>
+                        <label for="jellyfin_flavor" class="form-label">Which one?</label>
+                        <select class="form-control" id="jellyfin_flavor" name="jellyfin_flavor">
+                            <option value="jellyfin">Jellyfin</option>
+                            <option value="emby">Emby</option>
+                        </select>
+                        <small class="form-text text-muted">They share one client here because Jellyfin forked from Emby. Emby support is written from its documentation and has not been verified against a real server yet.</small>
+                    </div>
+                    <div class="mb-3">
+                        <label for="jellyfin_url" class="form-label">Server URL</label>
                         <input type="text" class="form-control" id="jellyfin_url" name="jellyfin_url" value="{{ settings.jellyfin_url or '' }}" placeholder="http://localhost:8096">
                         <small class="form-text text-muted">Leave blank to use http://localhost:8096. Clear the API key to disable.</small>
                     </div>

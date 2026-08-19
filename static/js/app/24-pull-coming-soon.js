@@ -74,7 +74,8 @@ window.pullRunners.coming_soon = async function ({ chained = false } = {}) {
     }
 };
 
-document.getElementById('pullComingSoonBtn').addEventListener('click', (e) => {
+const _pullComingSoonBtn = document.getElementById('pullComingSoonBtn');
+if (_pullComingSoonBtn) _pullComingSoonBtn.addEventListener('click', (e) => {
     if (!confirmFreshRepull(e.currentTarget, 'coming_soon')) return;
     window.pullRunners.coming_soon({ chained: false });
 });

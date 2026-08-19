@@ -21,7 +21,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.test_js_preview_parity import _extract_js_function
+from tests.js_helpers import _extract_js_function
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 PREVIEW_JS = REPO_ROOT / "static/js/app/01-preview.js"

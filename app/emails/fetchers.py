@@ -47,7 +47,11 @@ def fetch_tautulli_data_for_email(tautulli_base_url, tautulli_api_key, date_rang
         {'command': 'get_stream_type_by_top_10_users', 'name': 'Stream Type by Top Users'}
     ]
     
-    jellyfin_active = get_media_server_type() == 'jellyfin'
+    server_type = get_media_server_type()
+    if server_type == 'none':
+        return data
+
+    jellyfin_active = server_type in ('jellyfin', 'emby')
 
     try:
         if jellyfin_active:
@@ -96,8 +100,8 @@ def fetch_tautulli_data_for_email(tautulli_base_url, tautulli_api_key, date_rang
         data['recent_data'] = recent_data
 
         if not jellyfin_active:
-            data['most_watched_data'] = fetch_most_watched_data(tautulli_base_url, tautulli_api_key)
-            data['most_watched_recent_data'] = fetch_most_watched_data(tautulli_base_url, tautulli_api_key, days=date_range)
+            data['most_watched_data'] = fetch_most_watched_data(tautulli_base_url, tautulli_api_key, metric=stats_type)
+            data['most_watched_recent_data'] = fetch_most_watched_data(tautulli_base_url, tautulli_api_key, days=date_range, metric=stats_type)
         data['most_watched_recent_days'] = date_range
 
         logger.info(f"Fetched media data: {len(data['stats'])} stats, {len(data['graph_data'])} graphs, {len(data['recent_data'])} recent sections")
@@ -109,6 +113,16 @@ def fetch_tautulli_data_for_email(tautulli_base_url, tautulli_api_key, date_rang
 
 def fetch_recent_data_for_index(tautulli_base_url, tautulli_api_key, count, recently_added_mode="items", recently_added_sort="date"):
     return fetch_recently_added(tautulli_base_url, tautulli_api_key, int(count), recently_added_mode=recently_added_mode, recently_added_sort=recently_added_sort)
+
+def _row_seconds(row):
+    for key in ('duration', 'play_duration'):
+        try:
+            value = int(row.get(key) or 0)
+        except (TypeError, ValueError):
+            continue
+        if value > 0:
+            return value
+    return 0
 
 def _aggregate_history_rows(rows):
     """Collapse get_history play rows to top-level items with play counts:
@@ -140,15 +154,17 @@ def _aggregate_history_rows(rows):
                 'year': str(row.get('year', '') or ''),
                 'thumb': thumb or '',
                 'play_count': 1,
+                'total_duration': _row_seconds(row),
                 'last_played': row.get('date', ''),
                 'media_type': 'show' if media_type == 'episode' else ('album' if media_type == 'track' else media_type),
                 'type': 'show' if media_type == 'episode' else ('album' if media_type == 'track' else media_type),
             }
         else:
             agg['play_count'] += 1
+            agg['total_duration'] += _row_seconds(row)
     return list(aggregates.values())
 
-def fetch_most_watched_data(tautulli_base_url, tautulli_api_key, per_library=25, days=None):
+def fetch_most_watched_data(tautulli_base_url, tautulli_api_key, per_library=25, days=None, metric='plays'):
     """Most Watched snap-in (NEWS-17): per-library most watched content with
     pull-time plex_url enrichment (the NEWS-5 pattern) so cards deep-link
     into Plex without a render-time network call. Shaped like recent_data:
@@ -157,7 +173,15 @@ def fetch_most_watched_data(tautulli_base_url, tautulli_api_key, per_library=25,
     days=None is all-time (Tautulli get_library_media_info ordered by
     lifetime play_count). With days set, plays inside the window are pulled
     via get_history and aggregated here, episodes rolling up to shows and
-    tracks to albums."""
+    tracks to albums.
+
+    metric is the Stats & Graph Metric setting. 'duration' ranks by
+    watch time instead of play count, which always comes from the history
+    aggregation: get_library_media_info reports play counts and no watch time
+    at all, so the all-time scope switches to unwindowed history there. That
+    history call is capped at HISTORY_PAGE_LENGTH rows per library, so on a
+    library busier than the cap an all-time duration ranking covers the most
+    recent plays rather than every play ever."""
     most_watched_data = []
     libraries, _ = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_library_names', None, None)
     if not libraries:
@@ -168,20 +192,23 @@ def fetch_most_watched_data(tautulli_base_url, tautulli_api_key, per_library=25,
     plex_configured = bool(settings.get('plex_url') and settings.get('plex_token'))
     machine_id = get_plex_machine_id() if plex_configured else None
 
+    by_duration = metric == 'duration'
     after_date = None
     if days:
         try:
             after_date = (datetime.now() - timedelta(days=int(days))).strftime('%Y-%m-%d')
         except (TypeError, ValueError):
             after_date = None
+    use_history = bool(after_date) or by_duration
 
     for library in libraries:
         section_id = library.get('section_id')
         library_name = library.get('section_name', '')
 
         items = []
-        if after_date:
-            history, _ = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_history', section_id, None, after_date)
+        if use_history:
+            # a blank after date is the all-time history pull
+            history, _ = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_history', section_id, None, after_date or '')
             items = _aggregate_history_rows((history or {}).get('data') or [])
         else:
             info, _ = run_tautulli_command(tautulli_base_url, tautulli_api_key, 'get_library_media_info', section_id, None, str(per_library))
@@ -198,6 +225,9 @@ def fetch_most_watched_data(tautulli_base_url, tautulli_api_key, per_library=25,
                     'year': str(row.get('year', '') or ''),
                     'thumb': row.get('thumb', ''),
                     'play_count': play_count,
+                    # media info carries no watch time; the duration metric
+                    # never reaches this branch
+                    'total_duration': 0,
                     'last_played': row.get('last_played', ''),
                     'media_type': row.get('media_type', ''),
                     'type': row.get('media_type', ''),
@@ -210,7 +240,8 @@ def fetch_most_watched_data(tautulli_base_url, tautulli_api_key, per_library=25,
 
         if items:
             # rank explicitly so the card grid never depends on API ordering
-            items.sort(key=lambda x: x['play_count'], reverse=True)
+            _rank = 'total_duration' if by_duration else 'play_count'
+            items.sort(key=lambda x: x.get(_rank) or 0, reverse=True)
             most_watched_data.append({'most_watched': items[:per_library]})
 
     return most_watched_data
@@ -398,7 +429,11 @@ def get_yearly_wrapped_cached(use_cache=True):
 
         _s = get_settings(decrypt_secrets=False)
 
-        if get_media_server_type(_s) == 'jellyfin':
+        _server_type = get_media_server_type(_s)
+        if _server_type == 'none':
+            return None  # standalone mode has no watch history to wrap up
+
+        if _server_type in ('jellyfin', 'emby'):
             stats_data = fetch_jellywatch_home_stats(days=days_since_year_start()) or None
             if use_cache and stats_data:
                 set_cached_data('yearly_wrapped_json', stats_data, {'timestamp': time.time(), 'manual_fetch': True})

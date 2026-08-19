@@ -39,11 +39,11 @@
     // content or an attribute value cannot be mangled by accident.
     var ARTIFACT_PROPS = ['font-size', 'font-family'];
 
-    // Text blocks are centred by default, which leaves a list's markers
+    // Text blocks are centered by default, which leaves a list's markers
     // pinned to the far left of the block while the item text sits in the
     // middle - on a short item the bullet can end up an inch from its own
     // words. Shrink-wrapping the list with inline-block lets the parent
-    // centre it as a unit, and text-align: left keeps each marker next to
+    // center it as a unit, and text-align: left keeps each marker next to
     // its text. Applied to the element so it survives into the email, where
     // no stylesheet of ours reaches.
     function normalizeList(list) {
@@ -66,7 +66,7 @@
     }
 
     // Every <a> the selection touches. Link appearance lives on the anchor
-    // itself, so the underline and colour controls need the elements rather
+    // itself, so the underline and color controls need the elements rather
     // than the selection.
     function anchorsInSelection(surface) {
         var sel = document.getSelection();
@@ -174,7 +174,7 @@
         if (e.target.closest && e.target.closest('.rte-btn')) e.preventDefault();
     });
 
-    // The colour swatch is the exception: preventing default would stop the
+    // The color swatch is the exception: preventing default would stop the
     // native picker opening. Remember the selection instead and put it back
     // before applying, since opening the picker collapses it.
     var savedRange = null;
@@ -206,14 +206,14 @@
         if (!restoreSelection()) return;
 
         // foreColor as CSS rather than a <font> tag: a span carrying `color`
-        // is what the sanitizer keeps and what every client honours. Any
+        // is what the sanitizer keeps and what every client honors. Any
         // font-size the browser copies in alongside is stripped on read.
         try { document.execCommand('styleWithCSS', false, true); } catch (err) { /* older browsers */ }
         exec('foreColor', swatch.value);
         try { document.execCommand('styleWithCSS', false, false); } catch (err) { /* older browsers */ }
 
-        // A link keeps the client's own colour unless the anchor itself says
-        // otherwise, so colour the <a> too when the selection is inside one.
+        // A link keeps the client's own color unless the anchor itself says
+        // otherwise, so color the <a> too when the selection is inside one.
         anchorsInSelection(surface).forEach(function (a) {
             a.style.color = swatch.value;
         });

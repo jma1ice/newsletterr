@@ -80,7 +80,9 @@
                 <li><a href="{{ url_for('scheduling.scheduling') }}" title="sends"{% if request.endpoint in ['scheduling.scheduling', 'emails.email_history'] %} class="is-active"{% endif %}>{{ icon('clock') }}<span class="nav-label">sends</span></a></li>
                 <li class="nav-group-gap"><a href="{{ url_for('settings.settings') }}" title="settings"{% if request.endpoint == 'settings.settings' %} class="is-active"{% endif %}>{{ icon('settings') }}<span class="nav-label">settings</span></a></li>
                 <li><a href="{{ url_for('main.about') }}" title="about"{% if request.endpoint == 'main.about' %} class="is-active"{% endif %}>{{ icon('info') }}<span class="nav-label">about</span></a></li>
-                {% if session["username"] %}
+                {# no logout in demo mode: there is no account to leave, and clearing
+                   the demo session would drop the visitor into first-run setup #}
+                {% if session["username"] and not demo_mode %}
                 <li><a href="{{ url_for('auth.logout') }}" title="logout">{{ icon('log-out') }}<span class="nav-label">logout</span></a></li>
                 {% endif %}
             </ul>

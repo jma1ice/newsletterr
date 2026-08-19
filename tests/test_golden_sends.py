@@ -140,12 +140,15 @@ def _normalize(content):
     headers = {k: msg[k] for k in ("Subject", "From", "To", "Reply-To") if msg[k]}
     return {"headers": headers, "parts": parts, "plain": plain_text, "html": html_text}
 
-def _run_and_normalize(scheduled, template_id):
+def _run_and_normalize(scheduled, template_id, expected_sends=1, pick_to=None):
     ok = scheduled.send_scheduled_email_with_cids(9001, 9001, template_id)
     assert ok is True
     sends = [s for inst in RecorderSMTP.instances for s in inst.sent]
-    assert len(sends) == 1
-    from_addr, to_addrs, content = sends[0]
+    assert len(sends) == expected_sends
+    if pick_to is None:
+        from_addr, to_addrs, content = sends[0]
+    else:
+        from_addr, to_addrs, content = next(s for s in sends if list(s[1]) == pick_to)
     logins = [l for inst in RecorderSMTP.instances for l in inst.logins]
     normalized = _normalize(content)
     normalized["envelope"] = {"from": from_addr, "to": to_addrs}
@@ -172,9 +175,9 @@ def test_scheduled_single_email_golden(send_env):
     _assert_golden("scheduled_single", normalized)
 
 def test_scheduled_user_email_golden(send_env):
-    normalized = _run_and_normalize(send_env, 9002)
+    normalized = _run_and_normalize(send_env, 9002, expected_sends=2,
+                                    pick_to=["news@example.com", "a@b.c"])
     assert normalized["headers"]["Subject"] == "[SCHEDULED] Your Picks"
-    # user 2 has no recommendations block -> only user 1's group is sent
     assert normalized["envelope"]["to"] == ["news@example.com", "a@b.c"]
     assert "Personal intro" in normalized["html"]
     _assert_golden("scheduled_user", normalized)
@@ -299,15 +302,19 @@ def test_scheduled_user_email_hosted_gives_each_recipient_a_distinct_token(hoste
     ok = hosted_scheduled_env.send_scheduled_email_with_cids(9001, 9001, 9002)
     assert ok is True
     sends = [s for inst in RecorderSMTP.instances for s in inst.sent]
-    assert len(sends) == 2  # from_addr + a@b.c (only user 1's group matches)
+    assert len(sends) == 4
 
     tokens = set()
+    recipients = set()
     for from_addr, to_addrs, content in sends:
         assert len(to_addrs) == 1
+        recipients.add(to_addrs[0])
         msg = email_lib.message_from_string(content)
         assert "/u/" in msg.get("List-Unsubscribe", "")
         tokens.add(msg.get("List-Unsubscribe").split("/u/")[1].split(">")[0])
-    assert len(tokens) == 2
+    # three distinct addresses (from_addr appears in both groups, same token)
+    assert recipients == {"news@example.com", "a@b.c", "d@e.f"}
+    assert len(tokens) == 3
 
 # --- standard (manual) send paths, driven through the HTTP route
 
@@ -429,17 +436,19 @@ def test_recommendations_send_gives_each_recipient_a_distinct_unsubscribe_token(
     assert resp.get_json().get("success") is True
 
     sends = [s for inst in RecorderSMTP.instances for s in inst.sent]
-    # only user 1's group matches the recommendations block (from_addr + a@b.c)
-    assert len(sends) == 2
+    assert len(sends) == 4
 
     tokens = set()
+    recipients = set()
     for from_addr, to_addrs, content in sends:
         assert len(to_addrs) == 1
+        recipients.add(to_addrs[0])
         msg = email_lib.message_from_string(content)
         list_unsub = msg.get("List-Unsubscribe", "")
         assert "/u/" in list_unsub
         tokens.add(list_unsub.split("/u/")[1].split(">")[0])
-    assert len(tokens) == 2
+    assert recipients == {"news@example.com", "a@b.c", "d@e.f"}
+    assert len(tokens) == 3
 
 def test_suppressed_recipient_filtered_from_manual_send(manual_send_env):
     from app.store import add_suppressed
@@ -564,8 +573,20 @@ def test_manual_recommendations_email_golden(manual_send_env):
     assert body.get("success") is True
 
     sends = [s for inst in RecorderSMTP.instances for s in inst.sent]
-    assert len(sends) == 1  # only user 1 matches the recommendations block
-    from_addr, to_addrs, content = sends[0]
+    assert len(sends) == 2
+
+    by_recipient = {tuple(to_addrs): content for _f, to_addrs, content in sends}
+    assert ("news@example.com", "a@b.c") in by_recipient
+    assert ("news@example.com", "d@e.f") in by_recipient
+
+    # the user with no recommendations gets the shared content and, critically,
+    # none of user 1's recommendations
+    without_recs = _normalize(by_recipient[("news@example.com", "d@e.f")])
+    assert "Manual personal intro" in without_recs["html"]
+    assert "Recommendations" not in without_recs["html"]
+
+    from_addr, to_addrs, content = next(
+        s for s in sends if tuple(s[1]) == ("news@example.com", "a@b.c"))
     normalized = _normalize(content)
     normalized["envelope"] = {"from": from_addr, "to": to_addrs}
     normalized["response"] = body
@@ -861,7 +882,7 @@ def _send_coming_soon_item(client, monkeypatch, item_extra):
     """One manual send of a single Coming Soon snap-in; returns its HTML.
 
     Shared by the heading-override tests below, which assert on
-    behaviour rather than pinning new goldens.
+    behavior rather than pinning new goldens.
     """
     from app.emails import send as send_mod
     from app.emails.builders import coming_soon as coming_soon_mod

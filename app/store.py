@@ -1,6 +1,7 @@
 import calendar, os, secrets, sqlite3
 from datetime import datetime, timedelta
 
+from app import dates
 from app.db import db_connect
 from app.settings_store import get_settings
 
@@ -76,8 +77,139 @@ def delete_email_list(list_id):
     conn = db_connect()
     cursor = conn.cursor()
     cursor.execute("DELETE FROM email_lists WHERE id = ?", (list_id,))
+    cursor.execute("DELETE FROM contacts WHERE list_id = ?", (list_id,))
     conn.commit()
     conn.close()
+
+# --- contacts
+#
+# email_lists.emails stays the address of record for sends; every write here
+# rewrites it from the contacts rows so the two can never drift. Contacts adds
+# the name column that standalone mode needs and that Tautulli used to supply.
+
+def get_contacts(list_id):
+    conn = db_connect()
+    try:
+        rows = conn.execute(
+            "SELECT id, email, name FROM contacts WHERE list_id = ? ORDER BY email",
+            (list_id,),
+        ).fetchall()
+    finally:
+        conn.close()
+    return [{'id': r[0], 'email': r[1], 'name': r[2] or ''} for r in rows]
+
+def get_contact_names():
+    """{email_lower: name} across every list, for personalization."""
+    conn = db_connect()
+    try:
+        rows = conn.execute(
+            "SELECT email, name FROM contacts WHERE name IS NOT NULL AND name != ''"
+        ).fetchall()
+    finally:
+        conn.close()
+    return {(r[0] or '').strip().lower(): r[1] for r in rows}
+
+def _sync_list_emails(cursor, list_id):
+    """Rewrite email_lists.emails from the list's contact rows."""
+    rows = cursor.execute(
+        "SELECT email FROM contacts WHERE list_id = ? ORDER BY email", (list_id,)
+    ).fetchall()
+    cursor.execute(
+        "UPDATE email_lists SET emails = ? WHERE id = ?",
+        (', '.join(r[0] for r in rows), list_id),
+    )
+
+def add_contacts(list_id, entries):
+    conn = db_connect()
+    cursor = conn.cursor()
+    added = 0
+    try:
+        for email, name in entries:
+            cursor.execute(
+                "INSERT OR IGNORE INTO contacts (list_id, email, name) VALUES (?, ?, ?)",
+                (list_id, email, name or ''),
+            )
+            added += cursor.rowcount or 0
+        _sync_list_emails(cursor, list_id)
+        conn.commit()
+        return added
+    except sqlite3.Error as e:
+        logger.error(f"Error adding contacts: {e}")
+        conn.rollback()
+        return 0
+    finally:
+        conn.close()
+
+def delete_contact(contact_id):
+    conn = db_connect()
+    cursor = conn.cursor()
+    try:
+        row = cursor.execute("SELECT list_id FROM contacts WHERE id = ?", (contact_id,)).fetchone()
+        if not row:
+            return False
+        cursor.execute("DELETE FROM contacts WHERE id = ?", (contact_id,))
+        _sync_list_emails(cursor, row[0])
+        conn.commit()
+        return True
+    except sqlite3.Error as e:
+        logger.error(f"Error deleting contact: {e}")
+        return False
+    finally:
+        conn.close()
+
+# --- media user emails
+#
+# Jellyfin has no email field on a user, so the link between a media-server
+# account and an address lives here. Everything downstream consumes the same
+# {user_id: email} dict it always did, so filling this in is all it takes for
+# per-user recommendations, wrapped cards and personalized sends to work on a
+# server that cannot supply addresses itself.
+
+def get_media_user_emails(server_type='jellyfin'):
+    """{user_id: email} for one server type."""
+    conn = db_connect()
+    try:
+        rows = conn.execute(
+            "SELECT user_id, email FROM media_user_emails WHERE server_type = ?",
+            (server_type,),
+        ).fetchall()
+    finally:
+        conn.close()
+    return {r[0]: r[1] for r in rows}
+
+def set_media_user_email(user_id, email, server_type='jellyfin'):
+    """Link (or, with a blank email, unlink) one media-server user."""
+    user_id = str(user_id or '').strip()
+    email = (email or '').strip().lower()
+    if not user_id:
+        return False
+    conn = db_connect()
+    try:
+        if email:
+            conn.execute(
+                """INSERT INTO media_user_emails (server_type, user_id, email) VALUES (?, ?, ?)
+                   ON CONFLICT (server_type, user_id) DO UPDATE SET email = excluded.email""",
+                (server_type, user_id, email),
+            )
+        else:
+            conn.execute(
+                "DELETE FROM media_user_emails WHERE server_type = ? AND user_id = ?",
+                (server_type, user_id),
+            )
+        conn.commit()
+        return True
+    except sqlite3.Error as e:
+        logger.error(f"Error saving media user email: {e}")
+        return False
+    finally:
+        conn.close()
+
+def set_media_user_emails(mapping, server_type='jellyfin'):
+    written = 0
+    for user_id, email in (mapping or {}).items():
+        if set_media_user_email(user_id, email, server_type):
+            written += 1
+    return written
 
 def add_suppressed(email):
     conn = db_connect()
@@ -156,17 +288,20 @@ def get_most_recent_hosted_newsletter():
     return row
 
 def get_email_schedules():
-    MONTH_ABBR_PERIOD = ["Jan.", "Feb.", "Mar.", "Apr.", "May.", "Jun.", "Jul.", "Aug.", "Sep.", "Oct.", "Nov.", "Dec."]
-    
+    _s = get_settings(decrypt_secrets=False)
+    _date_format = dates.resolve_date_format(_s.get('date_format'))
+    _time_format = dates.resolve_time_format(_s.get('time_format'))
+
     conn = db_connect()
     cursor = conn.cursor()
     cursor.execute("""
         SELECT 
             es.id, es.name, es.email_list_id, es.template_id, es.frequency, es.start_date, 
             es.send_time, es.last_sent, es.next_send, es.is_active, es.created_at, es.date_range,
-            es.items_count, es.skip_if_no_new,
+            es.items_count, es.skip_if_no_new, es.skip_if_empty,
             el.name as email_list_name,
-            et.name as template_name
+            et.name as template_name,
+            es.skip_triggers, es.skip_min_items
         FROM email_schedules es
         LEFT JOIN email_lists el ON es.email_list_id = el.id
         LEFT JOIN email_templates et ON es.template_id = et.id
@@ -181,9 +316,7 @@ def get_email_schedules():
         if schedule[8]:
             try:
                 next_dt = datetime.fromisoformat(schedule[8])
-                weekday = next_dt.strftime('%A')
-                month_abbr = MONTH_ABBR_PERIOD[next_dt.month - 1]
-                next_send_formatted = f"{weekday} {month_abbr} {next_dt.day}, {next_dt.year}  {next_dt.strftime('%H:%M')}"
+                next_send_formatted = dates.fmt_schedule_stamp(next_dt, _date_format, _time_format)
             except Exception:
                 logger.debug("suppressed exception; using fallback", exc_info=True)
                 next_send_formatted = schedule[8]
@@ -192,9 +325,7 @@ def get_email_schedules():
         if schedule[7]:
             try:
                 last_dt = datetime.fromisoformat(schedule[7])
-                weekday = last_dt.strftime('%A')
-                month_abbr = MONTH_ABBR_PERIOD[last_dt.month - 1]
-                last_sent_formatted = f"{weekday} {month_abbr} {last_dt.day}, {last_dt.year}  {last_dt.strftime('%H:%M')}"
+                last_sent_formatted = dates.fmt_schedule_stamp(last_dt, _date_format, _time_format)
             except Exception:
                 logger.debug("suppressed exception; using fallback", exc_info=True)
                 last_sent_formatted = schedule[7]
@@ -203,13 +334,13 @@ def get_email_schedules():
         start_date_formatted = start_date_raw
         try:
             start_dt = datetime.fromisoformat(start_date_raw)
-            start_date_formatted = f"{MONTH_ABBR_PERIOD[start_dt.month - 1]} {start_dt.day}, {start_dt.year}"
+            start_date_formatted = dates.fmt_short_stamp(start_dt, _date_format)
         except Exception:
             logger.debug("suppressed exception; using fallback", exc_info=True)
             pass
 
         email_list_id = schedule[2]
-        email_list_name = schedule[14]
+        email_list_name = schedule[15]
         
         if email_list_id == 0:
             email_list_id = 'ALL'
@@ -233,8 +364,11 @@ def get_email_schedules():
             'date_range': schedule[11] or 7,
             'items_count': schedule[12] or 10,
             'skip_if_no_new': bool(schedule[13]),
+            'skip_if_empty': bool(schedule[14]),
+            'skip_triggers': schedule[17] or '',
+            'skip_min_items': schedule[18] or 1,
             'email_list_name': email_list_name,
-            'template_name': schedule[15]
+            'template_name': schedule[16]
         })
     return result
 
@@ -363,7 +497,7 @@ def next_future_send(frequency, start_date, send_time='09:00'):
         guard += 1
     return nxt
 
-def create_email_schedule(name, email_list_id, template_id, frequency, start_date, send_time='09:00', date_range=7, items_count=10, skip_if_no_new=0):
+def create_email_schedule(name, email_list_id, template_id, frequency, start_date, send_time='09:00', date_range=7, items_count=10, skip_if_no_new=0, skip_triggers='', skip_min_items=1, skip_if_empty=0):
     conn = db_connect()
     cursor = conn.cursor()
 
@@ -373,9 +507,9 @@ def create_email_schedule(name, email_list_id, template_id, frequency, start_dat
         list_id_value = 0 if email_list_id == 'ALL' else int(email_list_id)
 
         cursor.execute("""
-            INSERT INTO email_schedules (name, email_list_id, template_id, frequency, start_date, send_time, next_send, date_range, items_count, skip_if_no_new)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (name, list_id_value, template_id, frequency, start_date, send_time, next_send.isoformat(), date_range, items_count, int(bool(skip_if_no_new))))
+            INSERT INTO email_schedules (name, email_list_id, template_id, frequency, start_date, send_time, next_send, date_range, items_count, skip_if_no_new, skip_triggers, skip_min_items, skip_if_empty)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (name, list_id_value, template_id, frequency, start_date, send_time, next_send.isoformat(), date_range, items_count, int(bool(skip_if_no_new)), skip_triggers, skip_min_items, int(bool(skip_if_empty))))
         conn.commit()
         return True
     except sqlite3.Error as e:
@@ -384,7 +518,7 @@ def create_email_schedule(name, email_list_id, template_id, frequency, start_dat
     finally:
         conn.close()
 
-def update_email_schedule(schedule_id, name, email_list_id, template_id, frequency, start_date, send_time='09:00', date_range=7, items_count=10, skip_if_no_new=0):
+def update_email_schedule(schedule_id, name, email_list_id, template_id, frequency, start_date, send_time='09:00', date_range=7, items_count=10, skip_if_no_new=0, skip_triggers='', skip_min_items=1, skip_if_empty=0):
     conn = db_connect()
     cursor = conn.cursor()
 
@@ -397,9 +531,9 @@ def update_email_schedule(schedule_id, name, email_list_id, template_id, frequen
             UPDATE email_schedules
             SET name = ?, email_list_id = ?, template_id = ?, frequency = ?,
                 start_date = ?, send_time = ?, next_send = ?, date_range = ?,
-                items_count = ?, skip_if_no_new = ?
+                items_count = ?, skip_if_no_new = ?, skip_triggers = ?, skip_min_items = ?, skip_if_empty = ?
             WHERE id = ?
-        """, (name, list_id_value, template_id, frequency, start_date, send_time, next_send.isoformat(), date_range, items_count, int(bool(skip_if_no_new)), schedule_id))
+        """, (name, list_id_value, template_id, frequency, start_date, send_time, next_send.isoformat(), date_range, items_count, int(bool(skip_if_no_new)), skip_triggers, skip_min_items, int(bool(skip_if_empty)), schedule_id))
         conn.commit()
         return True
     except sqlite3.Error as e:

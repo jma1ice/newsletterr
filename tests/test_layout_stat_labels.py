@@ -1,4 +1,4 @@
-"""Aggregate stat rows must be labelled by their key, not by the last-watched item.
+"""Aggregate stat rows must be labeled by their key, not by the last-watched item.
 
 Tautulli ships the last-played item on every top_users/top_libraries/top_platforms
 row (title, year, rating_key, artwork). The legacy table pins the label column per

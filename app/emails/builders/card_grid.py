@@ -30,9 +30,11 @@ def format_relative_date(date_str):
         logger.debug("suppressed exception; using fallback", exc_info=True)
         return ""
 
+EMPTY_STATE_MARKER = 'data-nl-empty="1"'
+
 def empty_state_html(theme_colors, message):
     return f"""
-    <div style="background-color: {theme_colors['card_bg']}; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid {theme_colors['border']}; font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;">
+    <div {EMPTY_STATE_MARKER} style="background-color: {theme_colors['card_bg']}; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid {theme_colors['border']}; font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;">
         <p style="text-align: center; color: {theme_colors['muted_text']}; padding: 20px; margin: 0; font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;">{message}</p>
     </div>
     """

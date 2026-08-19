@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.test_js_preview_parity import _extract_js_function
+from tests.js_helpers import _extract_js_function
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 BUILDER_JS = REPO_ROOT / "static/js/app/07-email-builder.js"
@@ -148,13 +148,13 @@ def test_the_editors_own_font_size_is_stripped_from_content():
     carrying the builder editor's `font-size: 0.9rem`, which would then have
     overridden the block's real size in the email. Two defences: commands emit
     tags rather than CSS, and any inline font-size is stripped on read. The
-    behavioural check runs in the browser (scratchpad check_phase7.py), since
+    behavioral check runs in the browser (scratchpad check_phase7.py), since
     both defences need a real contenteditable to exercise.
     """
     rich = (REPO_ROOT / "static/js/app/38-rich-text.js").read_text(encoding="utf-8")
 
     # Formatting commands emit tags, not CSS. styleWithCSS is switched on for
-    # exactly one thing (the colour swatch, which needs a style) and switched
+    # exactly one thing (the color swatch, which needs a style) and switched
     # straight back off, so `true` must never outnumber `false`.
     assert "styleWithCSS', false, false" in rich, "commands emit CSS again"
     assert rich.count("styleWithCSS', false, true") <= rich.count("styleWithCSS', false, false")

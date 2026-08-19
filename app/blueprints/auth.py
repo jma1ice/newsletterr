@@ -4,11 +4,14 @@ import time
 
 from flask import Blueprint, abort, redirect, render_template, request, session, url_for
 
-from app.config import DEFAULT_RADARR_URL, DEFAULT_SONARR_URL, DEFAULT_OMBI_URL, DEFAULT_SEERR_URL, DEFAULT_TAUTULLI_URL, DEFAULT_DROPPEDNEEDLE_URL, DEFAULT_JELLYFIN_URL
+from app import config
+from app.config import DEFAULT_RADARR_URL, DEFAULT_SONARR_URL, DEFAULT_OMBI_URL, DEFAULT_SEERR_URL, DEFAULT_TAUTULLI_URL, DEFAULT_DROPPEDNEEDLE_URL, DEFAULT_JELLYFIN_URL, LANDING_ENDPOINTS, DEFAULT_LANDING_PAGE
 from app.crypto import encrypt
 from app.db import db_connect
 from app.settings_store import get_settings
 from app.security import requires_auth, check_credentials, admin_configured, set_admin_credentials
+from app.store import add_contacts, save_email_list
+from app.contacts_import import parse_contacts
 
 import logging
 
@@ -54,7 +57,34 @@ def _clear_failures(ip):
     with _attempts_lock:
         _attempts.pop(ip, None)
 
-SETUP_STEPS = ['admin', 'email', 'plex', 'jellyfin', 'tautulli', 'conjurr', 'droppedneedle', 'sonarr', 'radarr', 'ombi', 'seerr']
+SETUP_STEPS = ['admin', 'mode', 'email', 'plex', 'jellyfin', 'tautulli', 'conjurr', 'droppedneedle', 'sonarr', 'radarr', 'ombi', 'seerr']
+
+# standalone mode collapses the wizard to the steps that still mean
+# something with no media server attached. The step-dot indicator in setup.html
+# iterates whatever list it is handed, so it adapts on its own.
+STANDALONE_SETUP_STEPS = ['admin', 'mode', 'email', 'contacts']
+
+def _setup_steps():
+    """The wizard's step list for the mode chosen so far. Read per request
+    rather than captured at import, since the mode step is what sets it."""
+    try:
+        s = get_settings(decrypt_secrets=False)
+    except Exception:
+        logger.debug("suppressed exception; showing the full wizard", exc_info=True)
+        return SETUP_STEPS
+    return STANDALONE_SETUP_STEPS if (s.get('media_server_type') == 'none') else SETUP_STEPS
+
+def _is_standalone_setup():
+    return _setup_steps() is STANDALONE_SETUP_STEPS
+
+def _landing_url():
+    try:
+        page = get_settings(decrypt_secrets=False).get('default_landing_page')
+    except Exception:
+        logger.debug("suppressed exception; landing on the default page", exc_info=True)
+        page = None
+    endpoint = LANDING_ENDPOINTS.get(page or DEFAULT_LANDING_PAGE, LANDING_ENDPOINTS[DEFAULT_LANDING_PAGE])
+    return url_for(endpoint)
 
 @bp.route('/setup', methods=['GET', 'POST'])
 def setup():
@@ -76,19 +106,79 @@ def setup():
         confirm = request.form.get('confirm', '')
 
         if not username or not password:
-            return render_template('setup.html', step='admin', steps=SETUP_STEPS, error='Username and password are required', csrf_token=session["csrf_token"])
+            return render_template('setup.html', step='admin', steps=_setup_steps(), error='Username and password are required', csrf_token=session["csrf_token"])
         if len(password) < 8:
-            return render_template('setup.html', step='admin', steps=SETUP_STEPS, error='Password must be at least 8 characters', csrf_token=session["csrf_token"])
+            return render_template('setup.html', step='admin', steps=_setup_steps(), error='Password must be at least 8 characters', csrf_token=session["csrf_token"])
         if password != confirm:
-            return render_template('setup.html', step='admin', steps=SETUP_STEPS, error='Passwords do not match', csrf_token=session["csrf_token"])
+            return render_template('setup.html', step='admin', steps=_setup_steps(), error='Passwords do not match', csrf_token=session["csrf_token"])
 
         set_admin_credentials(username, password)
         session['authenticated'] = True
         session['username'] = username
         logger.info("Admin account created via first-run setup")
+        return redirect(url_for('auth.setup_mode'))
+
+    return render_template('setup.html', step='admin', steps=_setup_steps(), csrf_token=session["csrf_token"])
+
+@bp.route('/setup/mode', methods=['GET', 'POST'])
+@requires_auth
+def setup_mode():
+    if not session.get("csrf_token"):
+        session["csrf_token"] = secrets.token_urlsafe(32)
+    s = get_settings(decrypt_secrets=False)
+
+    if request.method == 'POST':
+        token = request.form.get("csrf_token", "").strip()
+        if not token or token != session.get("csrf_token"):
+            abort(400)
+
+        standalone = request.form.get('setup_mode') == 'standalone'
+        conn = db_connect()
+        conn.execute("INSERT OR IGNORE INTO settings (id) VALUES (1)")
+        conn.execute(
+            "UPDATE settings SET media_server_type = ? WHERE id = 1",
+            ('none' if standalone else 'plex',),
+        )
+        conn.commit()
+        conn.close()
+        logger.info(f"First-run setup mode: {'standalone' if standalone else 'media server'}")
         return redirect(url_for('auth.setup_email'))
 
-    return render_template('setup.html', step='admin', steps=SETUP_STEPS, csrf_token=session["csrf_token"])
+    return render_template('setup.html', step='mode', steps=_setup_steps(), settings=s, csrf_token=session["csrf_token"])
+
+@bp.route('/setup/contacts', methods=['GET', 'POST'])
+@requires_auth
+def setup_contacts():
+    if not session.get("csrf_token"):
+        session["csrf_token"] = secrets.token_urlsafe(32)
+    s = get_settings(decrypt_secrets=False)
+
+    if request.method == 'POST':
+        token = request.form.get("csrf_token", "").strip()
+        if not token or token != session.get("csrf_token"):
+            abort(400)
+
+        list_name = (request.form.get('list_name') or 'Subscribers').strip() or 'Subscribers'
+        pasted = request.form.get('contacts_text') or ''
+        upload = request.files.get('contacts_file')
+        if upload is not None and upload.filename:
+            pasted = upload.read(2 * 1024 * 1024).decode('utf-8', errors='replace')
+
+        if pasted.strip():
+            result = parse_contacts(pasted)
+            if result['contacts']:
+                save_email_list(list_name, ', '.join(e for e, _ in result['contacts']))
+                conn = db_connect()
+                row = conn.execute("SELECT id FROM email_lists WHERE name = ?", (list_name,)).fetchone()
+                conn.close()
+                if row:
+                    add_contacts(row[0], result['contacts'])
+                logger.info(f"First-run setup imported {len(result['contacts'])} contacts into '{list_name}'")
+
+        logger.info("First-run setup wizard completed (standalone)")
+        return redirect(url_for('main.index'))
+
+    return render_template('setup.html', step='contacts', steps=_setup_steps(), settings=s, csrf_token=session["csrf_token"])
 
 @bp.route('/setup/email', methods=['GET', 'POST'])
 @requires_auth
@@ -112,7 +202,7 @@ def setup_email():
         server_name = request.form.get('server_name', '').strip()
 
         if not from_email or not smtp_server or not password:
-            return render_template('setup.html', step='email', steps=SETUP_STEPS, settings=s,
+            return render_template('setup.html', step='email', steps=_setup_steps(), settings=s,
                                     error='From email, SMTP server, and password are required',
                                     csrf_token=session["csrf_token"])
         try:
@@ -130,9 +220,11 @@ def setup_email():
         conn.commit()
         conn.close()
         logger.info("Email server configured via first-run setup")
+        if _is_standalone_setup():
+            return redirect(url_for('auth.setup_contacts'))
         return redirect(url_for('auth.setup_plex'))
 
-    return render_template('setup.html', step='email', steps=SETUP_STEPS, settings=s, csrf_token=session["csrf_token"])
+    return render_template('setup.html', step='email', steps=_setup_steps(), settings=s, csrf_token=session["csrf_token"])
 
 @bp.route('/setup/plex', methods=['GET', 'POST'])
 @requires_auth
@@ -155,7 +247,7 @@ def setup_plex():
             conn.close()
         return redirect(url_for('auth.setup_jellyfin'))
 
-    return render_template('setup.html', step='plex', steps=SETUP_STEPS, settings=s, csrf_token=session["csrf_token"])
+    return render_template('setup.html', step='plex', steps=_setup_steps(), settings=s, csrf_token=session["csrf_token"])
 
 @bp.route('/setup/jellyfin', methods=['GET', 'POST'])
 @requires_auth
@@ -171,6 +263,7 @@ def setup_jellyfin():
 
         jellyfin_url = request.form.get('jellyfin_url', '').strip() or DEFAULT_JELLYFIN_URL
         jellyfin_api_key = request.form.get('jellyfin_api_key', '').strip()
+        server_choice = 'emby' if request.form.get('jellyfin_flavor') == 'emby' else 'jellyfin'
         jellywatch_url = request.form.get('jellywatch_url', '').strip()
         jellywatch_api_key = request.form.get('jellywatch_api_key', '').strip()
         if jellyfin_api_key:
@@ -179,8 +272,8 @@ def setup_jellyfin():
             # Filling in Jellyfin during setup means Jellyfin is the media
             # server; the choice can be flipped any time in Settings.
             conn.execute(
-                "UPDATE settings SET media_server_type = 'jellyfin', jellyfin_url = ?, jellyfin_api_key = ? WHERE id = 1",
-                (jellyfin_url, encrypt(jellyfin_api_key)),
+                "UPDATE settings SET media_server_type = ?, jellyfin_url = ?, jellyfin_api_key = ? WHERE id = 1",
+                (server_choice, jellyfin_url, encrypt(jellyfin_api_key)),
             )
             if jellywatch_url and jellywatch_api_key:
                 conn.execute(
@@ -191,7 +284,7 @@ def setup_jellyfin():
             conn.close()
         return redirect(url_for('auth.setup_tautulli'))
 
-    return render_template('setup.html', step='jellyfin', steps=SETUP_STEPS, settings=s, csrf_token=session["csrf_token"])
+    return render_template('setup.html', step='jellyfin', steps=_setup_steps(), settings=s, csrf_token=session["csrf_token"])
 
 @bp.route('/setup/tautulli', methods=['GET', 'POST'])
 @requires_auth
@@ -215,7 +308,7 @@ def setup_tautulli():
             conn.close()
         return redirect(url_for('auth.setup_conjurr'))
 
-    return render_template('setup.html', step='tautulli', steps=SETUP_STEPS, settings=s, csrf_token=session["csrf_token"])
+    return render_template('setup.html', step='tautulli', steps=_setup_steps(), settings=s, csrf_token=session["csrf_token"])
 
 @bp.route('/setup/conjurr', methods=['GET', 'POST'])
 @requires_auth
@@ -238,7 +331,7 @@ def setup_conjurr():
             conn.close()
         return redirect(url_for('auth.setup_droppedneedle'))
 
-    return render_template('setup.html', step='conjurr', steps=SETUP_STEPS, settings=s, csrf_token=session["csrf_token"])
+    return render_template('setup.html', step='conjurr', steps=_setup_steps(), settings=s, csrf_token=session["csrf_token"])
 
 @bp.route('/setup/droppedneedle', methods=['GET', 'POST'])
 @requires_auth
@@ -262,7 +355,7 @@ def setup_droppedneedle():
             conn.close()
         return redirect(url_for('auth.setup_sonarr'))
 
-    return render_template('setup.html', step='droppedneedle', steps=SETUP_STEPS, settings=s, csrf_token=session["csrf_token"])
+    return render_template('setup.html', step='droppedneedle', steps=_setup_steps(), settings=s, csrf_token=session["csrf_token"])
 
 @bp.route('/setup/sonarr', methods=['GET', 'POST'])
 @requires_auth
@@ -286,7 +379,7 @@ def setup_sonarr():
             conn.close()
         return redirect(url_for('auth.setup_radarr'))
 
-    return render_template('setup.html', step='sonarr', steps=SETUP_STEPS, settings=s, csrf_token=session["csrf_token"])
+    return render_template('setup.html', step='sonarr', steps=_setup_steps(), settings=s, csrf_token=session["csrf_token"])
 
 @bp.route('/setup/radarr', methods=['GET', 'POST'])
 @requires_auth
@@ -310,7 +403,7 @@ def setup_radarr():
             conn.close()
         return redirect(url_for('auth.setup_ombi'))
 
-    return render_template('setup.html', step='radarr', steps=SETUP_STEPS, settings=s, csrf_token=session["csrf_token"])
+    return render_template('setup.html', step='radarr', steps=_setup_steps(), settings=s, csrf_token=session["csrf_token"])
 
 @bp.route('/setup/ombi', methods=['GET', 'POST'])
 @requires_auth
@@ -334,7 +427,7 @@ def setup_ombi():
             conn.close()
         return redirect(url_for('auth.setup_seerr'))
 
-    return render_template('setup.html', step='ombi', steps=SETUP_STEPS, settings=s, csrf_token=session["csrf_token"])
+    return render_template('setup.html', step='ombi', steps=_setup_steps(), settings=s, csrf_token=session["csrf_token"])
 
 @bp.route('/setup/seerr', methods=['GET', 'POST'])
 @requires_auth
@@ -359,7 +452,7 @@ def setup_seerr():
         logger.info("First-run setup wizard completed")
         return redirect(url_for('main.index'))
 
-    return render_template('setup.html', step='seerr', steps=SETUP_STEPS, settings=s, csrf_token=session["csrf_token"])
+    return render_template('setup.html', step='seerr', steps=_setup_steps(), settings=s, csrf_token=session["csrf_token"])
 
 @bp.route('/login', methods=['GET', 'POST'])
 def login():
@@ -388,7 +481,7 @@ def login():
             _clear_failures(ip)
             session['authenticated'] = True
             session['username'] = username
-            return redirect(url_for('main.index'))
+            return redirect(_landing_url())
         else:
             _record_failure(ip)
             return render_template('login.html', error='Invalid credentials', csrf_token=session["csrf_token"])
@@ -398,5 +491,11 @@ def login():
 @bp.route('/logout')
 @requires_auth
 def logout():
+    # Demo mode has no account to leave: clearing the session there would send
+    # the visitor to first-run setup. The before_request guard in app/demo.py
+    # already redirects this endpoint, and this keeps the route honest on its
+    # own. The nav hides the button in demo (templates/base.html).
+    if config.DEMO_MODE:
+        return redirect(url_for('main.index'))
     session.clear()
     return redirect(url_for('auth.login'))

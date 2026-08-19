@@ -132,6 +132,12 @@
         if (window.ResizeObserver) {
             var ro = new ResizeObserver(function () {
                 if (pane.style.height) {
+                    // Clamp before storing, not just on load: a height above
+                    // the cap would otherwise be handed back on every visit
+                    // and only get trimmed if the window happened to resize.
+                    // The write settles after one echo because the clamped
+                    // value is already under the cap.
+                    clampPaneHeight(pane);
                     try { localStorage.setItem('snapinsHeight', pane.style.height); } catch (e) {}
                 }
             });

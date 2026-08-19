@@ -137,7 +137,8 @@ window.pullRunners.recommendations = async function ({ chained = false } = {}) {
     }
 };
 
-document.getElementById('pullRecsBtn').addEventListener('click', (e) => {
+const _pullRecsBtn = document.getElementById('pullRecsBtn');
+if (_pullRecsBtn) _pullRecsBtn.addEventListener('click', (e) => {
     if (!confirmFreshRepull(e.currentTarget, 'recommendations')) return;
     window.pullRunners.recommendations({ chained: false });
 });

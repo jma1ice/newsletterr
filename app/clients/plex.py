@@ -219,7 +219,7 @@ def group_recent_episodes_into_shows(metadata, cutoff_ts):
     mode. A show is included when AT LEAST ONE of its episodes was added at or
     after cutoff_ts (a unix timestamp); new_episode_count counts only those
     in-window episodes, so a single new episode of a long-running show reads as
-    "1 new episode" instead of pulling the whole back catalogue in whenever the
+    "1 new episode" instead of pulling the whole back catalog in whenever the
     season happens to be complete inside the window. Shows are ordered by their
     most-recent in-window episode, newest first. Pure and side-effect free so it
     can be unit-tested with synthetic added_at spreads; the caller enriches each
@@ -530,6 +530,9 @@ def fetch_library_sections_with_genres(include_genres=True):
     {section_id, title, type, genres: [{id, title}]} dicts.
     include_genres=False skips the per-section genre calls (used when only
     resolving a library name to its section id)."""
+    if config.DEMO_MODE:
+        from app.demo import demo_library_sections
+        return demo_library_sections()
     try:
         _s = get_settings(decrypt_secrets=False)
         plex_settings = (_s.get("plex_url"), _s.get("plex_token")) if "id" in _s else None
@@ -611,6 +614,9 @@ def fetch_random_library_item(section_id, genre=None, machine_id=None):
     recently-added fetchers produce. Randomness is per-call on purpose: every
     render draws a fresh pick. Returns None when the section is empty or
     Plex is unreachable."""
+    if config.DEMO_MODE:
+        from app.demo import demo_random_item
+        return demo_random_item(section_id, genre=genre, machine_id=machine_id)
     try:
         _s = get_settings(decrypt_secrets=False)
         plex_settings = (_s.get("plex_url"), _s.get("plex_token")) if "id" in _s else None
@@ -677,6 +683,9 @@ def _plex_connection():
     return _s["plex_url"].rstrip('/'), decrypt(_s["plex_token"]), _s.get("plex_web_url")
 
 def search_library_items(query, section_id=None, limit=20):
+    if config.DEMO_MODE:
+        from app.demo import demo_search_items
+        return demo_search_items(query, section_id=section_id, limit=limit)
     query = (query or '').strip()
     if not query:
         return []
@@ -722,6 +731,9 @@ def search_library_items(query, section_id=None, limit=20):
         return []
 
 def fetch_library_item_by_rating_key(rating_key, machine_id=None):
+    if config.DEMO_MODE:
+        from app.demo import demo_item_by_rating_key
+        return demo_item_by_rating_key(rating_key)
     rating_key = str(rating_key or '').strip()
     if not rating_key:
         return None

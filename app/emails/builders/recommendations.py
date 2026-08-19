@@ -97,16 +97,27 @@ def build_recommendations_html_with_cids(recs_data, msg_root, theme_colors, user
     
     return '\n'.join(html_sections)
 
-def _wrapped_ranked_list_html(title, items, label_fn, theme_colors):
+def _wrapped_ranked_list_html(title, items, label_fn, theme_colors, art_fn=None):
     if not items:
         return ""
-    rows = "".join(
-        f'<li style="margin: 4px 0; color: {theme_colors["text"]};">'
-        f'<strong>#{i + 1}</strong> {esc(label_fn(item))}'
-        f'<span style="color: {theme_colors["muted_text"]}; font-size: 0.85em;"> - {item.get("listen_count", 0)} plays</span>'
-        f'</li>'
-        for i, item in enumerate(items)
-    )
+    rows = ""
+    for i, item in enumerate(items):
+        meta = (f'<span style="color: {theme_colors["muted_text"]}; font-size: 0.85em;">'
+                f' - {item.get("listen_count", 0)} plays</span>')
+        label = f'<strong>#{i + 1}</strong> {esc(label_fn(item))}{meta}'
+        src = art_fn(item, i) if art_fn else None
+        if src:
+            rows += (
+                f'<li style="margin: 6px 0; color: {theme_colors["text"]};">'
+                f'<table cellpadding="0" cellspacing="0" border="0"><tr>'
+                f'<td width="36" valign="middle" style="padding-right: 10px;">'
+                f'<img src="{src}" alt="" width="36" style="width: 36px; height: auto; '
+                f'display: block; border-radius: 3px;"></td>'
+                f'<td valign="middle" style="color: {theme_colors["text"]};">{label}</td>'
+                f'</tr></table></li>'
+            )
+        else:
+            rows += f'<li style="margin: 4px 0; color: {theme_colors["text"]};">{label}</li>'
     return (
         f'<div style="margin-bottom: 16px;">'
         f'<h3 style="margin-bottom: 6px; color: {theme_colors["text"]};">{title}</h3>'
@@ -114,10 +125,69 @@ def _wrapped_ranked_list_html(title, items, label_fn, theme_colors):
         f'</div>'
     )
 
-def build_droppedneedle_wrapped_html_with_cids(wrapped_data, msg_root, theme_colors, user_emails=None, display_preference='email', users_full_data=None):
+def wrapped_display_name(user_id, payload, user_emails=None, display_preference='email', users_full_data=None):
+    if users_full_data:
+        resolved = get_user_display_name(user_id, users_full_data, display_preference)
+        if resolved and str(resolved) != str(user_id):
+            return resolved
+    if user_emails and str(user_id) in {str(k) for k in user_emails}:
+        return user_emails.get(str(user_id)) or str(user_id)
+    return (payload or {}).get('display_name') or str(user_id)
+
+def dn_options_from_settings(settings):
+    settings = settings or {}
+    try:
+        item_count = int(settings.get('dn_item_count') or 0)
+    except (TypeError, ValueError):
+        item_count = 0
+    return {
+        'item_count': max(0, item_count),
+        'show_artists': settings.get('dn_show_artists', 'enabled') != 'disabled',
+        'show_tracks': settings.get('dn_show_tracks', 'enabled') != 'disabled',
+        'show_albums': settings.get('dn_show_albums', 'enabled') != 'disabled',
+        'show_genres': settings.get('dn_show_genres', 'enabled') != 'disabled',
+        'cover_art': settings.get('dn_cover_art', 'disabled') == 'enabled',
+    }
+
+def wrapped_lists(payload, options=None):
+    options = options or {}
+    cap = options.get('item_count') or 0
+
+    def _cap(items):
+        items = items or []
+        return items[:cap] if cap else items
+
+    out = []
+    if options.get('show_artists', True):
+        out.append(('Top Artists', _cap(payload.get('top_artists')), lambda a: a.get('name', ''), False))
+    if options.get('show_tracks', True):
+        out.append(('Top Tracks', _cap(payload.get('top_tracks')), lambda t: f"{t.get('name', '')} - {t.get('artist_name', '')}", False))
+    if options.get('show_albums', True):
+        out.append(('Top Albums', _cap(payload.get('top_albums')), lambda al: f"{al.get('name', '')} - {al.get('artist_name', '')}", True))
+    if options.get('show_genres', True):
+        out.append(('Top Genres', _cap(payload.get('top_genres')), lambda g: g.get('genre', ''), False))
+    return out
+
+def wrapped_album_art_fn(msg_root, base_url, user_id, hosted_images_enabled=False, hosted_base_url=""):
+    from app.clients.coverart import release_group_cover_url
+    from app.emails.images import fetch_and_attach_small_thumbnail
+
+    def art_fn(item, i):
+        url = release_group_cover_url(item.get('mbid'))
+        if not url:
+            return None
+        return fetch_and_attach_small_thumbnail(
+            url, msg_root, f"dn-{user_id}-album-{i}", base_url, height=36,
+            hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url,
+            quiet=True,
+        )
+    return art_fn
+
+def build_droppedneedle_wrapped_html_with_cids(wrapped_data, msg_root, theme_colors, user_emails=None, display_preference='email', users_full_data=None, options=None, base_url="", hosted_images_enabled=False, hosted_base_url=""):
     if not wrapped_data:
         return ""
 
+    options = options or {}
     html_sections = []
 
     for user_id, payload in wrapped_data.items():
@@ -126,19 +196,17 @@ def build_droppedneedle_wrapped_html_with_cids(wrapped_data, msg_root, theme_col
         if not payload or not payload.get('has_data'):
             continue
 
-        if users_full_data:
-            display_name = get_user_display_name(user_id, users_full_data, display_preference)
-        elif user_emails:
-            display_name = user_emails.get(str(user_id), str(user_id))
-        else:
-            display_name = str(user_id)
+        display_name = wrapped_display_name(user_id, payload, user_emails, display_preference, users_full_data)
 
-        sections = "".join([
-            _wrapped_ranked_list_html('Top Artists', payload.get('top_artists', []), lambda a: a.get('name', ''), theme_colors),
-            _wrapped_ranked_list_html('Top Tracks', payload.get('top_tracks', []), lambda t: f"{t.get('name', '')} - {t.get('artist_name', '')}", theme_colors),
-            _wrapped_ranked_list_html('Top Albums', payload.get('top_albums', []), lambda al: f"{al.get('name', '')} - {al.get('artist_name', '')}", theme_colors),
-            _wrapped_ranked_list_html('Top Genres', payload.get('top_genres', []), lambda g: g.get('genre', ''), theme_colors),
-        ])
+        art_fn = None
+        if options.get('cover_art'):
+            art_fn = wrapped_album_art_fn(msg_root, base_url, user_id, hosted_images_enabled, hosted_base_url)
+
+        sections = "".join(
+            _wrapped_ranked_list_html(title, items, label_fn, theme_colors,
+                                      art_fn if (is_album and art_fn) else None)
+            for title, items, label_fn, is_album in wrapped_lists(payload, options)
+        )
 
         container_style = f"""
             margin: 30px 0;

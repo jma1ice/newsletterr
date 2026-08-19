@@ -35,7 +35,8 @@ def test_setup_creates_admin_and_authenticates(anon_client, clean_credentials):
         "csrf_token": "setup-token", "username": "newadmin",
         "password": "strongpass1", "confirm": "strongpass1",
     })
-    assert resp.status_code == 302 and "/setup/email" in resp.headers["Location"]  # -> next wizard step
+    # -> next wizard step, which is the media-server/standalone fork
+    assert resp.status_code == 302 and "/setup/mode" in resp.headers["Location"]
     assert admin_configured()
     # created account authenticates
     assert check_credentials("newadmin", "strongpass1")

@@ -169,7 +169,7 @@ def test_group_recent_episodes_rolls_up_and_counts_only_in_window():
     from app.clients.plex import group_recent_episodes_into_shows
     cutoff = 1000
     meta = [
-        # Show A: one new episode in window, two old back-catalogue -> count 1
+        # Show A: one new episode in window, two old back-catalog -> count 1
         {"grandparentRatingKey": "A", "grandparentTitle": "Show A", "addedAt": 1500},
         {"grandparentRatingKey": "A", "grandparentTitle": "Show A", "addedAt": 200},
         {"grandparentRatingKey": "A", "grandparentTitle": "Show A", "addedAt": 500},
@@ -188,7 +188,7 @@ def test_group_recent_episodes_rolls_up_and_counts_only_in_window():
     assert by_key["A"]["new_episode_count"] == 1
     assert by_key["B"]["new_episode_count"] == 3
     assert by_key["A"]["media_type"] == by_key["A"]["type"] == "show"
-    # added_at reflects the newest in-window episode, not the old back catalogue
+    # added_at reflects the newest in-window episode, not the old back catalog
     assert by_key["A"]["added_at"] == "1500"
     assert by_key["B"]["added_at"] == "1300"
     # the scratch sort field never leaks into the rendered card

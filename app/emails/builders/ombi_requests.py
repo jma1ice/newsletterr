@@ -1,6 +1,7 @@
 # Reuses the card/grid HTML pattern from coming_soon.py (Radarr/Sonarr).
 from datetime import datetime, timezone
 
+from app import config
 from app.emails import density
 from app.emails.builders.card_grid import empty_state_html as _empty_state_html, build_calendar_grid_html as _build_calendar_grid_html, build_card_html as _build_card_html, format_relative_date as _format_relative_date
 from app.emails.images import fetch_and_attach_image, truncate_text
@@ -18,6 +19,9 @@ def _poster_src(poster_path):
     if not poster_path:
         return None
     if poster_path.startswith('http'):
+        return poster_path
+    if config.DEMO_MODE:
+        # demo posters are already local /proxy-art paths, not TMDB fragments
         return poster_path
     return f"{TMDB_POSTER_BASE}{poster_path}"
 

@@ -8,9 +8,11 @@ from email.utils import formataddr
 
 from app import config
 from app.clients.tautulli import run_tautulli_command
+from app.clients.mediaserver import get_media_server_type
 from app.db import db_connect
-from app.store import filter_suppressed, record_email_history
+from app.store import filter_suppressed, get_contact_names, record_email_history
 from app.tokens import make_unsubscribe_placeholder, sign_unsubscribe_token
+from app.emails import personalization
 from app.emails.assemble import convert_html_to_plain_text, build_email_html_with_all_cids
 from app.emails.fetchers import get_current_tautulli_data_for_email, get_recommendations_for_users, get_droppedneedle_wrapped_for_users, get_droppedneedle_server_stats_cached, get_yearly_wrapped_cached, get_sonarr_coming_soon_cached, get_radarr_coming_soon_cached, get_ombi_requests_cached, get_seerr_requests_cached
 
@@ -33,6 +35,12 @@ def filter_inactive(emails, settings):
         days = 0
     if days <= 0:
         return emails, []
+
+    server_type = get_media_server_type(settings)
+    if server_type == 'none':
+        return emails, []
+    if server_type in ('jellyfin', 'emby'):
+        return _filter_inactive_jellyfin(emails, days)
 
     tautulli_url = (settings.get("tautulli_url") or "").rstrip('/')
     tautulli_api = settings.get("tautulli_api")
@@ -95,6 +103,44 @@ def filter_inactive(emails, settings):
             kept.append(email)
     return kept, excluded
 
+def _filter_inactive_jellyfin(emails, days):
+    import time as _time
+    from app.clients.jellyfin import fetch_jellyfin_users
+
+    try:
+        users = fetch_jellyfin_users()
+    except Exception:
+        logger.warning("filter_inactive: Jellyfin lookup raised; not filtering", exc_info=True)
+        return emails, []
+    if not users:
+        logger.warning("filter_inactive: no Jellyfin users returned; not filtering")
+        return emails, []
+
+    last_seen_by_email = {}
+    for user in users:
+        email = (user.get('email') or '').strip().lower()
+        if email:
+            last_seen_by_email[email] = user.get('last_seen')
+
+    cutoff = _time.time() - days * 86400
+    kept, excluded = [], []
+    for email in emails:
+        key = (email or '').strip().lower()
+        if key not in last_seen_by_email:
+            kept.append(email)   # unmapped or unknown: cannot judge, keep
+            continue
+        try:
+            raw = last_seen_by_email.get(key)
+            last_seen_val = float(raw) if raw not in (None, '') else None
+        except (TypeError, ValueError):
+            last_seen_val = None
+        if last_seen_val is None or last_seen_val < cutoff:
+            excluded.append(email)
+            logger.info(f"filter_inactive: excluding inactive recipient {email}")
+        else:
+            kept.append(email)
+    return kept, excluded
+
 def group_recipients_by_user(to_emails_list, user_dict):
     email_to_user = { (v or '').strip().lower(): k for k, v in (user_dict or {}).items() if v }
     groups = defaultdict(list)
@@ -103,6 +149,34 @@ def group_recipients_by_user(to_emails_list, user_dict):
         groups[key].append(email)
     return groups
 
+REASON_PERSONALIZED_SECTIONS = 'personalized_sections'   # recs / DN wrapped per user
+REASON_TO_MODE = 'to_mode'                               # send_mode == 'to'
+REASON_HOSTED = 'hosted'                                 # per-recipient unsubscribe token
+REASON_TOKENS = 'tokens'                                 # personalization token in the body
+
+PERSONALIZED_ITEM_TYPES = ('recommendations', 'droppedneedle_wrapped')
+
+NO_PERSONAL_DATA = '__nl_no_personal_data__'
+
+def per_recipient_reasons(selected_items=None, settings=None, user_dict=None, body_html=None, body_plain=None):
+    settings = settings or {}
+    reasons = set()
+
+    if any(item.get('type') in PERSONALIZED_ITEM_TYPES and item.get('userKey')
+           for item in (selected_items or [])) and user_dict:
+        reasons.add(REASON_PERSONALIZED_SECTIONS)
+
+    if (settings.get('send_mode') or 'bcc') == 'to':
+        reasons.add(REASON_TO_MODE)
+
+    if settings.get('hosted_enabled') == 'enabled' and (settings.get('hosted_base_url') or '').strip():
+        reasons.add(REASON_HOSTED)
+
+    if personalization.has_tokens(body_html, body_plain):
+        reasons.add(REASON_TOKENS)
+
+    return reasons
+
 def send_personalized_per_recipient(server, msg_root, from_addr, recipients, email_html, plain_text,
                                      unsub_placeholder, links_base_url, send_mode):
     """Sends msg_root once per recipient, swapping in that recipient's own
@@ -110,21 +184,33 @@ def send_personalized_per_recipient(server, msg_root, from_addr, recipients, ema
     email_html/plain_text at build time."""
     image_parts = msg_root.get_payload()[1:]
     last_content = None
+    contact_names = get_contact_names() if personalization.has_tokens(email_html, plain_text) else {}
+
     for recipient in recipients:
-        token = sign_unsubscribe_token(recipient)
-        personalized_html = email_html.replace(unsub_placeholder, token)
-        personalized_plain = plain_text.replace(unsub_placeholder, token)
+        personalized_html, personalized_plain = email_html, plain_text
+        token = None
+        if unsub_placeholder:
+            token = sign_unsubscribe_token(recipient)
+            personalized_html = email_html.replace(unsub_placeholder, token)
+            personalized_plain = plain_text.replace(unsub_placeholder, token)
+
+        if contact_names:
+            personalized_html, personalized_plain = personalization.resolve_pair(
+                personalized_html, personalized_plain,
+                recipient, contact_names.get((recipient or '').strip().lower()),
+            )
 
         alt = MIMEMultipart('alternative')
         alt.attach(MIMEText(personalized_plain, 'plain', 'utf-8'))
         alt.attach(MIMEText(personalized_html, 'html', 'utf-8'))
         msg_root.set_payload([alt] + image_parts)
 
-        if 'List-Unsubscribe' in msg_root:
-            del msg_root['List-Unsubscribe']
-        msg_root['List-Unsubscribe'] = f'<mailto:{from_addr}?subject=unsubscribe>, <{links_base_url}/u/{token}>'
-        if 'List-Unsubscribe-Post' not in msg_root:
-            msg_root['List-Unsubscribe-Post'] = 'List-Unsubscribe=One-Click'
+        if token and links_base_url:
+            if 'List-Unsubscribe' in msg_root:
+                del msg_root['List-Unsubscribe']
+            msg_root['List-Unsubscribe'] = f'<mailto:{from_addr}?subject=unsubscribe>, <{links_base_url}/u/{token}>'
+            if 'List-Unsubscribe-Post' not in msg_root:
+                msg_root['List-Unsubscribe-Post'] = 'List-Unsubscribe=One-Click'
 
         if send_mode == 'to':
             msg_root.replace_header('To', recipient)
@@ -260,6 +346,7 @@ def send_standard_email_with_cids(req, settings, to_emails):
         )
 
         plain_text = convert_html_to_plain_text(email_html)
+        fan_out_reasons = per_recipient_reasons(req.selected_items, settings, req.user_dict, email_html, plain_text)
         if not use_personalized_send:
             msg_alternative.attach(MIMEText(plain_text, 'plain', 'utf-8'))
             msg_alternative.attach(MIMEText(email_html, 'html', 'utf-8'))
@@ -284,18 +371,13 @@ def send_standard_email_with_cids(req, settings, to_emails):
         logger.info("Sending email...")
 
         from_addr = alias_email if alias_email else from_email
-        if use_personalized_send:
+        if fan_out_reasons:
+            logger.info(f"Sending per recipient ({', '.join(sorted(fan_out_reasons))})")
             all_recipients = to_emails if send_mode == 'to' else [from_addr] + to_emails
             email_content = send_personalized_per_recipient(
                 server, msg_root, from_addr, all_recipients, email_html, plain_text,
                 unsub_placeholder, links_base_url, send_mode
             )
-        elif send_mode == 'to':
-            email_content = msg_root.as_string()
-            for recipient in to_emails:
-                msg_root.replace_header('To', recipient)
-                server.sendmail(from_addr, [recipient], msg_root.as_string())
-            all_recipients = to_emails
         else:
             email_content = msg_root.as_string()
             server.sendmail(from_addr, [from_addr] + to_emails, email_content)
@@ -377,8 +459,10 @@ def send_recommendations_email_with_cids(req, settings, to_emails):
 
         for user_key, recipients in groups.items():
             if user_key is None or user_key not in personalized_user_keys:
-                logger.info(f"Skipping recipients without recommendations or wrapped stats: {recipients}")
-                continue
+                logger.info(
+                    f"Sending shared content only (no personalized data) to: {recipients}"
+                )
+                user_key = NO_PERSONAL_DATA
 
             success = send_single_user_email_with_cids(
                 req, settings, recipients, user_key,
@@ -397,7 +481,7 @@ def send_recommendations_email_with_cids(req, settings, to_emails):
                 sent_info.append(', '.join(recipients))
 
         if total_sent == 0:
-            return {"error": "No recipients matched a recommendations or wrapped stats block. No emails sent."}, 400
+            return {"error": "No emails were sent. Check the logs for the per-recipient failure."}, 500
 
         return {"success": True, "sent_groups": sent_info}, 200
 
@@ -523,6 +607,7 @@ def send_single_user_email_with_cids(req, settings, recipients, user_key, recomm
         )
 
         plain_text = convert_html_to_plain_text(email_html)
+        fan_out_reasons = per_recipient_reasons(None, settings, None, email_html, plain_text)
         if not use_personalized_send:
             msg_alternative.attach(MIMEText(plain_text, 'plain', 'utf-8'))
             msg_alternative.attach(MIMEText(email_html, 'html', 'utf-8'))
@@ -547,18 +632,13 @@ def send_single_user_email_with_cids(req, settings, recipients, user_key, recomm
         logger.info("Sending email...")
 
         from_addr = alias_email if alias_email else from_email
-        if use_personalized_send:
+        if fan_out_reasons:
+            logger.info(f"Sending per recipient ({', '.join(sorted(fan_out_reasons))})")
             all_recipients = recipients if send_mode == 'to' else [from_addr] + recipients
             email_content = send_personalized_per_recipient(
                 server, msg_root, from_addr, all_recipients, email_html, plain_text,
                 unsub_placeholder, links_base_url, send_mode
             )
-        elif send_mode == 'to':
-            email_content = msg_root.as_string()
-            for recipient in recipients:
-                msg_root.replace_header('To', recipient)
-                server.sendmail(from_addr, [recipient], msg_root.as_string())
-            all_recipients = recipients
         else:
             email_content = msg_root.as_string()
             server.sendmail(from_addr, [from_addr] + recipients, email_content)

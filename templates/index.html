@@ -46,6 +46,12 @@
                             <span class="msg-recipients-count"><span id="bcc-count">(0)</span> recipients</span>
                             <span id="bcc-toggle-icon">{{ icon('chevron-down') }}</span>
                         </button>
+                        {# Standalone mode has no media server to supply recipients and, on a
+                           fresh install, no saved lists either, so the way in needs saying out
+                           loud rather than hiding behind a collapsed panel. #}
+                        {% if service_flags.standalone and not email_lists %}
+                        <div class="rail-note">Open Recipients above, then choose Import to add a list from a CSV or a paste.</div>
+                        {% endif %}
                         <div id="bcc-collapse" class="msg-recipients-body d-none">
                             <div class="d-flex gap-2 align-items-center">
                                 <select id="email_list_selector" class="form-select flex-1">
@@ -56,7 +62,24 @@
                                         <option value="{{ list.id }}" data-emails="{{ list.emails }}">{{ list.name }}</option>
                                     {% endfor %}
                                 </select>
+                                <button id="import_list_btn" type="button" class="btn btn-sm btn-secondary" title="Add recipients from a CSV or a paste">Import</button>
+                                <a id="export_list_btn" class="btn btn-sm btn-secondary d-none" href="#" title="Download this list as CSV">Export</a>
                                 <button id="delete_list_btn" type="button" class="btn btn-sm btn-danger d-none">Delete</button>
+                            </div>
+                            <div id="import_list_container" class="d-none mt-2">
+                                <div id="import_list_name_row" class="mb-2 d-none">
+                                    <input type="text" id="import_list_name" class="form-control form-control-sm"
+                                           placeholder="New list name" value="Subscribers">
+                                    <div class="rail-note">Creates this list, or adds to it if it already exists.</div>
+                                </div>
+                                <input type="file" id="import_list_file" class="form-control form-control-sm" accept=".csv,.txt,text/csv,text/plain">
+                                <textarea id="import_list_text" class="form-control form-control-sm mt-2" rows="4"
+                                          placeholder="Or paste addresses: one per line, or email,name per line"></textarea>
+                                <div class="d-flex gap-2 mt-2">
+                                    <button id="do_import_btn" type="button" class="btn btn-sm btn-success">Add to list</button>
+                                    <button id="cancel_import_btn" type="button" class="btn btn-sm btn-secondary">Cancel</button>
+                                </div>
+                                <div id="import_result" class="rail-note mt-2"></div>
                             </div>
                             <div id="save_list_container" class="d-none mt-2">
                                 <div class="d-flex gap-2">
@@ -130,6 +153,12 @@
                         <div id="selected-items-empty" class="text-muted text-center py-3">
                             No items selected. Use the buttons below to add items to your email.
                         </div>
+                    </div>
+                    <div id="personalization-note" class="rail-note mb-3 d-none">
+                        This email uses a personalization token, so it will be sent
+                        individually to each recipient rather than as one BCC message.
+                        Recipients with no saved name are greeted as
+                        &ldquo;{{ personalization_default_name }}&rdquo;.
                     </div>
                     <div id="custom-html-pane" style="display: none;">
                         <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">

@@ -34,7 +34,8 @@
                 displayPreference: {{ settings.recipient_display_name | string | tojson }},
                 allUserEmails: {{ (user_dict.values() | list) | tojson }},
                 serviceFlags: {{ service_flags | tojson }},
-                pullCacheFresh: {{ pull_cache_fresh | default({}) | tojson }}
+                pullCacheFresh: {{ pull_cache_fresh | default({}) | tojson }},
+                demo: {{ demo_mode | default(false) | tojson }}
             };
         </script>
         <script src="{{ url_for('static', filename='js/app/00-alerts.js') }}" nonce="{{ nonce }}"></script>
@@ -98,4 +99,8 @@
         <script src="{{ url_for('static', filename='js/app/36-top-viewer.js') }}" nonce="{{ nonce }}"></script>
         <script src="{{ url_for('static', filename='js/app/37-featured-pick.js') }}" nonce="{{ nonce }}"></script>
         <script src="{{ url_for('static', filename='js/app/38-rich-text.js') }}" nonce="{{ nonce }}"></script>
+        <script src="{{ url_for('static', filename='js/app/39-personalization-note.js') }}" nonce="{{ nonce }}"></script>
+        {% if demo_mode %}
+        <script src="{{ url_for('static', filename='js/app/40-demo.js') }}" nonce="{{ nonce }}"></script>
+        {% endif %}
     </div>

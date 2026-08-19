@@ -11,6 +11,7 @@ from app.cache import is_cache_valid, get_cached_data, get_cache_info, clear_cac
 from app.progress import progress_get
 from app.crypto import decrypt
 from app.net import is_safe_fetch_url, configured_media_hosts
+from app.emails import personalization
 from app.settings_store import get_service_flags, get_settings
 from app.security import require_csrf_for_json, requires_auth, safe_get
 from app.clients.jellyfin import get_jellyfin_headers
@@ -219,7 +220,8 @@ def index():
                            sonarr_coming_soon_json=sonarr_coming_soon_json, radarr_coming_soon_json=radarr_coming_soon_json,
                            ombi_requests_json=ombi_requests_json,
                            seerr_requests_json=seerr_requests_json,
-                           csrf_token=session["csrf_token"], username=username, service_flags=service_flags
+                           csrf_token=session["csrf_token"], username=username, service_flags=service_flags,
+                           personalization_default_name=personalization.DEFAULT_NAME
                         )
 
 def _maybe_blur(raw, content_type):
@@ -240,8 +242,11 @@ def proxy_art(art_path):
     # frontend JS. When Jellyfin is the active media server, item thumbs are
     # Jellyfin art paths, so serve them through the Jellyfin fetch instead of
     # requiring every caller to know which proxy to use (zero builder changes).
-    if (_s.get('media_server_type') or 'plex') == 'jellyfin':
+    _server_type = (_s.get('media_server_type') or 'plex')
+    if _server_type in ('jellyfin', 'emby'):
         return _fetch_jellyfin_art(art_path, _s)
+    if _server_type == 'none':
+        return Response("No media server is configured.", status=404)
 
     row = (_s.get("plex_url"), _s.get("plex_token")) if "id" in _s else None
 

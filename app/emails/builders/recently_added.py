@@ -1,7 +1,8 @@
 from datetime import datetime, timezone, timedelta
 
+from app import dates
 from app.emails import density, headings
-from app.emails.builders.card_grid import effective_columns
+from app.emails.builders.card_grid import EMPTY_STATE_MARKER, effective_columns
 from app.emails.images import fetch_and_attach_image, truncate_text
 from app.security import escape_html_output as esc
 
@@ -68,12 +69,12 @@ def _duration_text(item):
             duration = f"{n} new episode" + ("s" if n != 1 else "")
     return duration
 
-def recently_added_title(library_filter, recently_added_mode, max_items):
+def recently_added_title(library_filter, recently_added_mode, max_items, date_format=dates.DEFAULT_DATE_FORMAT):
     """Section heading. Days mode spells out the window it covers."""
     if recently_added_mode == "days" and max_items:
         try:
-            since_date = (datetime.now() - timedelta(days=int(max_items))).strftime("%-m/%-d/%y")
-            end_date = datetime.now().strftime("%-m/%-d/%y")
+            since_date = dates.fmt_numeric_date(datetime.now() - timedelta(days=int(max_items)), date_format)
+            end_date = dates.fmt_numeric_date(datetime.now(), date_format)
             date_range = f"{since_date} - {end_date}"
         except Exception:
             logger.debug("suppressed exception; using fallback", exc_info=True)
@@ -84,7 +85,7 @@ def recently_added_title(library_filter, recently_added_mode, max_items):
 def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, library_filter=None, base_url="", max_items=None, recently_added_mode="items", ra_grid_columns=5, poster_max_height=0, hosted_images_enabled=False, hosted_base_url="", show_description=True, library_item_cap=0, orientation=""):
     if not recent_data:
         return f"""
-        <div style="background-color: {theme_colors['card_bg']}; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid {theme_colors['border']}; font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;">
+        <div {EMPTY_STATE_MARKER} style="background-color: {theme_colors['card_bg']}; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid {theme_colors['border']}; font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;">
             <p style="text-align: center; color: {theme_colors['muted_text']}; padding: 20px; margin: 0; font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;">No recently added items available.</p>
         </div>
         """
@@ -109,7 +110,7 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
 
     if not items:
         return f"""
-        <div style="background-color: {theme_colors['card_bg']}; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid {theme_colors['border']}; font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;">
+        <div {EMPTY_STATE_MARKER} style="background-color: {theme_colors['card_bg']}; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid {theme_colors['border']}; font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;">
             <p style="text-align: center; color: {theme_colors['muted_text']}; padding: 20px; margin: 0; font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;">No recently added items found{f' for {esc(library_filter)}' if library_filter else ''}.</p>
         </div>
         """
@@ -126,7 +127,7 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
     if stacked:
         return _build_recently_added_list_html(
             items, msg_root, theme_colors, base_url,
-            recently_added_title(library_filter, recently_added_mode, max_items),
+            recently_added_title(library_filter, recently_added_mode, max_items, dates.date_format_of(theme_colors)),
             poster_max_height, hosted_images_enabled, hosted_base_url, show_description)
 
     # Email-safe uniform poster box: the delivered bytes are cropped to a 2:3
@@ -372,7 +373,7 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
         table-layout: fixed;
     """
     
-    ra_title = headings.resolve(theme_colors, recently_added_title(library_filter, recently_added_mode, max_items))
+    ra_title = headings.resolve(theme_colors, recently_added_title(library_filter, recently_added_mode, max_items, dates.date_format_of(theme_colors)))
     ra_title_html = f'<h2 style="{title_style}">{esc(ra_title)}</h2>' if ra_title else ''
 
     return f"""

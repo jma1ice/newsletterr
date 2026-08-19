@@ -202,20 +202,20 @@ def test_link_underline_removal_survives():
     assert "text-decoration: none" in out
 
 
-def test_text_colour_survives_in_both_notations():
+def test_text_color_survives_in_both_notations():
     for value in ("color: #ff3366", "color: rgb(255, 51, 102)"):
         out = sanitize_html(f'<span style="{value}">x</span>')
         assert value.split(': ')[1] in out, out
 
 
-def test_a_coloured_link_keeps_both_href_and_colour():
+def test_a_colored_link_keeps_both_href_and_color():
     out = sanitize_html('<a href="https://x.example" style="color: rgb(255, 51, 102);">x</a>')
     assert 'href="https://x.example"' in out
     assert "color: rgb(255, 51, 102)" in out
 
 
 def test_ordered_lists_and_their_layout_styles_survive():
-    """The list normalization is what stops a centred block stranding the
+    """The list normalization is what stops a centered block stranding the
     marker away from its text, so it has to reach the email intact."""
     out = sanitize_html(
         '<ol style="display: inline-block; text-align: left; margin: 0px; padding-left: 1.5em;">'

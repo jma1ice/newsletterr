@@ -29,7 +29,7 @@ jobs:
             exit 0
           fi
           if printf '%s' "$LABELS" | grep -q '"override-base"'; then
-            echo "PR is labelled override-base, allowed."
+            echo "PR is labeled override-base, allowed."
             exit 0
           fi
           echo "::error title=Wrong base branch::This PR targets 'main'. Pull requests go to 'nightly' first, see CONTRIBUTING.md. Retarget it with the Edit button next to the PR title (no need to close and reopen), or add the 'override-base' label if this is a deliberate hotfix."

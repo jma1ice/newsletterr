@@ -1,13 +1,14 @@
 import json
 import re
 
+from app import dates
 from app.settings_store import DEFAULTS, get_settings
 
 import logging
 
 logger = logging.getLogger(__name__)
 
-# Custom app UI theme (NEWS-29): a user-built palette applied via the
+# Custom app UI theme: a user-built palette applied via the
 # .theme-custom html class (deliberately not the pride class, so the pride
 # brand flourish and logo swap never trigger). Users pick six base colors per
 # mode; the remaining tokens of the 13-token set derive here, mirroring the
@@ -109,8 +110,14 @@ def get_email_chrome_settings():
         logger.error(f"Error getting email chrome settings: {e}")
         s = {}
     header_bg = (s.get('email_header_bg') or '').strip()
-    jellyfin = (s.get('media_server_type') or 'plex') == 'jellyfin'
-    server_url = (s.get('jellyfin_web_url') if jellyfin else s.get('plex_web_url')) or ''
+    server_type = (s.get('media_server_type') or 'plex')
+    jellyfin = server_type in ('jellyfin', 'emby')
+    # Standalone mode has no server to open, so the spotlight call to
+    # action drops out rather than pointing at an unconfigured Plex.
+    if server_type == 'none':
+        server_url = ''
+    else:
+        server_url = (s.get('jellyfin_web_url') if jellyfin else s.get('plex_web_url')) or ''
     return {
         'show_server_name': s.get('email_show_server_name') == 'enabled',
         # blank (or anything not #rrggbb) keeps the default gradient
@@ -125,6 +132,11 @@ def get_email_chrome_settings():
         # the spotlight layout's call to action; blank hides the button
         'server_url': server_url.strip(),
         'server_cta': 'Open Jellyfin' if jellyfin else 'Open Plex',
+        # display formats. The email shell renders its own dates, so it
+        # needs these here as well as on the stamped theme dict.
+        'date_format': dates.resolve_date_format(s.get('date_format')),
+        'time_format': dates.resolve_time_format(s.get('time_format')),
+        'week_start': dates.resolve_week_start(s.get('week_start_day')),
     }
 
 def build_email_css_from_theme(theme_colors, logo_width, container_width=800):

@@ -69,7 +69,8 @@ window.pullRunners.ombi = async function ({ chained = false } = {}) {
     }
 };
 
-document.getElementById('pullOmbiRequestsBtn').addEventListener('click', (e) => {
+const _pullOmbiRequestsBtn = document.getElementById('pullOmbiRequestsBtn');
+if (_pullOmbiRequestsBtn) _pullOmbiRequestsBtn.addEventListener('click', (e) => {
     if (!confirmFreshRepull(e.currentTarget, 'ombi')) return;
     window.pullRunners.ombi({ chained: false });
 });

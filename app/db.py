@@ -66,6 +66,48 @@ def init_db(db_path):
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+
+    # contacts: a named recipient per list, for standalone mode where
+    # there is no Tautulli user list to borrow names from.
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS media_user_emails (
+            server_type TEXT NOT NULL,
+            user_id TEXT NOT NULL,
+            email TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (server_type, user_id)
+        )
+    """)
+
+    _contacts_existed = cursor.execute(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'contacts'"
+    ).fetchone() is not None
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS contacts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            list_id INTEGER NOT NULL,
+            email TEXT NOT NULL,
+            name TEXT DEFAULT '',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE (list_id, email),
+            FOREIGN KEY (list_id) REFERENCES email_lists (id)
+        )
+    """)
+    if not _contacts_existed:
+        # One-time backfill from the comma-joined column, with blank names.
+        # Gated on the table not having existed rather than on it being empty,
+        # so a user who deletes every contact does not get them all back on the
+        # next restart.
+        logger.info("Backfilling contacts from existing email lists...")
+        for list_id, emails in cursor.execute("SELECT id, emails FROM email_lists").fetchall():
+            for address in (emails or '').split(','):
+                address = address.strip()
+                if address:
+                    cursor.execute(
+                        "INSERT OR IGNORE INTO contacts (list_id, email, name) VALUES (?, ?, '')",
+                        (list_id, address),
+                    )
+        conn.commit()
     
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS email_templates (
@@ -140,7 +182,10 @@ def init_db(db_path):
             send_time TEXT DEFAULT '09:00', -- Time of day to send (HH:MM format)
             date_range INTEGER DEFAULT 7, -- Number of days of data to include
             items_count INTEGER DEFAULT 10,
-            skip_if_no_new INTEGER DEFAULT 0, -- skip the send when no new recently-added/most-watched items landed
+            skip_if_no_new INTEGER DEFAULT 0, -- skip the send when too little new content landed
+            skip_triggers TEXT DEFAULT '', -- JSON list of watched section types; blank means the legacy recently-added/most-watched pair
+            skip_min_items INTEGER DEFAULT 1, -- minimum item count across the watched sections
+            skip_if_empty INTEGER DEFAULT 0, -- skip when no section rendered any content at all
             last_sent TIMESTAMP,
             next_send TIMESTAMP NOT NULL,
             is_active BOOLEAN DEFAULT 1,
@@ -172,6 +217,26 @@ def init_db(db_path):
     if 'skip_if_no_new' not in columns:
         logger.info("Adding skip_if_no_new column to email_schedules table...")
         cursor.execute("ALTER TABLE email_schedules ADD COLUMN skip_if_no_new INTEGER DEFAULT 0")
+        conn.commit()
+
+    # Both default to the pre-widening behavior: a blank trigger list
+    # means the legacy recently-added/most-watched pair, and a threshold of 1
+    # means "anything at all", so no existing schedule changes when it upgrades.
+    if 'skip_triggers' not in columns:
+        logger.info("Adding skip_triggers column to email_schedules table...")
+        cursor.execute("ALTER TABLE email_schedules ADD COLUMN skip_triggers TEXT DEFAULT ''")
+        conn.commit()
+
+    if 'skip_min_items' not in columns:
+        logger.info("Adding skip_min_items column to email_schedules table...")
+        cursor.execute("ALTER TABLE email_schedules ADD COLUMN skip_min_items INTEGER DEFAULT 1")
+        conn.commit()
+
+    # Off by default, so no existing schedule changes behavior. Unlike
+    # skip_if_no_new this decides after the pull, on what actually rendered.
+    if 'skip_if_empty' not in columns:
+        logger.info("Adding skip_if_empty column to email_schedules table...")
+        cursor.execute("ALTER TABLE email_schedules ADD COLUMN skip_if_empty INTEGER DEFAULT 0")
         conn.commit()
 
     cursor.execute("PRAGMA table_info(settings)")
@@ -232,7 +297,7 @@ def init_db(db_path):
 
     cursor.execute("PRAGMA table_info(settings)")
     columns = [column[1] for column in cursor.fetchall()]
-    for col_name, col_def in [('default_intro_text', 'TEXT DEFAULT ""'), ('default_outro_text', 'TEXT DEFAULT ""'), ('hsts_enabled', 'TEXT DEFAULT "disabled"'), ('scheduled_subject_prefix', 'TEXT DEFAULT "enabled"'), ('logo_position', 'TEXT DEFAULT "center"'), ('hide_stat_play_counts', 'TEXT DEFAULT "disabled"'), ('hide_graph_play_counts', 'TEXT DEFAULT "disabled"'), ('stats_type', 'TEXT DEFAULT "plays"'), ('recently_added_mode', 'TEXT DEFAULT "items"'), ('recently_added_sort', 'TEXT DEFAULT "date"'), ('ra_grid_columns', 'TEXT DEFAULT "5"'), ('recs_grid_columns', 'TEXT DEFAULT "5"'), ('stat_cover_art', 'TEXT DEFAULT "disabled"'), ('send_mode', 'TEXT DEFAULT "bcc"'), ('poster_max_height', 'TEXT DEFAULT ""'), ('droppedneedle_url', 'TEXT DEFAULT ""'), ('droppedneedle_api_key', 'TEXT DEFAULT ""'), ('discord_webhook_url', 'TEXT DEFAULT ""'), ('sonarr_url', 'TEXT DEFAULT ""'), ('sonarr_api_key', 'TEXT DEFAULT ""'), ('radarr_url', 'TEXT DEFAULT ""'), ('radarr_api_key', 'TEXT DEFAULT ""'), ('ombi_url', 'TEXT DEFAULT ""'), ('ombi_api_key', 'TEXT DEFAULT ""'), ('seerr_url', 'TEXT DEFAULT ""'), ('seerr_api_key', 'TEXT DEFAULT ""'), ('coming_soon_days_ahead', 'TEXT DEFAULT "14"'), ('released_since_days', 'TEXT DEFAULT ""'), ('coming_soon_grid_columns', 'TEXT DEFAULT "5"'), ('hosted_enabled', 'TEXT DEFAULT "disabled"'), ('hosted_base_url', 'TEXT DEFAULT ""'), ('hosted_images_enabled', 'TEXT DEFAULT "disabled"'), ('ra_show_description', 'TEXT DEFAULT "enabled"'), ('collections_grid_columns', 'TEXT DEFAULT "5"'), ('exclude_inactive_days', 'TEXT DEFAULT "0"'), ('include_user_info', 'TEXT DEFAULT "enabled"'), ('email_size_warn_mb', 'TEXT DEFAULT "10"'), ('appearance_theme', 'TEXT DEFAULT "dark"'), ('pride_flag', 'TEXT DEFAULT "off"'), ('snapins_floating', 'TEXT DEFAULT "1"'), ('hosted_image_retention_days', 'TEXT DEFAULT "90"'), ('hosted_links_enabled', 'TEXT DEFAULT "disabled"'), ('hosted_links_base_url', 'TEXT DEFAULT ""'), ('recs_item_count', 'TEXT DEFAULT ""'), ('ui_custom_light', 'TEXT DEFAULT ""'), ('ui_custom_dark', 'TEXT DEFAULT ""'), ('email_layout', 'TEXT DEFAULT "classic"'), ('email_density', 'TEXT DEFAULT ""'), ('media_server_type', 'TEXT DEFAULT "plex"'), ('jellyfin_url', 'TEXT DEFAULT ""'), ('jellyfin_api_key', 'TEXT DEFAULT ""'), ('jellyfin_web_url', 'TEXT DEFAULT ""'), ('jellywatch_url', 'TEXT DEFAULT ""'), ('jellywatch_api_key', 'TEXT DEFAULT ""'), ('email_show_server_name', 'TEXT DEFAULT "disabled"'), ('email_header_bg', 'TEXT DEFAULT ""'), ('recs_show_description', 'TEXT DEFAULT "enabled"'), ('email_eyebrow_text', 'TEXT DEFAULT ""'), ('email_auto_header_text', 'TEXT DEFAULT "disabled"')]:
+    for col_name, col_def in [('default_intro_text', 'TEXT DEFAULT ""'), ('default_outro_text', 'TEXT DEFAULT ""'), ('hsts_enabled', 'TEXT DEFAULT "disabled"'), ('scheduled_subject_prefix', 'TEXT DEFAULT "enabled"'), ('logo_position', 'TEXT DEFAULT "center"'), ('hide_stat_play_counts', 'TEXT DEFAULT "disabled"'), ('hide_graph_play_counts', 'TEXT DEFAULT "disabled"'), ('stats_type', 'TEXT DEFAULT "plays"'), ('recently_added_mode', 'TEXT DEFAULT "items"'), ('recently_added_sort', 'TEXT DEFAULT "date"'), ('ra_grid_columns', 'TEXT DEFAULT "5"'), ('recs_grid_columns', 'TEXT DEFAULT "5"'), ('stat_cover_art', 'TEXT DEFAULT "disabled"'), ('send_mode', 'TEXT DEFAULT "bcc"'), ('poster_max_height', 'TEXT DEFAULT ""'), ('droppedneedle_url', 'TEXT DEFAULT ""'), ('droppedneedle_api_key', 'TEXT DEFAULT ""'), ('discord_webhook_url', 'TEXT DEFAULT ""'), ('sonarr_url', 'TEXT DEFAULT ""'), ('sonarr_api_key', 'TEXT DEFAULT ""'), ('radarr_url', 'TEXT DEFAULT ""'), ('radarr_api_key', 'TEXT DEFAULT ""'), ('ombi_url', 'TEXT DEFAULT ""'), ('ombi_api_key', 'TEXT DEFAULT ""'), ('seerr_url', 'TEXT DEFAULT ""'), ('seerr_api_key', 'TEXT DEFAULT ""'), ('coming_soon_days_ahead', 'TEXT DEFAULT "14"'), ('released_since_days', 'TEXT DEFAULT ""'), ('coming_soon_grid_columns', 'TEXT DEFAULT "5"'), ('hosted_enabled', 'TEXT DEFAULT "disabled"'), ('hosted_base_url', 'TEXT DEFAULT ""'), ('hosted_images_enabled', 'TEXT DEFAULT "disabled"'), ('ra_show_description', 'TEXT DEFAULT "enabled"'), ('collections_grid_columns', 'TEXT DEFAULT "5"'), ('exclude_inactive_days', 'TEXT DEFAULT "0"'), ('include_user_info', 'TEXT DEFAULT "enabled"'), ('email_size_warn_mb', 'TEXT DEFAULT "10"'), ('appearance_theme', 'TEXT DEFAULT "dark"'), ('pride_flag', 'TEXT DEFAULT "off"'), ('snapins_floating', 'TEXT DEFAULT "1"'), ('hosted_image_retention_days', 'TEXT DEFAULT "90"'), ('hosted_links_enabled', 'TEXT DEFAULT "disabled"'), ('hosted_links_base_url', 'TEXT DEFAULT ""'), ('recs_item_count', 'TEXT DEFAULT ""'), ('ui_custom_light', 'TEXT DEFAULT ""'), ('ui_custom_dark', 'TEXT DEFAULT ""'), ('email_layout', 'TEXT DEFAULT "classic"'), ('email_density', 'TEXT DEFAULT ""'), ('media_server_type', 'TEXT DEFAULT "plex"'), ('jellyfin_url', 'TEXT DEFAULT ""'), ('jellyfin_api_key', 'TEXT DEFAULT ""'), ('jellyfin_web_url', 'TEXT DEFAULT ""'), ('jellywatch_url', 'TEXT DEFAULT ""'), ('jellywatch_api_key', 'TEXT DEFAULT ""'), ('email_show_server_name', 'TEXT DEFAULT "disabled"'), ('email_header_bg', 'TEXT DEFAULT ""'), ('recs_show_description', 'TEXT DEFAULT "enabled"'), ('email_eyebrow_text', 'TEXT DEFAULT ""'), ('email_auto_header_text', 'TEXT DEFAULT "disabled"'), ('default_landing_page', 'TEXT DEFAULT "builder"'), ('week_start_day', 'TEXT DEFAULT "sunday"'), ('date_format', 'TEXT DEFAULT "mdy"'), ('time_format', 'TEXT DEFAULT "12"'), ('dn_item_count', 'TEXT DEFAULT ""'), ('dn_show_artists', 'TEXT DEFAULT "enabled"'), ('dn_show_tracks', 'TEXT DEFAULT "enabled"'), ('dn_show_albums', 'TEXT DEFAULT "enabled"'), ('dn_show_genres', 'TEXT DEFAULT "enabled"'), ('dn_cover_art', 'TEXT DEFAULT "disabled"'), ('wrapped_extra_stats', 'TEXT DEFAULT ""'), ('wrapped_rank_depth', 'TEXT DEFAULT "1"'), ('playback_reporting_enabled', 'TEXT DEFAULT "disabled"')]:
         if col_name not in columns:
             logger.info(f"Adding {col_name} column to settings table...")
             cursor.execute(f'ALTER TABLE settings ADD COLUMN {col_name} {col_def}')

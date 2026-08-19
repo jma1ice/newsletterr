@@ -75,7 +75,7 @@ def test_pull_window_is_used_when_the_setting_is_blank():
 
 
 def test_no_cutoff_when_neither_is_set():
-    """Items mode has no time window, so ordering is the whole behaviour."""
+    """Items mode has no time window, so ordering is the whole behavior."""
     assert rr.resolve_cutoff("", None, today=TODAY) is None
     assert rr.resolve_cutoff(None, None, today=TODAY) is None
 

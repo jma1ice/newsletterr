@@ -113,33 +113,38 @@
     <h2>recent changes</h2>
     <p class="info-subhead">New Features:</p>
     <ul class="info-list">
-        <li>New options for how the coming soon calendar is displayed</li>
-        <li>Email Density setting for expanding/condensing layouts</li>
-        <li>Move to top and move to bottom arrows on every snap-in, for reordering without dragging</li>
-        <li>Save dialog for templates, with an explicit "overwrite an existing template" option</li>
-        <li>Pick which collection group an added collection goes to, and move collections between groups</li>
-        <li>Rename or hide the heading on any snap-in, including a custom Coming Soon title</li>
-        <li>Rich text editing on text snap-ins: bold, italic, underline, alignment, bulleted and numbered lists, links and text color from a toolbar</li>
-        <li>Links can have their underline removed</li>
-        <li>Per-block font and size on text snap-ins, without going to Settings</li>
-        <li>New Recently Released snap-in, showing library items by release or air date rather than date added</li>
-        <li>Limit how many entries a Coming Soon snap-in shows</li>
-        <li>Filter Coming Soon (TV) down to premieres only, or new series only</li>
+        <li>Standalone mode: run newsletterr with no media server at all, as a plain mailing list tool. Setup now asks which you want, and the media snap-ins stay out of the builder</li>
+        <li>Import recipient lists from a CSV or by pasting addresses, with names picked up alongside them. Accepts a header row or none, tabs or commas, and the "Name &lt;address&gt;" form mail clients produce</li>
+        <li>Every rejected row from an import is reported with its line number, and addresses that have unsubscribed cannot come back in through a file</li>
+        <li>Export any saved list as a CSV</li>
+        <li>Link Jellyfin users to email addresses. Jellyfin does not store them, so importing a list with names links what it can automatically, and Settings has a table to fill in or correct the rest</li>
+        <li>Once linked, per-user recommendations, per-user DroppedNeedle wrapped and personalized sends work on Jellyfin the same way they do on Plex</li>
+        <li>Default landing page after login</li>
+        <li>Calendar week can start on Sunday or Monday, in the scheduling calendar and in the Coming Soon calendar view</li>
+        <li>Date and time format settings (month/day/year, day/month/year or year/month/day, and 12 or 24 hour), applied everywhere a date is shown to a reader including sent emails</li>
+        <li>Skip-on-no-new now lets you pick which sections count as new content, across recently added, most watched, recently released, both Coming Soon snap-ins and both request snap-ins</li>
+        <li>Skip-on-no-new also takes a minimum item count, so a schedule can wait for a week worth mailing about rather than firing on a single item</li>
+        <li>Album art on the DroppedNeedle wrapped card, matched from the music database</li>
+        <li>Choose which DroppedNeedle lists appear (artists, tracks, albums, genres) and how many rows each one shows</li>
+        <li>Extra Year in Review highlights: popular movie, popular show, top platform, top library and peak streams</li>
+        <li>Year in Review can show the top 1, 3 or 5 of each highlight instead of just the winner</li>
+        <li>**Emby support, untested.** Jellyfin forked from Emby, so they speak nearly the same API and share one client here, but this was written against Emby's documentation rather than verified against a real server. Pick it in Settings under Media Server and use the Jellyfin fields for the URL and API key. Reports of what breaks are very welcome</li>
+        <li>Graphs on Jellyfin and Emby, via the Playback Reporting plugin. Jellywatch keeps no history over time, so graphs need that plugin installed on your server; it reuses the URL and API key you already entered. Offers Plays by Date, by Day, by Hour, by Top Users and by Top Platforms. The other Plex graphs have no equivalent in the plugin and are not offered, and if the plugin is missing the graph list simply stays empty</li>
+        <li>Most Watched now works on Jellyfin, via Jellywatch. Note it groups by media type (Movies, TV Shows, Music) rather than per library, because Jellywatch reports play counts by type; the counts are server-wide, which is what the section means on Plex</li>
+        <li>The inactive-recipient filter now works on Jellyfin too, using each account's last activity date. It still fails open everywhere: if the server cannot be asked, nobody is filtered out of a send</li>
+        <li>Personalization tokens: `{{name}}`, `{{first_name}}` and `{{email}}` in any text block or custom HTML, filled in per recipient from your saved contacts. A template using one sends individually rather than as one BCC message, and the builder says so while you write it</li>
+        <li>New scheduling option: skip the send when the email would come out empty. A catch-all next to the per-section triggers, for when every section returns nothing. Headers, footers and text blocks do not count as content, and a section showing "no items found" counts as empty rather than as content</li>
+        <li>Demo mode is now an actual demo: it runs on a sample library (recently added, stats, graphs, recommendations, wrapped, coming soon and requests, with placeholder artwork), the builder opens with a newsletter already assembled, and the live preview renders it for real. Appearance, UI theme, email theme, layout and density can all be switched on the Settings page and take effect immediately for that visitor without saving anything</li>
     </ul>
     <p class="info-subhead">Fixes:</p>
     <ul class="info-list mb-4">
-        <li>Cards with multiple rows were clamping all rows to one grid size</li>
-        <li>Templates were shipping old captured data</li>
-        <li>Legacy stat posters were filling the screen</li>
-        <li>Lost blur on stat card backgrounds</li>
-        <li>Editorial titles were jammed against "requested by ..."</li>
-        <li>Dragging the snap-ins panel taller grew the panel but not the list inside it</li>
-        <li>Dragging a snap-in past the edge of the list did not scroll on macOS</li>
-        <li>Loading a template reopened its collections closed, losing the saved expansion</li>
-        <li>Overwriting a template meant retyping its name exactly, now there is a dropdown</li>
-        <li>Clicking the center of an icon button did nothing, only the edge worked</li>
-        <li>Year in Plex posters rendered full size in the legacy layout at expanded density</li>
-        <li>Live preview refetched expanded collections from Plex on every edit, making it lag seconds behind</li>
+        <li>The per-user DroppedNeedle wrapped card ignored the email layout, rendering the same plain lists under editorial, digest and spotlight instead of matching the rest of the email</li>
+        <li>Recommendations, collections and graphs also ignored the email layout, so a classic, editorial, digest or spotlight email had sections that did not match the rest of it. Every data section now follows the layout you picked</li>
+        <li>Jellyfin never loaded a user list, so recipients could not be pulled from the server and no per-user section had anyone to address</li>
+        <li>The wrapped card fell back to a numeric user id when there was no Tautulli user list to read a name from, which was every Jellyfin install</li>
+        <li>Demo mode showed a logout button that emptied the session and dropped the visitor into first-run setup, and the live preview came back empty because the render request was blocked as a write</li>
+        <li>The Most Watched snap-in ignored the Stats and Graphs metric setting: it always ranked and labelled by play count, even with Duration picked. It now ranks by time watched and labels cards with it. Tautulli reports no watch time in its per-library media list, so an all-time section on Duration is aggregated from that library's history, which covers its most recent 1000 plays</li>
+        <li>Demo mode's Most Watched section listed no libraries, because the sample data was built in the wrong shape for the snap-in</li>
     </ul>
 </div>
 {% endblock %}

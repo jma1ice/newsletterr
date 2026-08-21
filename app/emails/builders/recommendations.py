@@ -314,7 +314,7 @@ def build_recommendations_section_with_cids(available_items, unavailable_items, 
     rows_html = ""
     for i in range(0, len(all_items), items_per_row):
         row_items = all_items[i:i + items_per_row]
-        row_html = '<tr class="recommendations-row">'
+        row_html = '<tr class="recommendations-row nl-grid-row">'
         
         for j, item in enumerate(row_items):
             is_unavailable = (i + j) >= len(available_items)
@@ -395,7 +395,7 @@ def build_recommendations_section_with_cids(available_items, unavailable_items, 
                 ]))
 
                 card_content = f"""
-                    <div class="recommendations-card" style="
+                    <div class="recommendations-card nl-grid-card" style="
                         background-color: {theme_colors['card_bg']};
                         border-radius: 12px;
                         overflow: hidden;
@@ -442,7 +442,7 @@ def build_recommendations_section_with_cids(available_items, unavailable_items, 
                 card_html = f'<a href="{esc(href)}" style="text-decoration: none; color: inherit; display: block;" target="_blank" title="{link_title}">{card_content}</a>'
             else:
                 card_html = f"""
-                    <div class="recommendations-card" style="
+                    <div class="recommendations-card nl-grid-card" style="
                         background-color: {theme_colors['card_bg']};
                         border-radius: 12px;
                         border: 1px solid {theme_colors['border']};
@@ -508,7 +508,7 @@ def build_recommendations_section_with_cids(available_items, unavailable_items, 
     return f"""
         <div style="margin: {p3('10px 0', '20px 0', '26px 0')};">
             <h3 style="{section_title_style}">{title}</h3>
-            <table class="recommendations-table" style="{table_style}">
+            <table class="recommendations-table nl-grid" style="{table_style}">
                 {rows_html}
             </table>
         </div>

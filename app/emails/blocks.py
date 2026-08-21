@@ -13,6 +13,9 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+CHART_CAPTURE_WIDTH = 600
+
+
 def _graph_wrapper_html(chart_name, img_src):
     container_style = """
         border-radius: 8px;
@@ -34,7 +37,7 @@ def _graph_wrapper_html(chart_name, img_src):
 
     return f"""
     <div style="{container_style}">
-        <img src="{img_src}" alt="{esc(chart_name)}" style="{image_style}">
+        <img src="{img_src}" alt="{esc(chart_name)}" width="{CHART_CAPTURE_WIDTH}" style="{image_style}">
     </div>
     """
 

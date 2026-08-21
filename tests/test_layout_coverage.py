@@ -59,8 +59,8 @@ def test_recommendation_layouts_differ_from_each_other():
 
 
 def test_unavailable_titles_keep_their_meaning_in_every_layout():
-    """The legacy render greys the poster out. The row layouts have no poster to
-    grey, so the distinction has to survive some other way rather than being
+    """The legacy render grays the poster out. The row layouts have no poster to
+    gray, so the distinction has to survive some other way rather than being
     quietly dropped."""
     for layout in LAYOUTS:
         html = layouts.render_recommendations(

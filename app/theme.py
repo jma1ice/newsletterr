@@ -47,6 +47,12 @@ def _on_accent(accent_hex):
     luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255
     return '#111417' if luminance > 0.55 else '#ffffff'
 
+def is_dark_background(hex_color):
+    if not is_hex_color(hex_color):
+        return True  # every preset is dark, so that is the safer default
+    r, g, b = (int(hex_color[i:i + 2], 16) for i in (1, 3, 5))
+    return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 <= 0.5
+
 def _custom_token_block(c, mode):
     # accent-strong pushes toward black in light mode and white in dark mode,
     # matching how the pride palettes step their accents per mode
@@ -140,205 +146,183 @@ def get_email_chrome_settings():
     }
 
 def build_email_css_from_theme(theme_colors, logo_width, container_width=800):
+    _scheme = "dark" if is_dark_background(theme_colors.get('background')) else "light"
     return f"""
         <style>
-            @import url(https://fonts.googleapis.com/css?family=IBM+Plex+Sans:400,700&display=swap);
-            
+            :root {{
+                color-scheme: {_scheme}!important;
+            }}
+
             body {{
-                margin: 0 !important;
-                padding: 0 !important;
-                font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif !important;
-                background-color: {theme_colors['background']} !important;
-                line-height: 1.6 !important;
-                color: {theme_colors['text']} !important;
-                -webkit-text-size-adjust: 100% !important;
-                -ms-text-size-adjust: 100% !important;
+                margin: 0!important;
+                padding: 0!important;
+                font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif!important;
+                background-color: {theme_colors['background']}!important;
+                line-height: 1.6!important;
+                color: {theme_colors['text']}!important;
+                -webkit-text-size-adjust: 100%!important;
+                -ms-text-size-adjust: 100%!important;
             }}
             
             table, td {{
-                border-collapse: collapse !important;
-                mso-table-lspace: 0pt !important;
-                mso-table-rspace: 0pt !important;
+                border-collapse: collapse!important;
+                mso-table-lspace: 0pt!important;
+                mso-table-rspace: 0pt!important;
             }}
             
             img {{
-                border: 0 !important;
-                height: auto !important;
-                line-height: 100% !important;
-                outline: none !important;
-                text-decoration: none !important;
-                -ms-interpolation-mode: bicubic !important;
+                border: 0!important;
+                height: auto!important;
+                line-height: 100%!important;
+                outline: none!important;
+                text-decoration: none!important;
+                -ms-interpolation-mode: bicubic!important;
             }}
             
-            .ReadMsgBody {{ width: 100% !important; }}
-            .ExternalClass {{ width: 100% !important; }}
-            .ExternalClass * {{ line-height: 100% !important; }}
+            .ReadMsgBody {{ width: 100%!important; }}
+            .ExternalClass {{ width: 100%!important; }}
+            .ExternalClass * {{ line-height: 100%!important; }}
 
             .email-container {{
-                max-width: {container_width}px !important;
-                width: 100% !important;
-                margin: 0 auto !important;
+                max-width: {container_width}px!important;
+                width: 100%!important;
+                margin: 0 auto!important;
             }}
             
             .email-logo {{
-                max-width: {logo_width}px !important;
-                width: auto !important;
-                height: auto !important;
+                max-width: {logo_width}px!important;
+                width: {logo_width}px!important;
+                height: auto!important;
             }}
 
             .card-poster-img {{
-                width: 100% !important;
-                height: auto !important;
-                display: block !important;
-                object-fit: cover !important;
-                background-color: #f8f9fa !important;
-                border-radius: 10px 10px 0 0 !important;
+                width: 100%!important;
+                height: auto!important;
+                display: block!important;
+                object-fit: cover!important;
+                background-color: #f8f9fa!important;
+                border-radius: 10px 10px 0 0!important;
             }}
 
             @media only screen and (max-width: 600px) {{
                 .email-container {{
-                    width: 100% !important;
-                    max-width: 100% !important;
-                    margin: 0 !important;
+                    width: 100%!important;
+                    max-width: 100%!important;
+                    margin: 0!important;
                 }}
                 
                 .email-logo {{
-                    max-width: 60px !important;
-                    width: 60px !important;
+                    max-width: 60px!important;
+                    width: 60px!important;
                 }}
 
-                .recently-added-table {{
-                    display: block !important;
-                    width: 100% !important;
-                    text-align: center !important;
+                .nl-grid {{
+                    display: block!important;
+                    width: 100%!important;
+                    text-align: center!important;
                 }}
 
-                .recently-added-row {{
-                    display: inline !important;
+                .nl-grid-row {{
+                    display: inline!important;
                 }}
-                
-                .recently-added-table td {{
-                    width: 30% !important;
-                    padding: 6px !important;
-                    display: inline-block !important;
-                    vertical-align: top !important;
-                    box-sizing: border-box !important;
+
+                .nl-grid td {{
+                    width: 30%!important;
+                    padding: 6px!important;
+                    display: inline-block!important;
+                    vertical-align: top!important;
+                    box-sizing: border-box!important;
                 }}
-                
-                .recently-added-card {{
-                    width: 100% !important;
-                    max-width: 150px !important;
-                    margin: 0 auto 10px auto !important;
-                    height: auto !important;
-                    overflow: hidden !important;
-                    border-radius: 10px !important;
+
+                .nl-grid-card {{
+                    width: 100%!important;
+                    max-width: 150px!important;
+                    height: auto!important;
+                    margin: 0 auto 10px auto!important;
+                    overflow: hidden!important;
+                    border-radius: 10px!important;
+                    display: block!important;
+                }}
+
+                .nl-stats-table th:nth-child(n+5),
+                .nl-stats-table td:nth-child(n+5) {{
+                    display: none!important;
                 }}
 
                 .card-content {{
-                    height: auto !important;
-                    min-height: 165px !important;
-                    text-align: left !important;
-                }}
-
-                .recommendations-table {{
-                    display: block !important;
-                    width: 100% !important;
-                    text-align: center !important;
-                }}
-
-                .recommendations-row {{
-                    display: inline !important;
-                }}
-
-                .recommendations-table td {{
-                    width: 30% !important;
-                    padding: 6px !important;
-                    display: inline-block !important;
-                    vertical-align: top !important;
-                    box-sizing: border-box !important;
-                }}
-
-                .recommendations-card {{
-                    width: 100% !important;
-                    max-width: 150px !important;
-                    height: auto !important;
-                    margin: 0 auto 10px auto !important;
-                    overflow: hidden !important;
-                    border-radius: 10px !important;
-                    display: block !important;
+                    height: auto!important;
+                    min-height: 165px!important;
+                    text-align: left!important;
                 }}
 
                 .cs-cal-table,
                 .cs-cal-table tbody,
                 .cs-cal-row {{
-                    display: block !important;
-                    width: 100% !important;
+                    display: block!important;
+                    width: 100%!important;
                 }}
 
                 .cs-cal-head {{
-                    display: none !important;
+                    display: none!important;
                 }}
 
                 .cs-cal-cell {{
-                    display: block !important;
-                    width: 100% !important;
-                    box-sizing: border-box !important;
-                    border-left: 0 !important;
-                    border-right: 0 !important;
-                    border-top: 0 !important;
-                    padding: 10px 12px !important;
+                    display: block!important;
+                    width: 100%!important;
+                    box-sizing: border-box!important;
+                    border-left: 0!important;
+                    border-right: 0!important;
+                    border-top: 0!important;
+                    padding: 10px 12px!important;
                 }}
 
-                /* must follow .cs-cal-cell: same specificity, later wins */
                 .cs-cal-empty {{
-                    display: none !important;
+                    display: none!important;
                 }}
 
                 .cs-cal-daynum {{
-                    display: none !important;
+                    display: none!important;
                 }}
 
                 .cs-cal-daylong {{
-                    display: block !important;
+                    display: block!important;
                 }}
 
                 .cs-cal-event {{
-                    margin: 0 0 10px 0 !important;
+                    margin: 0 0 10px 0!important;
                 }}
 
                 .cs-cal-poster {{
-                    width: 56px !important;
-                    display: inline-block !important;
-                    vertical-align: top !important;
-                    margin: 0 10px 0 0 !important;
+                    width: 56px!important;
+                    display: inline-block!important;
+                    vertical-align: top!important;
+                    margin: 0 10px 0 0!important;
                 }}
 
                 .cs-cal-event-text {{
-                    display: inline-block !important;
-                    vertical-align: top !important;
-                    max-width: 70% !important;
-                    text-align: left !important;
+                    display: inline-block!important;
+                    vertical-align: top!important;
+                    max-width: 70%!important;
+                    text-align: left!important;
                 }}
 
-                /* Agenda view: the date column becomes a heading line above
-                   its items rather than a narrow left rail. */
                 .cs-agenda-table,
                 .cs-agenda-table tbody,
                 .cs-agenda-row {{
-                    display: block !important;
-                    width: 100% !important;
+                    display: block!important;
+                    width: 100%!important;
                 }}
 
                 .cs-agenda-date,
                 .cs-agenda-items {{
-                    display: block !important;
-                    width: 100% !important;
-                    box-sizing: border-box !important;
+                    display: block!important;
+                    width: 100%!important;
+                    box-sizing: border-box!important;
                 }}
 
                 .cs-agenda-items {{
-                    border-top: 0 !important;
-                    padding-top: 0 !important;
+                    border-top: 0!important;
+                    padding-top: 0!important;
                 }}
             }}
         </style>

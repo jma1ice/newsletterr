@@ -225,6 +225,62 @@ def test_service_lookups_answer_from_sample_data(demo_client):
     assert search['results'][0]['title'] == 'The Grand Voyage'
 
 
+def test_scheduling_and_history_render_sample_rows(demo_client):
+    # Both pages read the database rather than a media server, so they are the
+    # two that render as empty states unless demo supplies rows of its own.
+    scheduling = demo_client.get('/scheduling').get_data(as_text=True)
+    assert 'no schedules created' not in scheduling
+    assert 'Weekly Roundup' in scheduling and 'Coming Soon Friday' in scheduling
+    # An inactive schedule is present too: the page styles the two differently.
+    assert 'Paused' in scheduling
+
+    history = demo_client.get('/email_history').get_data(as_text=True)
+    assert 'no email history' not in history
+    # The table lists subjects and a recipient count; the addresses themselves
+    # only arrive through the modal's fetch, covered separately below.
+    assert 'Demo Media Server - Weekly Roundup' in history
+    # One of each terminal state, so the status filter chips all have a row.
+    for status in ('sent', 'skipped', 'failed'):
+        assert f'data-status="{status}"' in history
+
+
+def test_sample_sends_never_reach_the_database(demo_client):
+    demo_client.get('/scheduling')
+    demo_client.get('/email_history')
+    conn = sqlite3.connect(config.DB_PATH)
+    try:
+        for table in ('email_schedules', 'email_history', 'email_lists', 'email_templates'):
+            assert conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0] == 0
+    finally:
+        conn.close()
+
+
+def test_schedule_next_send_lands_on_its_own_recurrence(demo_client):
+    # The cards print next_send while the calendar walks forward from
+    # start_date itself. Picked independently they drift apart and the demo
+    # looks like the scheduler is miscounting.
+    from datetime import datetime
+    for row in demo.demo_schedule_rows():
+        start, frequency, last, upcoming = row[5], row[4], row[7], row[8]
+        if frequency != 'weekly' or not upcoming:
+            continue
+        start_dt = datetime.fromisoformat(start)
+        for stamp in (last, upcoming):
+            when = datetime.fromisoformat(stamp)
+            assert (when.date() - start_dt.date()).days % 7 == 0
+            assert when.weekday() == start_dt.weekday()
+        assert datetime.fromisoformat(upcoming) > datetime.now()
+        assert datetime.fromisoformat(last) <= datetime.now()
+
+
+def test_history_row_actions_answer_instead_of_404ing(demo_client):
+    recipients = demo_client.get('/email_history/recipients/1').get_json()
+    assert recipients['recipients'] and '@' in recipients['recipients'][0]
+    # No stored message body exists to export, so the button explains itself.
+    pdf = demo_client.get('/email_history/1/pdf')
+    assert pdf.status_code == 404 and pdf.get_json().get('demo') is True
+
+
 def test_off_by_default_no_banner(client, seeded_settings):
     # DEMO_MODE defaults off: normal auth applies and no demo banner appears
     assert config.DEMO_MODE is False

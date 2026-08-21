@@ -129,9 +129,13 @@ def shell(app, seeded_settings):
 
 
 def test_shell_runs_a_narrower_column_than_the_other_layouts(shell):
-    """The class rule carries !important, so the width must come from the CSS."""
-    assert "max-width: 640px !important" in shell()
-    assert "max-width: 800px !important" in shell(layout='classic')
+    """The class rule carries !important, so the width must come from the CSS.
+
+    No space before !important: Yahoo drops the declaration when whitespace
+    precedes it, so the email CSS is written without one throughout.
+    """
+    assert "max-width: 640px!important" in shell()
+    assert "max-width: 800px!important" in shell(layout='classic')
 
 
 def test_shell_and_cards_share_the_spotlight_canvas(shell):

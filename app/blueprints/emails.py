@@ -8,7 +8,7 @@ from app import dates
 from app.db import db_connect
 from app.settings_store import get_settings
 from app.security import require_csrf_for_json, requires_auth, json_body
-from app.store import get_saved_email_lists, save_email_list, delete_email_list, get_suppressed_emails, remove_suppressed, get_contacts, add_contacts, delete_contact, get_media_user_emails, set_media_user_emails
+from app.store import get_saved_email_lists, save_email_list, delete_email_list, get_suppressed_emails, remove_suppressed, get_contacts, add_contacts, delete_contact, get_media_user_emails, set_media_user_emails, get_email_history_page
 from app.contacts_import import contacts_to_csv, is_email, match_contacts_to_users, normalize_email, parse_contacts
 from app.clients.jellyfin import fetch_jellyfin_users
 from app.clients.mediaserver import get_media_server_type, is_jellyfin_like, media_user_scope
@@ -144,17 +144,7 @@ def email_history():
         per_page = 50
         offset = (page - 1) * per_page
 
-        conn = db_connect()
-        cursor = conn.cursor()
-        total = cursor.execute("SELECT COUNT(*) FROM email_history").fetchone()[0]
-        cursor.execute("""
-            SELECT id, subject, recipients, content_size_kb, recipient_count, sent_at, template_name, status, error
-            FROM email_history
-            ORDER BY sent_at DESC, id DESC
-            LIMIT ? OFFSET ?
-        """, (per_page, offset))
-        emails = cursor.fetchall()
-        conn.close()
+        emails, total = get_email_history_page(per_page, offset)
 
         _time_format = dates.resolve_time_format(get_settings(decrypt_secrets=False).get('time_format'))
 

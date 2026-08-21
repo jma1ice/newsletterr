@@ -4,6 +4,7 @@ from datetime import timedelta
 
 from app import dates
 from app.emails import headings
+from app.emails.builders.card_grid import poster_px_for
 from app.security import escape_html_output as esc
 
 import logging
@@ -23,6 +24,9 @@ WEEKDAY_LABELS = ('Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat')
 # 13-row table that no mail client renders comfortably. Weeks past the cap are
 # summarized in a trailing line rather than dropped silently.
 MAX_CALENDAR_WEEKS = 6
+
+GMAIL_DARK_MIN_IMAGE_PX = 56
+AGENDA_POSTER_PX = 64
 
 def make_event(date, title, subtitle="", poster_src=None):
     """One normalized calendar entry. date is a datetime.date or None; entries
@@ -68,6 +72,7 @@ def _event_html(event, theme):
     poster_html = ""
     if poster_src:
         poster_html = (f'<img class="cs-cal-poster" src="{poster_src}" alt="{title}" '
+                       f'width="{poster_px_for(7)}" '
                        f'style="width: 100%; height: auto; display: block; margin: 0 0 3px 0; '
                        f'border-radius: 4px; background-color: #f8f9fa;">')
     sub_html = ""
@@ -101,7 +106,7 @@ def _day_cell_html(day, events, theme, today, cell_width_pct):
     # because a bare "15" reads fine under a weekday header but not in a list.
     long_label = dates.fmt_weekday_date(day, dates.date_format_of(theme))
     return f"""
-        <td class="{classes}" valign="top" style="width: {cell_width_pct}; padding: 6px 5px;
+        <td class="{classes}" valign="top" bgcolor="{bg}" style="width: {cell_width_pct}; padding: 6px 5px;
             background-color: {bg}; border: 1px solid {theme['border']};
             font-family: {FONT}; vertical-align: top;">
             <div class="cs-cal-daynum" style="font-size: 11px; font-weight: {number_weight};
@@ -163,11 +168,11 @@ def _agenda_item_html(event, theme):
     poster_src = event.get('poster_src')
     poster_cell = ""
     if poster_src:
-        # no class: 44px reads at every width, so this poster never reflows
-        poster_cell = (f'<td width="44" valign="top" style="padding: 0 10px 0 0;">'
-                       f'<img src="{poster_src}" alt="{title}" width="44" '
-                       f'style="width: 44px; height: auto; display: block; border-radius: 4px; '
-                       f'background-color: #f8f9fa;"></td>')
+        # No class: this poster reads at every width, so it never reflows
+        poster_cell = (f'<td width="{AGENDA_POSTER_PX}" valign="top" style="padding: 0 10px 0 0;">'
+                       f'<img src="{poster_src}" alt="{title}" width="{AGENDA_POSTER_PX}" '
+                       f'style="width: {AGENDA_POSTER_PX}px; height: auto; display: block; '
+                       f'border-radius: 4px; background-color: #f8f9fa;"></td>')
     sub_html = ""
     if subtitle:
         sub_html = (f'<div style="font-size: 11.5px; color: {theme["muted_text"]}; padding-top: 2px; '

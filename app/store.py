@@ -1,7 +1,7 @@
 import calendar, os, secrets, sqlite3
 from datetime import datetime, timedelta
 
-from app import dates
+from app import config, dates
 from app.db import db_connect
 from app.settings_store import get_settings
 
@@ -47,11 +47,15 @@ def cleanup_expired_hosted_images():
     conn.close()
 
 def get_saved_email_lists():
-    conn = db_connect()
-    cursor = conn.cursor()
-    cursor.execute("SELECT id, name, emails FROM email_lists ORDER BY name")
-    lists = cursor.fetchall()
-    conn.close()
+    if config.DEMO_MODE:
+        from app.demo import demo_email_list_rows
+        lists = demo_email_list_rows()
+    else:
+        conn = db_connect()
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, name, emails FROM email_lists ORDER BY name")
+        lists = cursor.fetchall()
+        conn.close()
     return [{'id': row[0], 'name': row[1], 'emails': row[2]} for row in lists]
 
 def save_email_list(name, emails):
@@ -249,6 +253,24 @@ EMAIL_HISTORY_RETENTION = 1000
 EMAIL_CONTENT_MAX_CHARS = 5 * 1024 * 1024
 RECIPIENTS_MAX_CHARS = 50_000
 
+def get_email_history_page(limit, offset):
+    if config.DEMO_MODE:
+        from app.demo import demo_history_rows
+        return demo_history_rows(limit, offset)
+
+    conn = db_connect()
+    cursor = conn.cursor()
+    total = cursor.execute("SELECT COUNT(*) FROM email_history").fetchone()[0]
+    cursor.execute("""
+        SELECT id, subject, recipients, content_size_kb, recipient_count, sent_at, template_name, status, error
+        FROM email_history
+        ORDER BY sent_at DESC, id DESC
+        LIMIT ? OFFSET ?
+    """, (limit, offset))
+    rows = cursor.fetchall()
+    conn.close()
+    return rows, total
+
 def record_email_history(subject, recipients, email_content, content_size_kb,
                          recipient_count, template_name="Manual",
                          status="sent", error=None, hosted_html=None):
@@ -292,23 +314,27 @@ def get_email_schedules():
     _date_format = dates.resolve_date_format(_s.get('date_format'))
     _time_format = dates.resolve_time_format(_s.get('time_format'))
 
-    conn = db_connect()
-    cursor = conn.cursor()
-    cursor.execute("""
-        SELECT 
-            es.id, es.name, es.email_list_id, es.template_id, es.frequency, es.start_date, 
-            es.send_time, es.last_sent, es.next_send, es.is_active, es.created_at, es.date_range,
-            es.items_count, es.skip_if_no_new, es.skip_if_empty,
-            el.name as email_list_name,
-            et.name as template_name,
-            es.skip_triggers, es.skip_min_items
-        FROM email_schedules es
-        LEFT JOIN email_lists el ON es.email_list_id = el.id
-        LEFT JOIN email_templates et ON es.template_id = et.id
-        ORDER BY es.created_at DESC
-    """)
-    schedules = cursor.fetchall()
-    conn.close()
+    if config.DEMO_MODE:
+        from app.demo import demo_schedule_rows
+        schedules = demo_schedule_rows()
+    else:
+        conn = db_connect()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT
+                es.id, es.name, es.email_list_id, es.template_id, es.frequency, es.start_date,
+                es.send_time, es.last_sent, es.next_send, es.is_active, es.created_at, es.date_range,
+                es.items_count, es.skip_if_no_new, es.skip_if_empty,
+                el.name as email_list_name,
+                et.name as template_name,
+                es.skip_triggers, es.skip_min_items
+            FROM email_schedules es
+            LEFT JOIN email_lists el ON es.email_list_id = el.id
+            LEFT JOIN email_templates et ON es.template_id = et.id
+            ORDER BY es.created_at DESC
+        """)
+        schedules = cursor.fetchall()
+        conn.close()
     
     result = []
     for schedule in schedules:

@@ -18,6 +18,7 @@ from app.emails.builders.card_grid import (
     empty_state_html as _empty_state_html,
     build_card_html as _build_card_html,
     effective_columns as _effective_columns,
+    with_poster_width as _with_poster_width,
 )
 from app.emails.builders.coming_soon import (
     _poster_url as _arr_poster_url,
@@ -893,10 +894,10 @@ def _grid(cards, cols):
     width_pct = f"{100 / cols:.4f}%"
     for i in range(0, len(cards), cols):
         row = cards[i:i + cols]
-        cells = "".join(f'<td valign="top" style="width: {width_pct}; padding: 8px; font-family: {FONT};">{c}</td>' for c in row)
+        cells = "".join(f'<td valign="top" style="width: {width_pct}; padding: 8px; font-family: {FONT};">{_with_poster_width(c, cols)}</td>' for c in row)
         cells += "".join(f'<td style="width: {width_pct}; padding: 8px;"></td>' for _ in range(cols - len(row)))
-        rows_html += f'<tr>{cells}</tr>'
-    return f'<table width="100%" cellpadding="0" cellspacing="0" border="0" style="table-layout: fixed;">{rows_html}</table>'
+        rows_html += f'<tr class="nl-grid-row">{cells}</tr>'
+    return f'<table class="nl-grid" width="100%" cellpadding="0" cellspacing="0" border="0" style="table-layout: fixed;">{rows_html}</table>'
 
 # ---------------------------------------------------------------- most watched
 
@@ -1317,7 +1318,8 @@ def render_recommendations(layout, recs_data, msg_root, theme, user_emails=None,
             def _meta(index, item):
                 bits = []
                 if item.get('vote'):
-                    bits.append(f"{item['vote']}")
+                    vote = item['vote']
+                    bits.append(f"{vote:.1f}" if isinstance(vote, (int, float)) else f"{vote}")
                 if index >= available_count:
                     bits.append("not on the server")
                 return ' · '.join(bits)

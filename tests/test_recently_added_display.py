@@ -99,14 +99,14 @@ def test_list_orientation_puts_one_item_per_row(render, layout):
     html = render(layout, count=6, orientation='list')
     grid = render(layout, count=6, orientation='grid')
     # a grid packs several titles between row boundaries; a list never does
-    assert max(len(_titles(chunk)) for chunk in html.split('<tr>')) == 1
-    assert max(len(_titles(chunk)) for chunk in grid.split('<tr>')) > 1
+    assert max(len(_titles(chunk)) for chunk in html.split('<tr')) == 1
+    assert max(len(_titles(chunk)) for chunk in grid.split('<tr')) > 1
 
 
 def test_grid_orientation_honors_the_column_count_in_every_layout(render):
     for layout in ('classic', 'editorial', 'digest'):
         html = render(layout, count=9, orientation='grid', ra_grid_columns=3)
-        rows = [chunk for chunk in html.split('<tr>') if _titles(chunk)]
+        rows = [chunk for chunk in html.split('<tr') if _titles(chunk)]
         assert len(rows) == 3, layout
         assert all(len(_titles(row)) == 3 for row in rows), layout
 

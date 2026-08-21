@@ -13,11 +13,12 @@
 #      and is rate limited by its own interval.)
 #   3. The sample data uses the exact shapes the real clients return, so the
 #      builders, previews and layouts run their normal code paths.
+import calendar
 import json
 import random
 import time
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from flask import Response, abort, jsonify, redirect, request, send_from_directory, session, url_for
 
@@ -765,6 +766,134 @@ def _reseed_if_stale():
     if not get_cache_info('stats').get('is_usable'):
         seed_demo_cache()
 
+# ------------------------------------------------- sample sends and history --
+
+DEMO_EMAIL_LIST_ID = 1
+DEMO_EMAIL_LIST_NAME = "All Users"
+
+# (id, name, emails): the shape of the email_lists SELECT.
+def demo_email_list_rows():
+    return [
+        (DEMO_EMAIL_LIST_ID, DEMO_EMAIL_LIST_NAME,
+         "ava.mercer@example.com, dev.okafor@example.com, "
+         "noor.haddad@example.com, sam.whitfield@example.com"),
+        (2, "Movie Night Crew",
+         "ava.mercer@example.com, sam.whitfield@example.com"),
+    ]
+
+DEMO_TEMPLATE_ROWS = (
+    (1, "Weekly Roundup"),
+    (2, "Monthly Wrapped"),
+    (3, "New Arrivals"),
+    (4, "Coming Soon"),
+)
+
+def _local(day_offset, hhmm):
+    hour, minute = (int(part) for part in hhmm.split(':'))
+    return (datetime.now() + timedelta(days=day_offset)).replace(
+        hour=hour, minute=minute, second=0, microsecond=0)
+
+def _at(day_offset, hhmm):
+    return _local(day_offset, hhmm).isoformat(timespec='seconds')
+
+def _at_utc(day_offset, hhmm):
+    aware = _local(day_offset, hhmm).astimezone()
+    return aware.astimezone(timezone.utc).replace(tzinfo=None).isoformat(timespec='seconds')
+
+def _add_months(when, months):
+    index = when.month - 1 + months
+    year = when.year + index // 12
+    month = index % 12 + 1
+    return when.replace(year=year, month=month,
+                        day=min(when.day, calendar.monthrange(year, month)[1]))
+
+def _surrounding_sends(start, frequency, now):
+    step = (lambda when, n: when + timedelta(weeks=n)) if frequency == "weekly" else _add_months
+    count = 0
+    while step(start, count + 1) <= now:
+        count += 1
+    return step(start, count), step(start, count + 1)
+
+_SCHEDULE_SPECS = (
+    ("Weekly Roundup", "weekly", "09:00", DEMO_EMAIL_LIST_ID, 1, 1, 13, 0,
+     7, 10, 1, 0, "no_new_items", 3),
+    ("Monthly Wrapped", "monthly", "18:30", DEMO_EMAIL_LIST_ID, 2, 1, 4, None,
+     30, 20, 0, 1, "", 1),
+    ("New Movies Only", "weekly", "07:45", 2, 3, 1, 9, 2,
+     7, 8, 1, 0, "no_new_items", 2),
+    ("Coming Soon Friday", "weekly", "16:00", DEMO_EMAIL_LIST_ID, 4, 0, 11, 4,
+     14, 12, 0, 0, "", 1),
+)
+
+def demo_schedule_rows():
+    now = datetime.now()
+    rows = []
+    for index, spec in enumerate(_SCHEDULE_SPECS, start=1):
+        (name, frequency, send_time, list_id, template_id, active, periods_back,
+         weekday, date_range, items, skip_new, skip_empty, triggers, min_items) = spec
+
+        days_back = periods_back * (7 if frequency == "weekly" else 30)
+        start = _local(-days_back, send_time)
+        if weekday is not None:
+            start -= timedelta(days=(start.weekday() - weekday) % 7)
+        last, upcoming = _surrounding_sends(start, frequency, now)
+
+        template_name = next(
+            (title for tid, title in DEMO_TEMPLATE_ROWS if tid == template_id), None)
+        list_name = next(
+            (title for lid, title, _emails in demo_email_list_rows() if lid == list_id), None)
+        rows.append((
+            index, name, list_id, template_id, frequency,
+            start.isoformat(timespec='seconds'),
+            send_time,
+            last.isoformat(timespec='seconds'),
+            upcoming.isoformat(timespec='seconds') if active else None,
+            active,
+            _at(-days_back, "12:00"),
+            date_range, items, skip_new, skip_empty,
+            list_name, template_name, triggers, min_items,
+        ))
+    return rows
+
+def demo_calendar_schedule_rows():
+    return [
+        (row[0], row[1], row[4], row[5], row[6], row[8], row[9], row[3])
+        for row in demo_schedule_rows() if row[9]
+    ]
+
+_HISTORY_SPECS = (
+    ("Demo Media Server - Weekly Roundup", "Weekly Roundup", "sent", 3, "09:00", 4, 186, None),
+    ("New Movies Only", "New Arrivals", "sent", 6, "07:45", 2, 94, None),
+    ("Demo Media Server - Weekly Roundup", "Weekly Roundup", "sent", 10, "09:00", 4, 178, None),
+    ("New Movies Only", "New Arrivals", "skipped", 13, "07:45", 0, 0,
+     "Skipped: no new items in the last 7 days"),
+    ("Demo Media Server - Monthly Wrapped", "Monthly Wrapped", "sent", 14, "18:30", 4, 241, None),
+    ("Demo Media Server - Weekly Roundup", "Weekly Roundup", "sent", 17, "09:00", 4, 165, None),
+    ("Coming Soon on Demo Media Server", "Coming Soon", "sent", 19, "16:00", 4, 132, None),
+    ("Demo Media Server - Weekly Roundup", "Weekly Roundup", "failed", 24, "09:00", 0, 171,
+     "SMTP error: connection refused by smtp.example.com:587"),
+    ("Demo Media Server - Weekly Roundup", "Weekly Roundup", "sent", 31, "09:00", 3, 159, None),
+    ("Welcome to the Demo Media Server newsletter", None, "sent", 45, "12:15", 4, 88, None),
+)
+
+_HISTORY_RECIPIENTS = (
+    "ava.mercer@example.com", "dev.okafor@example.com",
+    "noor.haddad@example.com", "sam.whitfield@example.com",
+)
+
+def demo_history_rows(limit, offset):
+    rows = []
+    for index, spec in enumerate(_HISTORY_SPECS, start=1):
+        subject, template, status, days, hhmm, count, size, error = spec
+        rows.append((
+            index, subject,
+            ", ".join(_HISTORY_RECIPIENTS[:count]),
+            size, count,
+            _at_utc(-days, hhmm),
+            template, status, error,
+        ))
+    return rows[offset:offset + limit], len(rows)
+
 # ------------------------------------------------------------- interceptors --
 
 def _serve_demo_art():
@@ -932,9 +1061,29 @@ def _demo_plex_info():
         "plex_url": BASE_SETTINGS["plex_url"],
     })
 
+def _demo_history_recipients():
+    email_id = (request.view_args or {}).get('email_id')
+    for row in demo_history_rows(len(_HISTORY_SPECS), 0)[0]:
+        if row[0] == email_id:
+            return jsonify({
+                "subject": row[1],
+                "recipients": row[2].split(', ') if row[2] else [],
+            })
+    return jsonify({"error": "Email not found"}), 404
+
+def _demo_history_pdf():
+    return jsonify({
+        "error": "Demo mode does not keep a stored copy of these sends, so there is "
+                 "nothing to export. Export PDF on the build page renders the live preview.",
+        "demo": True,
+    }), 404
+
 # GET endpoints that would otherwise call a media server (or plex.tv) on the
-# demo's behalf. Answered from the sample data instead.
+# demo's behalf, or read a table the demo deliberately leaves empty. Answered
+# from the sample data instead.
 _DEMO_GET_HANDLERS = {
+    'emails.get_email_recipients': _demo_history_recipients,
+    'emails.email_history_pdf': _demo_history_pdf,
     'stats.fetch_collections': _demo_fetch_collections,
     'stats.random_pick_options': _demo_random_pick_options,
     'stats.featured_pick_search': _demo_featured_pick_search,

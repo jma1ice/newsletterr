@@ -143,7 +143,7 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
 
     for i in range(0, len(items), items_per_row):
         row_items = items[i:i + items_per_row]
-        row_html = '<tr class="recently-added-row">'
+        row_html = '<tr class="recently-added-row nl-grid-row">'
         
         for j, item in enumerate(row_items):
             full_title = item.get('title', 'Unknown')
@@ -225,7 +225,7 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
                 ])), 46)
 
                 card_html = f"""
-                    <div class="recently-added-card" style="
+                    <div class="recently-added-card nl-grid-card" style="
                         background-color: {theme_colors['card_bg']};
                         border-radius: 12px;
                         overflow: hidden;
@@ -379,7 +379,7 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
     return f"""
         <div style="{container_style}">
             {ra_title_html}
-            <table class="recently-added-table" style="{table_style}">
+            <table class="recently-added-table nl-grid" style="{table_style}">
                 {items_html}
             </table>
         </div>
@@ -439,7 +439,7 @@ def _build_recently_added_list_html(items, msg_root, theme_colors, base_url, ra_
         border = "" if i == len(items) - 1 else f" border-bottom: 1px solid {theme_colors['border']};"
         _pad = p('6px', '10px')
         rows_html += f"""
-            <tr class="recently-added-row">
+            <tr class="recently-added-row nl-grid-row">
                 {f'<td class="recently-added-cell" width="{poster_px}" valign="top" style="padding: {_pad} 14px {_pad} 0;{border}">{poster_html}</td>' if poster_html else ''}
                 <td class="recently-added-cell" valign="top" style="padding: {_pad} 0;{border} font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;">
                     <div style="font-weight: bold; font-size: {p('13.5px', '15px')}; color: {theme_colors['text']}; line-height: 1.25;">{title_html}</div>
@@ -473,7 +473,7 @@ def _build_recently_added_list_html(items, msg_root, theme_colors, base_url, ra_
     return f"""
         <div style="{container_style}">
             {ra_title_html}
-            <table class="recently-added-table" width="100%" cellpadding="0" cellspacing="0" border="0" style="width: 100%; border-collapse: collapse;">
+            <table class="recently-added-table nl-grid" width="100%" cellpadding="0" cellspacing="0" border="0" style="width: 100%; border-collapse: collapse;">
                 {rows_html}
             </table>
         </div>

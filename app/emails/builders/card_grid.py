@@ -1,5 +1,6 @@
 # Shared card/grid HTML helpers for the Coming Soon (Sonarr/Radarr) and
 # Ombi Recent Requests snap-ins, which all render the same poster-card layout.
+import re
 from datetime import datetime, timezone
 
 from app.emails import density, headings
@@ -41,6 +42,19 @@ def empty_state_html(theme_colors, message):
 
 MIN_AUTO_COLUMNS = 3
 
+POSTER_BASE_WIDTH = 760
+
+_POSTER_PCT_RE = re.compile(r'(<img class="card-poster-img"[^>]*?)width="100%"')
+
+
+def poster_px_for(items_per_row):
+    return max(60, int(POSTER_BASE_WIDTH / max(1, items_per_row)) - 16)
+
+
+def with_poster_width(card_html, items_per_row):
+    return _POSTER_PCT_RE.sub(
+        lambda m: f'{m.group(1)}width="{poster_px_for(items_per_row)}"', card_html)
+
 def effective_columns(grid_columns, item_count):
     """Columns to actually lay a snap-in out with."""
     cols = max(1, int(grid_columns) if grid_columns else 5)
@@ -57,8 +71,9 @@ def build_calendar_grid_html(cards, msg_root, theme_colors, title, base_url, gri
     rows_html = ""
     for i in range(0, len(cards), items_per_row):
         row_cards = cards[i:i + items_per_row]
-        row_html = '<tr class="coming-soon-row">'
+        row_html = '<tr class="coming-soon-row nl-grid-row">'
         for card_html in row_cards:
+            card_html = with_poster_width(card_html, items_per_row)
             row_html += f'<td class="coming-soon-cell" style="width: {cell_width_pct}; padding: {p3("3px 0", "8px", "10px")}; vertical-align: top; font-family: \'IBM Plex Sans\', \'Segoe UI\', Helvetica, Arial, sans-serif;">{card_html}</td>'
         for _ in range(items_per_row - len(row_cards)):
             row_html += f'<td class="coming-soon-cell" style="width: {cell_width_pct}; padding: {p3("3px 0", "8px", "10px")};"></td>'
@@ -97,7 +112,7 @@ def build_calendar_grid_html(cards, msg_root, theme_colors, title, base_url, gri
     return f"""
         <div style="{container_style}">
             {title_html}
-            <table class="coming-soon-table" style="{table_style}">
+            <table class="coming-soon-table nl-grid" style="{table_style}">
                 {rows_html}
             </table>
         </div>
@@ -112,7 +127,7 @@ def build_card_html(theme_colors, title, subtitle, meta_text, poster_src, extra_
         poster_html = ""
 
     return f"""
-        <div class="coming-soon-card" style="
+        <div class="coming-soon-card nl-grid-card" style="
             background-color: {theme_colors['card_bg']};
             border-radius: {'8px' if compact else '12px'};
             overflow: hidden;

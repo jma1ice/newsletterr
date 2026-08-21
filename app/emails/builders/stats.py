@@ -114,7 +114,7 @@ def build_stats_html_with_cid_background(stat_data, msg_root, theme_colors, base
     
     headers = get_stat_headers(title, hide_play_counts=hide_play_counts)
     header_cells = "".join([
-        f'<th style="padding: {p("7px 9px", "12px")}; background-color: rgba(52, 58, 64, 0.9); color: white; font-weight: bold; border: none; font-family: \'IBM Plex Sans\', \'Segoe UI\', Helvetica, Arial, sans-serif; font-size: 14px; text-align: left;">{h}</th>'
+        f'<th style="padding: {p("7px 9px", "12px")}; background-color: {theme_colors["secondary"]}; color: {theme_colors["text"]}; font-weight: bold; border: none; font-family: \'IBM Plex Sans\', \'Segoe UI\', Helvetica, Arial, sans-serif; font-size: 14px; text-align: left;">{h}</th>'
         for h in headers
     ])
 
@@ -148,7 +148,7 @@ def build_stats_html_with_cid_background(stat_data, msg_root, theme_colors, base
                     # rendered these posters at their natural size.
                     cells[0] = f'<img src="{thumb_src}" width="25" style="width:25px;max-width:25px;height:auto;border-radius:3px;margin-right:7px;vertical-align:middle;">{cells[0]}'
         cells_html = "".join([
-            f'<td style="padding: {p("7px 9px", "12px")}; background-color: rgba(255, 255, 255, 0.5); color: #333; border-bottom: 1px solid rgba(222, 226, 230, 0.8); font-family: \'IBM Plex Sans\', \'Segoe UI\', Helvetica, Arial, sans-serif; font-size: 14px;">{cell}</td>'
+            f'<td style="padding: {p("7px 9px", "12px")}; background-color: {theme_colors["card_bg"]}; color: {theme_colors["text"]}; border-bottom: 1px solid {theme_colors["border"]}; font-family: \'IBM Plex Sans\', \'Segoe UI\', Helvetica, Arial, sans-serif; font-size: 14px;">{cell}</td>'
             for cell in cells
         ])
         rows_html += f'<tr>{cells_html}</tr>'
@@ -218,7 +218,7 @@ def build_stats_html_with_cid_background(stat_data, msg_root, theme_colors, base
             {overlay}
             <div style="position: relative; z-index: 1;">
                 {header_html}
-                <table style="{table_style}">
+                <table class="nl-stats-table" style="{table_style}">
                     <thead>
                         <tr>{header_cells}</tr>
                     </thead>

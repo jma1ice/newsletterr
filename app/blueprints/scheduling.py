@@ -4,7 +4,7 @@ import calendar, json
 from datetime import datetime, timedelta
 from flask import Blueprint, jsonify, render_template, request, session
 
-from app import dates
+from app import config, dates
 from app.db import db_connect
 from app.settings_store import get_settings
 from app.cache import can_use_cached_data_for_preview, get_cached_data
@@ -29,11 +29,16 @@ def scheduling():
         schedules = get_email_schedules()
         email_lists = get_saved_email_lists()
         
-        templates_conn = db_connect()
-        templates_cursor = templates_conn.cursor()
-        templates_cursor.execute("SELECT id, name FROM email_templates ORDER BY name")
-        templates = [{'id': row[0], 'name': row[1]} for row in templates_cursor.fetchall()]
-        templates_conn.close()
+        if config.DEMO_MODE:
+            from app.demo import DEMO_TEMPLATE_ROWS
+            template_rows = DEMO_TEMPLATE_ROWS
+        else:
+            templates_conn = db_connect()
+            templates_cursor = templates_conn.cursor()
+            templates_cursor.execute("SELECT id, name FROM email_templates ORDER BY name")
+            template_rows = templates_cursor.fetchall()
+            templates_conn.close()
+        templates = [{'id': row[0], 'name': row[1]} for row in template_rows]
 
         if not session.get("csrf_token"):
             session["csrf_token"] = secrets.token_urlsafe(32)
@@ -540,15 +545,19 @@ def get_calendar_data():
         return jsonify({"error": "month and year must be integers"}), 400
     try:
         
-        conn = db_connect()
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT id, name, frequency, start_date, send_time, next_send, is_active, template_id
-            FROM email_schedules 
-            WHERE is_active = 1
-        """)
-        schedules = cursor.fetchall()
-        conn.close()
+        if config.DEMO_MODE:
+            from app.demo import demo_calendar_schedule_rows
+            schedules = demo_calendar_schedule_rows()
+        else:
+            conn = db_connect()
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT id, name, frequency, start_date, send_time, next_send, is_active, template_id
+                FROM email_schedules
+                WHERE is_active = 1
+            """)
+            schedules = cursor.fetchall()
+            conn.close()
         
         calendar_data = {}
         start_date = datetime(year, month, 1)

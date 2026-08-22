@@ -118,6 +118,8 @@ window.pullRunners.stats = async function ({ chained = false } = {}) {
             plexWarnEl.style.display = data.plex_unavailable ? '' : 'none';
         }
 
+        renderMissingLibraries(data.missing_libraries);
+
         if (data.user_dict && Object.keys(data.user_dict).length > 0) {
             const recsBtn = document.getElementById('pullRecsBtn');
             // Only re-enable if Conjurr is actually configured; otherwise the

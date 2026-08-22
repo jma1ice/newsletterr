@@ -130,6 +130,17 @@ def test_send_is_blocked_with_a_notice(demo_client):
     assert "Demo mode" in body["message"]
 
 
+def test_oauth_endpoints_are_blocked(demo_client):
+    # The demo must never reach Microsoft. These are POSTs outside the write
+    # allowlist, so the demo before_request answers them before the route runs.
+    for path in ('/api/oauth/microsoft/start',
+                 '/api/oauth/microsoft/poll',
+                 '/api/oauth/microsoft/disconnect'):
+        resp = demo_client.post(path, json={'client_id': 'x', 'device_code': 'y'})
+        assert resp.status_code == 200, path
+        assert resp.get_json()["demo"] is True, path
+
+
 def test_settings_save_applies_to_the_session_only(demo_csrf):
     client, token = demo_csrf
     resp = client.post('/settings', data={

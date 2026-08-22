@@ -9,6 +9,7 @@ from email.utils import formataddr
 from app import config
 from app.clients.tautulli import run_tautulli_command
 from app.clients.mediaserver import get_media_server_type
+from app.clients import msoauth
 from app.db import db_connect
 from app.store import filter_suppressed, get_contact_names, record_email_history
 from app.tokens import make_unsubscribe_placeholder, sign_unsubscribe_token
@@ -230,6 +231,38 @@ class SendRequest:
     user_dict: dict = field(default_factory=dict)
     is_test: bool = False
 
+def xoauth2_string(user, access_token):
+    return f"user={user}\x01auth=Bearer {access_token}\x01\x01"
+
+def smtp_connect(smtp_server, smtp_port, smtp_protocol, smtp_username, from_email, password, settings=None):
+    logger.info("Attempting SMTP connection...")
+    port = int(smtp_port or 587)
+
+    if smtp_protocol == 'SSL':
+        logger.info(f"Using SMTP_SSL on port {port}")
+        server = smtplib.SMTP_SSL(smtp_server, port)
+    else:
+        logger.info(f"Using SMTP with STARTTLS on port {port}")
+        server = smtplib.SMTP(smtp_server, port)
+        logger.info("Starting TLS...")
+        server.starttls()
+
+    account = smtp_username if smtp_username else from_email
+
+    if settings is not None and msoauth.uses_oauth(settings):
+        # STARTTLS clears the capabilities learned before the upgrade, and
+        # SMTP.auth (unlike SMTP.login) does not re-greet on its own.
+        server.ehlo()
+        access_token = msoauth.get_valid_access_token()
+        account = settings.get('oauth_account') or account
+        logger.info("Authenticating with OAuth (XOAUTH2)")
+        server.auth('XOAUTH2', lambda challenge=None: xoauth2_string(account, access_token))
+    else:
+        server.login(account, password)
+
+    logger.info("SMTP connection established successfully")
+    return server
+
 def send_standard_email_with_cids(req, settings, to_emails):
     """Returns (payload, http_status), the route wraps it in jsonify."""
     try:
@@ -351,22 +384,7 @@ def send_standard_email_with_cids(req, settings, to_emails):
             msg_alternative.attach(MIMEText(plain_text, 'plain', 'utf-8'))
             msg_alternative.attach(MIMEText(email_html, 'html', 'utf-8'))
 
-        logger.info(f"Attempting SMTP connection...")
-
-        if smtp_protocol == 'SSL':
-            logger.info(f"Using SMTP_SSL on port {smtp_port}")
-            server = smtplib.SMTP_SSL(smtp_server, smtp_port)
-            login_username = smtp_username if smtp_username else from_email
-            server.login(login_username, password)
-        else:
-            logger.info(f"Using SMTP with STARTTLS on port {smtp_port}")
-            server = smtplib.SMTP(smtp_server, smtp_port)
-            logger.info("Starting TLS...")
-            server.starttls()
-            login_username = smtp_username if smtp_username else from_email
-            server.login(login_username, password)
-
-        logger.info("SMTP connection established successfully")
+        server = smtp_connect(smtp_server, smtp_port, smtp_protocol, smtp_username, from_email, password, settings)
 
         logger.info("Sending email...")
 
@@ -612,22 +630,7 @@ def send_single_user_email_with_cids(req, settings, recipients, user_key, recomm
             msg_alternative.attach(MIMEText(plain_text, 'plain', 'utf-8'))
             msg_alternative.attach(MIMEText(email_html, 'html', 'utf-8'))
 
-        logger.info(f"Attempting SMTP connection...")
-
-        if smtp_protocol == 'SSL':
-            logger.info(f"Using SMTP_SSL on port {smtp_port}")
-            server = smtplib.SMTP_SSL(smtp_server, smtp_port)
-            login_username = smtp_username if smtp_username else from_email
-            server.login(login_username, password)
-        else:
-            logger.info(f"Using SMTP with STARTTLS on port {smtp_port}")
-            server = smtplib.SMTP(smtp_server, smtp_port)
-            logger.info("Starting TLS...")
-            server.starttls()
-            login_username = smtp_username if smtp_username else from_email
-            server.login(login_username, password)
-
-        logger.info("SMTP connection established successfully")
+        server = smtp_connect(smtp_server, smtp_port, smtp_protocol, smtp_username, from_email, password, settings)
 
         logger.info("Sending email...")
 
@@ -711,13 +714,7 @@ def resend_email_from_history(email_id, settings):
     from_addr = alias_email if alias_email else from_email
 
     try:
-        if smtp_protocol == 'SSL':
-            server = smtplib.SMTP_SSL(smtp_server, smtp_port)
-        else:
-            server = smtplib.SMTP(smtp_server, smtp_port)
-            server.starttls()
-        login_username = smtp_username if smtp_username else from_email
-        server.login(login_username, password)
+        server = smtp_connect(smtp_server, smtp_port, smtp_protocol, smtp_username, from_email, password, settings)
 
         server.sendmail(from_addr, recipients, email_content)
         server.quit()

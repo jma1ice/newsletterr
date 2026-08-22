@@ -23,12 +23,33 @@ _plex_health = threading.local()
 
 def reset_plex_health():
     _plex_health.failed = False
+    _plex_health.missing_libraries = []
 
 def mark_plex_failed():
     _plex_health.failed = True
 
 def plex_call_failed():
     return getattr(_plex_health, 'failed', False)
+
+def note_missing_library(section_id, name=None, section_type=None):
+    entries = getattr(_plex_health, 'missing_libraries', None)
+    if entries is None:
+        entries = _plex_health.missing_libraries = []
+    section_id = str(section_id)
+    if any(entry['section_id'] == section_id for entry in entries):
+        return
+    entries.append({
+        'section_id': section_id,
+        'name': name or f'Section {section_id}',
+        'type': section_type or '',
+    })
+
+def plex_missing_libraries():
+    return list(getattr(_plex_health, 'missing_libraries', []))
+
+def section_is_gone(exc):
+    response = getattr(exc, 'response', None)
+    return response is not None and getattr(response, 'status_code', None) == 404
 
 def get_plex_client_identifier():
     try:
@@ -361,6 +382,9 @@ def fetch_tv_shows_from_plex_sdk(section_id, limit=10, machine_id=None, days=Non
         return shows
             
     except Exception as e:
+        if section_is_gone(e):
+            logger.debug(f"Section {section_id} no longer exists on Plex, skipping")
+            return None
         logger.exception(f"Error fetching TV shows from Plex API: {e}")
         mark_plex_failed()
         return []
@@ -442,6 +466,9 @@ def fetch_movies_from_plex_sdk(section_id, limit=10, machine_id=None, days=None)
         return movies
             
     except Exception as e:
+        if section_is_gone(e):
+            logger.debug(f"Section {section_id} no longer exists on Plex, skipping")
+            return None
         logger.exception(f"Error fetching movies from Plex API: {e}")
         mark_plex_failed()
         return []
@@ -520,6 +547,9 @@ def fetch_albums_from_plex_sdk(section_id, limit=10, machine_id=None, days=None)
         return albums
             
     except Exception as e:
+        if section_is_gone(e):
+            logger.debug(f"Section {section_id} no longer exists on Plex, skipping")
+            return None
         logger.exception(f"Error fetching albums from Plex API: {e}")
         mark_plex_failed()
         return []
@@ -778,12 +808,24 @@ def fetch_recently_added_using_plex_sdk(tautulli_base_url, tautulli_api_key, ite
         logger.debug("No libraries found")
         return recent_data
 
+    known_section_ids = {
+        str(section['section_id'])
+        for section in (fetch_library_sections_with_genres(include_genres=False) or [])
+    }
+
     for library in libraries:
         section_id = library['section_id']
         section_type = library['section_type']
         library_name = library['section_name']
 
         logger.debug(f"\nFetching recently added for library: {library_name} (type: {section_type}, mode: {recently_added_mode})")
+
+        if (section_type in ('show', 'movie', 'artist')
+                and known_section_ids
+                and str(section_id) not in known_section_ids):
+            logger.debug(f"Skipping '{library_name}' (section {section_id}): not on the Plex server")
+            note_missing_library(section_id, library_name, section_type)
+            continue
 
         items = []
         days_val = int(items_count) if days_mode else None
@@ -807,6 +849,10 @@ def fetch_recently_added_using_plex_sdk(tautulli_base_url, tautulli_api_key, ite
                     item['library_name'] = library_name
                     if 'rating_key' in item and machine_id:
                         item['plex_url'] = build_plex_web_link(item['rating_key'], machine_id, plex_web_url)
+
+        if items is None:
+            note_missing_library(section_id, library_name, section_type)
+            items = []
 
         if recently_added_sort == "rating":
             items.sort(key=lambda x: float(x.get('rating', '') or 0), reverse=True)

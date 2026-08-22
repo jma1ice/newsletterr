@@ -21,6 +21,8 @@ SECRET_COLUMNS = frozenset({
     "seerr_api_key",
     "jellyfin_api_key",
     "jellywatch_api_key",
+    "oauth_refresh_token",
+    "oauth_access_token",
 })
 
 # Empty/NULL columns are normalized with `or`-semantics, matching the
@@ -45,6 +47,9 @@ DEFAULTS = {
     "recently_added_sort": "date",
     "stat_cover_art": "disabled",
     "send_mode": "bcc",
+    "smtp_auth_method": "password",
+    "oauth_provider": "microsoft",
+    "oauth_tenant": "common",
     "hsts_enabled": "disabled",
     "coming_soon_days_ahead": "14",
     "released_since_days": "",

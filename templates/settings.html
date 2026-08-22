@@ -103,9 +103,44 @@
 
                         <div class="settings-group-card">
                         <h6 class="text-uppercase">SMTP</h6>
+
+                        <label for="smtp_auth_method">Authentication:</label><br>
+                        <select id="smtp_auth_method" name="smtp_auth_method">
+                            <option value="password" {% if (settings.smtp_auth_method or 'password') != 'oauth' %}selected{% endif %}>Password or app password</option>
+                            <option value="oauth" {% if settings.smtp_auth_method == 'oauth' %}selected{% endif %}>Microsoft OAuth (Outlook.com and Microsoft 365)</option>
+                        </select>
+                        <p class="text-info mt-2 field-hint">Microsoft is retiring password authentication for SMTP, and personal Outlook.com accounts cannot use it at all. Gmail still works with an app password.</p><br>
+
+                        <div id="oauth_microsoft_block" style="display: none;">
+                            <label for="oauth_client_id">Application (client) ID:</label><br>
+                            <input type="text" id="oauth_client_id" name="oauth_client_id"
+                                {% if settings.oauth_client_id != "" %}value="{{ settings.oauth_client_id }}"{% endif %}
+                                placeholder="From your Microsoft Entra app registration"><br><br>
+
+                            <label for="oauth_tenant">Directory (tenant) ID:</label><br>
+                            <input type="text" id="oauth_tenant" name="oauth_tenant"
+                                value="{{ settings.oauth_tenant or 'common' }}"
+                                placeholder="common"><br>
+                            <p class="text-info mt-2 field-hint">Leave as <strong>common</strong> unless your organization requires a specific tenant. Register the app as a public client with device code flow allowed, and add the delegated permission <strong>SMTP.Send</strong> plus <strong>offline_access</strong>.</p><br>
+
+                            <div id="oauth_status" class="mb-2">
+                                {% if settings.oauth_account %}
+                                    Connected as <strong>{{ settings.oauth_account }}</strong>
+                                {% else %}
+                                    Not connected
+                                {% endif %}
+                            </div>
+                            <button type="button" class="btn btn-secondary" id="oauth_connect_btn">Connect Microsoft account</button>
+                            <button type="button" class="btn btn-secondary" id="oauth_disconnect_btn"
+                                {% if not settings.oauth_account %}style="display: none;"{% endif %}>Disconnect</button>
+                            <div id="oauth_device_prompt" class="mt-2" style="display: none;"></div><br>
+                        </div>
+
+                        <div id="smtp_password_block">
                         <label for="password">Password:</label><br>
                         <input type="password" id="password" name="password" autocomplete="new-password"
                             placeholder="{% if settings.has_password %}Saved - leave blank to keep{% else %}Email Password or App Password{% endif %}"><br><br>
+                        </div>
 
                         <label for="smtp_username">SMTP Username (Optional - for SMTP clients needing username login):</label><br>
                         <input type="text" id="smtp_username" name="smtp_username"
@@ -2245,6 +2280,121 @@
         saveBtn.addEventListener('click', save);
         reloadBtn.addEventListener('click', load);
         load();
+    })();
+</script>
+
+<script nonce="{{ nonce }}">
+    // Microsoft device code flow. The browser drives the polling interval so
+    // no server thread is parked waiting on a human finishing consent.
+    (function() {
+        const methodSel = document.getElementById('smtp_auth_method');
+        const oauthBlock = document.getElementById('oauth_microsoft_block');
+        const passwordBlock = document.getElementById('smtp_password_block');
+        const connectBtn = document.getElementById('oauth_connect_btn');
+        const disconnectBtn = document.getElementById('oauth_disconnect_btn');
+        const statusEl = document.getElementById('oauth_status');
+        const promptEl = document.getElementById('oauth_device_prompt');
+        if (!methodSel || !oauthBlock) return;
+
+        const headers = {'Content-Type': 'application/json', 'X-CSRF-Token': '{{ csrf_token }}'};
+        let pollTimer = null;
+
+        function syncVisibility() {
+            const oauth = methodSel.value === 'oauth';
+            oauthBlock.style.display = oauth ? '' : 'none';
+            if (passwordBlock) passwordBlock.style.display = oauth ? 'none' : '';
+        }
+        methodSel.addEventListener('change', syncVisibility);
+        syncVisibility();
+
+        function stopPolling() {
+            if (pollTimer) { clearTimeout(pollTimer); pollTimer = null; }
+        }
+
+        // Microsoft's instructions and code are server-supplied strings, so
+        // they are placed as text, never interpolated into markup.
+        function showPrompt(text) {
+            promptEl.textContent = text;
+            promptEl.style.display = text ? '' : 'none';
+        }
+
+        connectBtn.addEventListener('click', async () => {
+            stopPolling();
+            connectBtn.disabled = true;
+            showPrompt('Contacting Microsoft...');
+            try {
+                const resp = await fetch('/api/oauth/microsoft/start', {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify({
+                        client_id: document.getElementById('oauth_client_id').value,
+                        tenant: document.getElementById('oauth_tenant').value,
+                    }),
+                });
+                const data = await resp.json();
+                if (data.status !== 'ok') {
+                    showPrompt(data.message || 'Could not start sign-in.');
+                    connectBtn.disabled = false;
+                    return;
+                }
+                showPrompt(`Go to ${data.verification_uri} and enter the code ${data.user_code}, then leave this page open.`);
+                pollForConsent(data.device_code, (data.interval || 5) * 1000, Date.now() + (data.expires_in || 900) * 1000);
+            } catch (e) {
+                showPrompt('Could not start sign-in.');
+                connectBtn.disabled = false;
+            }
+        });
+
+        function pollForConsent(deviceCode, intervalMs, deadline) {
+            pollTimer = setTimeout(async () => {
+                if (Date.now() > deadline) {
+                    showPrompt('The sign-in code expired. Try again.');
+                    connectBtn.disabled = false;
+                    return;
+                }
+                try {
+                    const resp = await fetch('/api/oauth/microsoft/poll', {
+                        method: 'POST',
+                        headers,
+                        body: JSON.stringify({
+                            device_code: deviceCode,
+                            client_id: document.getElementById('oauth_client_id').value,
+                            tenant: document.getElementById('oauth_tenant').value,
+                        }),
+                    });
+                    const data = await resp.json();
+                    if (data.status === 'pending') {
+                        pollForConsent(deviceCode, intervalMs, deadline);
+                        return;
+                    }
+                    if (data.status === 'connected') {
+                        statusEl.textContent = data.account ? `Connected as ${data.account}` : 'Connected';
+                        disconnectBtn.style.display = '';
+                        showPrompt('Connected. Save settings to keep the rest of this page.');
+                        connectBtn.disabled = false;
+                        return;
+                    }
+                    showPrompt(data.message || 'Sign-in failed.');
+                    connectBtn.disabled = false;
+                } catch (e) {
+                    showPrompt('Sign-in failed.');
+                    connectBtn.disabled = false;
+                }
+            }, intervalMs);
+        }
+
+        disconnectBtn.addEventListener('click', async () => {
+            stopPolling();
+            try {
+                await fetch('/api/oauth/microsoft/disconnect', {method: 'POST', headers});
+                statusEl.textContent = 'Not connected';
+                disconnectBtn.style.display = 'none';
+                showPrompt('');
+                connectBtn.disabled = false;
+            } catch (e) {
+                showPrompt('Could not disconnect.');
+            }
+        });
     })();
 </script>
 

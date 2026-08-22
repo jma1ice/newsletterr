@@ -954,6 +954,7 @@ def _demo_pull_stats():
         "time_range": time_range,
         "count": count,
         "plex_unavailable": False,
+        "missing_libraries": [],
         "error": None,
     })
 

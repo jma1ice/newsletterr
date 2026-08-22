@@ -34,6 +34,26 @@ function markPullCacheFresh(key, value) {
     if (window.APP?.pullCacheFresh) window.APP.pullCacheFresh[key] = value;
 }
 
+function renderMissingLibraries(libraries) {
+    const banner = document.getElementById('missing_libraries_p');
+    const text = document.getElementById('missing_libraries_text');
+    if (!banner || !text) return;
+
+    const entries = Array.isArray(libraries) ? libraries : [];
+    if (!entries.length) {
+        banner.style.display = 'none';
+        text.textContent = '';
+        return;
+    }
+
+    const names = entries.map(entry => entry?.name || `Section ${entry?.section_id}`);
+    const label = entries.length === 1 ? 'library is' : 'libraries are';
+    text.textContent = `${entries.length} ${label} listed in Tautulli but no longer on the Plex server, `
+        + `and were skipped: ${names.join(', ')}. `
+        + 'Remove them in Tautulli under Settings > Libraries to clear this.';
+    banner.style.display = '';
+}
+
 (function() {
     const a = document.getElementById('alert_p');
     const e = document.getElementById('error_p');
@@ -44,6 +64,14 @@ function markPullCacheFresh(key, value) {
     if (plexClose) {
         plexClose.addEventListener('click', () => {
             const banner = document.getElementById('plex_warning_p');
+            if (banner) banner.style.display = 'none';
+        });
+    }
+
+    const missingClose = document.getElementById('missing_libraries_close');
+    if (missingClose) {
+        missingClose.addEventListener('click', () => {
+            const banner = document.getElementById('missing_libraries_p');
             if (banner) banner.style.display = 'none';
         });
     }

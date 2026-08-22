@@ -9,7 +9,7 @@ from app.cache import set_cached_data, get_cache_info
 from app.crypto import decrypt
 from app.security import require_csrf_for_json, requires_auth, safe_get, json_body
 from app.theme import get_theme_settings
-from app.clients.plex import get_plex_headers, get_plex_machine_id, build_plex_web_link, reset_plex_health, plex_call_failed, fetch_library_sections_with_genres, search_library_items
+from app.clients.plex import get_plex_headers, get_plex_machine_id, build_plex_web_link, reset_plex_health, plex_call_failed, plex_missing_libraries, fetch_library_sections_with_genres, search_library_items
 from app.clients.jellyfin import reset_jellyfin_health, jellyfin_call_failed, fetch_recently_added_using_jellyfin, fetch_jellyfin_library_counts, get_jellyfin_server_id, build_jellyfin_web_link, fetch_jellyfin_users
 from app.clients.jellywatch import fetch_jellywatch_home_stats, fetch_jellywatch_most_watched
 from app.clients.playback_reporting import fetch_playback_reporting_graphs
@@ -152,6 +152,7 @@ def pull_stats():
     reset_plex_health()
     recent_data = fetch_recent_data_for_index(tautulli_base_url, tautulli_api_key, count, recently_added_mode=recently_added_mode, recently_added_sort=recently_added_sort)
     plex_unavailable = plex_configured and plex_call_failed()
+    missing_libraries = plex_missing_libraries() if plex_configured else []
     set_cached_data('recent_data', recent_data, cache_params)
 
     progress_step('pull_stats', 'Pulling most watched...')
@@ -194,6 +195,7 @@ def pull_stats():
         "time_range": time_range,
         "count": count,
         "plex_unavailable": plex_unavailable,
+        "missing_libraries": missing_libraries,
         "error": error
     })
 
@@ -307,6 +309,7 @@ def _pull_stats_jellyfin(_s, time_range, count):
         "time_range": time_range,
         "count": count,
         "plex_unavailable": jellyfin_unavailable,
+        "missing_libraries": [],
         "error": error
     })
 

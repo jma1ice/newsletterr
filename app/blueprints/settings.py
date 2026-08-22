@@ -434,6 +434,15 @@ def settings():
                   default_landing_page, week_start_day, date_format, time_format,
                   dn_item_count, dn_show_artists, dn_show_tracks, dn_show_albums, dn_show_genres, dn_cover_art,
                   wrapped_extra_stats, wrapped_rank_depth, playback_reporting_enabled))
+
+            cursor.execute(
+                "UPDATE settings SET smtp_auth_method = ?, oauth_client_id = ?, oauth_tenant = ? WHERE id = 1",
+                (
+                    'oauth' if request.form.get("smtp_auth_method") == 'oauth' else 'password',
+                    (request.form.get("oauth_client_id") or '').strip(),
+                    (request.form.get("oauth_tenant") or 'common').strip() or 'common',
+                ),
+            )
             conn.commit()
             cursor.execute("SELECT plex_token FROM settings WHERE id = 1")
             plex_token = cursor.fetchone()[0]

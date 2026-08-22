@@ -146,10 +146,10 @@ def test_the_editors_own_font_size_is_stripped_from_content():
 
     With styleWithCSS on, applying an alignment re-wrapped the text in spans
     carrying the builder editor's `font-size: 0.9rem`, which would then have
-    overridden the block's real size in the email. Two defences: commands emit
+    overridden the block's real size in the email. Two defenses: commands emit
     tags rather than CSS, and any inline font-size is stripped on read. The
     behavioral check runs in the browser (scratchpad check_phase7.py), since
-    both defences need a real contenteditable to exercise.
+    both defenses need a real contenteditable to exercise.
     """
     rich = (REPO_ROOT / "static/js/app/38-rich-text.js").read_text(encoding="utf-8")
 

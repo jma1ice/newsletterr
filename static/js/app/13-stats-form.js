@@ -118,10 +118,12 @@ window.pullRunners.stats = async function ({ chained = false } = {}) {
             plexWarnEl.style.display = data.plex_unavailable ? '' : 'none';
         }
 
+        renderMissingLibraries(data.missing_libraries);
+
         if (data.user_dict && Object.keys(data.user_dict).length > 0) {
             const recsBtn = document.getElementById('pullRecsBtn');
             // Only re-enable if Conjurr is actually configured; otherwise the
-            // button stays greyed with its explanatory tooltip.
+            // button stays grayed with its explanatory tooltip.
             if (recsBtn && window.APP?.serviceFlags?.conjurr) {
                 recsBtn.disabled = false;
                 recsBtn.classList.remove('opacity-50', 'cursor-not-allowed');
@@ -129,7 +131,7 @@ window.pullRunners.stats = async function ({ chained = false } = {}) {
 
             const dnBtn = document.getElementById('pullDroppedNeedleBtn');
             // Same treatment for the DroppedNeedle button: only re-enable when
-            // the service is configured, otherwise leave it greyed with tooltip.
+            // the service is configured, otherwise leave it grayed with tooltip.
             if (dnBtn && window.APP?.serviceFlags?.droppedneedle) {
                 dnBtn.disabled = false;
                 dnBtn.classList.remove('opacity-50', 'cursor-not-allowed');

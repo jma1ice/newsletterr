@@ -12,6 +12,7 @@ from app.security import requires_auth, safe_get, require_csrf_for_json
 from app.clients.plex import get_plex_client_identifier, get_plex_headers
 from app.clients.jellyfin import get_jellyfin_headers
 from app.clients.jellywatch import ping_jellywatch
+from app.clients import msoauth
 
 import logging
 
@@ -530,3 +531,91 @@ def plex_get_info():
         "recommended_url": recommended_url,
         "plex_url": save_url,
     })
+
+@bp.route('/api/oauth/microsoft/start', methods=['POST'])
+@requires_auth
+def oauth_microsoft_start():
+    require_csrf_for_json()
+
+    data = request.get_json(silent=True) or {}
+    s = get_settings()
+    client_id = _fallback(data.get('client_id'), s.get('oauth_client_id'))
+    tenant = _fallback(data.get('tenant'), s.get('oauth_tenant')) or 'common'
+
+    try:
+        payload = msoauth.start_device_code(client_id, tenant)
+    except msoauth.OAuthError as e:
+        return jsonify({"status": "error", "message": str(e)}), 400
+    except requests.RequestException as e:
+        logger.warning(f"Microsoft device code request failed: {e}")
+        return jsonify({"status": "error", "message": "Could not reach Microsoft"}), 502
+
+    return jsonify({
+        "status": "ok",
+        "device_code": payload.get("device_code"),
+        "user_code": payload.get("user_code"),
+        "verification_uri": payload.get("verification_uri"),
+        "interval": payload.get("interval") or 5,
+        "expires_in": payload.get("expires_in") or 900,
+    })
+
+@bp.route('/api/oauth/microsoft/poll', methods=['POST'])
+@requires_auth
+def oauth_microsoft_poll():
+    require_csrf_for_json()
+
+    data = request.get_json(silent=True) or {}
+    device_code = (data.get('device_code') or '').strip()
+    if not device_code:
+        return jsonify({"status": "error", "message": "Missing device code"}), 400
+
+    s = get_settings()
+    client_id = _fallback(data.get('client_id'), s.get('oauth_client_id'))
+    tenant = _fallback(data.get('tenant'), s.get('oauth_tenant')) or 'common'
+
+    try:
+        status, payload = msoauth.poll_device_code(client_id, device_code, tenant)
+    except requests.RequestException as e:
+        logger.warning(f"Microsoft token poll failed: {e}")
+        return jsonify({"status": "error", "message": "Could not reach Microsoft"}), 502
+
+    if status == "pending":
+        return jsonify({"status": "pending"})
+    if status == "error":
+        return jsonify({
+            "status": "error",
+            "message": payload.get("error_description") or payload.get("error") or "Authorization failed",
+        }), 400
+
+    account = msoauth.account_email(payload)
+    msoauth.store_tokens(payload, account=account)
+    conn = db_connect()
+    try:
+        conn.execute("INSERT OR IGNORE INTO settings (id) VALUES (1)")
+        conn.execute(
+            "UPDATE settings SET oauth_client_id = ?, oauth_tenant = ?, oauth_provider = 'microsoft',"
+            " smtp_auth_method = 'oauth' WHERE id = 1",
+            (client_id, tenant),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    logger.info("Microsoft OAuth connected for SMTP")
+    return jsonify({"status": "connected", "account": account})
+
+@bp.route('/api/oauth/microsoft/disconnect', methods=['POST'])
+@requires_auth
+def oauth_microsoft_disconnect():
+    require_csrf_for_json()
+
+    msoauth.clear_tokens()
+    conn = db_connect()
+    try:
+        conn.execute("UPDATE settings SET smtp_auth_method = 'password' WHERE id = 1")
+        conn.commit()
+    finally:
+        conn.close()
+
+    logger.info("Microsoft OAuth disconnected for SMTP")
+    return jsonify({"status": "disconnected"})

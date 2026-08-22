@@ -184,6 +184,7 @@ The Settings page is split into sections: **Email Server**, **Connections**, **D
    * **From** - e‑mail address that will appear as the sender  
    * **From Name (optional)** - the name you wish to appear when your e-mail is sent  
    * **Alias (optional)** - _Send As_ alias. If blank, **From** will be used, [setup instructions](https://support.google.com/a/answer/33327?hl=en)  
+   * **Authentication** - Password (the default, and what every existing install keeps using) or Microsoft OAuth. Outlook.com and Microsoft 365 accounts need OAuth, see [Sending through Outlook.com or Microsoft 365](#sending-through-outlookcom-or-microsoft-365) below  
    * **Password** - account or [app‑password](https://support.google.com/mail/answer/185833?hl=en) if using Gmail. App Password is required by Gmail for security, it will not work with your regular Gmail password  
    * **SMTP Username (optional)** - used for SMTP clients that need username login  
    * **SMTP Server** - e.g. `smtp.gmail.com`  
@@ -204,6 +205,24 @@ The Settings page is split into sections: **Email Server**, **Connections**, **D
    * **Auto Header Text (optional)** - off by default. When on, a blank header title or eyebrow falls back to newsletterr's stock wording ("Your server", "This week on the server", "Your server, this month") in the Editorial and Spotlight layouts. When off, a blank field simply leaves the line out  
    * **Header Background (optional)** - the area behind the logo and header title. Theme gradient blends your accent and primary colors; pick Solid color for a single color, which is safer in clients that drop gradients  
 4. Click **Apply Settings**.  Settings are saved to `database/data.db`.
+
+### Sending through Outlook.com or Microsoft 365
+
+Microsoft no longer accepts a password for SMTP. Personal Outlook.com mailboxes cannot enable password authentication at all, and Exchange Online is disabling it for organizations by default at the end of December 2026. A password there fails with `535 5.7.139 Authentication unsuccessful, basic authentication is disabled`. Gmail is unaffected and still works with an app password.
+
+SMTP itself still works, it just needs an OAuth token. newsletterr does not ship a Microsoft application registration, so each install registers its own. It takes about five minutes and only has to be done once.
+
+1. Sign in to the [Microsoft Entra admin center](https://entra.microsoft.com) and go to **Applications** then **App registrations** then **New registration**.
+2. Give it any name, for example `newsletterr`. Under **Supported account types** choose the option that covers your mailbox. For a personal Outlook.com address pick the one that includes personal Microsoft accounts.
+3. Leave **Redirect URI** empty and register. The device code flow does not use one, which is why newsletterr works on any host and port without extra configuration.
+4. On the app's **Authentication** page, set **Allow public client flows** to **Yes**. Without this the sign-in fails.
+5. On **API permissions** choose **Add a permission**, then **APIs my organization uses**, search for **Office 365 Exchange Online**, choose **Delegated permissions**, and add **SMTP.Send**. Add **offline_access** as well: it is what lets scheduled sends keep working after the first hour.
+6. Copy the **Application (client) ID** from the app's Overview page.
+7. In newsletterr, open **Settings**, set **Authentication** to **Microsoft OAuth**, paste the client ID, and leave the tenant as `common` unless your organization requires a specific one.
+8. Click **Connect Microsoft account**, open the link shown, enter the code, and approve. The page confirms the connected address once consent completes.
+9. Set **SMTP Server** to `smtp.office365.com`, **SMTP Port** to `587`, and **SMTP Protocol** to `TLS`, then click **Apply Settings**.
+
+Tokens are stored encrypted in the database and refreshed automatically before each send, including scheduled sends that run with nobody signed in. If the connection is ever revoked on Microsoft's side, sends fail with a message asking you to reconnect, and the **Connect Microsoft account** button re-runs the flow. Note that some organizations block unapproved applications, in which case a tenant administrator has to approve the registration.
 
 ---
 
@@ -317,6 +336,28 @@ Released under the **MIT License** - see [LICENSE](LICENSE.txt) for details.
 
 ## Recent Changes
 
+## v2026.4.5:
+
+#### New Features:
+* Demo mode's Scheduling and Email History pages now have sample content: four schedules (one paused) laid out across the calendar, and a send log with sent, skipped and failed entries. Both pages used to open on an empty state, which made two of the headline features look like they did nothing
+* New warnings when Tautulli is reporting stale libraries that are not found in Plex
+* Option for setting up OAuth in Outlook since basic auth is being depreciated there
+* 5 SMTP connect instances moved to one central occurrence
+
+#### Fixed:
+* The logo could render at its own full size instead of the size you set. Outlook ignores the CSS that held it, and several clients (Thunderbird, Yahoo on Android, the stock Android mail app) drop the stylesheet altogether. The stock logo is 2512px wide, so the header blew open, and because the message was then forced wider than the screen those clients zoomed the whole email out until the body was too small to read. The width is now stated inline and in the stylesheet as well as on the image itself, so no single one of them has to survive
+* Poster images in card grids carried a percentage width. Outlook does not honor that on an image and fell back to the file's own size, bursting the cell and pulling the grid out of alignment. Every poster and chart now carries an explicit pixel width
+* Card grids never reflowed on a phone in the classic, editorial, digest and spotlight layouts. The responsive rules only matched class names the legacy layout produces, so a phone got five cards across at about 56px each, with titles breaking in the middle of a word. All five layouts now share one grid treatment and stack to three readable columns
+* Emails scrolled sideways on a phone. The outer container was full width plus a 1px border and did not count the border in its own width, so it measured two pixels wider than the screen
+* The Most Watched table rendered as a white block with dark text in the middle of an otherwise dark email on some clients. Its colors were written in directly as semi transparent white rather than taken from your theme, and clients that do not blend transparency fell back to solid white
+* A six column stats table cannot fit a phone, which is what made the legacy layout scroll sideways. Cert. and Score now drop out below 600px, leaving Title, Year and Plays
+* IBM Plex Sans was pulled in by an @import at the very top of the stylesheet. Gmail can stop reading a stylesheet when it meets one, which would have taken the mobile rules with it, and it also meant every reader's mail client fetched a file from Google on open. The font is now requested from the document head instead, and hidden from Outlook, which falls back to Times New Roman when it sees a webfont it cannot load
+* Yahoo silently drops a CSS rule that has a comment directly in front of it, and drops any !important with a space before it. Both patterns were in the email stylesheet, and one of the rules at risk was the one that collapses empty calendar cells on a phone
+* Table cells with a background color now carry a matching bgcolor attribute as well, for the clients that ignore the CSS
+* A recommendation score could print as a raw number such as 7.6999999999999999 instead of 7.7
+* Emails declared themselves light only while every email theme paints a dark background. Gmail on Android took that at its word and lightened the message, so artwork arrived washed out and pale. The declaration now follows whichever theme you are actually using
+* Coming Soon posters in the agenda view were still washed out in Gmail's Android dark mode, which drains the color from any image under about 56px. They are now 64px. Smaller thumbnails elsewhere are still affected: growing them enough to clear that threshold would add several hundred pixels of height to a section in every other client, and the stats thumbnails it would affect most can already be turned off under Stats and Graphs
+
 ## v2026.4.4:
 
 #### New Features:
@@ -352,39 +393,9 @@ Released under the **MIT License** - see [LICENSE](LICENSE.txt) for details.
 * The Most Watched snap-in ignored the Stats and Graphs metric setting: it always ranked and labelled by play count, even with Duration picked. It now ranks by time watched and labels cards with it. Tautulli reports no watch time in its per-library media list, so an all-time section on Duration is aggregated from that library's history, which covers its most recent 1000 plays
 * Demo mode's Most Watched section listed no libraries, because the sample data was built in the wrong shape for the snap-in
 
-## v2026.4.3:
-
-#### New Features:
-* New options for how the coming soon calendar is displayed
-* Email Density setting for expanding/condensing layouts
-* Move to top and move to bottom arrows on every snap-in, for reordering without dragging
-* Save dialog for templates, with an explicit "overwrite an existing template" option
-* Pick which collection group an added collection goes to, and move collections between groups
-* Rename or hide the heading on any snap-in, including a custom Coming Soon title
-* Rich text editing on text snap-ins: bold, italic, underline, alignment, bulleted and numbered lists, links and text color from a toolbar
-* Links can have their underline removed
-* Per-block font and size on text snap-ins, without going to Settings
-* New Recently Released snap-in, showing library items by release or air date rather than date added
-* Limit how many entries a Coming Soon snap-in shows
-* Filter Coming Soon (TV) down to premieres only, or new series only
-
-#### Fixed:
-* Cards with multiple rows were clamping all rows to one grid size
-* Templates were shipping old captured data
-* Legacy stat posters were filling the screen
-* Lost blur on stat card backgrounds
-* Editorial titles were jammed against "requested by ..."
-* Dragging the snap-ins panel taller grew the panel but not the list inside it
-* Dragging a snap-in past the edge of the list did not scroll on macOS
-* Loading a template reopened its collections closed, losing the saved expansion
-* Overwriting a template meant retyping its name exactly, now there is a dropdown
-* Clicking the center of an icon button did nothing, only the edge worked
-* Year in Plex posters rendered full size in the legacy layout at expanded density
-* Live preview refetched expanded collections from Plex on every edit, making it lag seconds behind
-
 ---
 
-## Acknowledgements
+## Acknowledgments
 
 * [Tautulli](https://github.com/Tautulli/Tautulli) for the Plex charts, users, and graphs  
 * [Jellyfin](https://github.com/jellyfin/jellyfin) & [Jellywatch](https://github.com/JellyWatchteam/JellyWatch) APIs for Jellyfin 'Stats/Graphs' and recently added

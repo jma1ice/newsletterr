@@ -23,6 +23,10 @@
         <span>{% if settings.media_server_type == 'jellyfin' %}Jellyfin connection failed, showing cached data (previews and images may be missing). Check the Jellyfin connection in settings.{% else %}Plex connection failed, showing cached/Tautulli data (previews, images, and collections may be missing). Use Force Reconnect in settings.{% endif %}</span>
         <button type="button" class="nl-alert__close" id="plex_warning_close" aria-label="Dismiss">&times;</button>
     </div>
+    <div id="missing_libraries_p" class="nl-alert nl-alert--warning nl-alert--dismissible mb-3" style="display: none;">
+        <span id="missing_libraries_text"></span>
+        <button type="button" class="nl-alert__close" id="missing_libraries_close" aria-label="Dismiss">&times;</button>
+    </div>
     <div class="foreground">
         <div class="builder-grid">
             <div class="builder-col mobile-content-panel mobile-section-config active" id="config-row">

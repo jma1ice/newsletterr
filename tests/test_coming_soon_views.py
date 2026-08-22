@@ -190,8 +190,8 @@ def _movies():
 
 
 @pytest.mark.parametrize("view,marker", [
-    ("", 'class="coming-soon-table"'),
-    ("grid", 'class="coming-soon-table"'),
+    ("", 'class="coming-soon-table nl-grid"'),
+    ("grid", 'class="coming-soon-table nl-grid"'),
     ("calendar", 'class="cs-cal-table"'),
     ("agenda", 'class="cs-agenda-table"'),
 ])
@@ -203,7 +203,7 @@ def test_legacy_sonarr_builder_dispatches_on_view(stub_images, view, marker):
 
 
 @pytest.mark.parametrize("view,marker", [
-    ("", 'class="coming-soon-table"'),
+    ("", 'class="coming-soon-table nl-grid"'),
     ("calendar", 'class="cs-cal-table"'),
     ("agenda", 'class="cs-agenda-table"'),
 ])

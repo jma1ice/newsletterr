@@ -1,16 +1,34 @@
 import base64
 
+from urllib.parse import urlsplit
+
 from playwright.sync_api import sync_playwright
 
+from app import config
 from app import state
 
 import logging
 
 logger = logging.getLogger(__name__)
 
+def _wait_for(page, expression: str, timeout_ms: int, poll_ms: int = 100):
+    deadline = timeout_ms
+    while True:
+        try:
+            if page.evaluate(expression):
+                return True
+        except Exception as e:
+            logger.debug(f"Poll of {expression!r} raised, retrying: {e}")
+        if deadline <= 0:
+            raise TimeoutError(f"Timed out after {timeout_ms}ms waiting for: {expression}")
+        page.wait_for_timeout(poll_ms)
+        deadline -= poll_ms
+
 def capture_chart_images_via_headless(schedule_id: int, base: str, theme: str) -> dict:
     url = f"{base}/scheduling/{schedule_id}/preview-page?schedule_id={schedule_id}"
-    
+
+    app_origin = urlsplit(base)._replace(path="", query="", fragment="").geturl()
+
     with state._RENDER_LOCK:
         with sync_playwright() as pw:
             browser = pw.chromium.launch(headless=True, args=["--no-sandbox"])
@@ -18,21 +36,28 @@ def capture_chart_images_via_headless(schedule_id: int, base: str, theme: str) -
                 viewport={"width": 1280, "height": 900},
                 color_scheme="dark" if theme == "dark" else "light"
             )
+
+            def _add_internal_token(route):
+                headers = {**route.request.headers, "X-Internal-Token": config.INTERNAL_TOKEN}
+                route.continue_(headers=headers)
+
+            context.route(lambda url: str(url).startswith(app_origin), _add_internal_token)
+
             page = context.new_page()
             page.on("console", lambda msg: logger.debug(f"PAGE LOG: {msg.text}"))
             page.goto(url, wait_until="load")
             logger.debug(f"Loaded URL (before waiting): {page.url}")
-            
+
             try:
-                page.wait_for_function("typeof loadPreview === 'function'", timeout=30_000)
+                _wait_for(page, "typeof loadPreview === 'function'", 30_000)
                 page.evaluate("loadPreview()")
-                page.wait_for_function("typeof Highcharts !== 'undefined' && Highcharts.charts && Highcharts.charts.filter(Boolean).length > 0", timeout=60_000)
+                _wait_for(page, "typeof Highcharts !== 'undefined' && Highcharts.charts && Highcharts.charts.filter(Boolean).length > 0", 60_000)
                 page.wait_for_timeout(2000)
             except Exception as e:
                 logger.error(f"Error waiting for charts to load: {e}")
 
             try:
-                page.wait_for_function("typeof selectedItems !== 'undefined'", timeout=10_000)
+                _wait_for(page, "typeof selectedItems !== 'undefined'", 10_000)
                 selected_items = page.evaluate("selectedItems || []")
             except Exception as e:
                 logger.warning(f"selectedItems never defined or timeout: {e}")

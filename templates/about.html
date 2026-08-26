@@ -113,25 +113,20 @@
     <h2>recent changes</h2>
     <p class="info-subhead">New Features:</p>
     <ul class="info-list">
-        <li>Demo mode's Scheduling and Email History pages now have sample content: four schedules (one paused) laid out across the calendar, and a send log with sent, skipped and failed entries. Both pages used to open on an empty state, which made two of the headline features look like they did nothing</li>
-        <li>New warnings when Tautulli is reporting stale libraries that are not found in Plex</li>
-        <li>Option for setting up OAuth in Outlook since basic auth is being depreciated there</li>
-        <li>5 SMTP connect instances moved to one central occurrence</li>
+        <li></li>
+    </ul>
+    <p class="info-subhead">Changes:</p>
+    <ul class="info-list">
+        <li>Poster Max Height now ships set to 800px rather than blank</li>
+        <li>Playwright install moved to solely headless, thanks @bferd</li>
     </ul>
     <p class="info-subhead">Fixes:</p>
     <ul class="info-list mb-4">
-        <li>The logo could render at its own full size instead of the size you set. Outlook ignores the CSS that held it, and several clients (Thunderbird, Yahoo on Android, the stock Android mail app) drop the stylesheet altogether. The stock logo is 2512px wide, so the header blew open, and because the message was then forced wider than the screen those clients zoomed the whole email out until the body was too small to read. The width is now stated inline and in the stylesheet as well as on the image itself, so no single one of them has to survive</li>
-        <li>Poster images in card grids carried a percentage width. Outlook does not honor that on an image and fell back to the file's own size, bursting the cell and pulling the grid out of alignment. Every poster and chart now carries an explicit pixel width</li>
-        <li>Card grids never reflowed on a phone in the classic, editorial, digest and spotlight layouts. The responsive rules only matched class names the legacy layout produces, so a phone got five cards across at about 56px each, with titles breaking in the middle of a word. All five layouts now share one grid treatment and stack to three readable columns</li>
-        <li>Emails scrolled sideways on a phone. The outer container was full width plus a 1px border and did not count the border in its own width, so it measured two pixels wider than the screen</li>
-        <li>The Most Watched table rendered as a white block with dark text in the middle of an otherwise dark email on some clients. Its colors were written in directly as semi transparent white rather than taken from your theme, and clients that do not blend transparency fell back to solid white</li>
-        <li>A six column stats table cannot fit a phone, which is what made the legacy layout scroll sideways. Cert. and Score now drop out below 600px, leaving Title, Year and Plays</li>
-        <li>IBM Plex Sans was pulled in by an @import at the very top of the stylesheet. Gmail can stop reading a stylesheet when it meets one, which would have taken the mobile rules with it, and it also meant every reader's mail client fetched a file from Google on open. The font is now requested from the document head instead, and hidden from Outlook, which falls back to Times New Roman when it sees a webfont it cannot load</li>
-        <li>Yahoo silently drops a CSS rule that has a comment directly in front of it, and drops any !important with a space before it. Both patterns were in the email stylesheet, and one of the rules at risk was the one that collapses empty calendar cells on a phone</li>
-        <li>Table cells with a background color now carry a matching bgcolor attribute as well, for the clients that ignore the CSS</li>
-        <li>A recommendation score could print as a raw number such as 7.6999999999999999 instead of 7.7</li>
-        <li>Emails declared themselves light only while every email theme paints a dark background. Gmail on Android took that at its word and lightened the message, so artwork arrived washed out and pale. The declaration now follows whichever theme you are actually using</li>
-        <li>Coming Soon posters in the agenda view were still washed out in Gmail's Android dark mode, which drains the color from any image under about 56px. They are now 64px. Smaller thumbnails elsewhere are still affected: growing them enough to clear that threshold would add several hundred pixels of height to a section in every other client, and the stats thumbnails it would affect most can already be turned off under Stats and Graphs</li>
+        <li>Poster Max Height now applies to every image embedded in an email</li>
+        <li>Every card grid now asks for artwork at the size it actually displays</li>
+        <li>Poster Max Height did nothing at all on the classic, editorial, digest and spotlight layouts</li>
+        <li>An animated GIF in a custom media block could arrive as a single still frame, and was labelled as a GIF while carrying PNG data</li>
+        <li>Blurred backdrop artwork behind stat cards was embedded at full resolution</li>
     </ul>
 </div>
 {% endblock %}

@@ -33,6 +33,31 @@ def _center_crop_resize(img, target_w, target_h):
         img = img.crop((0, top, orig_w, top + new_h))
     return img.resize((target_w, target_h), Image.LANCZOS)
 
+def size_cap(msg_root):
+    try:
+        return max(0, int(getattr(msg_root, 'poster_max_height', 0) or 0))
+    except (TypeError, ValueError):
+        return 0
+
+def _re_encode(image_bytes, subtype, resize):
+    img = Image.open(io.BytesIO(image_bytes))
+    if getattr(img, 'is_animated', False):
+        return image_bytes, subtype
+    img = resize(img)
+    if img is None:
+        return image_bytes, subtype
+    save_fmt = 'JPEG' if subtype == 'jpeg' else 'PNG'
+    if save_fmt == 'JPEG' and img.mode in ('RGBA', 'P', 'LA'):
+        img = img.convert('RGB')
+    out = io.BytesIO()
+    img.save(out, format=save_fmt, quality=85)
+    # the part is labelled from these bytes, not from what the server served
+    return out.getvalue(), ('jpeg' if save_fmt == 'JPEG' else 'png')
+
+def box_cap(msg_root, box_height):
+    cap = size_cap(msg_root)
+    return min(cap, box_height) if cap else None
+
 # Preview mode (single-renderer previews): a msg_root carrying
 # preview_mode=True makes every attach helper return a browser-usable URL
 # instead of fetching and embedding, so /preview_email can run the real
@@ -135,31 +160,28 @@ def fetch_and_attach_image(image_url, msg_root, cid_name, base_url="", max_heigh
                 _tw, _th = int(target[0]), int(target[1])
             except (TypeError, ValueError):
                 _tw = _th = 0
+        _cap = size_cap(msg_root)
+        if _cap:
+            if _tw > 0 and _th > _cap:
+                # shrink the crop box rather than dropping it, so the grid
+                # keeps its single aspect ratio at the capped resolution
+                _tw, _th = max(1, int(round(_tw * _cap / _th))), _cap
+            elif _tw <= 0:
+                max_height = min(max_height, _cap) if (max_height and max_height > 0) else _cap
         if _tw > 0 and _th > 0:
             try:
-                img = Image.open(io.BytesIO(image_bytes))
-                img = _center_crop_resize(img, _tw, _th)
-                out = io.BytesIO()
-                save_fmt = 'JPEG' if subtype == 'jpeg' else 'PNG'
-                if save_fmt == 'JPEG' and img.mode in ('RGBA', 'P', 'LA'):
-                    img = img.convert('RGB')
-                img.save(out, format=save_fmt, quality=85)
-                image_bytes = out.getvalue()
+                image_bytes, subtype = _re_encode(
+                    image_bytes, subtype, lambda img: _center_crop_resize(img, _tw, _th))
             except Exception as _e:
                 logger.error(f"PIL target crop failed, using original: {_e}")
         elif max_height and isinstance(max_height, int) and max_height > 0:
-            try:
-                img = Image.open(io.BytesIO(image_bytes))
+            def _shrink(img):
                 orig_w, orig_h = img.size
-                if orig_h > max_height:
-                    target_w = max(1, int(orig_w * max_height / orig_h))
-                    img = img.resize((target_w, max_height), Image.LANCZOS)
-                    out = io.BytesIO()
-                    save_fmt = 'JPEG' if subtype == 'jpeg' else 'PNG'
-                    if save_fmt == 'JPEG' and img.mode in ('RGBA', 'P', 'LA'):
-                        img = img.convert('RGB')
-                    img.save(out, format=save_fmt, quality=85)
-                    image_bytes = out.getvalue()
+                if orig_h <= max_height:
+                    return None
+                return img.resize((max(1, int(orig_w * max_height / orig_h)), max_height), Image.LANCZOS)
+            try:
+                image_bytes, subtype = _re_encode(image_bytes, subtype, _shrink)
             except Exception as _e:
                 logger.error(f"PIL resize failed, using original: {_e}")
 
@@ -192,10 +214,13 @@ def fetch_and_attach_image(image_url, msg_root, cid_name, base_url="", max_heigh
         logger.exception(f"Error processing image {image_url}: {e}")
         return None
 
-def blur_image_bytes(raw):
+def blur_image_bytes(raw, max_height=0):
     image = Image.open(io.BytesIO(raw))
     if image.mode in ('RGBA', 'LA', 'P'):
         image = image.convert('RGB')
+    w, h = image.size
+    if max_height and h > max_height:
+        image = image.resize((max(1, int(round(w * max_height / h))), max_height), Image.LANCZOS)
     darkened = ImageEnhance.Brightness(image.filter(ImageFilter.GaussianBlur(radius=30))).enhance(0.7)
     out = io.BytesIO()
     darkened.save(out, format='JPEG', quality=85)
@@ -225,8 +250,8 @@ def fetch_and_attach_blurred_image(image_url, msg_root, cid_name, base_url="", h
 
         response = safe_get(full_url, timeout=10, headers=headers)
         response.raise_for_status()
-        
-        img_bytes = io.BytesIO(blur_image_bytes(response.content))
+
+        img_bytes = io.BytesIO(blur_image_bytes(response.content, size_cap(msg_root)))
 
         if hosted_images_enabled and hosted_base_url:
             try:
@@ -278,6 +303,9 @@ def fetch_and_attach_small_thumbnail(image_url, msg_root, cid_name, base_url="",
         orig_w, orig_h = image.size
         if orig_h == 0:
             return None
+        _cap = size_cap(msg_root)
+        if _cap:
+            height = min(height, _cap)
         target_w = max(1, int(orig_w * height / orig_h))
         resized = image.resize((target_w, height), Image.LANCZOS)
 

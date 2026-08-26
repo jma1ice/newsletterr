@@ -5,8 +5,8 @@ from datetime import datetime, timezone
 
 from app import config
 from app.emails import density
-from app.emails.builders.card_grid import empty_state_html as _empty_state_html, build_calendar_grid_html as _build_calendar_grid_html, build_card_html as _build_card_html, format_relative_date as _format_relative_date
-from app.emails.images import fetch_and_attach_image, truncate_text
+from app.emails.builders.card_grid import empty_state_html as _empty_state_html, build_calendar_grid_html as _build_calendar_grid_html, build_card_html as _build_card_html, format_relative_date as _format_relative_date, effective_columns as _effective_columns, poster_max_height_for as _poster_max_height_for
+from app.emails.images import box_cap, fetch_and_attach_image, truncate_text
 
 import logging
 
@@ -70,6 +70,7 @@ def build_seerr_requests_html_with_cids(data, msg_root, theme_colors, base_url="
 
     art_on = density.show_art(theme_colors)
     cards = []
+    _cap = box_cap(msg_root, _poster_max_height_for(_effective_columns(grid_columns, len(entries))))
     for i, entry in enumerate(entries):
         status = "Approved" if entry['approved'] else "Pending Approval"
         relative = _format_relative_date(entry['requested_date'])
@@ -79,7 +80,7 @@ def build_seerr_requests_html_with_cids(data, msg_root, theme_colors, base_url="
         poster_src = None
         poster_url = _poster_src(entry['poster']) if art_on else None
         if poster_url:
-            poster_src = fetch_and_attach_image(poster_url, msg_root, f"seerr-{i}", base_url, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
+            poster_src = fetch_and_attach_image(poster_url, msg_root, f"seerr-{i}", base_url, max_height=_cap, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
 
         cards.append(_build_card_html(theme_colors, truncate_text(entry['title'], 23), entry['year'], meta_text, poster_src, extra_line=extra_line, compact=not art_on))
 

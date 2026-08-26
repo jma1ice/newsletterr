@@ -45,7 +45,7 @@ def test_values_and_defaults(settings_db):
     assert s["server_name"] == "MyPlex"
     assert s["stats_type"] == "plays"        # empty string -> default (or-semantics)
     assert s["ra_grid_columns"] == 3          # int cast
-    assert s["poster_max_height"] == 0        # NULL int -> default
+    assert s["poster_max_height"] == 800      # NULL int -> default
 
 def test_secrets_decrypted_eagerly(settings_db):
     _seed(settings_db, tautulli_api=encrypt("tt-key"), password=encrypt("smtp-pw"))

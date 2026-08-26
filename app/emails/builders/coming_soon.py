@@ -4,7 +4,7 @@
 from datetime import datetime, timezone
 
 from app.emails import density
-from app.emails.builders.card_grid import format_relative_date as _format_relative_date, empty_state_html as _empty_state_html, build_calendar_grid_html as _build_calendar_grid_html, build_card_html as _build_card_html
+from app.emails.builders.card_grid import format_relative_date as _format_relative_date, empty_state_html as _empty_state_html, build_calendar_grid_html as _build_calendar_grid_html, build_card_html as _build_card_html, effective_columns as _effective_columns, poster_max_height_for as _poster_max_height_for
 from app.emails.builders.calendar_view import (
     VIEWS,
     build_agenda_html,
@@ -12,7 +12,7 @@ from app.emails.builders.calendar_view import (
     make_event,
     section_container_html,
 )
-from app.emails.images import fetch_and_attach_image, fetch_and_attach_small_thumbnail, truncate_text
+from app.emails.images import box_cap, fetch_and_attach_image, fetch_and_attach_small_thumbnail, truncate_text
 
 import logging
 
@@ -245,6 +245,7 @@ def build_sonarr_coming_soon_html_with_cids(episodes, msg_root, theme_colors, ba
     if not groups:
         return _empty_state_html(theme_colors, "No upcoming episodes found.")
     cards = []
+    _cap = box_cap(msg_root, _poster_max_height_for(_effective_columns(grid_columns, len(groups))))
     for i, group in enumerate(groups):
         series = group['series']
         eps = group['episodes']
@@ -259,7 +260,7 @@ def build_sonarr_coming_soon_html_with_cids(episodes, msg_root, theme_colors, ba
         poster_src = None
         poster_url = _arr_poster_src(poster, '/proxy-sonarr-art') if _art_on else None
         if poster_url:
-            poster_src = fetch_and_attach_image(poster_url, msg_root, f"sonarr-{i}", base_url, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
+            poster_src = fetch_and_attach_image(poster_url, msg_root, f"sonarr-{i}", base_url, max_height=_cap, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
 
         if len(eps) >= 2:
             season_label = f"Season {season}" if season is not None else "New episodes"
@@ -293,6 +294,7 @@ def build_radarr_coming_soon_html_with_cids(movies, msg_root, theme_colors, base
 
     _art_on = density.show_art(theme_colors)
     cards = []
+    _cap = box_cap(msg_root, _poster_max_height_for(_effective_columns(grid_columns, len(movies))))
     for i, movie in enumerate(movies):
         title = movie.get('title', 'Unknown')
         year = movie.get('year', '')
@@ -303,7 +305,7 @@ def build_radarr_coming_soon_html_with_cids(movies, msg_root, theme_colors, base
         poster_src = None
         poster_url = _arr_poster_src(poster, '/proxy-radarr-art') if _art_on else None
         if poster_url:
-            poster_src = fetch_and_attach_image(poster_url, msg_root, f"radarr-{i}", base_url, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
+            poster_src = fetch_and_attach_image(poster_url, msg_root, f"radarr-{i}", base_url, max_height=_cap, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
 
         subtitle = str(year) if year else ""
         meta_text = truncate_text(' • '.join(filter(None, [f'Releases {relative}' if relative else ''])), 46)

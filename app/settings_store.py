@@ -96,7 +96,7 @@ DEFAULTS = {
 INT_COLUMNS = {
     "ra_grid_columns": 5,
     "recs_grid_columns": 5,
-    "poster_max_height": 0,
+    "poster_max_height": 800,
     "coming_soon_grid_columns": 5,
     "collections_grid_columns": 5,
     "exclude_inactive_days": 0,

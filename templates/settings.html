@@ -645,7 +645,7 @@
                                 <input type="number" id="poster_max_height" name="poster_max_height" min="50" max="2000"
                                        value="{{ settings.get('poster_max_height', '') }}"
                                        placeholder="Original" class="w-num-lg">
-                                <p class="text-info mt-2 field-hint">Caps the pixel height of posters embedded in emails (Recently Added, Recommendations, Collections). Width scales automatically to preserve aspect ratio. Leave blank to use original resolution.</p>
+                                <p class="text-info mt-2 field-hint">Caps the pixel height of every image embedded in emails: posters, cover art, avatars and logos. Width scales automatically to preserve aspect ratio. Leave blank to embed artwork at its original resolution, which on a large library can push a send past what mail servers accept.</p>
                             </div>
                         </div>
                         </div>

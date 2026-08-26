@@ -179,6 +179,7 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, displ
     ra_grid_columns = int(tautulli_data.get('settings', {}).get('ra_grid_columns', 5) or 5)
     recs_grid_columns = int(tautulli_data.get('settings', {}).get('recs_grid_columns', 5) or 5)
     poster_max_height = int(tautulli_data.get('settings', {}).get('poster_max_height') or 0)
+    msg_root.poster_max_height = poster_max_height
     coming_soon_grid_columns = int(tautulli_data.get('settings', {}).get('coming_soon_grid_columns', 5) or 5)
     collections_grid_columns = int(tautulli_data.get('settings', {}).get('collections_grid_columns', 5) or 5)
     ra_show_description = tautulli_data.get('settings', {}).get('ra_show_description', 'enabled') != 'disabled'

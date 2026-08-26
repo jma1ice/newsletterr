@@ -55,6 +55,10 @@ def with_poster_width(card_html, items_per_row):
     return _POSTER_PCT_RE.sub(
         lambda m: f'{m.group(1)}width="{poster_px_for(items_per_row)}"', card_html)
 
+
+def poster_max_height_for(items_per_row):
+    return max(1, int(poster_px_for(items_per_row) * 1.5))
+
 def effective_columns(grid_columns, item_count):
     """Columns to actually lay a snap-in out with."""
     cols = max(1, int(grid_columns) if grid_columns else 5)

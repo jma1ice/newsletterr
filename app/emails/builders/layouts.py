@@ -19,6 +19,7 @@ from app.emails.builders.card_grid import (
     build_card_html as _build_card_html,
     effective_columns as _effective_columns,
     with_poster_width as _with_poster_width,
+    poster_max_height_for as _poster_max_height_for,
 )
 from app.emails.builders.coming_soon import (
     _poster_url as _arr_poster_url,
@@ -64,6 +65,7 @@ from app.emails.builders.top_viewer import (
     top_viewer_metrics,
 )
 from app.emails.images import (
+    box_cap,
     fetch_and_attach_blurred_image,
     fetch_and_attach_image,
     fetch_and_attach_small_thumbnail,
@@ -675,12 +677,12 @@ def _ra_items(recent_data, library_filter, max_items, recently_added_mode, libra
         items = items[:max_items]
     return items
 
-def _ra_poster(item, msg_root, cid, base_url, hosted_images_enabled, hosted_base_url, target=None):
+def _ra_poster(item, msg_root, cid, base_url, hosted_images_enabled, hosted_base_url, target=None, max_height=None):
     thumb = item.get('thumb') or item.get('art') or item.get('parent_thumb') or item.get('grandparent_thumb')
     if not thumb:
         return None
     proxy = thumb if thumb.startswith('/proxy-art') else f"/proxy-art{thumb if thumb.startswith('/') else '/' + thumb}"
-    return fetch_and_attach_image(proxy, msg_root, cid, base_url, target=target, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
+    return fetch_and_attach_image(proxy, msg_root, cid, base_url, target=target, max_height=max_height, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
 
 def _ra_duration(item):
     try:
@@ -774,7 +776,7 @@ def render_recently_added(layout, recent_data, msg_root, theme, library_filter=N
             for i, item in enumerate(rest):
                 title = item.get('title') or item.get('grandparent_title') or '(untitled)'
                 sub_bits = [str(item.get('year') or item.get('grandparent_title') or item.get('parent_title') or ''), _ra_duration(item)]
-                poster_src = _ra_poster(item, msg_root, f"ld-ra-{i}", base_url, hosted_images_enabled, hosted_base_url)
+                poster_src = _ra_poster(item, msg_root, f"ld-ra-{i}", base_url, hosted_images_enabled, hosted_base_url, max_height=_card_cap(msg_root, cols, len(rest)))
                 cards.append(_build_card_html(theme, truncate_text(title, 23), truncate_text(' · '.join(b for b in sub_bits if b), 30), _relative_added(item), poster_src))
             inner = _grid(cards, cols)
         else:
@@ -797,7 +799,7 @@ def render_recently_added(layout, recent_data, msg_root, theme, library_filter=N
                 title = item.get('title') or item.get('grandparent_title') or '(untitled)'
                 sub_bits = [str(item.get('year') or item.get('grandparent_title') or item.get('parent_title') or ''), _ra_duration(item)]
                 meta = _relative_added(item)
-                poster_src = _ra_poster(item, msg_root, f"la-ra-{i}", base_url, hosted_images_enabled, hosted_base_url) if art_on else None
+                poster_src = _ra_poster(item, msg_root, f"la-ra-{i}", base_url, hosted_images_enabled, hosted_base_url, max_height=_card_cap(msg_root, cols, len(items))) if art_on else None
                 cards.append(_build_card_html(theme, truncate_text(title, 23), truncate_text(' · '.join(b for b in sub_bits if b), 30), meta, poster_src, compact=not art_on))
             inner = _grid(cards, cols)
         else:
@@ -821,7 +823,7 @@ def render_recently_added(layout, recent_data, msg_root, theme, library_filter=N
             for i, item in enumerate(items):
                 title = item.get('title') or item.get('grandparent_title') or '(untitled)'
                 sub_bits = [str(item.get('year') or item.get('grandparent_title') or item.get('parent_title') or ''), _ra_duration(item)]
-                poster_src = _ra_poster(item, msg_root, f"lb-ra-{i}", base_url, hosted_images_enabled, hosted_base_url) if art_on else None
+                poster_src = _ra_poster(item, msg_root, f"lb-ra-{i}", base_url, hosted_images_enabled, hosted_base_url, max_height=_card_cap(msg_root, cols, len(items))) if art_on else None
                 cards.append(_build_card_html(theme, truncate_text(title, 23), truncate_text(' · '.join(b for b in sub_bits if b), 30), _relative_added(item), poster_src, compact=not art_on))
             return _shell(layout, theme, label, _grid(cards, cols), overline="New on the shelf")
         rows = ""
@@ -885,6 +887,9 @@ def _relative_added(item):
         added = datetime.fromtimestamp(int(added)).isoformat()
     rel = _relative(str(added)) if added else ""
     return f"added {rel}" if rel else ""
+
+def _card_cap(msg_root, cols, count):
+    return box_cap(msg_root, _poster_max_height_for(_effective_columns(cols, count)))
 
 def _grid(cards, cols):
     # A snap-in with fewer cards than columns lays out across its own count so
@@ -1057,13 +1062,15 @@ def render_sonarr_coming_soon(layout, episodes, msg_root, theme, base_url="", gr
 
     if view == 'grid' or layout in _CARD_LAYOUTS:
         cards = []
+        cols = density.columns(theme, layout, max(1, int(grid_columns or 5)))
+        cap = _card_cap(msg_root, cols, len(groups))
         for i, group in enumerate(groups):
             title, sub, when, series, first = entry(group)
             rel = _relative(when)
             poster = _arr_poster_url(series.get('images')) or _arr_poster_url(first.get('images'))
-            src = fetch_and_attach_image(_arr_poster_src(poster, '/proxy-sonarr-art'), msg_root, f"la-tv-{i}", base_url, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url) if (poster and art_on) else None
+            src = fetch_and_attach_image(_arr_poster_src(poster, '/proxy-sonarr-art'), msg_root, f"la-tv-{i}", base_url, max_height=cap, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url) if (poster and art_on) else None
             cards.append(_build_card_html(theme, truncate_text(title, 23), truncate_text(sub, 30), f"Airs {rel}" if rel else "", src, compact=not art_on))
-        return _shell(layout, theme, "Coming Soon (TV)", _grid(cards, density.columns(theme, layout, max(1, int(grid_columns or 5)))))
+        return _shell(layout, theme, "Coming Soon (TV)", _grid(cards, cols))
 
     rows = ""
     for group in groups:
@@ -1095,12 +1102,14 @@ def render_radarr_coming_soon(layout, movies, msg_root, theme, base_url="", grid
 
     if view == 'grid' or layout in _CARD_LAYOUTS:
         cards = []
+        cols = density.columns(theme, layout, max(1, int(grid_columns or 5)))
+        cap = _card_cap(msg_root, cols, len(upcoming))
         for i, movie in enumerate(upcoming):
             rel = _relative(str(upcoming_release_date(movie) or ''))
             poster = _arr_poster_url(movie.get('images'))
-            src = fetch_and_attach_image(_arr_poster_src(poster, '/proxy-radarr-art'), msg_root, f"la-mv-{i}", base_url, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url) if (poster and art_on) else None
+            src = fetch_and_attach_image(_arr_poster_src(poster, '/proxy-radarr-art'), msg_root, f"la-mv-{i}", base_url, max_height=cap, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url) if (poster and art_on) else None
             cards.append(_build_card_html(theme, truncate_text(movie.get('title', 'Unknown'), 23), str(movie.get('year') or ''), f"Releases {rel}" if rel else "", src, compact=not art_on))
-        return _shell(layout, theme, "Coming Soon (Movies)", _grid(cards, density.columns(theme, layout, max(1, int(grid_columns or 5)))))
+        return _shell(layout, theme, "Coming Soon (Movies)", _grid(cards, cols))
 
     rows = ""
     for movie in upcoming:
@@ -1337,11 +1346,13 @@ def render_recommendations(layout, recs_data, msg_root, theme, user_emails=None,
 
             if layout in _CARD_LAYOUTS:
                 cards = []
+                cols = density.columns(theme, layout, max(1, int(recs_grid_columns or 5)))
+                cap = _card_cap(msg_root, cols, len(items))
                 for i, item in enumerate(items):
                     src = None
                     if item.get('url') and art_on:
                         src = fetch_and_attach_image(
-                            item['url'], msg_root, f"l-recs-{kind}-{user_id}-{i}", base_url,
+                            item['url'], msg_root, f"l-recs-{kind}-{user_id}-{i}", base_url, max_height=cap,
                             hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
                     overview = (item.get('overview') or '')[:60] if show_description else ''
                     cards.append(_build_card_html(
@@ -1349,8 +1360,7 @@ def render_recommendations(layout, recs_data, msg_root, theme, user_emails=None,
                         str(item.get('year') or ''), truncate_text(_meta(i, item), 46),
                         src, extra_line=truncate_text(overview, 46) if overview else None,
                         compact=not art_on))
-                inner += _shell(layout, theme, title,
-                                _grid(cards, density.columns(theme, layout, max(1, int(recs_grid_columns or 5)))))
+                inner += _shell(layout, theme, title, _grid(cards, cols))
                 continue
 
             # editorial: dated-row treatment, the same one its coming-soon uses
@@ -1407,19 +1417,20 @@ def render_collections(layout, all_collections, msg_root, theme, base_url="", cu
 
     if layout in _CARD_LAYOUTS:
         cards = []
+        cols = density.columns(theme, layout, max(1, int(grid_columns or 5)))
+        cap = _card_cap(msg_root, cols, len(items))
         for i, item in enumerate(items):
             src = None
             thumb = item.get('thumb')
             if thumb and art_on:
                 path = thumb if str(thumb).startswith('/proxy-art') else f"/proxy-art{thumb}"
                 src = fetch_and_attach_image(
-                    path, msg_root, f"l-coll-{group_index}-{i}", base_url,
+                    path, msg_root, f"l-coll-{group_index}-{i}", base_url, max_height=cap,
                     hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
             cards.append(_build_card_html(
                 theme, truncate_text(_title(item), 23), truncate_text(_sub(item), 30),
                 str(item.get('year') or ''), src, compact=not art_on))
-        return _shell(layout, theme, label,
-                      _grid(cards, density.columns(theme, layout, max(1, int(grid_columns or 5)))))
+        return _shell(layout, theme, label, _grid(cards, cols))
 
     rows = ""
     for item in items:
@@ -1450,23 +1461,25 @@ def render_requests(layout, source, data, msg_root, theme, base_url="", grid_col
     p = density.picker(theme, layout)
     art_on = density.show_art(theme, layout)
 
-    def poster_src(entry, i):
+    def poster_src(entry, i, max_height=None):
         # one TMDB resolution for both request builders and both layouts paths,
         # so the demo's local poster paths are not re-prefixed here
         url = _request_poster_src(entry.get('poster')) if art_on else None
         if not url:
             return None
-        return fetch_and_attach_image(url, msg_root, f"l-{source}-{i}", base_url, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
+        return fetch_and_attach_image(url, msg_root, f"l-{source}-{i}", base_url, max_height=max_height, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
 
     if layout in _CARD_LAYOUTS:
         cards = []
+        cols = density.columns(theme, layout, max(1, int(grid_columns or 5)))
+        cap = _card_cap(msg_root, cols, len(entries))
         for i, entry in enumerate(entries):
             status = "Approved" if entry['approved'] else "Pending Approval"
             rel = _relative(entry['requested_date'])
             meta = truncate_text(' · '.join(b for b in [status, f'Requested {rel}' if rel else ''] if b), 46)
             extra = truncate_text(f"Requested by {entry['requested_by']}", 46) if include_user_info and entry.get('requested_by') else None
-            cards.append(_build_card_html(theme, truncate_text(entry['title'], 23), entry['year'], meta, poster_src(entry, i), extra_line=extra, compact=not art_on))
-        return _shell(layout, theme, "Recent Requests", _grid(cards, density.columns(theme, layout, max(1, int(grid_columns or 5)))))
+            cards.append(_build_card_html(theme, truncate_text(entry['title'], 23), entry['year'], meta, poster_src(entry, i, cap), extra_line=extra, compact=not art_on))
+        return _shell(layout, theme, "Recent Requests", _grid(cards, cols))
 
     rows = ""
     for entry in entries:

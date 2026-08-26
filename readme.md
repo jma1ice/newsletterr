@@ -326,7 +326,6 @@ Released under the **MIT License** - see [LICENSE](LICENSE.txt) for details.
 ### Community
 * GitHub webhook to pull submitted issues to Discord channel
 * Ko-fi -> Discord integration for contributor role
-* Servarr PR
 
 ### Blocked on upstream
 * Email click for recently added/available recommendations is going to browser on mobile instead of Plex app - this is an issue with the new Plex client, have not seen a fix yet and no info released by Plex at this time
@@ -335,6 +334,22 @@ Released under the **MIT License** - see [LICENSE](LICENSE.txt) for details.
 ---
 
 ## Recent Changes
+
+## v2026.4.6:
+
+#### New Features:
+* 
+
+#### Changes:
+* Poster Max Height now ships set to 800px rather than blank
+* Playwright install moved to solely headless, thanks @bferd
+
+#### Fixed:
+* Poster Max Height now applies to every image embedded in an email
+* Every card grid now asks for artwork at the size it actually displays
+* Poster Max Height did nothing at all on the classic, editorial, digest and spotlight layouts
+* An animated GIF in a custom media block could arrive as a single still frame, and was labelled as a GIF while carrying PNG data
+* Blurred backdrop artwork behind stat cards was embedded at full resolution
 
 ## v2026.4.5:
 
@@ -351,7 +366,7 @@ Released under the **MIT License** - see [LICENSE](LICENSE.txt) for details.
 * Emails scrolled sideways on a phone. The outer container was full width plus a 1px border and did not count the border in its own width, so it measured two pixels wider than the screen
 * The Most Watched table rendered as a white block with dark text in the middle of an otherwise dark email on some clients. Its colors were written in directly as semi transparent white rather than taken from your theme, and clients that do not blend transparency fell back to solid white
 * A six column stats table cannot fit a phone, which is what made the legacy layout scroll sideways. Cert. and Score now drop out below 600px, leaving Title, Year and Plays
-* IBM Plex Sans was pulled in by an @import at the very top of the stylesheet. Gmail can stop reading a stylesheet when it meets one, which would have taken the mobile rules with it, and it also meant every reader's mail client fetched a file from Google on open. The font is now requested from the document head instead, and hidden from Outlook, which falls back to Times New Roman when it sees a webfont it cannot load
+* IBM Plex Sans was pulled in by an @ import at the very top of the stylesheet. Gmail can stop reading a stylesheet when it meets one, which would have taken the mobile rules with it, and it also meant every reader's mail client fetched a file from Google on open. The font is now requested from the document head instead, and hidden from Outlook, which falls back to Times New Roman when it sees a webfont it cannot load
 * Yahoo silently drops a CSS rule that has a comment directly in front of it, and drops any !important with a space before it. Both patterns were in the email stylesheet, and one of the rules at risk was the one that collapses empty calendar cells on a phone
 * Table cells with a background color now carry a matching bgcolor attribute as well, for the clients that ignore the CSS
 * A recommendation score could print as a raw number such as 7.6999999999999999 instead of 7.7

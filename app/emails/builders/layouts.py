@@ -272,6 +272,13 @@ def _linked(title, url, underline=True):
         return f'<a href="{esc(url)}" target="_blank" style="color: inherit; text-decoration: {decoration};" title="Open in Plex">{t}</a>'
     return t
 
+def _linked_poster(poster_html, url):
+    """Make a Plex-backed poster tappable without changing its image source."""
+    if not poster_html or not url:
+        return poster_html
+    return (f'<a href="{esc(url)}" target="_blank" style="display: block; text-decoration: none;" '
+            f'title="Open in Plex">{poster_html}</a>')
+
 # ---------------------------------------------------------------- stats
 
 _COVER_ART_TITLES = frozenset({
@@ -758,6 +765,7 @@ def render_recently_added(layout, recent_data, msg_root, theme, library_filter=N
         hero_summary = (hero.get('tagline') or hero.get('summary') or '') if show_description else ''
         hero_src = _ra_poster(hero, msg_root, "ld-ra-hero", base_url, hosted_images_enabled, hosted_base_url, target=(150, 225)) if art_on else None
         hero_poster = f'<img src="{hero_src}" alt="{esc(hero_title)}" width="150" style="width: 150px; height: auto; border-radius: 8px; display: block;">' if hero_src else ''
+        hero_poster = _linked_poster(hero_poster, hero.get('plex_url'))
         hero_html = f"""
             <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: {theme['card_bg']}; border: 1px solid {theme['accent']}; border-radius: 10px; border-collapse: separate; margin: 0 0 12px 0;">
                 <tr>
@@ -777,7 +785,7 @@ def render_recently_added(layout, recent_data, msg_root, theme, library_filter=N
                 title = item.get('title') or item.get('grandparent_title') or '(untitled)'
                 sub_bits = [str(item.get('year') or item.get('grandparent_title') or item.get('parent_title') or ''), _ra_duration(item)]
                 poster_src = _ra_poster(item, msg_root, f"ld-ra-{i}", base_url, hosted_images_enabled, hosted_base_url, max_height=_card_cap(msg_root, cols, len(rest)))
-                cards.append(_build_card_html(theme, truncate_text(title, 23), truncate_text(' · '.join(b for b in sub_bits if b), 30), _relative_added(item), poster_src))
+                cards.append(_build_card_html(theme, truncate_text(title, 23), truncate_text(' · '.join(b for b in sub_bits if b), 30), _relative_added(item), poster_src, poster_link_url=item.get('plex_url', '')))
             inner = _grid(cards, cols)
         else:
             inner = ""
@@ -785,6 +793,7 @@ def render_recently_added(layout, recent_data, msg_root, theme, library_filter=N
                 title = item.get('title') or item.get('grandparent_title') or '(untitled)'
                 src = _ra_poster(item, msg_root, f"ld-ra-{i}", base_url, hosted_images_enabled, hosted_base_url, target=(42, 63)) if art_on else None
                 art = f'<img src="{src}" alt="{esc(title)}" width="42" style="width: 42px; height: auto; border-radius: 5px; display: block;">' if src else ''
+                art = _linked_poster(art, item.get('plex_url'))
                 meta = ' &middot; '.join(esc(b) for b in [
                     str(item.get('year') or ''), _ra_duration(item), _relative_added(item)] if b)
                 inner += _spotlight_row(theme, art, _linked(title, item.get('plex_url'), underline=False), meta, "",
@@ -800,7 +809,7 @@ def render_recently_added(layout, recent_data, msg_root, theme, library_filter=N
                 sub_bits = [str(item.get('year') or item.get('grandparent_title') or item.get('parent_title') or ''), _ra_duration(item)]
                 meta = _relative_added(item)
                 poster_src = _ra_poster(item, msg_root, f"la-ra-{i}", base_url, hosted_images_enabled, hosted_base_url, max_height=_card_cap(msg_root, cols, len(items))) if art_on else None
-                cards.append(_build_card_html(theme, truncate_text(title, 23), truncate_text(' · '.join(b for b in sub_bits if b), 30), meta, poster_src, compact=not art_on))
+                cards.append(_build_card_html(theme, truncate_text(title, 23), truncate_text(' · '.join(b for b in sub_bits if b), 30), meta, poster_src, compact=not art_on, poster_link_url=item.get('plex_url', '')))
             inner = _grid(cards, cols)
         else:
             inner = f'<div style="padding: {p("3px 12px 7px 12px", "4px 16px 10px 16px")};">'
@@ -812,6 +821,7 @@ def render_recently_added(layout, recent_data, msg_root, theme, library_filter=N
                 summary = (item.get('tagline') or item.get('summary') or '') if show_description else ''
                 poster_src = _ra_poster(item, msg_root, f"la-ra-{i}", base_url, hosted_images_enabled, hosted_base_url, target=(60, 90)) if art_on else None
                 poster_html = f'<img src="{poster_src}" alt="{esc(title)}" width="60" style="width: 60px; height: auto; border-radius: 6px; display: block;">' if poster_src else ''
+                poster_html = _linked_poster(poster_html, item.get('plex_url'))
                 inner += _ra_stacked_row(theme, poster_html, _linked(title, item.get('plex_url'), underline=False),
                                          meta, summary, 60, last=(i == len(items) - 1))
             inner += '</div>'
@@ -824,7 +834,7 @@ def render_recently_added(layout, recent_data, msg_root, theme, library_filter=N
                 title = item.get('title') or item.get('grandparent_title') or '(untitled)'
                 sub_bits = [str(item.get('year') or item.get('grandparent_title') or item.get('parent_title') or ''), _ra_duration(item)]
                 poster_src = _ra_poster(item, msg_root, f"lb-ra-{i}", base_url, hosted_images_enabled, hosted_base_url, max_height=_card_cap(msg_root, cols, len(items))) if art_on else None
-                cards.append(_build_card_html(theme, truncate_text(title, 23), truncate_text(' · '.join(b for b in sub_bits if b), 30), _relative_added(item), poster_src, compact=not art_on))
+                cards.append(_build_card_html(theme, truncate_text(title, 23), truncate_text(' · '.join(b for b in sub_bits if b), 30), _relative_added(item), poster_src, compact=not art_on, poster_link_url=item.get('plex_url', '')))
             return _shell(layout, theme, label, _grid(cards, cols), overline="New on the shelf")
         rows = ""
         for i, item in enumerate(items):
@@ -834,6 +844,7 @@ def render_recently_added(layout, recent_data, msg_root, theme, library_filter=N
             _ra_w = p(132, 96)
             poster_src = _ra_poster(item, msg_root, f"lb-ra-{i}", base_url, hosted_images_enabled, hosted_base_url, target=(_ra_w, int(_ra_w * 1.5))) if art_on else None
             poster_html = f'<img src="{poster_src}" alt="{esc(title)}" width="{_ra_w}" style="width: {_ra_w}px; height: auto; border-radius: 6px; display: block;">' if poster_src else ''
+            poster_html = _linked_poster(poster_html, item.get('plex_url'))
             rows += f"""
                 <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
                     <td width="{_ra_w}" valign="top" style="padding: 0 {p('22px', '16px')} {p('20px', '12px')} 0;">{poster_html}</td>
@@ -874,6 +885,7 @@ def render_recently_added(layout, recent_data, msg_root, theme, library_filter=N
             poster_html = (f'<img src="{poster_src}" alt="{esc(title)}" width="{poster_px}" style="width: 100%; max-width: {poster_px}px; height: auto; border-radius: 6px; display: block;">'
                            if poster_src else
                            f'<div style="width: 100%; max-width: {poster_px}px; height: {int(round(poster_px * 1.5))}px; background-color: {theme["card_bg"]}; border: 1px solid {theme["border"]}; border-radius: 6px;">&nbsp;</div>')
+            poster_html = _linked_poster(poster_html, item.get('plex_url'))
             cells += (f'<td valign="top" style="width: {cell_pct}; padding: 0 8px 10px 0;">{poster_html}'
                       f'<div style="font-size: 10px; color: {theme["muted_text"]}; max-width: {poster_px}px; padding-top: 3px; font-family: {FONT};">{esc(truncate_text(title, caption_len))}</div></td>')
         cells += "".join(f'<td style="width: {cell_pct}; padding: 0 8px 10px 0;"></td>' for _ in range(cols - len(chunk)))

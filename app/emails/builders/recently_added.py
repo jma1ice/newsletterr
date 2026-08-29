@@ -434,6 +434,8 @@ def _build_recently_added_list_html(items, msg_root, theme_colors, base_url, ra_
         title_html = esc(truncate_text(title, 60))
         plex_url = item.get('plex_url', '')
         if plex_url:
+            poster_html = (f'<a href="{esc(plex_url)}" target="_blank" style="display: block; text-decoration: none;" '
+                           f'title="Open in Plex">{poster_html}</a>') if poster_html else ''
             title_html = f'<a href="{esc(plex_url)}" target="_blank" style="color: inherit; text-decoration: none;" title="Open in Plex">{title_html}</a>'
 
         border = "" if i == len(items) - 1 else f" border-bottom: 1px solid {theme_colors['border']};"

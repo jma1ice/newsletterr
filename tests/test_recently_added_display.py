@@ -124,6 +124,11 @@ def test_legacy_builder_takes_the_same_orientation(monkeypatch):
     # both keep the section heading and the item metadata
     assert '>Recently Added</h2>' in listed
     assert '1h 30m' in listed
+    for i in range(4):
+        assert re.search(
+            rf'<a href="http://plex/{i}"[^>]*>\s*<img[^>]*alt="Title {i}"',
+            listed,
+        )
 
 
 # --- spotlight hero pick

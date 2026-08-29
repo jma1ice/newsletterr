@@ -122,11 +122,16 @@ def build_calendar_grid_html(cards, msg_root, theme_colors, title, base_url, gri
         </div>
     """
 
-def build_card_html(theme_colors, title, subtitle, meta_text, poster_src, extra_line=None, compact=False):
+def build_card_html(theme_colors, title, subtitle, meta_text, poster_src, extra_line=None, compact=False,
+                    poster_link_url=""):
     title, subtitle, meta_text = esc(title), esc(subtitle), esc(meta_text)
     extra_line = esc(extra_line) if extra_line else None
     if poster_src:
         poster_html = f'<img class="card-poster-img" src="{poster_src}" alt="{title}" width="100%" style="width: 100%; height: auto; display: block; object-fit: cover; border-radius: 10px 10px 0 0; background-color: #f8f9fa;">'
+        if poster_link_url:
+            poster_html = (f'<a href="{esc(poster_link_url)}" target="_blank" '
+                           f'style="display: block; text-decoration: none;" title="Open in Plex">'
+                           f'{poster_html}</a>')
     else:
         poster_html = ""
 

@@ -98,6 +98,37 @@ def test_titles_are_not_underlined_but_stay_linked():
     assert "text-decoration: underline" not in html
 
 
+@pytest.mark.parametrize(
+    ("layout", "orientation"),
+    [
+        ("spotlight", "list"),
+        ("spotlight", "grid"),
+        ("classic", "list"),
+        ("classic", "grid"),
+        ("editorial", "list"),
+        ("editorial", "grid"),
+        ("digest", "grid"),
+    ],
+)
+def test_recently_added_movie_and_show_posters_link_to_plex(layout, orientation):
+    recent = [{"recently_added": [
+        {**RECENT[0]["recently_added"][0], "title": "Linked Movie", "plex_url": "https://plex/movie"},
+        {**RECENT[0]["recently_added"][0], "title": "Linked Show", "type": "show", "media_type": "show",
+         "rating_key": "2", "plex_url": "https://plex/show"},
+    ]}]
+
+    html = layouts_mod.render_recently_added(
+        layout, recent, MIMEMultipart(), theme() if layout == "spotlight" else THEME,
+        base_url="http://b", orientation=orientation,
+    )
+
+    for title, plex_url in (("Linked Movie", "https://plex/movie"), ("Linked Show", "https://plex/show")):
+        assert re.search(
+            rf'<a href="{re.escape(plex_url)}"[^>]*>\s*<img[^>]*alt="{title}"',
+            html,
+        ), html
+
+
 def test_sections_without_a_spotlight_treatment_still_get_its_card():
     """Coming soon has no bespoke spotlight markup; it must not fall through to
     the digest text rows."""

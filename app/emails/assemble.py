@@ -175,6 +175,7 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, displ
     hide_stat_play_counts = tautulli_data.get('settings', {}).get('hide_stat_play_counts', 'disabled') == 'enabled'
     show_cover_art = tautulli_data.get('settings', {}).get('stat_cover_art', 'disabled') == 'enabled'
     recently_added_mode = tautulli_data.get('settings', {}).get('recently_added_mode', 'items')
+    recently_added_sort = tautulli_data.get('settings', {}).get('recently_added_sort', 'date')
     stats_metric = tautulli_data.get('settings', {}).get('stats_type') or 'plays'
     ra_grid_columns = int(tautulli_data.get('settings', {}).get('ra_grid_columns', 5) or 5)
     recs_grid_columns = int(tautulli_data.get('settings', {}).get('recs_grid_columns', 5) or 5)
@@ -264,7 +265,7 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, displ
                 content_html += build_graph_html_with_frontend_image(item, msg_root, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url)
         
         elif item_type == 'recently added':
-            library_filter = item.get('raLibrary')
+            library_filter = item.get('raLibraries') or item.get('raLibrary')
             recent_data = tautulli_data.get('recent_data', [])
 
             max_items = items_count
@@ -290,9 +291,9 @@ def build_email_html_with_all_cids(template_data, tautulli_data, msg_root, displ
             ra_hero_key = item.get('raHero') or ''
 
             if use_layout:
-                content_html += layouts.render_recently_added(email_layout, recent_data, msg_root, theme_colors, library_filter, base_url, max_items, recently_added_mode=recently_added_mode, ra_grid_columns=ra_grid_columns, poster_max_height=poster_max_height, show_description=ra_show_description, library_item_cap=library_item_cap, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url, orientation=ra_orientation, hero_key=ra_hero_key)
+                content_html += layouts.render_recently_added(email_layout, recent_data, msg_root, theme_colors, library_filter, base_url, max_items, recently_added_mode=recently_added_mode, ra_grid_columns=ra_grid_columns, poster_max_height=poster_max_height, show_description=ra_show_description, library_item_cap=library_item_cap, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url, orientation=ra_orientation, hero_key=ra_hero_key, recently_added_sort=recently_added_sort)
             else:
-                content_html += build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, library_filter, base_url, max_items, recently_added_mode=recently_added_mode, ra_grid_columns=ra_grid_columns, poster_max_height=poster_max_height, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url, show_description=ra_show_description, library_item_cap=library_item_cap, orientation=ra_orientation)
+                content_html += build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, library_filter, base_url, max_items, recently_added_mode=recently_added_mode, ra_grid_columns=ra_grid_columns, poster_max_height=poster_max_height, hosted_images_enabled=hosted_images_enabled, hosted_base_url=hosted_base_url, show_description=ra_show_description, library_item_cap=library_item_cap, orientation=ra_orientation, recently_added_sort=recently_added_sort)
         
         elif item_type == 'recently_released':
             rr_library = item.get('rrLibrary')

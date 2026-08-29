@@ -81,6 +81,21 @@ def test_library_filter_still_applies_when_counting():
     assert count_new_content(items, RA_DATA, ("recently added",)) == 0
 
 
+def test_grouped_recently_added_libraries_are_deduplicated_when_counting():
+    data = {"recent_data": [
+        {"recently_added": [
+            {"title": "Shared", "guid": "plex://movie/shared", "library_name": "Movies", "added_at": "100"},
+        ]},
+        {"recently_added": [
+            {"title": "Shared", "guid": "plex://movie/shared", "library_name": "Requested Movies", "added_at": "200"},
+            {"title": "Newest", "guid": "plex://movie/new", "library_name": "Requested Movies", "added_at": "300"},
+        ]},
+    ]}
+    items = [{"type": "recently added", "raLibraries": ["Movies", "Requested Movies"]}]
+
+    assert count_new_content(items, data, ("recently added",)) == 2
+
+
 def test_missing_probe_data_counts_as_nothing_found():
     """A failed fetch must not be able to claim there is new content."""
     items = [{"type": "sonarr_coming_soon"}, {"type": "ombi_requests"}]

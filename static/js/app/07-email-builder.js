@@ -530,7 +530,7 @@ function updateSelectedItemsDisplay() {
                 const countValue = isRA ? (item.raCount || '') : (isRR ? (item.rrCount || '') : (item.mwCount || ''));
                 const countLabel = isRA || isRR ? 'Items' : 'Titles';
                 const orientation = isRR ? (item.rrOrientation || '') : (item.raOrientation || '');
-                const heroChoices = (isRA && window.raItemsForLibrary) ? window.raItemsForLibrary(item.raLibrary) : [];
+                const heroChoices = (isRA && window.raItemsForLibraries) ? window.raItemsForLibraries(item.raLibraries || item.raLibrary) : [];
                 const spotlight = (window.APP?.emailLayout || '') === 'spotlight';
 
                 htmlContent += `
@@ -1578,6 +1578,22 @@ document.addEventListener('click', async (e) => {
     console.log('Current selectedItems before:', selectedItems);
 
     const extra = {};
+    const isRAGroup = type === 'recently added' && btn.classList.contains('ra-group-add-btn');
+    if (isRAGroup) {
+        const row = btn.closest('.snapin-row');
+        const libraries = Array.from(row?.querySelectorAll('.ra-group-library:checked') || [])
+            .map(input => input.value)
+            .filter(Boolean);
+        if (libraries.length < 2) return;
+        const groupKey = [...libraries].sort((a, b) => a.localeCompare(b))
+            .map(lib => lib.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''))
+            .join('--');
+        id = `ra-group-${groupKey}`;
+        name = `Recently Added: ${libraries.join(' + ')}`;
+        extra.raLibraries = libraries;
+        const raCount = parseInt(row?.querySelector('.ra-count-input')?.value, 10);
+        if (raCount > 0) extra.raCount = raCount;
+    }
     if (type === 'recently added' && btn.dataset.lib) {
         extra.raLibrary = btn.dataset.lib;
         const raCount = parseInt(btn.closest('.snapin-row')?.querySelector('.ra-count-input')?.value, 10);
@@ -1614,6 +1630,11 @@ document.addEventListener('click', async (e) => {
     }
 
     if (await addItemWithChartCapture(id, name || id, type, extra)) {
+        if (isRAGroup) {
+            btn.textContent = 'Added';
+            setTimeout(() => { btn.textContent = 'Add'; }, 800);
+            return;
+        }
         btn.textContent = 'Added';
         btn.classList.remove('nl-btn--primary');
         btn.classList.add('nl-btn--success');

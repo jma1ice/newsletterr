@@ -10,6 +10,104 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
+def recently_added_library_names(library_filter):
+    """Normalize the legacy single-library value and the grouped list value."""
+    if isinstance(library_filter, (list, tuple, set)):
+        raw_names = library_filter
+    elif library_filter:
+        raw_names = [library_filter]
+    else:
+        raw_names = []
+
+    names = []
+    seen = set()
+    for raw_name in raw_names:
+        name = str(raw_name or '').strip()
+        key = name.lower()
+        if name and key not in seen:
+            names.append(name)
+            seen.add(key)
+    return names
+
+
+def recently_added_library_label(library_filter):
+    return " + ".join(recently_added_library_names(library_filter))
+
+
+def _recently_added_timestamp(item):
+    raw = item.get('added_at') or item.get('updated_at') or 0
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        try:
+            return datetime.fromisoformat(str(raw).replace('Z', '+00:00')).timestamp()
+        except (TypeError, ValueError):
+            return 0
+
+
+def _recently_added_identity(item):
+    guid = str(item.get('guid') or '').strip().lower()
+    if guid:
+        return ('guid', guid)
+    return (
+        'title',
+        str(item.get('media_type') or item.get('type') or '').strip().lower(),
+        str(item.get('title') or item.get('full_title') or '').strip().lower(),
+        str(item.get('year') or '').strip(),
+    )
+
+
+def _recently_added_rating(item):
+    try:
+        return float(item.get('rating') or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def recently_added_items(recent_data, library_filter=None, sort_mode='date'):
+    """Flatten and filter Recently Added data.
+
+    A string filter keeps the historical behavior exactly. A list containing
+    more than one library is a grouped snap-in: duplicate titles are removed,
+    then the merged result is sorted globally before the item cap is applied.
+    """
+    items = []
+    if isinstance(recent_data, list):
+        for entry in recent_data:
+            if isinstance(entry, dict) and 'recently_added' in entry:
+                items.extend(entry['recently_added'])
+            elif isinstance(entry, dict) and 'title' in entry:
+                items.append(entry)
+
+    library_names = recently_added_library_names(library_filter)
+    if library_names:
+        wanted = {name.lower() for name in library_names}
+        items = [
+            item for item in items
+            if str(item.get('library_name') or '').lower() in wanted
+        ]
+
+    if len(library_names) > 1:
+        unique = {}
+        for item in items:
+            key = _recently_added_identity(item)
+            existing = unique.get(key)
+            if existing is None or _recently_added_timestamp(item) > _recently_added_timestamp(existing):
+                unique[key] = item
+        items = list(unique.values())
+        if sort_mode == 'rating':
+            items.sort(
+                key=lambda item: (
+                    _recently_added_rating(item),
+                    _recently_added_timestamp(item),
+                ),
+                reverse=True,
+            )
+        else:
+            items.sort(key=_recently_added_timestamp, reverse=True)
+    return items
+
 def _relative_added(raw):
     timestamp = int(raw) if isinstance(raw, str) and raw.isdigit() else raw
     if isinstance(timestamp, (int, float)):
@@ -71,6 +169,7 @@ def _duration_text(item):
 
 def recently_added_title(library_filter, recently_added_mode, max_items, date_format=dates.DEFAULT_DATE_FORMAT):
     """Section heading. Days mode spells out the window it covers."""
+    library_label = recently_added_library_label(library_filter)
     if recently_added_mode == "days" and max_items:
         try:
             since_date = dates.fmt_numeric_date(datetime.now() - timedelta(days=int(max_items)), date_format)
@@ -79,10 +178,10 @@ def recently_added_title(library_filter, recently_added_mode, max_items, date_fo
         except Exception:
             logger.debug("suppressed exception; using fallback", exc_info=True)
             date_range = ""
-        return (f"Added to {library_filter}" if library_filter else "Recently Added") + (f" {date_range}" if date_range else "")
-    return f"Recently Added{f' - {library_filter}' if library_filter else ''}"
+        return (f"Added to {library_label}" if library_label else "Recently Added") + (f" {date_range}" if date_range else "")
+    return f"Recently Added{f' - {library_label}' if library_label else ''}"
 
-def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, library_filter=None, base_url="", max_items=None, recently_added_mode="items", ra_grid_columns=5, poster_max_height=0, hosted_images_enabled=False, hosted_base_url="", show_description=True, library_item_cap=0, orientation=""):
+def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, library_filter=None, base_url="", max_items=None, recently_added_mode="items", ra_grid_columns=5, poster_max_height=0, hosted_images_enabled=False, hosted_base_url="", show_description=True, library_item_cap=0, orientation="", recently_added_sort="date"):
     if not recent_data:
         return f"""
         <div {EMPTY_STATE_MARKER} style="background-color: {theme_colors['card_bg']}; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid {theme_colors['border']}; font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;">
@@ -90,16 +189,8 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
         </div>
         """
     
-    items = []
-    if isinstance(recent_data, list):
-        for item in recent_data:
-            if isinstance(item, dict) and 'recently_added' in item:
-                items.extend(item['recently_added'])
-            elif isinstance(item, dict) and 'title' in item:
-                items.append(item)
-    
-    if library_filter:
-        items = [item for item in items if library_filter.lower() == item.get('library_name', '').lower()]
+    items = recently_added_items(recent_data, library_filter, recently_added_sort)
+    library_label = recently_added_library_label(library_filter)
 
     # library_item_cap is this item's per-library override; unlike max_items
     # it also caps days mode, where max_items carries the day window instead
@@ -111,7 +202,7 @@ def build_recently_added_html_with_cids(recent_data, msg_root, theme_colors, lib
     if not items:
         return f"""
         <div {EMPTY_STATE_MARKER} style="background-color: {theme_colors['card_bg']}; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid {theme_colors['border']}; font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;">
-            <p style="text-align: center; color: {theme_colors['muted_text']}; padding: 20px; margin: 0; font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;">No recently added items found{f' for {esc(library_filter)}' if library_filter else ''}.</p>
+            <p style="text-align: center; color: {theme_colors['muted_text']}; padding: 20px; margin: 0; font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;">No recently added items found{f' for {esc(library_label)}' if library_label else ''}.</p>
         </div>
         """
     

@@ -1136,6 +1136,10 @@
     flex-shrink: 0;
     gap: var(--space-1);
 }
+.builder-page .ra-group-row .ra-library-options,
+.builder-page .ra-group-row .ra-group-help {
+    flex: 1 0 100%;
+}
 
 @media (max-width: 768px) {
     /* stack the message fields and let the preview size to content on mobile */

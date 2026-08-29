@@ -22,6 +22,7 @@ from app.clients.seerr import fetch_seerr_requests
 from datetime import datetime, timedelta
 from app.tokens import make_unsubscribe_placeholder
 from app.emails.assemble import convert_html_to_plain_text, build_email_html_with_all_cids
+from app.emails.builders.recently_added import recently_added_items
 from app.emails.fetchers import (
     fetch_tautulli_data_for_email,
     get_ombi_requests_cached,
@@ -130,7 +131,11 @@ def count_new_content(selected_items, data, watched_types=LEGACY_SKIP_TRIGGERS):
             continue
 
         if item_type == 'recently added':
-            total += _library_items(recent_data, 'recently_added', item.get('raLibrary'))
+            total += len(recently_added_items(
+                recent_data,
+                item.get('raLibraries') or item.get('raLibrary'),
+                (data.get('settings') or {}).get('recently_added_sort', 'date'),
+            ))
         elif item_type == 'most_watched':
             source = (data.get('most_watched_recent_data') if item.get('mwScope') == 'recent'
                       else data.get('most_watched_data')) or []

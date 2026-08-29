@@ -45,6 +45,10 @@ from app.emails.builders.random_pick import (
     random_pick_meta_text,
     attach_random_pick_poster,
 )
+from app.emails.builders.recently_added import (
+    recently_added_items,
+    recently_added_library_label,
+)
 from app.emails.builders.users import get_user_display_name
 from app.emails.builders.recommendations import (
     wrapped_album_art_fn,
@@ -661,16 +665,8 @@ def render_top_viewer(layout, row, msg_root, theme, base_url="", range_text="",
 
 # ---------------------------------------------------------------- recently added
 
-def _ra_items(recent_data, library_filter, max_items, recently_added_mode, library_item_cap):
-    items = []
-    if isinstance(recent_data, list):
-        for entry in recent_data:
-            if isinstance(entry, dict) and 'recently_added' in entry:
-                items.extend(entry['recently_added'])
-            elif isinstance(entry, dict) and 'title' in entry:
-                items.append(entry)
-    if library_filter:
-        items = [i for i in items if library_filter.lower() == i.get('library_name', '').lower()]
+def _ra_items(recent_data, library_filter, max_items, recently_added_mode, library_item_cap, recently_added_sort='date'):
+    items = recently_added_items(recent_data, library_filter, recently_added_sort)
     if library_item_cap and len(items) > library_item_cap:
         items = items[:library_item_cap]
     elif recently_added_mode != "days" and max_items and len(items) > max_items:
@@ -735,11 +731,12 @@ def _ra_stacked_row(theme, poster_html, title_html, meta, summary, poster_px, la
         </tr></table>
     """
 
-def render_recently_added(layout, recent_data, msg_root, theme, library_filter=None, base_url="", max_items=None, recently_added_mode="items", ra_grid_columns=5, poster_max_height=0, show_description=True, library_item_cap=0, hosted_images_enabled=False, hosted_base_url="", orientation="", hero_key=""):
-    items = _ra_items(recent_data, library_filter, max_items, recently_added_mode, library_item_cap)
-    label = f"Recently Added{f' - {library_filter}' if library_filter else ''}"
+def render_recently_added(layout, recent_data, msg_root, theme, library_filter=None, base_url="", max_items=None, recently_added_mode="items", ra_grid_columns=5, poster_max_height=0, show_description=True, library_item_cap=0, hosted_images_enabled=False, hosted_base_url="", orientation="", hero_key="", recently_added_sort="date"):
+    items = _ra_items(recent_data, library_filter, max_items, recently_added_mode, library_item_cap, recently_added_sort)
+    library_label = recently_added_library_label(library_filter)
+    label = f"Recently Added{f' - {library_label}' if library_label else ''}"
     if not items:
-        return _shell(layout, theme, label, _empty_state_html(theme, f"No recently added items found{f' for {esc(library_filter)}' if library_filter else ''}."))
+        return _shell(layout, theme, label, _empty_state_html(theme, f"No recently added items found{f' for {esc(library_label)}' if library_label else ''}."))
 
     p = density.picker(theme, layout)
     art_on = density.show_art(theme, layout)

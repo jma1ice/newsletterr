@@ -95,12 +95,54 @@ function buildItemsFromPayload() {
 }
 let items = buildItemsFromPayload();
 
+function raLibraryNames(value) {
+    const raw = Array.isArray(value) ? value : (value ? [value] : []);
+    const seen = new Set();
+    return raw.map(name => String(name || '').trim()).filter(name => {
+        const key = name.toLowerCase();
+        if (!key || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    });
+}
+
+function raAddedValue(item) {
+    const raw = item.added_at || item.updated_at || 0;
+    if (/^\d+(?:\.\d+)?$/.test(String(raw))) return Number(raw);
+    const parsed = Date.parse(raw);
+    return Number.isNaN(parsed) ? 0 : parsed / 1000;
+}
+
+function raDedupeKey(item) {
+    const guid = String(item.guid || '').trim().toLowerCase();
+    if (guid) return `guid:${guid}`;
+    return [
+        'title',
+        String(item.media_type || item.type || '').trim().toLowerCase(),
+        String(item.title || item.full_title || '').trim().toLowerCase(),
+        String(item.year || '').trim(),
+    ].join(':');
+}
+
 // Titles a builder item can feature as the Spotlight layout hero. rating_key
 // is the stable handle the backend matches on; title is the fallback.
-function raItemsForLibrary(lib) {
-    const wanted = String(lib || '').toLowerCase();
-    return flatten(recentPayload)
-        .filter(it => !wanted || String(it.library_name || it.section_name || '').toLowerCase() === wanted)
+function raItemsForLibraries(libraries) {
+    const names = raLibraryNames(libraries);
+    const wanted = new Set(names.map(name => name.toLowerCase()));
+    let matches = flatten(recentPayload)
+        .filter(it => !wanted.size || wanted.has(String(it.library_name || it.section_name || '').toLowerCase()));
+
+    if (names.length > 1) {
+        const unique = new Map();
+        matches.forEach(item => {
+            const key = raDedupeKey(item);
+            const existing = unique.get(key);
+            if (!existing || raAddedValue(item) > raAddedValue(existing)) unique.set(key, item);
+        });
+        matches = [...unique.values()].sort((a, b) => raAddedValue(b) - raAddedValue(a));
+    }
+
+    return matches
         .map(it => ({
             key: String(it.rating_key || it.title || ''),
             title: it.title || it.full_title || it.parent_title || it.grandparent_title || '(untitled)',
@@ -108,7 +150,11 @@ function raItemsForLibrary(lib) {
         }))
         .filter(it => it.key);
 }
+function raItemsForLibrary(lib) {
+    return raItemsForLibraries(lib);
+}
 window.raItemsForLibrary = raItemsForLibrary;
+window.raItemsForLibraries = raItemsForLibraries;
 
 const slug = s => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'');
 
@@ -139,6 +185,39 @@ function buildRALibraryRows() {
     const host = document.getElementById('ra-lib-list');
     if (!host) return;
     host.innerHTML = '';
+
+    if (libs.length > 1) {
+        const groupRow = document.createElement('div');
+        groupRow.className = 'col-12 mb-2';
+        groupRow.innerHTML = `
+            <div class="snapin-row ra-group-row p-2 border rounded flex-wrap">
+                <div class="snapin-row-actions">
+                    <button type="button" class="nl-btn nl-btn--primary nl-btn--sm ra-add-btn ra-group-add-btn"
+                            data-type="recently added" data-id="ra-group" data-name="Recently Added: Combined libraries"
+                            style="font-size: .8rem; padding: .25rem .5rem;" disabled>
+                    Add
+                    </button>
+                </div>
+                <span class="snapin-row-label" title="Merge selected libraries into one Recently Added section">Combined libraries</span>
+                <input type="number" class="ra-count-input" min="1" max="99" placeholder="all"
+                       title="Max items shown across the selected libraries. Editable again on the added snap-in."
+                       style="width: 4em; margin-left: auto; flex-shrink: 0; font-size: .8rem; padding: .15rem .3rem;">
+                <div class="w-100 mt-2 d-flex flex-wrap gap-2 ra-library-options">
+                    ${libs.map((lib, index) => `
+                        <label for="ra-group-lib-${index}" class="d-inline-flex align-items-center gap-1" style="font-size: .8rem;">
+                            <input id="ra-group-lib-${index}" type="checkbox" class="ra-group-library" value="${escapeHtml(lib)}">
+                            <span>${escapeHtml(lib)}</span>
+                        </label>`).join('')}
+                </div>
+                <small class="ra-group-help text-muted mt-1">Choose two or more libraries. Items are merged, deduplicated, and sorted before the limit is applied.</small>
+            </div>`;
+        const groupButton = groupRow.querySelector('.ra-group-add-btn');
+        const syncGroupButton = () => {
+            groupButton.disabled = groupRow.querySelectorAll('.ra-group-library:checked').length < 2;
+        };
+        groupRow.addEventListener('change', syncGroupButton);
+        host.appendChild(groupRow);
+    }
 
     libs.forEach(lib => {
         const row = document.createElement('div');

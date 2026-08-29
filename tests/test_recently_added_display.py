@@ -28,6 +28,23 @@ def _recent(count):
     return [{'recently_added': _items(count)}]
 
 
+def _grouped_recent():
+    return [
+        {'recently_added': [
+            dict(_items(1)[0], title='Library A older', rating_key='201', guid='plex://movie/a',
+                 library_name='Movies', added_at='100', rating='8.0'),
+            dict(_items(1)[0], title='Shared title', rating_key='202', guid='plex://movie/shared',
+                 library_name='Movies', added_at='200', rating='7.0'),
+        ]},
+        {'recently_added': [
+            dict(_items(1)[0], title='Library B newest', rating_key='301', guid='plex://movie/b',
+                 library_name='Requested Movies', added_at='400', rating='6.0'),
+            dict(_items(1)[0], title='Shared title', rating_key='302', guid='plex://movie/shared',
+                 library_name='Requested Movies', added_at='300', rating='9.0'),
+        ]},
+    ]
+
+
 @pytest.fixture()
 def render(monkeypatch):
     """render_recently_added with image attachment stubbed out."""
@@ -124,6 +141,57 @@ def test_legacy_builder_takes_the_same_orientation(monkeypatch):
     # both keep the section heading and the item metadata
     assert '>Recently Added</h2>' in listed
     assert '1h 30m' in listed
+
+
+# --- grouped libraries
+
+def test_grouped_libraries_merge_dedupe_sort_then_cap():
+    from app.emails.builders.recently_added import recently_added_items
+
+    picked = recently_added_items(
+        _grouped_recent(), ['Movies', 'Requested Movies'], 'date')[:2]
+
+    assert [item['title'] for item in picked] == ['Library B newest', 'Shared title']
+    assert picked[1]['library_name'] == 'Requested Movies'
+
+
+def test_grouped_libraries_honor_rating_sort():
+    from app.emails.builders.recently_added import recently_added_items
+
+    picked = recently_added_items(
+        _grouped_recent(), ['Movies', 'Requested Movies'], 'rating')
+
+    assert [item['title'] for item in picked] == [
+        'Shared title', 'Library A older', 'Library B newest']
+
+
+def test_grouped_rating_sort_treats_unparseable_ratings_as_zero():
+    from app.emails.builders.recently_added import recently_added_items
+
+    data = _grouped_recent()
+    data[0]['recently_added'][0]['rating'] = 'unrated'
+
+    picked = recently_added_items(data, ['Movies', 'Requested Movies'], 'rating')
+
+    assert picked[-1]['title'] == 'Library A older'
+
+
+def test_single_library_keeps_legacy_source_order():
+    from app.emails.builders.recently_added import recently_added_items
+
+    picked = recently_added_items(_grouped_recent(), 'Movies', 'date')
+
+    assert [item['title'] for item in picked] == ['Library A older', 'Shared title']
+
+
+def test_grouped_heading_names_every_library(render):
+    html = render(
+        'classic',
+        count=1,
+        library_filter=['Movies', 'Requested Movies'],
+    )
+
+    assert 'Recently Added - Movies + Requested Movies' in html
 
 
 # --- spotlight hero pick
